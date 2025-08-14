@@ -242,10 +242,8 @@
             isAnimating = true;
 
             playerControls.forEach(btn => btn.disabled = true);
-            if (autoPlayInterval) {
-                Object.values(upgrades).forEach(u => u.element.disabled = true);
-                upgrades.autoPlay.element.disabled = false;
-            }
+            Object.values(upgrades).forEach(u => u.element.disabled = true);
+            upgrades.autoPlay.element.disabled = false;
 
             if (gameSpeed >= HIGH_SPEED_THRESHOLD) {
                 showResult(playerChoice, true);
@@ -285,19 +283,13 @@
             
             lucide.createIcons();
             updateUI();
-            if (autoPlayInterval) {
-                Object.values(upgrades).forEach(u => u.element.disabled = true);
-                upgrades.autoPlay.element.disabled = false;
-            }
-            
+
             setTimeout(() => {
                 isAnimating = false;
                 if (!autoPlayInterval) {
                     playerControls.forEach(btn => btn.disabled = false);
-                    updateUI();
-                } else {
-                    upgrades.autoPlay.element.disabled = false;
                 }
+                updateUI();
             }, instant ? 50 : 400);
         }
         
@@ -341,10 +333,10 @@
                 updateUI();
             } else {
                 playerControls.forEach(btn => btn.disabled = true);
-                Object.values(upgrades).forEach(u => u.element.disabled = true);
                 upgrades.autoPlay.element.classList.add('toggled', 'pulse');
                 upgrades.autoPlay.element.disabled = false;
                 autoPlayInterval = setInterval(() => playGame(choices[Math.floor(Math.random() * choices.length)]), getIntervalDuration());
+                updateUI();
             }
         }
         
