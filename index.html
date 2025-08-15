@@ -242,8 +242,6 @@
             isAnimating = true;
 
             playerControls.forEach(btn => btn.disabled = true);
-            Object.values(upgrades).forEach(u => u.element.disabled = true);
-            upgrades.autoPlay.element.disabled = false;
 
             if (gameSpeed >= HIGH_SPEED_THRESHOLD) {
                 showResult(playerChoice, true);
