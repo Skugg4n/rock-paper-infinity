@@ -23,15 +23,26 @@
         .upgrade-btn:hover:not(:disabled) { transform: translateY(-2px); }
         .upgrade-btn:disabled:not(.purchased) { opacity: 0.4; cursor: not-allowed; }
 
-        .lucide { width: 56px; height: 56px; stroke-width: 1.5; }
-        .lucide-star-winner { width: 24px; height: 24px; stroke-width: 2; }
+        .lucide { width: 32px; height: 32px; stroke-width: 1.5; }
+        .lucide-lg { width: 56px; height: 56px; }
         
         /* Poängikoner */
         .currency-display { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-        .lucide-dot { width: 8px; height: 8px; }
         .lucide-star-small { width: 8px; height: 8px; }
         .lucide-gem-large { width: 32px; height: 32px; }
         .dot { width: 8px; height: 8px; background-color: #cbd5e1; border-radius: 9999px; }
+
+        /* Vinst-ring */
+        .win-ring {
+            position: absolute;
+            top: -8px; left: -8px; right: -8px; bottom: -8px;
+            border: 3px solid #334155; /* slate-700 */
+            border-radius: 9999px;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        .win-ring.visible { opacity: 1; transform: scale(1); }
 
         /* Progress Bar SVG */
         .progress-ring-bg { stroke: #e2e8f0; }
@@ -40,6 +51,22 @@
             transform: rotate(-90deg);
             transform-origin: 50% 50%;
             transition: stroke-dashoffset 0.3s ease;
+        }
+
+        /* Tooltip */
+        #tooltip {
+            position: absolute;
+            display: none;
+            background-color: #1e293b; /* slate-800 */
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap;
         }
 
         /* Animations */
@@ -51,48 +78,63 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .pulse { animation: pulse 1s infinite cubic-bezier(0.4, 0, 0.6, 1); }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
-        .countdown-spin { animation-name: spin; animation-timing-function: ease-in-out; }
-        @keyframes spin { from { transform: rotate(0deg); opacity: 0.5; } to { transform: rotate(360deg); opacity: 1; } }
+        .countdown-pop { animation-name: pop; animation-timing-function: ease-in-out; }
     </style>
 </head>
 <body class="text-slate-800">
 
-    <!-- Vinst-räknare på vänster sida -->
-    <div id="win-tracker" class="absolute top-8 left-4 md:left-8 flex flex-col items-start gap-3"></div>
-    <!-- Energibar -->
-    <div id="energy-bar" class="absolute top-32 left-4 md:left-8 w-4 h-40 bg-slate-300 rounded-full overflow-hidden">
-        <div id="energy-fill" class="w-full h-full bg-emerald-500 transition-all duration-300"></div>
+    <!-- Resurser på vänster sida -->
+    <div class="absolute top-8 left-4 md:left-8 flex flex-col items-start gap-4">
+        <div id="win-tracker" class="flex flex-col items-start gap-3"></div>
+        <div class="flex items-end gap-2">
+            <div id="energy-container" class="w-4 h-32 bg-slate-300 rounded-full overflow-hidden p-1 flex flex-col justify-end">
+                <div id="energy-fill" class="w-full bg-emerald-500 rounded-full transition-all duration-300"></div>
+            </div>
+            <div id="reserve-energy-container" class="w-6 h-40 bg-slate-300 rounded-full overflow-hidden p-1 flex flex-col justify-end">
+                <div id="reserve-energy-fill" class="w-full bg-sky-500 rounded-full transition-all duration-300"></div>
+            </div>
+        </div>
+        <div id="sps-container" class="hidden flex items-center gap-2 text-slate-500">
+            <span id="sps-value" class="font-bold text-lg font-mono">0.0</span>
+            <div class="flex items-center">
+                <i data-lucide="star" class="w-4 h-4"></i>
+                <span class="font-bold text-sm mx-0.5">/</span>
+                <i data-lucide="timer" class="w-4 h-4"></i>
+            </div>
+        </div>
     </div>
 
     <!-- Huvudcontainer för spelet -->
-    <div class="w-full max-w-xs mx-auto p-4 flex flex-col h-screen justify-between">
-        <header id="computer-zone" class="h-32 flex flex-col justify-center items-center">
-             <div id="computer-result" class="h-full w-full flex flex-col justify-center items-center text-slate-400"></div>
-        </header>
-        <main id="arena" class="flex-grow"></main> <!-- Tom spacer -->
-        <footer id="player-zone" class="h-40 flex flex-col-reverse justify-start items-center gap-4 pb-4">
-            <div class="flex items-center justify-center gap-4 w-full">
-                <div id="player-controls" class="grid grid-cols-3 gap-4 flex-grow">
-                    <button onclick="playGame('rock')" class="btn choice-btn bg-slate-50 p-4 rounded-2xl shadow-md flex justify-center"><i data-lucide="gem"></i></button>
-                    <button onclick="playGame('paper')" class="btn choice-btn bg-slate-50 p-4 rounded-2xl shadow-md flex justify-center"><i data-lucide="file-text"></i></button>
-                    <button onclick="playGame('scissors')" class="btn choice-btn bg-slate-50 p-4 rounded-2xl shadow-md flex justify-center"><i data-lucide="scissors"></i></button>
-                </div>
-                <button id="manualRecharge" onclick="handleUpgradeClick('manualRecharge')" class="hidden btn upgrade-btn bg-slate-50 p-4 rounded-2xl shadow-md"><i data-lucide="battery-charging"></i></button>
-                <button id="autoPlay" onclick="handleUpgradeClick('autoPlay')" class="hidden btn upgrade-btn bg-slate-50 p-4 rounded-2xl shadow-md"><i data-lucide="cog"></i></button>
+    <div class="w-full max-w-2xl mx-auto p-4 flex flex-col h-screen justify-between">
+        <header class="h-16"></header> <!-- Spacer -->
+        
+        <main id="game-board-container" class="flex-grow grid grid-cols-1 items-center justify-center gap-4">
+            <!-- Spelbord kommer att injiceras här av JS -->
+        </main>
+
+        <footer id="player-zone" class="h-40 flex flex-col justify-end items-center gap-4 pb-4">
+            <div id="player-controls-container" class="grid grid-cols-5 gap-2 w-full max-w-sm">
+                <button onmouseenter="showTooltip(this, 'choice')" onmouseleave="hideTooltip()" onclick="playGame('rock')" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="gem"></i></button>
+                <button onmouseenter="showTooltip(this, 'choice')" onmouseleave="hideTooltip()" onclick="playGame('paper')" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="file-text"></i></button>
+                <button onmouseenter="showTooltip(this, 'choice')" onmouseleave="hideTooltip()" onclick="playGame('scissors')" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="scissors"></i></button>
+                <button id="manualRecharge" onmouseenter="showTooltip(this, 'manualRecharge')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('manualRecharge')" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="battery-charging"></i></button>
+                <button id="autoPlay" onmouseenter="showTooltip(this, 'autoPlay')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('autoPlay')" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="repeat-2"></i></button>
             </div>
-            <div id="player-result" class="h-16 w-full flex flex-col-reverse justify-center items-center text-slate-400"></div>
         </footer>
     </div>
 
     <!-- Uppgraderingsknappar, initialt dolda -->
     <div id="upgrade-tray" class="absolute bottom-8 right-8 flex flex-col gap-3">
-         <button id="speed" onclick="handleUpgradeClick('speed')" class="hidden btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
+         <button id="speed" onmouseenter="showTooltip(this, 'speed')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('speed')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
             <svg class="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
                 <circle class="progress-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="3"></circle>
                 <circle id="speed-progress" class="progress-ring-fg" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
             </svg>
             <i data-lucide="chevrons-right" class="relative w-6 h-6 text-slate-600"></i>
         </button>
+        <button id="buyBattery" onmouseenter="showTooltip(this, 'buyBattery')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('buyBattery')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="battery-plus" class="relative w-6 h-6 text-slate-600"></i></button>
+        <button id="luck" onmouseenter="showTooltip(this, 'luck')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('luck')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="clover" class="relative w-6 h-6 text-slate-600"></i></button>
+        <button id="addGameBoard" onmouseenter="showTooltip(this, 'addGameBoard')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('addGameBoard')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="copy" class="relative w-6 h-6 text-slate-600"></i></button>
     </div>
 
     <!-- Debug-meny -->
@@ -109,48 +151,54 @@
              <button onclick="changeSpeed(1)" class="text-white text-lg font-bold bg-slate-600 hover:bg-slate-500 rounded w-6 h-6">+</button>
         </div>
     </div>
+    
+    <!-- Tooltip Element -->
+    <div id="tooltip"></div>
 
     <script>
         // DOM-element
-        const computerResultEl = document.getElementById('computer-result');
-        const playerResultEl = document.getElementById('player-result');
-        const playerControls = document.querySelectorAll('#player-controls button');
+        const gameBoardContainer = document.getElementById('game-board-container');
+        const choiceButtons = document.querySelectorAll('#player-controls-container .choice-btn');
         const winTracker = document.getElementById('win-tracker');
+        const energyFillEl = document.getElementById('energy-fill');
+        const reserveEnergyFillEl = document.getElementById('reserve-energy-fill');
+        const spsContainer = document.getElementById('sps-container');
+        const spsValue = document.getElementById('sps-value');
         const debugTrigger = document.getElementById('debug-trigger');
         const debugMenu = document.getElementById('debug-menu');
         const debugSpeedEl = document.getElementById('debug-speed');
         const dynamicStyles = document.getElementById('dynamic-styles');
         const speedProgressCircle = document.getElementById('speed-progress');
-        const energyFillEl = document.getElementById('energy-fill');
+        const tooltip = document.getElementById('tooltip');
 
         // Spelvariabler
-        let isAnimating = false;
         let starBalance = 0;
-        let totalWins = 0;
+        let totalStarsEarned = 0;
         let energy = 100;
+        let reserveEnergy = 0;
         const MAX_ENERGY = 100;
+        const MAX_RESERVE_ENERGY = 500;
         let autoPlayInterval = null;
         let gameSpeed = 1;
-        const BASE_ANIMATION_DURATION = 1.2;
-        const HIGH_SPEED_THRESHOLD = 10;
+        let winChance = 1/3;
+        let lastTick = performance.now();
+        let gameBoards = [];
+        const HYPER_SPEED_THRESHOLD = 10;
         
         // ===========================================
         // UPPGRADERINGSSYSTEM / "TECH TREE"
         // ===========================================
         const upgrades = {
             autoPlay: {
-                cost: 5, purchased: false, unlocksAt: 5, unlocks: ['speed'],
+                cost: 5, purchased: false, unlocksAt: 2, unlocks: ['speed'],
                 element: document.getElementById('autoPlay'),
                 purchase: function() { this.element.classList.remove('fade-in'); }
             },
             manualRecharge: {
-                level: 0, maxLevel: Infinity,
-                cost: () => 1,
-                unlocksAt: 15, unlocks: [],
+                cost: 1, purchased: false, unlocksAt: 15, unlocks: [],
                 element: document.getElementById('manualRecharge'),
-                purchase: function() {
+                purchase: function() { 
                     energy = Math.min(MAX_ENERGY, energy + 10);
-                    this.level++;
                 }
             },
             speed: {
@@ -164,13 +212,82 @@
                     this.element.classList.add('pop-item');
                     setTimeout(() => this.element.classList.remove('pop-item'), 500);
                 }
+            },
+            buyBattery: {
+                cost: 100, unlocksAt: 15, unlocks: [], consumable: true,
+                element: document.getElementById('buyBattery'),
+                purchase: function() {
+                    reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 700);
+                }
+            },
+            luck: {
+                cost: 50, purchased: false, unlocksAt: 100, unlocks: [],
+                element: document.getElementById('luck'),
+                purchase: function() {
+                    winChance = 0.5;
+                    this.element.style.display = 'none'; // Disappears after purchase
+                }
+            },
+            addGameBoard: {
+                cost: 100, purchased: false, unlocksAt: 100, unlocks: [],
+                element: document.getElementById('addGameBoard'),
+                purchase: function() {
+                    createGameBoard();
+                    this.element.classList.add('purchased');
+                    this.element.disabled = true;
+                }
             }
         };
 
         const choices = ['rock', 'paper', 'scissors'];
         const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
+        function createGameBoard() {
+            const boardId = `game-board-${gameBoards.length + 1}`;
+            const board = document.createElement('div');
+            board.id = boardId;
+            board.className = 'bg-white rounded-2xl shadow-md aspect-square w-full h-auto flex flex-col justify-around items-center p-4 transition-all';
+            board.innerHTML = `
+                <div class="relative h-20 w-20 flex justify-center items-center">
+                    <div class="computer-result-icon text-slate-400"></div>
+                    <div class="win-ring computer-ring"></div>
+                </div>
+                <div class="relative h-20 w-20 flex justify-center items-center">
+                    <div class="player-result-icon text-slate-400"></div>
+                    <div class="win-ring player-ring"></div>
+                </div>
+            `;
+            gameBoardContainer.appendChild(board);
+            gameBoards.push({
+                id: boardId,
+                isAnimating: false,
+                computerEl: board.querySelector('.computer-result-icon'),
+                playerEl: board.querySelector('.player-result-icon'),
+                computerRing: board.querySelector('.computer-ring'),
+                playerRing: board.querySelector('.player-ring')
+            });
+            adjustBoardLayout();
+        }
+        
+        function adjustBoardLayout() {
+            const count = gameBoards.length;
+            let cols = 1;
+            if (count > 1) cols = 2;
+            if (count > 4) cols = 3;
+            gameBoardContainer.className = `flex-grow grid grid-cols-${cols} items-center justify-center gap-4`;
+
+            // Adjust icon sizes
+            gameBoards.forEach(board => {
+                const icons = board.computerEl.querySelectorAll('.lucide-lg, .lucide');
+                icons.forEach(icon => {
+                    if (count > 1) icon.classList.add('w-12', 'h-12');
+                    if (count > 4) icon.classList.add('w-8', 'h-8');
+                });
+            });
+        }
+
         function init() {
+            createGameBoard();
             lucide.createIcons();
             updateAnimationSpeed();
             updateUI();
@@ -178,20 +295,19 @@
         }
         
         function updateAnimationSpeed() {
-            const spinDuration = BASE_ANIMATION_DURATION / gameSpeed;
-            const revealDuration = 0.4 / gameSpeed;
+            const animationDuration = 1.2 / gameSpeed;
             dynamicStyles.innerHTML = `
-                .countdown-spin { animation-duration: ${spinDuration}s; }
-                .reveal-item { animation-duration: ${revealDuration}s; }
+                .countdown-pop { animation-duration: ${animationDuration / 3}s; }
+                .reveal-item { animation-duration: ${0.4 / gameSpeed}s; }
             `;
             debugSpeedEl.textContent = `⚡︎ ${gameSpeed}x`;
             if (autoPlayInterval) restartAutoPlay();
         }
 
         function getVisibleDots() {
-            if (totalWins >= 30) return 100;
-            if (totalWins >= 10) return 20;
-            if (totalWins >= 5) return 10;
+            if (totalStarsEarned >= 30) return 100;
+            if (totalStarsEarned >= 10) return 20;
+            if (totalStarsEarned >= 5) return 10;
             return 5;
         }
 
@@ -218,128 +334,161 @@
             
             lucide.createIcons();
         }
+        
+        function updateSPSDisplay() {
+            if (gameSpeed > 5) {
+                spsContainer.classList.remove('hidden');
+                const gamesPerSecond = gameSpeed * gameBoards.length;
+                const starsPerSecond = gamesPerSecond * winChance;
+                spsValue.textContent = starsPerSecond.toFixed(1);
+            } else {
+                spsContainer.classList.add('hidden');
+            }
+        }
 
         function updateUI() {
             updateWinVisuals();
+            updateSPSDisplay();
 
             const energyPercent = (energy / MAX_ENERGY) * 100;
             energyFillEl.style.height = `${energyPercent}%`;
+            const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
+            reserveEnergyFillEl.style.height = `${reservePercent}%`;
+
             if (energy <= 0) {
-                energyFillEl.classList.add('bg-red-500', 'animate-pulse');
+                energyFillEl.classList.add('bg-red-500');
                 energyFillEl.classList.remove('bg-emerald-500');
             } else {
-                energyFillEl.classList.remove('bg-red-500', 'animate-pulse');
+                energyFillEl.classList.remove('bg-red-500');
                 energyFillEl.classList.add('bg-emerald-500');
             }
 
             for (const key in upgrades) {
                 const upgrade = upgrades[key];
-
-                const unlockedByWins = upgrade.unlocksAt > 0 && totalWins >= upgrade.unlocksAt;
-                const unlockedByParent = Object.keys(upgrades).some(parentKey =>
+                const unlockedByWins = upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt;
+                const unlockedByParent = Object.keys(upgrades).some(parentKey => 
                     upgrades[parentKey].purchased && upgrades[parentKey].unlocks.includes(key)
                 );
                 const shouldBeVisible = unlockedByWins || unlockedByParent;
 
                 if (shouldBeVisible) {
-                    upgrade.element.classList.remove('hidden');
+                    upgrade.element.classList.remove('invisible');
+                    const currentCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
 
-                    if (upgrade.level !== undefined) {
+                    if (key === 'manualRecharge') {
+                        upgrade.element.disabled = starBalance < currentCost || energy >= MAX_ENERGY;
+                    } else if (key === 'buyBattery') {
+                        upgrade.element.disabled = starBalance < currentCost || reserveEnergy >= MAX_RESERVE_ENERGY;
+                    } else if (upgrade.level !== undefined) {
                         if (upgrade.level >= upgrade.maxLevel) {
                             upgrade.element.disabled = true;
                             upgrade.element.classList.add('purchased');
                         } else {
-                            if (key === 'manualRecharge') {
-                                upgrade.element.disabled = starBalance < upgrade.cost() || energy >= MAX_ENERGY;
-                            } else {
-                                upgrade.element.disabled = starBalance < upgrade.cost();
-                            }
+                            upgrade.element.disabled = starBalance < currentCost;
                         }
-                    } else {
+                    } else { 
                         if (!upgrade.purchased) {
-                            upgrade.element.disabled = starBalance < upgrade.cost;
+                            upgrade.element.disabled = starBalance < currentCost;
+                        } else {
+                            upgrade.element.disabled = false; // Keep autoPlay toggleable
                         }
                     }
                 }
             }
-
-            if (energy <= 0) {
-                playerControls.forEach(btn => btn.disabled = true);
-                if (autoPlayInterval) {
-                    clearInterval(autoPlayInterval);
-                    autoPlayInterval = null;
-                    upgrades.autoPlay.element.classList.remove('toggled', 'pulse');
-                }
-                if (upgrades.autoPlay.purchased) upgrades.autoPlay.element.disabled = true;
-            } else {
-                if (upgrades.autoPlay.purchased && !autoPlayInterval) upgrades.autoPlay.element.disabled = false;
-                if (!autoPlayInterval && !isAnimating) playerControls.forEach(btn => btn.disabled = false);
-            }
-
+            
             const progress = upgrades.speed.level / upgrades.speed.maxLevel;
             const circumference = 100.5;
             const offset = circumference * (1 - progress);
             speedProgressCircle.style.strokeDashoffset = offset;
         }
 
-        function playGame(playerChoice) {
-            if (isAnimating || energy <= 0) return;
-            isAnimating = true;
+        async function runCountdownAnimation(board) {
+            const duration = (1.2 / gameSpeed / 3) * 1000;
+            let countdownIcons = [];
 
-            energy = Math.max(0, energy - 1);
-            updateUI();
-
-            playerControls.forEach(btn => btn.disabled = true);
-
-            if (energy <= 0 && autoPlayInterval) {
-                clearInterval(autoPlayInterval);
-                autoPlayInterval = null;
-                upgrades.autoPlay.element.classList.remove('toggled', 'pulse');
-            }
-
-            if (gameSpeed >= HIGH_SPEED_THRESHOLD) {
-                showResult(playerChoice, true);
-            } else {
-                computerResultEl.innerHTML = `<i data-lucide="loader-2" class="lucide countdown-spin"></i>`;
-                playerResultEl.innerHTML = `<i data-lucide="loader-2" class="lucide countdown-spin"></i>`;
-                lucide.createIcons();
-                const animationDurationMs = (BASE_ANIMATION_DURATION / gameSpeed) * 1000;
-                setTimeout(() => showResult(playerChoice, false), animationDurationMs);
+            if (gameSpeed <= 5) countdownIcons = ["III", "II", "I"];
+            else if (gameSpeed <= 6) countdownIcons = ["III", "II"];
+            else if (gameSpeed <= 7) countdownIcons = ["III"];
+            else countdownIcons = ["I"];
+            
+            const svgMap = {
+                "III": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`,
+                "II": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="22" y1="14" x2="22" y2="42"></line><line x1="34" y1="14" x2="34" y2="42"></line></svg>`,
+                "I": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="28" y1="14" x2="28" y2="42"></line></svg>`
+            };
+            
+            for (const icon of countdownIcons) {
+                board.computerEl.innerHTML = svgMap[icon];
+                board.playerEl.innerHTML = svgMap[icon];
+                await new Promise(resolve => setTimeout(resolve, duration));
             }
         }
 
-        function showResult(playerChoice, instant = false) {
+        function consumeEnergy(amount = 1) {
+            if (reserveEnergy >= amount) {
+                reserveEnergy -= amount;
+            } else {
+                const remaining = amount - reserveEnergy;
+                reserveEnergy = 0;
+                energy = Math.max(0, energy - remaining);
+            }
+        }
+
+        function hasEnergy() {
+            return energy > 0 || reserveEnergy > 0;
+        }
+
+        async function playGame(playerChoice, board = gameBoards[0]) {
+            if (board.isAnimating || !hasEnergy()) return;
+            board.isAnimating = true;
+            consumeEnergy();
+            
+            board.computerRing.classList.remove('visible');
+            board.playerRing.classList.remove('visible');
+
+            choiceButtons.forEach(btn => btn.disabled = true);
+
+            if (gameSpeed >= HYPER_SPEED_THRESHOLD && autoPlayInterval) {
+                showResult(playerChoice, board, true);
+            } else {
+                await runCountdownAnimation(board);
+                showResult(playerChoice, board, false);
+            }
+        }
+
+        function showResult(playerChoice, board, instant = false) {
             const computerChoice = choices[Math.floor(Math.random() * choices.length)];
             let result = 'tie';
-            if ((playerChoice === 'rock' && computerChoice === 'scissors') || (playerChoice === 'paper' && computerChoice === 'rock') || (playerChoice === 'scissors' && computerChoice === 'paper')) {
+            
+            if (Math.random() < winChance) {
                 result = 'win';
-            } else if (playerChoice !== computerChoice) {
-                result = 'lose';
+            } else if (Math.random() < 0.5) {
+                 result = 'lose';
             }
 
             const revealClass = instant ? '' : 'reveal-item';
-            const playerIconHTML = `<div class="${revealClass}"><i data-lucide="${iconMap[playerChoice]}" class="lucide text-slate-800"></i></div>`;
-            const computerIconHTML = `<div class="${revealClass}"><i data-lucide="${iconMap[computerChoice]}" class="lucide text-slate-800"></i></div>`;
-            const starHTML = `<div class="pop-item"><i data-lucide="star" class="lucide-star-winner text-slate-800 fill-current"></i></div>`;
-            
-            playerResultEl.innerHTML = playerIconHTML;
-            computerResultEl.innerHTML = computerIconHTML;
+            board.playerEl.innerHTML = `<div class="${revealClass}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            board.computerEl.innerHTML = `<div class="${revealClass}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
 
             if (result === 'win') {
                 starBalance++;
-                totalWins++;
-                playerResultEl.innerHTML = starHTML + playerIconHTML;
+                totalStarsEarned++;
+                board.playerRing.classList.add('visible');
             } else if (result === 'lose') {
-                computerResultEl.innerHTML = computerIconHTML + starHTML;
+                board.computerRing.classList.add('visible');
             }
             
             lucide.createIcons();
             updateUI();
+            
+            if (!hasEnergy() && autoPlayInterval) {
+                toggleAutoPlay();
+            }
 
             setTimeout(() => {
-                isAnimating = false;
-                if (!autoPlayInterval && energy > 0) {
-                    playerControls.forEach(btn => btn.disabled = false);
+                board.isAnimating = false;
+                if (!autoPlayInterval) {
+                    choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
                 }
                 updateUI();
             }, instant ? 50 : 400);
@@ -351,13 +500,11 @@
                 toggleAutoPlay();
                 return;
             }
-            if (key === 'manualRecharge' && energy >= MAX_ENERGY) return;
-
-            const currentCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
+            
+            const currentCost = (typeof upgrade.cost === 'function') ? upgrade.cost() : upgrade.cost;
             if (starBalance >= currentCost) {
                 starBalance -= currentCost;
-                // FIX: Set purchased to true for one-time purchases
-                if (upgrade.level === undefined) {
+                if (upgrade.level === undefined && !upgrade.consumable) {
                     upgrade.purchased = true;
                 }
                 upgrade.purchase();
@@ -367,37 +514,156 @@
             }
         }
         
-        function getIntervalDuration() {
-            if (gameSpeed >= HIGH_SPEED_THRESHOLD) { return 100; }
-            return (BASE_ANIMATION_DURATION / gameSpeed * 1000) + 500;
+        function processBulkGames() {
+            const now = performance.now();
+            const delta = (now - lastTick) / 1000;
+            lastTick = now;
+
+            const gamesToPlay = gameSpeed * gameBoards.length * delta;
+            
+            if (!hasEnergy()) {
+                toggleAutoPlay();
+                return;
+            }
+            
+            const energyToConsume = Math.min(energy + reserveEnergy, gamesToPlay);
+            consumeEnergy(energyToConsume);
+
+            const wins = energyToConsume * winChance;
+            const roundedWins = Math.floor(wins) + (Math.random() < (wins % 1) ? 1 : 0);
+
+            starBalance += roundedWins;
+            totalStarsEarned += roundedWins;
+            
+            gameBoards.forEach(board => {
+                const randomChoice1 = choices[Math.floor(Math.random() * 3)];
+                const randomChoice2 = choices[Math.floor(Math.random() * 3)];
+                board.computerEl.innerHTML = `<i data-lucide="${iconMap[randomChoice1]}" class="lucide-lg text-slate-400"></i>`;
+                board.playerEl.innerHTML = `<i data-lucide="${iconMap[randomChoice2]}" class="lucide-lg text-slate-400"></i>`;
+                
+                if(Math.random() < winChance) {
+                     board.playerRing.classList.add('visible');
+                     board.computerRing.classList.remove('visible');
+                } else {
+                     board.computerRing.classList.add('visible');
+                     board.playerRing.classList.remove('visible');
+                }
+            });
+
+            lucide.createIcons();
+            updateUI();
         }
 
         function restartAutoPlay() {
             clearInterval(autoPlayInterval);
-            autoPlayInterval = setInterval(() => playGame(choices[Math.floor(Math.random() * choices.length)]), getIntervalDuration());
+            if (gameSpeed >= HYPER_SPEED_THRESHOLD) {
+                autoPlayInterval = setInterval(processBulkGames, 100);
+            } else {
+                const intervalDuration = (1.2 / gameSpeed * 1000) + 450;
+                autoPlayInterval = setInterval(() => {
+                    gameBoards.forEach(board => {
+                        if(!board.isAnimating) playGame(choices[Math.floor(Math.random() * 3)], board);
+                    });
+                }, intervalDuration / gameBoards.length);
+            }
         }
 
         function toggleAutoPlay() {
             if (autoPlayInterval) {
                 clearInterval(autoPlayInterval);
                 autoPlayInterval = null;
-                playerControls.forEach(btn => btn.disabled = false);
+                choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
                 upgrades.autoPlay.element.classList.remove('toggled', 'pulse');
-                updateUI();
+                gameBoards.forEach(board => {
+                    board.computerEl.innerHTML = '';
+                    board.playerEl.innerHTML = '';
+                    board.computerRing.classList.remove('visible');
+                    board.playerRing.classList.remove('visible');
+                });
             } else {
-                if (energy <= 0) return;
-                playerControls.forEach(btn => btn.disabled = true);
+                if(!hasEnergy()) return;
+                choiceButtons.forEach(btn => btn.disabled = true);
                 upgrades.autoPlay.element.classList.add('toggled', 'pulse');
-                upgrades.autoPlay.element.disabled = false;
-                autoPlayInterval = setInterval(() => playGame(choices[Math.floor(Math.random() * choices.length)]), getIntervalDuration());
-                updateUI();
+                lastTick = performance.now();
+                restartAutoPlay();
             }
+            updateUI();
         }
         
+        // --- TOOLTIP FUNCTIONS ---
+        function toRoman(num) {
+            if (num < 1) return "";
+            const roman = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+            let str = '';
+            for (let i of Object.keys(roman)) {
+                let q = Math.floor(num / roman[i]);
+                num -= q * roman[i];
+                str += i.repeat(q);
+            }
+            return str;
+        }
+
+        const tallySVGs = {
+            1: `<svg width="8" height="16" viewBox="0 0 8 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
+            2: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
+            3: `<svg width="24" height="16" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M20 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
+            4: `<svg width="32" height="16" viewBox="0 0 32 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M20 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M28 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
+            5: `<svg width="34" height="16" viewBox="0 0 34 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M20 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M28 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M2 13L32 3" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`
+        };
+
+        function generateCostVisual(cost) {
+            let html = `<div class="flex items-center gap-2"><i data-lucide="star" class="w-4 h-4 text-white fill-current"></i><span class="font-bold text-lg">×</span>`;
+            if (cost === 0) return 'Gratis';
+            if (cost >= 10) {
+                html += `<span class="font-mono text-lg">${toRoman(cost)}</span>`;
+            } else {
+                html += `<div class="flex items-center gap-1">`;
+                let remaining = cost;
+                while(remaining > 0) {
+                    if (remaining >= 5) {
+                        html += tallySVGs[5];
+                        remaining -= 5;
+                    } else {
+                        if(tallySVGs[remaining]) html += tallySVGs[remaining];
+                        remaining = 0;
+                    }
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function showTooltip(element, key) {
+            if (key === 'choice') return;
+            const upgrade = upgrades[key];
+            if (!upgrade || (upgrade.purchased && !upgrade.consumable && upgrade.level === undefined) || (upgrade.level >= upgrade.maxLevel)) return;
+            
+            if (key === 'addGameBoard' || key === 'buyBattery') {
+                tooltip.innerHTML = `<div class="flex items-center gap-2"><i data-lucide="gem" class="w-6 h-6 text-white"></i></div>`;
+            } else {
+                const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
+                tooltip.innerHTML = generateCostVisual(cost);
+            }
+            
+            lucide.createIcons();
+            
+            const rect = element.getBoundingClientRect();
+            tooltip.style.display = 'block';
+            tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
+            tooltip.style.top = `${rect.top - tooltip.offsetHeight - 8}px`;
+            tooltip.style.opacity = '1';
+        }
+
+        function hideTooltip() {
+            tooltip.style.opacity = '0';
+            setTimeout(() => { tooltip.style.display = 'none'; }, 200);
+        }
+
         // --- DEBUG FUNCTIONS ---
         function addStars(amount) {
             starBalance += amount;
-            totalWins += amount;
+            totalStarsEarned += amount;
             updateUI();
         }
         function changeSpeed(amount) {
