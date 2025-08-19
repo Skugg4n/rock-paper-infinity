@@ -162,7 +162,7 @@
     <div class="w-full max-w-2xl mx-auto p-4 flex flex-col h-[100svh]">
         <header class="h-16 flex-shrink-0"></header> <!-- Spacer -->
         
-        <main id="game-board-container" class="flex-grow grid grid-cols-1 items-center justify-center gap-4">
+        <main id="game-board-container" class="pointer-events-none flex-grow grid grid-cols-1 items-center justify-center gap-4">
             <!-- Spelbord kommer att injiceras här av JS -->
         </main>
 
@@ -181,7 +181,7 @@
     <div class="absolute bottom-8 right-8 flex items-end gap-3">
         <div id="downgrade-tray" class="flex flex-col gap-3"></div>
         <div id="upgrade-tray" class="flex flex-col gap-3">
-            <button id="speed" onmouseenter="showTooltip(this, 'speed')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('speed')" class="btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
+            <button id="speed" onmouseenter="showTooltip(this, 'speed')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('speed')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
                 <svg class="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
                     <circle class="progress-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="3"></circle>
                     <circle id="speed-progress" class="progress-ring-fg" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
@@ -210,8 +210,9 @@
 
     <!-- Debug-meny -->
     <div id="debug-trigger" class="absolute bottom-0 left-0 w-16 h-16 cursor-pointer"></div>
-    <div id="debug-menu" class="hidden absolute bottom-16 left-4 flex flex-col gap-2 bg-slate-700 p-2 rounded-lg shadow-xl z-20">
+        <div id="debug-menu" class="hidden absolute bottom-16 left-4 flex flex-col gap-2 bg-slate-700 p-2 rounded-lg shadow-xl z-20">
         <div class="text-white text-xs font-bold border-b border-slate-600 pb-1 mb-1">Stjärnor</div>
+        <button onclick="addStars(1)" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+1 ★</button>
         <button onclick="addStars(100)" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+100 ★</button>
         <button onclick="addStars(1000)" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+1k ★</button>
         <button onclick="addStars(10000)" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+10k ★</button>
@@ -288,7 +289,7 @@
             speed: {
                 level: 0, maxLevel: 55,
                 cost: () => 10 + Math.floor(upgrades.speed.level * 2),
-                unlocksAt: 0, unlocks: [],
+                unlocks: [],
                 element: document.getElementById('speed'),
                 purchase: function() {
                     this.level++;
@@ -581,8 +582,8 @@
                                  (upgrade.unlocksAtSPS > 0 && getSPS() >= upgrade.unlocksAtSPS) ||
                                  Object.keys(upgrades).some(parentKey => {
                                      const parent = upgrades[parentKey];
-                                     const parentMaxed = parent.level !== undefined && parent.level >= parent.maxLevel;
-                                     return parentMaxed && parent.unlocks && parent.unlocks.includes(key);
+                                     const parentUnlocked = (parent.level !== undefined && parent.level >= parent.maxLevel) || parent.purchased;
+                                     return parent.unlocks && parent.unlocks.includes(key) && parentUnlocked;
                                  });
 
                 if (isUnlocked) {
