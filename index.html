@@ -261,7 +261,7 @@
         let energy = 100;
         let reserveEnergy = 0;
         const MAX_ENERGY = 100;
-        const MAX_RESERVE_ENERGY = 1500; // FIX: Satt till ett högre, konstant värde
+        const MAX_RESERVE_ENERGY = 1500;
         let autoPlayInterval = null;
         let autoPlayWantsToRun = false; 
         let gameSpeed = 1;
@@ -297,7 +297,6 @@
                     setTimeout(() => this.element.classList.remove('pop-item'), 500);
                 }
             },
-            // FIX: Återställd till en förbrukningsvara som fyller på energin
             buyBattery: {
                 cost: 100, consumable: true, 
                 unlocksAt: 50, unlocks: [],
@@ -334,8 +333,9 @@
                     createGameBoard();
                 }
             },
+            // FIX: Knappen låses inte längre upp vid start
             mergeGameBoard: {
-                cost: 1000, purchased: false, unlocksAt: 0,
+                cost: 1000, purchased: false,
                 element: document.getElementById('mergeGameBoard'),
                 purchase: function() {
                     this.purchased = true;
@@ -575,7 +575,7 @@
             for (const key in upgrades) {
                 const upgrade = upgrades[key];
                 
-                let isUnlocked = (upgrade.unlocksAt === 0) ||
+                let isUnlocked = (upgrade.unlocksAt === 0 && key !== 'mergeGameBoard') || // FIX: Gäller ej mergeGameBoard
                                  (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
                                  (upgrade.unlocksAtGames > 0 && totalGamesPlayed >= upgrade.unlocksAtGames) ||
                                  (upgrade.unlocksAtSPS > 0 && getSPS() >= upgrade.unlocksAtSPS) ||
@@ -629,7 +629,28 @@
             lucide.createIcons();
         }
 
-        async function runCountdownAnimation(board) { /* ... Samma som förut ... */ }
+        // FIX: Återställd funktion
+        async function runCountdownAnimation(board) {
+            const duration = (1.2 / gameSpeed / 3) * 1000;
+            let countdownIcons = [];
+
+            if (gameSpeed <= 5) countdownIcons = ["III", "II", "I"];
+            else if (gameSpeed <= 6) countdownIcons = ["III", "II"];
+            else if (gameSpeed <= 7) countdownIcons = ["III"];
+            else if (gameSpeed <= HYPER_SPEED_THRESHOLD) countdownIcons = ["I"];
+            
+            const svgMap = {
+                "III": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`,
+                "II": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="22" y1="14" x2="22" y2="42"></line><line x1="34" y1="14" x2="34" y2="42"></line></svg>`,
+                "I": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="28" y1="14" x2="28" y2="42"></line></svg>`
+            };
+            
+            for (const icon of countdownIcons) {
+                board.computerEl.innerHTML = svgMap[icon];
+                board.playerEl.innerHTML = svgMap[icon];
+                await new Promise(resolve => setTimeout(resolve, duration));
+            }
+        }
 
         function consumeEnergy(amount = 1) {
             if (reserveEnergy >= amount) {
@@ -655,8 +676,12 @@
             board.playerRing.classList.remove('visible');
             choiceButtons.forEach(btn => btn.disabled = true);
 
-            await runCountdownAnimation(board);
-            showResult(playerChoice, board, false);
+            if (gameSpeed >= HYPER_SPEED_THRESHOLD && autoPlayInterval) {
+                showResult(playerChoice, board, true);
+            } else {
+                await runCountdownAnimation(board);
+                showResult(playerChoice, board, false);
+            }
         }
 
         function showResult(playerChoice, board, instant = false) {
