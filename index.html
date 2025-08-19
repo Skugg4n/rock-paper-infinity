@@ -14,7 +14,8 @@
             overflow: hidden;
             background-color: #f1f5f9; /* bg-slate-200 */
         }
-        .btn { transition: all 0.2s ease-in-out; pointer-events: auto; }
+        .btn { transition: all 0.2s ease-in-out; pointer-events: auto; cursor: pointer; }
+        .btn > * { pointer-events: none; }
         .choice-btn:hover:not(:disabled) { transform: translateY(-4px); background-color: #ffffff; }
         .choice-btn:disabled { cursor: not-allowed; opacity: 0.5; }
         
@@ -168,11 +169,11 @@
 
         <footer id="player-zone" class="h-40 flex-shrink-0 flex flex-col justify-end items-center gap-4 pb-4">
             <div id="player-controls-container" class="grid grid-cols-5 gap-2 w-full max-w-sm">
-                <button onmouseenter="showTooltip(this, 'choice')" onmouseleave="hideTooltip()" onclick="playGame('rock')" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="gem"></i></button>
-                <button onmouseenter="showTooltip(this, 'choice')" onmouseleave="hideTooltip()" onclick="playGame('paper')" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="file-text"></i></button>
-                <button onmouseenter="showTooltip(this, 'choice')" onmouseleave="hideTooltip()" onclick="playGame('scissors')" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="scissors"></i></button>
-                <button id="manualRecharge" onmouseenter="showTooltip(this, 'manualRecharge')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('manualRecharge')" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="battery-charging"></i></button>
-                <button id="autoPlay" onmouseenter="showTooltip(this, 'autoPlay')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('autoPlay')" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="repeat-2"></i></button>
+                <button data-choice="rock" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="gem"></i></button>
+                <button data-choice="paper" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="file-text"></i></button>
+                <button data-choice="scissors" class="btn choice-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="scissors"></i></button>
+                <button id="manualRecharge" data-upgrade="manualRecharge" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="battery-charging"></i></button>
+                <button id="autoPlay" data-upgrade="autoPlay" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="repeat-2"></i></button>
             </div>
         </footer>
     </div>
@@ -181,30 +182,30 @@
     <div class="absolute bottom-8 right-8 flex items-end gap-3">
         <div id="downgrade-tray" class="flex flex-col gap-3"></div>
         <div id="upgrade-tray" class="flex flex-col gap-3">
-            <button id="speed" onmouseenter="showTooltip(this, 'speed')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('speed')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
+            <button id="speed" data-upgrade="speed" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
                 <svg class="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
                     <circle class="progress-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="3"></circle>
                     <circle id="speed-progress" class="progress-ring-fg" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
                 </svg>
                 <i id="speed-icon" data-lucide="chevrons-right" class="relative w-6 h-6 text-slate-600"></i>
             </button>
-            <button id="energyGenerator" onmouseenter="showTooltip(this, 'energyGenerator')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('energyGenerator')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
+            <button id="energyGenerator" data-upgrade="energyGenerator" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
                 <svg class="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
                     <circle class="progress-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="3"></circle>
                     <circle id="energy-gen-progress" class="progress-ring-fg" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
                 </svg>
                 <i data-lucide="atom" class="relative w-6 h-6 text-slate-600"></i>
             </button>
-            <button id="buyBattery" onmouseenter="showTooltip(this, 'buyBattery')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('buyBattery')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="battery-plus" class="relative w-6 h-6 text-slate-600"></i></button>
-            <button id="luck" onmouseenter="showTooltip(this, 'luck')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('luck')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="clover" class="relative w-6 h-6 text-slate-600"></i></button>
-            <button id="addGameBoard" onmouseenter="showTooltip(this, 'addGameBoard')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('addGameBoard')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
+            <button id="buyBattery" data-upgrade="buyBattery" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="battery-plus" class="relative w-6 h-6 text-slate-600"></i></button>
+            <button id="luck" data-upgrade="luck" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="clover" class="relative w-6 h-6 text-slate-600"></i></button>
+            <button id="addGameBoard" data-upgrade="addGameBoard" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
                 <svg class="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
                     <circle class="progress-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="3"></circle>
                     <circle id="add-board-progress" class="progress-ring-fg" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
                 </svg>
                 <i data-lucide="copy" class="relative w-6 h-6 text-slate-600"></i>
             </button>
-            <button id="mergeGameBoard" onmouseenter="showTooltip(this, 'mergeGameBoard')" onmouseleave="hideTooltip()" onclick="handleUpgradeClick('mergeGameBoard')" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="combine" class="relative w-6 h-6 text-slate-600"></i></button>
+            <button id="mergeGameBoard" data-upgrade="mergeGameBoard" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="combine" class="relative w-6 h-6 text-slate-600"></i></button>
         </div>
     </div>
 
@@ -253,7 +254,7 @@
         const energyGenProgressCircle = document.getElementById('energy-gen-progress');
         const addBoardProgressCircle = document.getElementById('add-board-progress');
         const downgradeTray = document.getElementById('downgrade-tray');
-        const tooltip = document.getElementById('tooltip');
+const tooltip = document.getElementById('tooltip');
 
         // Spelvariabler
         let starBalance = 0;
@@ -345,8 +346,23 @@
             }
         };
 
-        const choices = ['rock', 'paper', 'scissors'];
-        const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
+const choices = ['rock', 'paper', 'scissors'];
+const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
+
+        function setupButtons() {
+            document.querySelectorAll('[data-choice]').forEach(btn => {
+                const choice = btn.dataset.choice;
+                btn.addEventListener('click', () => playGame(choice));
+                btn.addEventListener('mouseenter', () => showTooltip(btn, 'choice'));
+                btn.addEventListener('mouseleave', hideTooltip);
+            });
+            document.querySelectorAll('[data-upgrade]').forEach(btn => {
+                const key = btn.dataset.upgrade;
+                btn.addEventListener('click', () => handleUpgradeClick(key));
+                btn.addEventListener('mouseenter', () => showTooltip(btn, key));
+                btn.addEventListener('mouseleave', hideTooltip);
+            });
+        }
 
         function createGameBoard() {
             const boardId = `game-board-${gameBoards.length + 1}`;
@@ -429,6 +445,7 @@
 
         function init() {
             createGameBoard();
+            setupButtons();
             lucide.createIcons();
             updateAnimationSpeed();
             updateUI();
