@@ -1,0 +1,112 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    touch-action: manipulation;
+    overflow: hidden;
+    background-color: #f1f5f9; /* bg-slate-200 */
+}
+.btn {
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+.btn:disabled { pointer-events: none; }
+.btn > * { pointer-events: none; }
+.choice-btn:hover:not(:disabled) { transform: translateY(-4px); background-color: #ffffff; }
+.choice-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.upgrade-btn { position: relative; }
+.upgrade-btn.toggled { background-color: #e2e8f0; /* bg-slate-300 */ box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05); }
+.upgrade-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.upgrade-btn:disabled:not(.purchased) { opacity: 0.4; cursor: not-allowed; }
+
+.lucide { width: 32px; height: 32px; stroke-width: 1.5; }
+.lucide-lg { width: 56px; height: 56px; transition: all 0.3s ease-in-out; }
+
+.currency-display { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lucide-star-small { width: 8px; height: 8px; }
+.lucide-gem-large { width: 32px; height: 32px; }
+.lucide-gem-medium { width: 16px; height: 16px; }
+.lucide-crown-xl { width: 40px; height: 40px; }
+.dot { width: 8px; height: 8px; background-color: #cbd5e1; border-radius: 9999px; }
+
+@keyframes winFlash {
+    0%, 100% { transform: scale(1); color: #facc15; }
+    50% { transform: scale(1.3); }
+}
+.win-highlight {
+    animation: winFlash 0.6s ease-in-out;
+    color: #facc15;
+}
+
+.progress-ring-bg { stroke: #e2e8f0; }
+.progress-ring-fg {
+    stroke: #475569;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 0.3s ease;
+}
+
+#tooltip {
+    position: absolute;
+    display: none;
+    background-color: #1e293b;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+@keyframes reveal { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.reveal-item { animation: reveal 0.4s ease-out forwards; }
+@keyframes pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
+.pop-item { animation: pop 0.5s cubic-bezier(0.77, 0, 0.175, 1) forwards; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.fade-in { animation: fadeIn 0.5s ease-in-out forwards; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+.pulse { animation: pulse 1s infinite cubic-bezier(0.4, 0, 0.6, 1); }
+.countdown-pop { animation-name: pop; animation-timing-function: ease-in-out; }
+
+#player-zone { position: relative; z-index: 10; }
+
+.small-icons .lucide-lg { width: 32px; height: 32px; }
+
+#meta-board {
+    border: 4px solid #000;
+    background-color: #fff;
+    box-shadow: none;
+    overflow: hidden;
+}
+.meta-active { animation: none; }
+
+#collapse-foam-btn {
+    position: relative;
+    background-color: #e2e8f0;
+    border: 2px solid #94a3b8;
+}
+#collapse-foam-btn.ready {
+    background-color: #fff;
+    border-color: #475569;
+    cursor: pointer;
+}
+#collapse-foam-btn.ready:hover {
+    transform: translateY(-2px);
+}
+#collapse-foam-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #67e8f9;
+    transition: height 0.3s ease-in-out;
+}
