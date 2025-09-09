@@ -19,6 +19,7 @@
         const debugGamesPlayedEl = document.getElementById('debug-games-played');
         const dynamicStyles = document.getElementById('dynamic-styles');
         const speedProgressCircle = document.getElementById('speed-progress');
+        const speedEarlyProgressCircle = document.getElementById('speed-early-progress');
         const energyGenProgressCircle = document.getElementById('energy-gen-progress');
         const addBoardProgressCircle = document.getElementById('add-board-progress');
         const downgradeTray = document.getElementById('downgrade-tray');
@@ -271,12 +272,15 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                     winTracker.appendChild(extraContainer);
                 }
             }
-            if (gems > 0) {
+            const showGemPlaceholders = totalStarsEarned >= 10000;
+            if (gems > 0 || showGemPlaceholders) {
                 const container = document.createElement('div');
                 container.className = 'grid grid-cols-10 gap-1 items-center';
                 const gemSizeClass = gems > 5 ? 'lucide-gem-medium' : 'lucide-gem-large';
-                for (let i = 0; i < gems; i++) {
-                    container.innerHTML += `<div><i data-lucide="gem" class="${gemSizeClass} text-slate-800"></i></div>`;
+                const totalSlots = showGemPlaceholders ? 100 : gems;
+                for (let i = 0; i < totalSlots; i++) {
+                    if (i < gems) container.innerHTML += `<div><i data-lucide="gem" class="${gemSizeClass} text-slate-800"></i></div>`;
+                    else container.innerHTML += '<div class="gem-dot"></div>';
                 }
                 winTracker.appendChild(container);
             }
@@ -293,11 +297,8 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             lucide.createIcons();
 
             winTracker.querySelectorAll('.lucide-star-small').forEach(svg => {
-                const polygon = svg.querySelector('polygon');
-                if (polygon) {
-                    polygon.setAttribute('fill', 'currentColor');
-                    polygon.setAttribute('stroke', 'none');
-                }
+                svg.setAttribute('fill', 'currentColor');
+                svg.setAttribute('stroke', 'none');
             });
         }
         
@@ -418,6 +419,9 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
             const speedUpgrade = upgrades.speed;
             speedProgressCircle.style.strokeDashoffset = circumference * (1 - (speedUpgrade.level / speedUpgrade.maxLevel));
+            const earlyFraction = Math.min(speedUpgrade.level, HYPER_SPEED_THRESHOLD) / HYPER_SPEED_THRESHOLD;
+            speedEarlyProgressCircle.style.strokeDashoffset = circumference * (1 - earlyFraction);
+            speedEarlyProgressCircle.style.display = speedUpgrade.level < HYPER_SPEED_THRESHOLD ? 'block' : 'none';
 
             const energyGenUpgrade = upgrades.energyGenerator;
             energyGenProgressCircle.style.strokeDashoffset = circumference * (1 - (energyGenUpgrade.level / energyGenUpgrade.maxLevel));

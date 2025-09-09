@@ -15,7 +15,7 @@ body {
     height: 100%;
     position: relative;
 }
-.btn:disabled { pointer-events: none; }
+.btn:disabled { cursor: not-allowed; }
 .btn > * { pointer-events: none; }
 .choice-btn:hover:not(:disabled) { transform: translateY(-4px); background-color: #ffffff; }
 .choice-btn:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -34,6 +34,7 @@ body {
 .lucide-gem-medium { width: 16px; height: 16px; }
 .lucide-crown-xl { width: 40px; height: 40px; }
 .dot { width: 8px; height: 8px; background-color: #cbd5e1; border-radius: 9999px; }
+.gem-dot { width: 16px; height: 16px; background-color: #cbd5e1; border-radius: 9999px; }
 
 @keyframes winFlash {
     0%, 100% { transform: scale(1); color: #facc15; }
@@ -57,6 +58,7 @@ body {
     transform-origin: 50% 50%;
     transition: stroke-dashoffset 0.3s ease;
 }
+.progress-ring-pre { stroke: #94a3b8; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.3s ease; }
 
 #tooltip {
     position: absolute;
