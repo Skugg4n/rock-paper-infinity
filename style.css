@@ -75,6 +75,16 @@ body {
 
 .small-icons .lucide-lg { width: 32px; height: 32px; }
 
+.result-wrapper.winner {
+    border: 4px solid #475569;
+    border-radius: 9999px;
+    padding: 8px;
+}
+
+.small-icons .result-wrapper.winner {
+    padding: 4px;
+}
+
 #meta-board {
     border: 4px solid #000;
     background-color: #fff;

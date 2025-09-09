@@ -616,8 +616,8 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             else result = 'lose';
 
             const revealClass = instant ? '' : 'reveal-item';
-            board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
-            board.computerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            board.computerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
 
             lucide.createIcons();
 
