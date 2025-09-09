@@ -5,19 +5,21 @@ export const phases = {
   ESCAPE: 'ESCAPE'
 };
 
-const handlers = {
-  [phases.INDUSTRY]: async () => {
-    const module = await import('./phase1/index.js');
-    return module.init();
-  },
-  [phases.CITY]: () => {},
-  [phases.WAR]: () => {},
-  [phases.ESCAPE]: () => {}
-};
+let currentModule = null;
 
 export async function setPhase(phase) {
-  const handler = handlers[phase];
-  if (handler) {
-    return handler();
+  if (currentModule && typeof currentModule.teardown === 'function') {
+    currentModule.teardown();
+  }
+  switch (phase) {
+    case phases.INDUSTRY:
+      currentModule = await import('./phase1/index.js');
+      return currentModule.init();
+    case phases.CITY:
+    case phases.WAR:
+    case phases.ESCAPE:
+    default:
+      currentModule = null;
+      return;
   }
 }

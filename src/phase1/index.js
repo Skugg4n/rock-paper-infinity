@@ -41,6 +41,10 @@ const resetBtn = document.getElementById('reset-btn');
         let autoPlayWantsToRun = false;
         let gameSpeed = 1;
         let lastTick = performance.now();
+        let lastUIRender = performance.now();
+        let passiveInterval = null;
+        let lastStarBalance = -1;
+        let lastTotalStarsEarned = -1;
         let gameBoards = [];
         let isMetaBoardActive = false;
         let starMultiplier = 1;
@@ -122,6 +126,19 @@ const resetBtn = document.getElementById('reset-btn');
 
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
+
+const buildIcon = (name, className = '') => {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `<i data-lucide="${name}" class="${className}"></i>`;
+    lucide.createIcons({}, wrapper);
+    return wrapper.firstElementChild;
+};
+
+const crownTemplate = buildIcon('crown', 'lucide-crown-xl text-slate-800');
+const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
+const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
+const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
+const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
 
         function setupButtons() {
             document.querySelectorAll('button').forEach(btn => {
@@ -206,7 +223,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                 gameBoardContainer.appendChild(metaBoard);
             }
             metaBoard.style.display = 'flex';
-            lucide.createIcons();
+            lucide.createIcons({}, metaBoard);
             quantumFoamContainer.classList.remove('hidden');
         }
 
@@ -223,9 +240,10 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             updateUI();
             debugTrigger.addEventListener('click', () => debugMenu.classList.toggle('hidden'));
             manageAutoPlay();
-            setInterval(passiveTick, 1000);
+            passiveInterval = setInterval(passiveTick, 1000);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
         }
-        
+
         function passiveTick() {
             const energyGen = upgrades.energyGenerator.level * 5;
             if (energyGen > 0) {
@@ -234,6 +252,19 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             }
             manageAutoPlay();
             updateUI();
+        }
+
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                if (passiveInterval) {
+                    clearInterval(passiveInterval);
+                    passiveInterval = null;
+                }
+                stopAutoPlayInterval();
+            } else {
+                if (!passiveInterval) passiveInterval = setInterval(passiveTick, 1000);
+                if (autoPlayWantsToRun && !autoPlayInterval) restartAutoPlay();
+            }
         }
 
         function updateAnimationSpeed() {
@@ -254,35 +285,51 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
         }
 
         function updateWinVisuals() {
+            if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned) return;
+            lastStarBalance = starBalance;
+            lastTotalStarsEarned = totalStarsEarned;
+
             winTracker.innerHTML = '';
             const crowns = Math.floor(starBalance / 10000);
             const gems = Math.floor((starBalance % 10000) / 100);
             const smallStars = starBalance % 100;
-            
+
             if (crowns > 0) {
                 const container = document.createElement('div');
                 container.className = 'grid grid-cols-5 gap-1 items-center';
                 const displayedCrowns = Math.min(crowns, 10);
                 for (let i = 0; i < displayedCrowns; i++) {
-                    container.innerHTML += '<div><i data-lucide="crown" class="lucide-crown-xl text-slate-800"></i></div>';
+                    const wrap = document.createElement('div');
+                    wrap.appendChild(crownTemplate.cloneNode(true));
+                    container.appendChild(wrap);
                 }
                 winTracker.appendChild(container);
                 if (crowns > 10) {
-                    const extraContainer = document.createElement('div');
-                    extraContainer.className = 'flex items-center gap-1 text-slate-800';
-                    extraContainer.innerHTML = `<i data-lucide="crown" class="lucide-crown-xl"></i><span class="text-sm">x ${crowns - 10}</span>`;
-                    winTracker.appendChild(extraContainer);
+                    const extra = document.createElement('div');
+                    extra.className = 'flex items-center gap-1 text-slate-800';
+                    extra.appendChild(crownTemplate.cloneNode(true));
+                    const span = document.createElement('span');
+                    span.className = 'text-sm';
+                    span.textContent = `x ${crowns - 10}`;
+                    extra.appendChild(span);
+                    winTracker.appendChild(extra);
                 }
             }
+
             const showGemPlaceholders = totalStarsEarned >= 10000;
             if (gems > 0 || showGemPlaceholders) {
                 const container = document.createElement('div');
                 container.className = 'grid grid-cols-10 gap-1 items-center';
-                const gemSizeClass = gems > 5 ? 'lucide-gem-medium' : 'lucide-gem-large';
+                const gemTemplate = gems > 5 ? gemMediumTemplate : gemLargeTemplate;
                 const totalSlots = showGemPlaceholders ? 100 : gems;
                 for (let i = 0; i < totalSlots; i++) {
-                    if (i < gems) container.innerHTML += `<div><i data-lucide="gem" class="${gemSizeClass} text-slate-800"></i></div>`;
-                    else container.innerHTML += '<div class="gem-dot"></div>';
+                    const slot = document.createElement('div');
+                    if (i < gems) {
+                        slot.appendChild(gemTemplate.cloneNode(true));
+                    } else {
+                        slot.className = 'gem-dot';
+                    }
+                    container.appendChild(slot);
                 }
                 winTracker.appendChild(container);
             }
@@ -291,17 +338,18 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             const gridContainer = document.createElement('div');
             gridContainer.className = 'grid grid-cols-10 gap-1';
             for (let i = 0; i < dotsToShow; i++) {
-                if (i < smallStars) gridContainer.innerHTML += '<div><i data-lucide="star" class="lucide-star-small text-slate-800"></i></div>';
-                else gridContainer.innerHTML += '<div class="dot"></div>';
+                const slot = document.createElement('div');
+                if (i < smallStars) {
+                    const star = starSmallTemplate.cloneNode(true);
+                    star.setAttribute('fill', 'currentColor');
+                    star.setAttribute('stroke', 'none');
+                    slot.appendChild(star);
+                } else {
+                    slot.className = 'dot';
+                }
+                gridContainer.appendChild(slot);
             }
             winTracker.appendChild(gridContainer);
-
-            lucide.createIcons();
-
-            winTracker.querySelectorAll('.lucide-star-small').forEach(svg => {
-                svg.setAttribute('fill', 'currentColor');
-                svg.setAttribute('stroke', 'none');
-            });
         }
         
         function getSPS() {
@@ -355,7 +403,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                     const btn = document.createElement('button');
                     btn.className = 'btn bg-white p-3 rounded-full shadow-lg flex items-center justify-center';
                     btn.onclick = () => handleSellClick(key);
-                    btn.innerHTML = `<i data-lucide="minus" class="relative w-6 h-6 text-red-500"></i>`;
+                    btn.appendChild(minusTemplate.cloneNode(true));
                     downgradeTray.appendChild(btn);
                 } else {
                     const placeholder = document.createElement('div');
@@ -363,7 +411,6 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                     downgradeTray.appendChild(placeholder);
                 }
         });
-            lucide.createIcons();
         }
 
         function updateUI() {
@@ -446,8 +493,6 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                 collapseFoamBtn.disabled = quantumFoam < MAX_QUANTUM_FOAM;
                 collapseFoamBtn.classList.toggle('ready', quantumFoam >= MAX_QUANTUM_FOAM);
             }
-
-            lucide.createIcons();
             saveGame();
         }
 
@@ -619,7 +664,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
             board.computerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
 
-            lucide.createIcons();
+            lucide.createIcons({}, board.element);
 
             if (result === 'win') {
                 const starGain = 1 * starMultiplier;
@@ -715,10 +760,8 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                     board.computerEl.innerHTML = `<i data-lucide="${iconMap[randomChoice1]}" class="lucide-lg text-slate-400"></i>`;
                     board.playerEl.innerHTML = `<i data-lucide="${iconMap[choices[Math.floor(Math.random() * 3)]]}" class="lucide-lg text-slate-400"></i>`;
                 });
-                lucide.createIcons();
+                lucide.createIcons({}, gameBoardContainer);
             }
-
-            updateUI();
         }
 
         function collapseFoam() {
@@ -737,18 +780,33 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
         }
 
         function restartAutoPlay() {
-            clearInterval(autoPlayInterval);
-            const processInterval = (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) ? 100 : (1.2 / gameSpeed * 1000) + 450;
-            
-            autoPlayInterval = setInterval(() => {
-                if (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) {
-                    processBulkGames();
-                } else {
-                    gameBoards.forEach(board => {
-                        if(!board.isAnimating) playGame(choices[Math.floor(Math.random() * 3)], board);
-                    });
+            stopAutoPlayInterval();
+            lastTick = performance.now();
+            lastUIRender = performance.now();
+            const step = (now) => {
+                if (!autoPlayWantsToRun || !hasEnergy()) {
+                    stopAutoPlayInterval();
+                    return;
                 }
-            }, processInterval / (isMetaBoardActive ? 1 : gameBoards.length));
+                const processInterval = (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) ? 100 : (1.2 / gameSpeed * 1000) + 450;
+                const interval = processInterval / (isMetaBoardActive ? 1 : gameBoards.length);
+                if (now - lastTick >= interval) {
+                    if (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) {
+                        processBulkGames();
+                    } else {
+                        gameBoards.forEach(board => {
+                            if(!board.isAnimating) playGame(choices[Math.floor(Math.random() * 3)], board);
+                        });
+                    }
+                    lastTick = now;
+                }
+                if (now - lastUIRender >= 100) {
+                    updateUI();
+                    lastUIRender = now;
+                }
+                autoPlayInterval = requestAnimationFrame(step);
+            };
+            autoPlayInterval = requestAnimationFrame(step);
         }
 
         function manageAutoPlay() {
@@ -765,7 +823,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
         
         function stopAutoPlayInterval() {
             if (!autoPlayInterval) return;
-            clearInterval(autoPlayInterval);
+            cancelAnimationFrame(autoPlayInterval);
             autoPlayInterval = null;
             upgrades.autoPlay.element.classList.remove('pulse');
             if (!isMetaBoardActive) {
@@ -825,8 +883,8 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
             tooltip.innerHTML = generateCostVisual(cost);
-            
-            lucide.createIcons();
+
+            lucide.createIcons({}, tooltip);
             
             const rect = element.getBoundingClientRect();
             tooltip.style.display = 'block';
@@ -838,6 +896,15 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
         function hideTooltip() {
             tooltip.style.opacity = '0';
             setTimeout(() => { tooltip.style.display = 'none'; }, 200);
+        }
+
+        export function teardown() {
+            stopAutoPlayInterval();
+            if (passiveInterval) {
+                clearInterval(passiveInterval);
+                passiveInterval = null;
+            }
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         }
 
         // --- DEBUG FUNCTIONS ---
