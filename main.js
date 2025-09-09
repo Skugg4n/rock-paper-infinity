@@ -13,6 +13,7 @@
         const epsValue = document.getElementById('eps-value');
         const egpsContainer = document.getElementById('egps-container');
         const egpsValue = document.getElementById('egps-value');
+        const resourceBars = document.getElementById('resource-bars');
         const debugTrigger = document.getElementById('debug-trigger');
         const debugMenu = document.getElementById('debug-menu');
         const debugSpeedEl = document.getElementById('debug-speed');
@@ -365,6 +366,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             updateRateDisplays();
             updateSellButtons();
             debugGamesPlayedEl.textContent = Math.floor(totalGamesPlayed);
+            resourceBars.classList.toggle('hidden', totalStarsEarned < 10);
 
             const energyPercent = (energy / MAX_ENERGY) * 100;
             energyFillEl.style.height = `${energyPercent}%`;
@@ -576,22 +578,10 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
             lucide.createIcons();
 
-            const playerWrapper = board.playerEl.querySelector('.result-wrapper');
-            const computerWrapper = board.computerEl.querySelector('.result-wrapper');
-
             if (result === 'win') {
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;
                 totalStarsEarned += starGain;
-                playerWrapper.classList.add('winner');
-                const playerSvg = playerWrapper.querySelector('svg');
-                playerSvg.classList.add('win-highlight');
-                setTimeout(() => playerSvg.classList.remove('win-highlight'), 600);
-            } else if (result === 'lose') {
-                computerWrapper.classList.add('winner');
-                const computerSvg = computerWrapper.querySelector('svg');
-                computerSvg.classList.add('win-highlight');
-                setTimeout(() => computerSvg.classList.remove('win-highlight'), 600);
             }
 
             updateUI();
