@@ -249,10 +249,19 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             const smallStars = starBalance % 100;
             
             if (crowns > 0) {
-                 const container = document.createElement('div');
-                container.className = 'flex flex-wrap gap-1 items-center';
-                for (let i = 0; i < crowns; i++) container.innerHTML += '<div><i data-lucide="crown" class="lucide-crown-xl text-slate-800"></i></div>';
+                const container = document.createElement('div');
+                container.className = 'grid grid-cols-5 gap-1 items-center';
+                const displayedCrowns = Math.min(crowns, 10);
+                for (let i = 0; i < displayedCrowns; i++) {
+                    container.innerHTML += '<div><i data-lucide="crown" class="lucide-crown-xl text-slate-800"></i></div>';
+                }
                 winTracker.appendChild(container);
+                if (crowns > 10) {
+                    const extraContainer = document.createElement('div');
+                    extraContainer.className = 'flex items-center gap-1 text-slate-800';
+                    extraContainer.innerHTML = `<i data-lucide="crown" class="lucide-crown-xl"></i><span class="text-sm">x ${crowns - 10}</span>`;
+                    winTracker.appendChild(extraContainer);
+                }
             }
             if (gems > 0) {
                 const container = document.createElement('div');
