@@ -108,6 +108,18 @@
         </div>
     </div>
 
+    <!-- Menu button -->
+    <div id="menu-wrapper" class="fixed bottom-4 right-4">
+        <div class="relative">
+            <button id="menu-btn" class="btn w-12 h-12 rounded-full bg-white shadow-lg">
+                <i data-lucide="menu" class="w-6 h-6 text-slate-600"></i>
+            </button>
+            <div id="menu-dropdown" class="hidden absolute bottom-14 right-0 bg-white rounded-lg shadow-lg">
+                <button id="reset-btn" class="block px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap">Reset everything</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Debug-meny -->
     <div id="debug-trigger" class="absolute bottom-0 left-0 w-16 h-16 cursor-pointer"></div>
         <div id="debug-menu" class="hidden absolute bottom-16 left-4 flex flex-col gap-2 bg-slate-700 p-2 rounded-lg shadow-xl z-20">
@@ -128,7 +140,7 @@
     
     <div id="tooltip"></div>
 
-    <div id="version-info" class="absolute bottom-1 left-1 text-[10px] text-slate-400 select-none">v1.0.3</div>
+    <div id="version-info" class="absolute bottom-1 left-1 text-[10px] text-slate-400 select-none">v1.0.4</div>
 
     <script src="roman.js"></script>
     <script src="main.js"></script>

@@ -23,6 +23,9 @@
         const addBoardProgressCircle = document.getElementById('add-board-progress');
         const downgradeTray = document.getElementById('downgrade-tray');
 const tooltip = document.getElementById('tooltip');
+const menuBtn = document.getElementById('menu-btn');
+const menuDropdown = document.getElementById('menu-dropdown');
+const resetBtn = document.getElementById('reset-btn');
 
         // Spelvariabler
         let starBalance = 0;
@@ -42,6 +45,7 @@ const tooltip = document.getElementById('tooltip');
         let quantumFoam = 0;
         const MAX_QUANTUM_FOAM = 1000;
         const HYPER_SPEED_THRESHOLD = 10;
+        const SAVE_KEY = 'rpi-save';
         
         const upgrades = {
             autoPlay: {
@@ -204,14 +208,18 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
         }
 
         function init() {
-            createGameBoard();
+            loadGame();
+            if (gameBoards.length === 0) createGameBoard();
             setupButtons();
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam);
+            menuBtn.addEventListener('click', () => menuDropdown.classList.toggle('hidden'));
+            resetBtn.addEventListener('click', resetGame);
             lucide.createIcons();
             updateAnimationSpeed();
             updateUI();
             debugTrigger.addEventListener('click', () => debugMenu.classList.toggle('hidden'));
+            manageAutoPlay();
             setInterval(passiveTick, 1000);
         }
         
@@ -347,7 +355,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                     placeholder.className = 'w-12 h-12';
                     downgradeTray.appendChild(placeholder);
                 }
-            });
+        });
             lucide.createIcons();
         }
 
@@ -425,6 +433,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             }
 
             lucide.createIcons();
+            saveGame();
         }
 
         // FIX: Återställd funktion
@@ -462,6 +471,71 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
         function hasEnergy() {
             return energy > 0 || reserveEnergy > 0;
+        }
+
+        function saveGame() {
+            const data = {
+                starBalance,
+                totalStarsEarned,
+                totalGamesPlayed,
+                energy,
+                reserveEnergy,
+                gameSpeed,
+                starMultiplier,
+                quantumFoam,
+                isMetaBoardActive,
+                autoPlayWantsToRun,
+                gameBoards: gameBoards.length,
+                upgrades: {}
+            };
+            for (const key in upgrades) {
+                const u = upgrades[key];
+                data.upgrades[key] = {
+                    level: u.level,
+                    purchased: u.purchased
+                };
+            }
+            localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+        }
+
+        function loadGame() {
+            const raw = localStorage.getItem(SAVE_KEY);
+            if (!raw) return;
+            try {
+                const data = JSON.parse(raw);
+                starBalance = data.starBalance ?? starBalance;
+                totalStarsEarned = data.totalStarsEarned ?? totalStarsEarned;
+                totalGamesPlayed = data.totalGamesPlayed ?? totalGamesPlayed;
+                energy = data.energy ?? energy;
+                reserveEnergy = data.reserveEnergy ?? reserveEnergy;
+                starMultiplier = data.starMultiplier ?? starMultiplier;
+                quantumFoam = data.quantumFoam ?? quantumFoam;
+                isMetaBoardActive = data.isMetaBoardActive ?? isMetaBoardActive;
+                autoPlayWantsToRun = data.autoPlayWantsToRun ?? autoPlayWantsToRun;
+                if (data.upgrades) {
+                    for (const key in data.upgrades) {
+                        if (upgrades[key]) {
+                            const info = data.upgrades[key];
+                            if (info.level !== undefined) upgrades[key].level = info.level;
+                            if (info.purchased !== undefined) upgrades[key].purchased = info.purchased;
+                        }
+                    }
+                }
+                if (upgrades.speed && upgrades.speed.level !== undefined) {
+                    gameSpeed = 1 + upgrades.speed.level;
+                } else {
+                    gameSpeed = data.gameSpeed ?? gameSpeed;
+                }
+                const boards = data.gameBoards || 0;
+                for (let i = 0; i < boards; i++) createGameBoard();
+            } catch (e) {
+                console.error('Failed to load save', e);
+            }
+        }
+
+        function resetGame() {
+            localStorage.removeItem(SAVE_KEY);
+            location.reload();
         }
 
         async function playGame(playerChoice, board = gameBoards[0]) {
