@@ -112,6 +112,7 @@ const resetBtn = document.getElementById('reset-btn');
             mergeGameBoard: {
                 cost: 1000, purchased: false,
                 element: document.getElementById('mergeGameBoard'),
+                unlockCondition: () => getSPS() >= 300 && getEPS() >= 300,
                 purchase: function() {
                     this.purchased = true;
                     mergeToMetaBoard();
@@ -311,7 +312,12 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                 : (gameSpeed * boardMultiplier) * baseWinRate;
             return baseSPS * starMultiplier;
         }
-        
+
+        function getEPS() {
+            const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
+            return gameSpeed * boardMultiplier;
+        }
+
         function updateRateDisplays() {
             const sps = getSPS();
             if (sps > 0.1) {
@@ -320,9 +326,8 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             } else {
                 spsContainer.classList.add('hidden');
             }
-            
-            const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
-            const eps = gameSpeed * boardMultiplier;
+
+            const eps = getEPS();
             if (autoPlayInterval) {
                 epsContainer.classList.remove('hidden');
                 epsValue.textContent = eps.toFixed(1);
@@ -393,6 +398,10 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                                      const parentUnlocked = (parent.level !== undefined && parent.level >= parent.maxLevel) || parent.purchased;
                                      return parent.unlocks && parent.unlocks.includes(key) && parentUnlocked;
                                  });
+
+                if (isUnlocked && typeof upgrade.unlockCondition === 'function') {
+                    isUnlocked = upgrade.unlockCondition();
+                }
 
                 if (isUnlocked) {
                     if (isMetaBoardActive && (key === 'addGameBoard' || key === 'mergeGameBoard')) {
