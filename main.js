@@ -33,9 +33,8 @@ const tooltip = document.getElementById('tooltip');
         const MAX_ENERGY = 100;
         const MAX_RESERVE_ENERGY = 1500;
         let autoPlayInterval = null;
-        let autoPlayWantsToRun = false; 
+        let autoPlayWantsToRun = false;
         let gameSpeed = 1;
-        let winChance = 1/3;
         let lastTick = performance.now();
         let gameBoards = [];
         let isMetaBoardActive = false;
@@ -81,7 +80,7 @@ const tooltip = document.getElementById('tooltip');
                 cost: 50, purchased: false, unlocksAtGames: 100, unlocks: [],
                 element: document.getElementById('luck'),
                 purchase: function() {
-                    winChance = 0.5;
+                    starMultiplier *= 1.5;
                     this.element.style.display = 'none';
                 }
             },
@@ -287,9 +286,10 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
         
         function getSPS() {
             const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
+            const baseWinRate = 1 / 3;
             const baseSPS = (gameSpeed < HYPER_SPEED_THRESHOLD)
-                ? (1000 / (((1.2 / gameSpeed) * 1000 + 450) / boardMultiplier)) * winChance
-                : (gameSpeed * boardMultiplier) * winChance;
+                ? (1000 / (((1.2 / gameSpeed) * 1000 + 450) / boardMultiplier)) * baseWinRate
+                : (gameSpeed * boardMultiplier) * baseWinRate;
             return baseSPS * starMultiplier;
         }
         
@@ -473,10 +473,15 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
         function showResult(playerChoice, board, instant = false) {
             const computerChoice = choices[Math.floor(Math.random() * choices.length)];
-            let result = 'tie';
-            
-            if (Math.random() < winChance) result = 'win';
-            else if (Math.random() < 0.5) result = 'lose';
+            let result;
+
+            if (playerChoice === computerChoice) result = 'draw';
+            else if (
+                (playerChoice === 'rock' && computerChoice === 'scissors') ||
+                (playerChoice === 'scissors' && computerChoice === 'paper') ||
+                (playerChoice === 'paper' && computerChoice === 'rock')
+            ) result = 'win';
+            else result = 'lose';
 
             const revealClass = instant ? '' : 'reveal-item';
             board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
@@ -573,7 +578,7 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             consumeEnergy(energyToConsume);
             totalGamesPlayed += energyToConsume;
 
-            const wins = energyToConsume * winChance;
+            const wins = energyToConsume / 3;
             const roundedWins = Math.floor(wins) + (Math.random() < (wins % 1) ? 1 : 0);
             
             const starGain = roundedWins * starMultiplier;
