@@ -51,7 +51,7 @@ const tooltip = document.getElementById('tooltip');
                 purchase: function() { this.element.classList.remove('fade-in'); }
             },
             manualRecharge: {
-                cost: 1, purchased: false, unlocksAt: 15, unlocks: [],
+                cost: 1, consumable: true, unlocksAt: 15, unlocks: [],
                 element: document.getElementById('manualRecharge'),
                 purchase: function() { energy = Math.min(MAX_ENERGY, energy + 10); }
             },
@@ -269,12 +269,20 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             const gridContainer = document.createElement('div');
             gridContainer.className = 'grid grid-cols-10 gap-1';
             for (let i = 0; i < dotsToShow; i++) {
-                if (i < smallStars) gridContainer.innerHTML += '<div><i data-lucide="star" class="lucide-star-small text-slate-800 fill-current"></i></div>';
+                if (i < smallStars) gridContainer.innerHTML += '<div><i data-lucide="star" class="lucide-star-small text-slate-800"></i></div>';
                 else gridContainer.innerHTML += '<div class="dot"></div>';
             }
             winTracker.appendChild(gridContainer);
-            
+
             lucide.createIcons();
+
+            winTracker.querySelectorAll('.lucide-star-small').forEach(svg => {
+                const polygon = svg.querySelector('polygon');
+                if (polygon) {
+                    polygon.setAttribute('fill', 'currentColor');
+                    polygon.setAttribute('stroke', 'none');
+                }
+            });
         }
         
         function getSPS() {
@@ -471,20 +479,25 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
             else if (Math.random() < 0.5) result = 'lose';
 
             const revealClass = instant ? '' : 'reveal-item';
-            board.playerEl.innerHTML = `<div class="${revealClass}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
-            board.computerEl.innerHTML = `<div class="${revealClass}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            board.computerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
 
             lucide.createIcons();
+
+            const playerWrapper = board.playerEl.querySelector('.result-wrapper');
+            const computerWrapper = board.computerEl.querySelector('.result-wrapper');
 
             if (result === 'win') {
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;
                 totalStarsEarned += starGain;
-                const playerSvg = board.playerEl.querySelector('svg');
+                playerWrapper.classList.add('winner');
+                const playerSvg = playerWrapper.querySelector('svg');
                 playerSvg.classList.add('win-highlight');
                 setTimeout(() => playerSvg.classList.remove('win-highlight'), 600);
             } else if (result === 'lose') {
-                const computerSvg = board.computerEl.querySelector('svg');
+                computerWrapper.classList.add('winner');
+                const computerSvg = computerWrapper.querySelector('svg');
                 computerSvg.classList.add('win-highlight');
                 setTimeout(() => computerSvg.classList.remove('win-highlight'), 600);
             }
