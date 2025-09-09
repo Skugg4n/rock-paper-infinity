@@ -84,6 +84,7 @@
             <button id="speed" data-upgrade="speed" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
                 <svg class="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
                     <circle class="progress-ring-bg" cx="18" cy="18" r="16" fill="none" stroke-width="3"></circle>
+                    <circle id="speed-early-progress" class="progress-ring-pre" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
                     <circle id="speed-progress" class="progress-ring-fg" cx="18" cy="18" r="16" fill="none" stroke-width="3" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
                 </svg>
                 <i id="speed-icon" data-lucide="chevrons-right" class="relative w-6 h-6 text-slate-600"></i>
@@ -128,7 +129,7 @@
     
     <div id="tooltip"></div>
 
-    <div id="version-info" class="absolute bottom-1 left-1 text-[10px] text-slate-400 select-none">v1.0.3</div>
+    <div id="version-info" class="absolute bottom-1 left-1 text-[10px] text-slate-400 select-none">v1.0.4</div>
 
     <script src="roman.js"></script>
     <script src="main.js"></script>
