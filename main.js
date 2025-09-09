@@ -543,14 +543,48 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
                 }
                 const boards = data.gameBoards || 0;
                 for (let i = 0; i < boards; i++) createGameBoard();
+                if (isMetaBoardActive) {
+                    mergeToMetaBoard();
+                }
+                if (upgrades.luck.purchased) {
+                    upgrades.luck.element.style.display = 'none';
+                }
             } catch (e) {
                 console.error('Failed to load save', e);
             }
         }
 
         function resetGame() {
+            stopAutoPlayInterval();
+            autoPlayWantsToRun = false;
             localStorage.removeItem(SAVE_KEY);
-            location.reload();
+            starBalance = 0;
+            totalStarsEarned = 0;
+            totalGamesPlayed = 0;
+            energy = MAX_ENERGY;
+            reserveEnergy = 0;
+            starMultiplier = 1;
+            quantumFoam = 0;
+            gameSpeed = 1;
+            isMetaBoardActive = false;
+            quantumFoamContainer.classList.add('hidden');
+            gameBoards = [];
+            gameBoardContainer.className = 'pointer-events-none flex-grow grid grid-cols-1 items-center justify-center gap-4';
+            gameBoardContainer.innerHTML = '';
+            for (const key in upgrades) {
+                const up = upgrades[key];
+                if (up.level !== undefined) up.level = 0;
+                if (up.purchased !== undefined) up.purchased = false;
+                up.element.classList.remove('purchased', 'invisible', 'toggled', 'pulse');
+                up.element.disabled = false;
+                up.element.style.display = '';
+            }
+            createGameBoard();
+            choiceButtons.forEach(btn => btn.disabled = false);
+            menuDropdown.classList.add('hidden');
+            updateAnimationSpeed();
+            manageAutoPlay();
+            updateUI();
         }
 
         async function playGame(playerChoice, board = gameBoards[0]) {
