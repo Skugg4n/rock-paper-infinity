@@ -140,6 +140,26 @@ const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
 const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
 const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
 
+const iconCache = {};
+const getIcon = (name, className = '') => {
+    const key = `${name}:${className}`;
+    if (!iconCache[key]) {
+        iconCache[key] = buildIcon(name, className);
+    }
+    return iconCache[key].cloneNode(true);
+};
+
+let uiUpdatePending = false;
+function scheduleUIUpdate() {
+    if (!uiUpdatePending) {
+        uiUpdatePending = true;
+        requestAnimationFrame(() => {
+            uiUpdatePending = false;
+            updateUI();
+        });
+    }
+}
+
         function setupButtons() {
             document.querySelectorAll('button').forEach(btn => {
                 const choice = btn.dataset.choice;
@@ -237,7 +257,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             resetBtn.addEventListener('click', resetGame);
             lucide.createIcons();
             updateAnimationSpeed();
-            updateUI();
+            scheduleUIUpdate();
             debugTrigger.addEventListener('click', () => debugMenu.classList.toggle('hidden'));
             manageAutoPlay();
             passiveInterval = setInterval(passiveTick, 1000);
@@ -251,7 +271,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                 reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + energyGen);
             }
             manageAutoPlay();
-            updateUI();
+            scheduleUIUpdate();
         }
 
         function handleVisibilityChange() {
@@ -413,24 +433,48 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
         });
         }
 
+const uiState = {
+    gamesPlayed: 0,
+    showResources: false,
+    energyPercent: -1,
+    reservePercent: -1,
+    energyEmpty: null
+};
+
         function updateUI() {
             updateWinVisuals();
             updateRateDisplays();
             updateSellButtons();
-            debugGamesPlayedEl.textContent = Math.floor(totalGamesPlayed);
-            resourceBars.classList.toggle('hidden', totalStarsEarned < 10);
+
+            const games = Math.floor(totalGamesPlayed);
+            if (games !== uiState.gamesPlayed) {
+                debugGamesPlayedEl.textContent = games;
+                uiState.gamesPlayed = games;
+            }
+
+            const showResources = totalStarsEarned >= 10;
+            if (showResources !== uiState.showResources) {
+                resourceBars.classList.toggle('hidden', !showResources);
+                uiState.showResources = showResources;
+            }
 
             const energyPercent = (energy / MAX_ENERGY) * 100;
-            energyFillEl.style.height = `${energyPercent}%`;
-            const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
-            reserveEnergyFillEl.style.height = `${reservePercent}%`;
+            if (energyPercent !== uiState.energyPercent) {
+                energyFillEl.style.height = `${energyPercent}%`;
+                uiState.energyPercent = energyPercent;
+            }
 
-            if (energy <= 0) {
-                energyFillEl.classList.add('bg-red-500');
-                energyFillEl.classList.remove('bg-emerald-500');
-            } else {
-                energyFillEl.classList.remove('bg-red-500');
-                energyFillEl.classList.add('bg-emerald-500');
+            const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
+            if (reservePercent !== uiState.reservePercent) {
+                reserveEnergyFillEl.style.height = `${reservePercent}%`;
+                uiState.reservePercent = reservePercent;
+            }
+
+            const energyEmpty = energy <= 0;
+            if (energyEmpty !== uiState.energyEmpty) {
+                energyFillEl.classList.toggle('bg-red-500', energyEmpty);
+                energyFillEl.classList.toggle('bg-emerald-500', !energyEmpty);
+                uiState.energyEmpty = energyEmpty;
             }
 
             for (const key in upgrades) {
@@ -505,18 +549,32 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             else if (gameSpeed <= 6) countdownIcons = ["III", "II"];
             else if (gameSpeed <= 7) countdownIcons = ["III"];
             else if (gameSpeed <= HYPER_SPEED_THRESHOLD) countdownIcons = ["I"];
-            
+
+            if (countdownIcons.length === 0) return;
+
             const svgMap = {
                 "III": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`,
                 "II": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="22" y1="14" x2="22" y2="42"></line><line x1="34" y1="14" x2="34" y2="42"></line></svg>`,
                 "I": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="28" y1="14" x2="28" y2="42"></line></svg>`
             };
-            
-            for (const icon of countdownIcons) {
-                board.computerEl.innerHTML = svgMap[icon];
-                board.playerEl.innerHTML = svgMap[icon];
-                await new Promise(resolve => setTimeout(resolve, duration));
-            }
+
+            const container = document.createElement('div');
+            container.className = 'countdown-container';
+
+            countdownIcons.forEach((icon, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = svgMap[icon];
+                const svg = wrapper.firstElementChild;
+                svg.style.animationDuration = `${duration}ms`;
+                svg.style.animationDelay = `${duration * index}ms`;
+                svg.classList.add('countdown-frame');
+                container.appendChild(svg);
+            });
+
+            board.computerEl.replaceChildren(container.cloneNode(true));
+            board.playerEl.replaceChildren(container);
+
+            await new Promise(resolve => setTimeout(resolve, duration * countdownIcons.length));
         }
 
         function consumeEnergy(amount = 1) {
@@ -629,7 +687,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             menuDropdown.classList.add('hidden');
             updateAnimationSpeed();
             manageAutoPlay();
-            updateUI();
+            scheduleUIUpdate();
         }
 
         async function playGame(playerChoice, board = gameBoards[0]) {
@@ -661,10 +719,15 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             else result = 'lose';
 
             const revealClass = instant ? '' : 'reveal-item';
-            board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
-            board.computerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            const playerWrapper = document.createElement('div');
+            playerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}`;
+            playerWrapper.appendChild(getIcon(iconMap[playerChoice], 'lucide-lg text-slate-800'));
+            board.playerEl.replaceChildren(playerWrapper);
 
-            lucide.createIcons({}, board.element);
+            const computerWrapper = document.createElement('div');
+            computerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}`;
+            computerWrapper.appendChild(getIcon(iconMap[computerChoice], 'lucide-lg text-slate-800'));
+            board.computerEl.replaceChildren(computerWrapper);
 
             if (result === 'win') {
                 const starGain = 1 * starMultiplier;
@@ -672,14 +735,14 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                 totalStarsEarned += starGain;
             }
 
-            updateUI();
+            scheduleUIUpdate();
             
             if (!hasEnergy() && autoPlayInterval) stopAutoPlayInterval();
 
             setTimeout(() => {
                 board.isAnimating = false;
                 if (!autoPlayInterval) choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
-                updateUI();
+                scheduleUIUpdate();
             }, instant ? 50 : 400);
         }
         
@@ -699,7 +762,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                     upgrade.purchased = true;
                 }
                 upgrade.purchase();
-                updateUI();
+                scheduleUIUpdate();
                 if (key === 'autoPlay') toggleAutoPlayState();
                 if (key.startsWith('speed')) updateAnimationSpeed();
             }
@@ -723,7 +786,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                 adjustBoardLayout();
             }
             
-            updateUI();
+            scheduleUIUpdate();
             if (key === 'speed') updateAnimationSpeed();
         }
 
@@ -757,10 +820,9 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             if (!isMetaBoardActive) {
                 gameBoards.forEach(board => {
                     const randomChoice1 = choices[Math.floor(Math.random() * 3)];
-                    board.computerEl.innerHTML = `<i data-lucide="${iconMap[randomChoice1]}" class="lucide-lg text-slate-400"></i>`;
-                    board.playerEl.innerHTML = `<i data-lucide="${iconMap[choices[Math.floor(Math.random() * 3)]]}" class="lucide-lg text-slate-400"></i>`;
+                    board.computerEl.replaceChildren(getIcon(iconMap[randomChoice1], 'lucide-lg text-slate-400'));
+                    board.playerEl.replaceChildren(getIcon(iconMap[choices[Math.floor(Math.random() * 3)]], 'lucide-lg text-slate-400'));
                 });
-                lucide.createIcons({}, gameBoardContainer);
             }
         }
 
@@ -776,7 +838,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                 metaBoard.classList.add('pop-item');
                 setTimeout(() => metaBoard.classList.remove('pop-item'), 500);
             }
-            updateUI();
+            scheduleUIUpdate();
         }
 
         function restartAutoPlay() {
@@ -801,7 +863,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                     lastTick = now;
                 }
                 if (now - lastUIRender >= 100) {
-                    updateUI();
+                    scheduleUIUpdate();
                     lastUIRender = now;
                 }
                 autoPlayInterval = requestAnimationFrame(step);
@@ -911,7 +973,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
         function addStars(amount) {
             starBalance += amount;
             totalStarsEarned += amount;
-            updateUI();
+            scheduleUIUpdate();
         }
         function changeSpeed(amount) {
             const currentLevel = upgrades.speed.level;
@@ -920,7 +982,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                 upgrades.speed.level = newLevel;
                 gameSpeed = 1 + newLevel;
                 updateAnimationSpeed();
-                updateUI();
+                scheduleUIUpdate();
             }
         }
 
