@@ -386,8 +386,7 @@ function scheduleUIUpdate() {
             return gameSpeed * boardMultiplier;
         }
 
-        function updateRateDisplays() {
-            const sps = getSPS();
+        function updateRateDisplays(sps, eps, egps, autoActive) {
             if (sps > 0.1) {
                 spsContainer.classList.remove('hidden');
                 spsValue.textContent = sps.toFixed(1);
@@ -395,15 +394,13 @@ function scheduleUIUpdate() {
                 spsContainer.classList.add('hidden');
             }
 
-            const eps = getEPS();
-            if (autoPlayInterval) {
+            if (autoActive) {
                 epsContainer.classList.remove('hidden');
                 epsValue.textContent = eps.toFixed(1);
             } else {
                 epsContainer.classList.add('hidden');
             }
 
-            const egps = upgrades.energyGenerator.level * 5;
             if (egps > 0) {
                 egpsContainer.classList.remove('hidden');
                 egpsValue.textContent = egps.toFixed(1);
@@ -430,56 +427,31 @@ function scheduleUIUpdate() {
                     placeholder.className = 'w-12 h-12';
                     downgradeTray.appendChild(placeholder);
                 }
-        });
+            });
         }
 
-const uiState = {
-    gamesPlayed: 0,
-    showResources: false,
-    energyPercent: -1,
-    reservePercent: -1,
-    energyEmpty: null
-};
+        function updateProgressCircles(speedLevel, energyGenLevel, addBoardLevel) {
+            const circumference = 100.5;
+            speedProgressCircle.style.strokeDashoffset = circumference * (1 - (speedLevel / upgrades.speed.maxLevel));
+            const earlyFraction = Math.min(speedLevel, HYPER_SPEED_THRESHOLD) / HYPER_SPEED_THRESHOLD;
+            speedEarlyProgressCircle.style.strokeDashoffset = circumference * (1 - earlyFraction);
+            speedEarlyProgressCircle.style.display = speedLevel < HYPER_SPEED_THRESHOLD ? 'block' : 'none';
 
-        function updateUI() {
-            updateWinVisuals();
-            updateRateDisplays();
-            updateSellButtons();
+            energyGenProgressCircle.style.strokeDashoffset = circumference * (1 - (energyGenLevel / upgrades.energyGenerator.maxLevel));
 
-            const games = Math.floor(totalGamesPlayed);
-            if (games !== uiState.gamesPlayed) {
-                debugGamesPlayedEl.textContent = games;
-                uiState.gamesPlayed = games;
-            }
+            addBoardProgressCircle.style.strokeDashoffset = circumference * (1 - (addBoardLevel / upgrades.addGameBoard.maxLevel));
+        }
 
-            const showResources = totalStarsEarned >= 10;
-            if (showResources !== uiState.showResources) {
-                resourceBars.classList.toggle('hidden', !showResources);
-                uiState.showResources = showResources;
-            }
+        function updateCollapseFoam(percent, ready) {
+            collapseFoamFill.style.height = `${percent}%`;
+            collapseFoamBtn.disabled = !ready;
+            collapseFoamBtn.classList.toggle('ready', ready);
+        }
 
-            const energyPercent = (energy / MAX_ENERGY) * 100;
-            if (energyPercent !== uiState.energyPercent) {
-                energyFillEl.style.height = `${energyPercent}%`;
-                uiState.energyPercent = energyPercent;
-            }
-
-            const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
-            if (reservePercent !== uiState.reservePercent) {
-                reserveEnergyFillEl.style.height = `${reservePercent}%`;
-                uiState.reservePercent = reservePercent;
-            }
-
-            const energyEmpty = energy <= 0;
-            if (energyEmpty !== uiState.energyEmpty) {
-                energyFillEl.classList.toggle('bg-red-500', energyEmpty);
-                energyFillEl.classList.toggle('bg-emerald-500', !energyEmpty);
-                uiState.energyEmpty = energyEmpty;
-            }
-
+        function updateUpgrades() {
             for (const key in upgrades) {
                 const upgrade = upgrades[key];
-                
+
                 let isUnlocked = (upgrade.unlocksAt === 0 && key !== 'mergeGameBoard') || // FIX: Gäller ej mergeGameBoard
                                  (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
                                  (upgrade.unlocksAtGames > 0 && totalGamesPlayed >= upgrade.unlocksAtGames) ||
@@ -508,7 +480,7 @@ const uiState = {
                         if (upgrade.level >= upgrade.maxLevel) upgrade.element.classList.add('purchased');
                     } else if (upgrade.consumable) {
                         upgrade.element.disabled = starBalance < currentCost;
-                    } else { 
+                    } else {
                         upgrade.element.disabled = (starBalance < currentCost) || upgrade.purchased;
                         if (upgrade.purchased) upgrade.element.classList.add('purchased');
                     }
@@ -516,28 +488,101 @@ const uiState = {
                     upgrade.element.classList.add('invisible');
                 }
             }
-            
-            const circumference = 100.5;
+        }
 
-            const speedUpgrade = upgrades.speed;
-            speedProgressCircle.style.strokeDashoffset = circumference * (1 - (speedUpgrade.level / speedUpgrade.maxLevel));
-            const earlyFraction = Math.min(speedUpgrade.level, HYPER_SPEED_THRESHOLD) / HYPER_SPEED_THRESHOLD;
-            speedEarlyProgressCircle.style.strokeDashoffset = circumference * (1 - earlyFraction);
-            speedEarlyProgressCircle.style.display = speedUpgrade.level < HYPER_SPEED_THRESHOLD ? 'block' : 'none';
+const uiState = {
+    gamesPlayed: 0,
+    showResources: false,
+    energyPercent: -1,
+    reservePercent: -1,
+    energyEmpty: null,
+    sps: -1,
+    eps: -1,
+    egps: -1,
+    autoPlayActive: false,
+    speedLevel: -1,
+    energyGenLevel: -1,
+    addBoardLevel: -1,
+    starBalance: -1,
+    totalStarsEarned: -1,
+    isMetaBoardActive: false,
+    foamPercent: -1,
+    foamReady: false
+};
 
-            const energyGenUpgrade = upgrades.energyGenerator;
-            energyGenProgressCircle.style.strokeDashoffset = circumference * (1 - (energyGenUpgrade.level / energyGenUpgrade.maxLevel));
-            
-            const addBoardUpgrade = upgrades.addGameBoard;
-            addBoardProgressCircle.style.strokeDashoffset = circumference * (1 - (addBoardUpgrade.level / addBoardUpgrade.maxLevel));
-            
-            if(isMetaBoardActive) {
-                const foamPercent = (quantumFoam / MAX_QUANTUM_FOAM) * 100;
-                collapseFoamFill.style.height = `${foamPercent}%`;
-                collapseFoamBtn.disabled = quantumFoam < MAX_QUANTUM_FOAM;
-                collapseFoamBtn.classList.toggle('ready', quantumFoam >= MAX_QUANTUM_FOAM);
-            }
-            saveGame();
+        function renderGamesPlayed(value) {
+            debugGamesPlayedEl.textContent = value;
+        }
+
+        function toggleResourceBars(show) {
+            resourceBars.classList.toggle('hidden', !show);
+        }
+
+        function renderEnergy(percent) {
+            energyFillEl.style.height = `${percent}%`;
+        }
+
+        function renderReserveEnergy(percent) {
+            reserveEnergyFillEl.style.height = `${percent}%`;
+        }
+
+        function setEnergyEmpty(empty) {
+            energyFillEl.classList.toggle('bg-red-500', empty);
+            energyFillEl.classList.toggle('bg-emerald-500', !empty);
+        }
+
+        function updateUI() {
+            const games = Math.floor(totalGamesPlayed);
+            const showResources = totalStarsEarned >= 10;
+            const energyPercent = (energy / MAX_ENERGY) * 100;
+            const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
+            const energyEmpty = energy <= 0;
+            const sps = getSPS();
+            const eps = getEPS();
+            const egps = upgrades.energyGenerator.level * 5;
+            const autoActive = !!autoPlayInterval;
+            const speedLevel = upgrades.speed.level;
+            const energyGenLevel = upgrades.energyGenerator.level;
+            const addBoardLevel = upgrades.addGameBoard.level;
+            const foamPercent = (quantumFoam / MAX_QUANTUM_FOAM) * 100;
+            const foamReady = quantumFoam >= MAX_QUANTUM_FOAM;
+
+            const gamesChanged = games !== uiState.gamesPlayed;
+            const resourcesChanged = showResources !== uiState.showResources;
+            const energyChanged = energyPercent !== uiState.energyPercent;
+            const reserveChanged = reservePercent !== uiState.reservePercent;
+            const emptyChanged = energyEmpty !== uiState.energyEmpty;
+            const rateChanged = sps !== uiState.sps || eps !== uiState.eps || egps !== uiState.egps || autoActive !== uiState.autoPlayActive;
+            const levelChanged = speedLevel !== uiState.speedLevel || energyGenLevel !== uiState.energyGenLevel || addBoardLevel !== uiState.addBoardLevel;
+            const foamChanged = isMetaBoardActive && (foamPercent !== uiState.foamPercent || foamReady !== uiState.foamReady);
+            const upgradesChanged = starBalance !== uiState.starBalance || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || levelChanged || isMetaBoardActive !== uiState.isMetaBoardActive;
+
+            const tasks = [];
+            if (gamesChanged) tasks.push(() => renderGamesPlayed(games));
+            if (resourcesChanged) tasks.push(() => toggleResourceBars(showResources));
+            if (energyChanged) tasks.push(() => renderEnergy(energyPercent));
+            if (reserveChanged) tasks.push(() => renderReserveEnergy(reservePercent));
+            if (emptyChanged) tasks.push(() => setEnergyEmpty(energyEmpty));
+            if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive));
+            if (levelChanged) tasks.push(() => { updateProgressCircles(speedLevel, energyGenLevel, addBoardLevel); updateSellButtons(); });
+            if (upgradesChanged) tasks.push(updateUpgrades);
+            if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
+
+            if (!tasks.length) return;
+
+            tasks.push(updateWinVisuals);
+            tasks.push(saveGame);
+            tasks.forEach(fn => fn());
+
+            if (gamesChanged) uiState.gamesPlayed = games;
+            if (resourcesChanged) uiState.showResources = showResources;
+            if (energyChanged) uiState.energyPercent = energyPercent;
+            if (reserveChanged) uiState.reservePercent = reservePercent;
+            if (emptyChanged) uiState.energyEmpty = energyEmpty;
+            if (rateChanged) { uiState.sps = sps; uiState.eps = eps; uiState.egps = egps; uiState.autoPlayActive = autoActive; }
+            if (levelChanged) { uiState.speedLevel = speedLevel; uiState.energyGenLevel = energyGenLevel; uiState.addBoardLevel = addBoardLevel; }
+            if (upgradesChanged) { uiState.starBalance = starBalance; uiState.totalStarsEarned = totalStarsEarned; uiState.isMetaBoardActive = isMetaBoardActive; }
+            if (foamChanged) { uiState.foamPercent = foamPercent; uiState.foamReady = foamReady; }
         }
 
         // FIX: Återställd funktion
