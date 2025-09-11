@@ -118,7 +118,10 @@ const resetBtn = document.getElementById('reset-btn');
                 cost: 1000, purchased: false,
                 unlocksAt: 0,
                 element: document.getElementById('mergeGameBoard'),
-                unlockCondition: () => getSPS() >= 300 && getEPS() >= 300,
+                // Factory becomes available when both speed and energy
+                // production are 500/s or more, or stars/s exceeds 250.
+                unlockCondition: () =>
+                    ((getEPS() >= 500 && upgrades.energyGenerator.level * 5 >= 500) || getSPS() >= 250),
                 purchase: function() {
                     this.purchased = true;
                     mergeToMetaBoard();
@@ -401,6 +404,9 @@ function scheduleUIUpdate() {
 
         function updateSellButtons() {
             downgradeTray.innerHTML = '';
+            const factoryReady = upgrades.mergeGameBoard.unlockCondition &&
+                upgrades.mergeGameBoard.unlockCondition();
+            if (factoryReady && !upgrades.mergeGameBoard.purchased) return;
             if (upgrades.energyGenerator.level < upgrades.energyGenerator.maxLevel) return;
 
             const sellableUpgrades = ['speed', 'addGameBoard'];
@@ -439,8 +445,16 @@ function scheduleUIUpdate() {
         }
 
         function updateUpgrades() {
+            const factoryReady = upgrades.mergeGameBoard.unlockCondition &&
+                upgrades.mergeGameBoard.unlockCondition() &&
+                !upgrades.mergeGameBoard.purchased;
             for (const key in upgrades) {
                 const upgrade = upgrades[key];
+
+                if (factoryReady && key !== 'mergeGameBoard') {
+                    upgrade.element.classList.add('invisible');
+                    continue;
+                }
 
                 let isUnlocked = (upgrade.unlocksAt === 0) ||
                                  (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
