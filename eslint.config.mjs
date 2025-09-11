@@ -13,7 +13,6 @@ export default [
         ...globals.browser,
         ...globals.node,
         ...globals.jest,
-        lucide: "readonly",
         toRoman: "readonly",
       },
     },

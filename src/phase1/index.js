@@ -1,3 +1,5 @@
+import { getIcon } from "../icons.js";
+
         // DOM-element
         const gameBoardContainer = document.getElementById('game-board-container');
         const choiceButtons = document.querySelectorAll('#player-controls-container .choice-btn');
@@ -127,12 +129,7 @@ const resetBtn = document.getElementById('reset-btn');
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
-const buildIcon = (name, className = '') => {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = `<i data-lucide="${name}" class="${className}"></i>`;
-    lucide.createIcons({}, wrapper);
-    return wrapper.firstElementChild;
-};
+const buildIcon = (name, className = '') => getIcon(name, className);
 
 const crownTemplate = buildIcon('crown', 'lucide-crown-xl text-slate-800');
 const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
@@ -140,7 +137,7 @@ const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
 const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
 const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
 
-const getIcon = (name, className = '') => buildIcon(name, className);
+
 
 let uiUpdatePending = false;
 function scheduleUIUpdate() {
@@ -230,13 +227,13 @@ function scheduleUIUpdate() {
                 metaBoard = document.createElement('div');
                 metaBoard.id = 'meta-board';
                 metaBoard.className = 'rounded-2xl aspect-square w-full h-auto flex justify-center items-center';
-                metaBoard.innerHTML = `<i data-lucide="factory" class="lucide-lg text-black"></i>`;
+                metaBoard.replaceChildren(getIcon('factory', 'lucide-lg text-black'));
                 gameBoardContainer.innerHTML = '';
                 gameBoardContainer.className = 'flex-grow grid grid-cols-1 items-center justify-center gap-4 max-w-sm mx-auto';
                 gameBoardContainer.appendChild(metaBoard);
             }
             metaBoard.style.display = 'flex';
-            lucide.createIcons({}, metaBoard);
+
             quantumFoamContainer.classList.remove('hidden');
         }
 
@@ -248,7 +245,7 @@ function scheduleUIUpdate() {
             collapseFoamBtn.addEventListener('click', collapseFoam);
             menuBtn.addEventListener('click', () => menuDropdown.classList.toggle('hidden'));
             resetBtn.addEventListener('click', resetGame);
-            lucide.createIcons();
+
             updateAnimationSpeed();
             scheduleUIUpdate();
             debugTrigger.addEventListener('click', () => debugMenu.classList.toggle('hidden'));
@@ -954,7 +951,7 @@ const uiState = {
         };
 
         function generateCostVisual(cost) {
-            let html = `<div class="flex items-center gap-2"><i data-lucide="star" class="w-4 h-4 text-white fill-current"></i><span class="font-bold text-lg">×</span>`;
+              let html = `<div class="flex items-center gap-2">${getIcon('star','w-4 h-4 text-white fill-current').outerHTML}<span class="font-bold text-lg">×</span>`;
             if (cost === 0) return 'Gratis';
             if (cost >= 10) {
                 html += `<span class="font-mono text-lg">${toRoman(cost)}</span>`;
@@ -984,7 +981,7 @@ const uiState = {
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
             tooltip.innerHTML = generateCostVisual(cost);
 
-            lucide.createIcons({}, tooltip);
+
             
             const rect = element.getBoundingClientRect();
             tooltip.style.display = 'block';
