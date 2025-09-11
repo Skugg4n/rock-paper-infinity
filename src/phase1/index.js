@@ -106,7 +106,7 @@ const resetBtn = document.getElementById('reset-btn');
             addGameBoard: {
                 level: 0, maxLevel: 8,
                 cost: () => 100 + Math.floor(upgrades.addGameBoard.level * 25),
-                unlocksAt: 100, unlocks: ['mergeGameBoard'],
+                unlocksAt: 100, unlocks: [],
                 element: document.getElementById('addGameBoard'),
                 purchase: function() {
                     if (this.level >= this.maxLevel) return;
@@ -114,9 +114,9 @@ const resetBtn = document.getElementById('reset-btn');
                     createGameBoard();
                 }
             },
-            // FIX: Knappen låses inte längre upp vid start
             mergeGameBoard: {
                 cost: 1000, purchased: false,
+                unlocksAt: 0,
                 element: document.getElementById('mergeGameBoard'),
                 unlockCondition: () => getSPS() >= 300 && getEPS() >= 300,
                 purchase: function() {
@@ -442,7 +442,7 @@ function scheduleUIUpdate() {
             for (const key in upgrades) {
                 const upgrade = upgrades[key];
 
-                let isUnlocked = (upgrade.unlocksAt === 0 && key !== 'mergeGameBoard') || // FIX: Gäller ej mergeGameBoard
+                let isUnlocked = (upgrade.unlocksAt === 0) ||
                                  (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
                                  (upgrade.unlocksAtGames > 0 && totalGamesPlayed >= upgrade.unlocksAtGames) ||
                                  (upgrade.unlocksAtSPS > 0 && getSPS() >= upgrade.unlocksAtSPS) ||
@@ -452,8 +452,8 @@ function scheduleUIUpdate() {
                                      return parent.unlocks && parent.unlocks.includes(key) && parentUnlocked;
                                  });
 
-                if (isUnlocked && typeof upgrade.unlockCondition === 'function') {
-                    isUnlocked = upgrade.unlockCondition();
+                if (typeof upgrade.unlockCondition === 'function') {
+                    isUnlocked = isUnlocked && upgrade.unlockCondition();
                 }
 
                 if (isUnlocked) {
