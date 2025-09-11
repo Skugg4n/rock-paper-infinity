@@ -125,6 +125,15 @@ const resetBtn = document.getElementById('reset-btn');
                     this.purchased = true;
                     mergeToMetaBoard();
                 }
+            },
+            bank: {
+                cost: 10000, purchased: false, unlocksAt: 0,
+                element: document.getElementById('buyBank'),
+                unlockCondition: () => isMetaBoardActive,
+                purchase: function() {
+                    this.purchased = true;
+                    window.location.href = 'city.html';
+                }
             }
         };
 
@@ -387,6 +396,11 @@ function scheduleUIUpdate() {
                 const upgrade = upgrades[key];
 
                 if (factoryReady && key !== 'mergeGameBoard') {
+                    upgrade.element.classList.add('invisible');
+                    continue;
+                }
+
+                if (isMetaBoardActive && !upgrades.bank.purchased && key !== 'bank') {
                     upgrade.element.classList.add('invisible');
                     continue;
                 }
