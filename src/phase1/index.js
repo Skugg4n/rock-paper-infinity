@@ -159,6 +159,7 @@ const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
 const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
 const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
 const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
+const factoryTemplate = buildIcon('factory', 'lucide-lg text-black');
 
         function setupButtons() {
             document.querySelectorAll('button').forEach(btn => {
@@ -237,13 +238,12 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
                 metaBoard = document.createElement('div');
                 metaBoard.id = 'meta-board';
                 metaBoard.className = 'rounded-2xl aspect-square w-full h-auto flex justify-center items-center';
-                metaBoard.innerHTML = `<i data-lucide="factory" class="lucide-lg text-black"></i>`;
+                metaBoard.appendChild(factoryTemplate.cloneNode(true));
                 gameBoardContainer.innerHTML = '';
                 gameBoardContainer.className = 'flex-grow grid grid-cols-1 items-center justify-center gap-4 max-w-sm mx-auto';
                 gameBoardContainer.appendChild(metaBoard);
             }
             metaBoard.style.display = 'flex';
-            lucide.createIcons({}, metaBoard);
             quantumFoamContainer.classList.remove('hidden');
         }
 
