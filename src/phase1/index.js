@@ -127,12 +127,32 @@ const resetBtn = document.getElementById('reset-btn');
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
-const buildIcon = (name, className = '') => {
+// Pre-generated icon templates to avoid repeated lucide.createIcons calls
+const iconNodes = {
+    light: {
+        rock: buildIcon(iconMap.rock, 'lucide-lg text-slate-400'),
+        paper: buildIcon(iconMap.paper, 'lucide-lg text-slate-400'),
+        scissors: buildIcon(iconMap.scissors, 'lucide-lg text-slate-400')
+    },
+    dark: {
+        rock: buildIcon(iconMap.rock, 'lucide-lg text-slate-800'),
+        paper: buildIcon(iconMap.paper, 'lucide-lg text-slate-800'),
+        scissors: buildIcon(iconMap.scissors, 'lucide-lg text-slate-800')
+    }
+};
+
+const starSvg = lucide.icons.star.toSvg({ class: 'w-4 h-4 text-white fill-current' });
+
+function cloneIcon(choice, variant = 'light') {
+    return iconNodes[variant][choice].cloneNode(true);
+}
+
+function buildIcon(name, className = '') {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = `<i data-lucide="${name}" class="${className}"></i>`;
     lucide.createIcons({}, wrapper);
     return wrapper.firstElementChild;
-};
+}
 
 const crownTemplate = buildIcon('crown', 'lucide-crown-xl text-slate-800');
 const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
@@ -506,15 +526,21 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             else if (gameSpeed <= 7) countdownIcons = ["III"];
             else if (gameSpeed <= HYPER_SPEED_THRESHOLD) countdownIcons = ["I"];
             
-            const svgMap = {
-                "III": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`,
-                "II": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="22" y1="14" x2="22" y2="42"></line><line x1="34" y1="14" x2="34" y2="42"></line></svg>`,
-                "I": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="28" y1="14" x2="28" y2="42"></line></svg>`
+            const buildCountdownSvg = svg => {
+                const t = document.createElement('template');
+                t.innerHTML = svg.trim();
+                return t.content.firstChild;
             };
-            
+            const countdownSvgMap = {
+                "III": buildCountdownSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`),
+                "II": buildCountdownSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="22" y1="14" x2="22" y2="42"></line><line x1="34" y1="14" x2="34" y2="42"></line></svg>`),
+                "I": buildCountdownSvg(`<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="28" y1="14" x2="28" y2="42"></line></svg>`)
+            };
+
             for (const icon of countdownIcons) {
-                board.computerEl.innerHTML = svgMap[icon];
-                board.playerEl.innerHTML = svgMap[icon];
+                const node = countdownSvgMap[icon].cloneNode(true);
+                board.computerEl.replaceChildren(node.cloneNode(true));
+                board.playerEl.replaceChildren(node);
                 await new Promise(resolve => setTimeout(resolve, duration));
             }
         }
@@ -661,10 +687,15 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             else result = 'lose';
 
             const revealClass = instant ? '' : 'reveal-item';
-            board.playerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}"><i data-lucide="${iconMap[playerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
-            board.computerEl.innerHTML = `<div class="result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}"><i data-lucide="${iconMap[computerChoice]}" class="lucide-lg text-slate-800"></i></div>`;
+            const playerWrapper = document.createElement('div');
+            playerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}`;
+            playerWrapper.appendChild(cloneIcon(playerChoice, 'dark'));
+            board.playerEl.replaceChildren(playerWrapper);
 
-            lucide.createIcons({}, board.element);
+            const computerWrapper = document.createElement('div');
+            computerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}`;
+            computerWrapper.appendChild(cloneIcon(computerChoice, 'dark'));
+            board.computerEl.replaceChildren(computerWrapper);
 
             if (result === 'win') {
                 const starGain = 1 * starMultiplier;
@@ -757,10 +788,10 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             if (!isMetaBoardActive) {
                 gameBoards.forEach(board => {
                     const randomChoice1 = choices[Math.floor(Math.random() * 3)];
-                    board.computerEl.innerHTML = `<i data-lucide="${iconMap[randomChoice1]}" class="lucide-lg text-slate-400"></i>`;
-                    board.playerEl.innerHTML = `<i data-lucide="${iconMap[choices[Math.floor(Math.random() * 3)]]}" class="lucide-lg text-slate-400"></i>`;
+                    const randomChoice2 = choices[Math.floor(Math.random() * 3)];
+                    board.computerEl.replaceChildren(cloneIcon(randomChoice1));
+                    board.playerEl.replaceChildren(cloneIcon(randomChoice2));
                 });
-                lucide.createIcons({}, gameBoardContainer);
             }
         }
 
@@ -829,8 +860,8 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             if (!isMetaBoardActive) {
                 choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
                 gameBoards.forEach(board => {
-                    board.computerEl.innerHTML = '';
-                    board.playerEl.innerHTML = '';
+                    board.computerEl.replaceChildren();
+                    board.playerEl.replaceChildren();
                 });
             }
         }
@@ -854,7 +885,7 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
         };
 
         function generateCostVisual(cost) {
-            let html = `<div class="flex items-center gap-2"><i data-lucide="star" class="w-4 h-4 text-white fill-current"></i><span class="font-bold text-lg">×</span>`;
+            let html = `<div class="flex items-center gap-2">${starSvg}<span class="font-bold text-lg">×</span>`;
             if (cost === 0) return 'Gratis';
             if (cost >= 10) {
                 html += `<span class="font-mono text-lg">${toRoman(cost)}</span>`;
@@ -883,8 +914,6 @@ const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
             
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
             tooltip.innerHTML = generateCostVisual(cost);
-
-            lucide.createIcons({}, tooltip);
             
             const rect = element.getBoundingClientRect();
             tooltip.style.display = 'block';
