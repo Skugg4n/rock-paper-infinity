@@ -12,7 +12,13 @@
 
     <!-- Star display on the left -->
     <div class="absolute top-8 left-4 md:left-8">
-        <div id="win-tracker" class="flex flex-col items-start gap-3"></div>
+        <div id="star-counter" class="flex items-center gap-2">
+            <i data-lucide="star" class="w-8 h-8 text-yellow-500 fill-yellow-500"></i>
+            <div class="leading-none">
+                <div id="star-balance" class="text-3xl font-bold font-mono">0</div>
+                <div id="star-rate" class="text-green-600 font-bold font-mono text-sm">+0/s</div>
+            </div>
+        </div>
     </div>
 
     <!-- Resource bars on the right -->
@@ -73,12 +79,12 @@
                 <button id="manualRecharge" data-upgrade="manualRecharge" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="battery-charging"></i></button>
                 <button id="autoPlay" data-upgrade="autoPlay" class="invisible btn upgrade-btn bg-slate-50 w-16 h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="repeat-2"></i></button>
             </div>
-            <div id="version-info" class="text-[10px] text-slate-400 select-none self-start">v1.3.6</div>
+            <div id="version-info" class="text-[10px] text-slate-400 select-none self-start">v1.3.7</div>
         </footer>
     </div>
 
-    <!-- Uppgraderingsknappar -->
-    <div class="absolute bottom-8 right-8 flex items-end gap-3">
+    <!-- Uppgraderingsknappar (dolda i steg 2) -->
+    <div class="absolute bottom-8 right-8 flex items-end gap-3 hidden">
         <div id="downgrade-tray" class="flex flex-col gap-3"></div>
         <div id="upgrade-tray" class="flex flex-col gap-3">
             <button id="speed" data-upgrade="speed" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
