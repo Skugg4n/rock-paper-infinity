@@ -140,14 +140,7 @@ const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
 const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
 const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
 
-const iconCache = {};
-const getIcon = (name, className = '') => {
-    const key = `${name}:${className}`;
-    if (!iconCache[key]) {
-        iconCache[key] = buildIcon(name, className);
-    }
-    return iconCache[key].cloneNode(true);
-};
+const getIcon = (name, className = '') => buildIcon(name, className);
 
 let uiUpdatePending = false;
 function scheduleUIUpdate() {
