@@ -3,8 +3,7 @@ import { getIcon } from "../icons.js";
         // DOM-element
         const gameBoardContainer = document.getElementById('game-board-container');
         const choiceButtons = document.querySelectorAll('#player-controls-container .choice-btn');
-        const starBalanceEl = document.getElementById('star-balance');
-        const starRateEl = document.getElementById('star-rate');
+        const winTracker = document.getElementById('win-tracker');
         const energyFillEl = document.getElementById('energy-fill');
         const reserveEnergyFillEl = document.getElementById('reserve-energy-fill');
         const quantumFoamContainer = document.getElementById('quantum-foam-container');
@@ -46,6 +45,8 @@ const resetBtn = document.getElementById('reset-btn');
         let lastTick = performance.now();
         let lastUIRender = performance.now();
         let passiveInterval = null;
+        let lastStarBalance = -1;
+        let lastTotalStarsEarned = -1;
         let gameBoards = [];
         let isMetaBoardActive = false;
         let starMultiplier = 1;
@@ -133,6 +134,10 @@ const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
 const buildIcon = (name, className = '') => getIcon(name, className);
 
+const crownTemplate = buildIcon('crown', 'lucide-crown-xl text-slate-800');
+const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
+const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
+const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
 const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
 
 
@@ -285,20 +290,80 @@ function scheduleUIUpdate() {
             if (autoPlayInterval) restartAutoPlay();
         }
 
-        let displayedStars = 0;
-
-        function updateStarDisplay() {
-            const diff = starBalance - displayedStars;
-            if (diff > 0) {
-                displayedStars += Math.max(1, Math.floor(diff / 5));
-            } else {
-                displayedStars = starBalance;
-            }
-            starBalanceEl.textContent = Math.floor(displayedStars).toLocaleString('sv-SE');
-            starRateEl.textContent = `+${Math.floor(getSPS()).toLocaleString('sv-SE')}/s`;
+        function getVisibleDots() {
+            if (totalStarsEarned >= 30) return 100;
+            if (totalStarsEarned >= 10) return 20;
+            if (totalStarsEarned >= 5) return 10;
+            return 5;
         }
 
-        setInterval(updateStarDisplay, 50);
+        function updateWinVisuals() {
+            if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned) return;
+            lastStarBalance = starBalance;
+            lastTotalStarsEarned = totalStarsEarned;
+
+            winTracker.innerHTML = '';
+            const crowns = Math.floor(starBalance / 10000);
+            const gems = Math.floor((starBalance % 10000) / 100);
+            const smallStars = starBalance % 100;
+
+            if (crowns > 0) {
+                const container = document.createElement('div');
+                container.className = 'grid grid-cols-5 gap-1 items-center';
+                const displayedCrowns = Math.min(crowns, 10);
+                for (let i = 0; i < displayedCrowns; i++) {
+                    const wrap = document.createElement('div');
+                    wrap.appendChild(crownTemplate.cloneNode(true));
+                    container.appendChild(wrap);
+                }
+                winTracker.appendChild(container);
+                if (crowns > 10) {
+                    const extra = document.createElement('div');
+                    extra.className = 'flex items-center gap-1 text-slate-800';
+                    extra.appendChild(crownTemplate.cloneNode(true));
+                    const span = document.createElement('span');
+                    span.className = 'text-sm';
+                    span.textContent = `x ${crowns - 10}`;
+                    extra.appendChild(span);
+                    winTracker.appendChild(extra);
+                }
+            }
+
+            const showGemPlaceholders = totalStarsEarned >= 10000;
+            if (gems > 0 || showGemPlaceholders) {
+                const container = document.createElement('div');
+                container.className = 'grid grid-cols-10 gap-1 items-center';
+                const gemTemplate = gems > 5 ? gemMediumTemplate : gemLargeTemplate;
+                const totalSlots = showGemPlaceholders ? 100 : gems;
+                for (let i = 0; i < totalSlots; i++) {
+                    const slot = document.createElement('div');
+                    if (i < gems) {
+                        slot.appendChild(gemTemplate.cloneNode(true));
+                    } else {
+                        slot.className = 'gem-dot';
+                    }
+                    container.appendChild(slot);
+                }
+                winTracker.appendChild(container);
+            }
+
+            const dotsToShow = getVisibleDots();
+            const gridContainer = document.createElement('div');
+            gridContainer.className = 'grid grid-cols-10 gap-1';
+            for (let i = 0; i < dotsToShow; i++) {
+                const slot = document.createElement('div');
+                if (i < smallStars) {
+                    const star = starSmallTemplate.cloneNode(true);
+                    star.setAttribute('fill', 'currentColor');
+                    star.setAttribute('stroke', 'none');
+                    slot.appendChild(star);
+                } else {
+                    slot.className = 'dot';
+                }
+                gridContainer.appendChild(slot);
+            }
+            winTracker.appendChild(gridContainer);
+        }
         
         function getSPS() {
             const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
@@ -509,7 +574,7 @@ const uiState = {
 
             if (!tasks.length) return;
 
-            tasks.push(updateStarDisplay);
+            tasks.push(updateWinVisuals);
             tasks.push(saveGame);
             tasks.forEach(fn => fn());
 
