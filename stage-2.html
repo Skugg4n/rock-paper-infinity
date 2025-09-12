@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock, Paper, Infinity - Civilisation Mockup (v5)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { --tooltip-opacity: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9; color: #334155;
+            overflow: hidden; height: 100vh; user-select: none;
+        }
+        .btn {
+            position: relative; display: flex; align-items: center; justify-content: center;
+            width: 56px; height: 56px; padding: 0.75rem; border-radius: 9999px;
+            background-color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: all 0.2s ease-in-out; cursor: pointer;
+        }
+        .btn.hidden { display: none; }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; background-color: #f1f5f9; }
+        .btn i, .building-action-btn i, .building-slot svg { pointer-events: none; }
+
+        .tooltip {
+            position: absolute; bottom: 110%; left: 50%;
+            transform: translateX(-50%);
+            background-color: #1e2b3b; color: white;
+            padding: 6px 12px; border-radius: 8px; font-size: 14px;
+            pointer-events: none; z-index: 50; white-space: nowrap;
+            opacity: var(--tooltip-opacity);
+            transition: opacity 0.2s;
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+        }
+        .tooltip .cost, .tooltip .effect, .tooltip .cost-science, .tooltip .unlock-req { display: flex; align-items: center; gap: 4px; }
+        .tooltip .effect { color: #81e6d9; }
+        .tooltip .unlock-req { color: #f9a8d4; }
+
+
+        .building-slot {
+            width: 96px; height: 96px;
+            border-radius: 1rem;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: all 0.3s ease-in-out;
+            position: relative;
+        }
+        .building-slot.empty { background-color: #e2e8f0; border: 2px dashed #cbd5e1; }
+        .building-slot .building {
+            width: 100%; height: 100%; background-color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 2px solid transparent;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-radius: 1rem; position: relative;
+        }
+        .building.factory { background-color: #e2e8f0; border-color: #94a3b8; }
+        .building-upkeep {
+            position: absolute; bottom: 4px;
+            display: flex; align-items: center; gap: 4px;
+            font-size: 12px; font-family: monospace; color: #ef4444;
+            background: rgba(255,255,255,0.7); padding: 1px 4px; border-radius: 4px;
+        }
+        
+        .building-action-btn {
+            position: absolute;
+            width: 24px; height: 24px;
+            border-radius: 9999px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: monospace; font-size: 18px; line-height: 1;
+            color: white;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            z-index: 10;
+        }
+        .building-action-btn:hover .tooltip { --tooltip-opacity: 1; }
+        
+        .sell-btn { top: -8px; left: -8px; background-color: #d1d5db; }
+        .sell-btn:hover { background-color: #ef4444; }
+        .upgrade-btn { top: -8px; right: -8px; background-color: #d1d5db; }
+        .upgrade-btn:hover:not(:disabled) { background-color: #38bdf8; }
+        .upgrade-btn:disabled { background-color: #94a3b8 !important; cursor: not-allowed; }
+
+        .progress-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .progress-ring-base { stroke: #e2e8f0; }
+        .progress-ring-fg { transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.2s linear; }
+        
+        #debug-menu {
+            position: absolute; top: 1rem; left: 1rem;
+            background-color: #334155; color: white;
+            padding: 1rem; border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            display: none; z-index: 50;
+        }
+        #debug-menu h3 { font-weight: bold; margin-bottom: 0.5rem; }
+        .debug-btn {
+            background-color: #475569; width: 100%; text-align: left;
+            padding: 0.5rem 1rem; border-radius: 0.25rem;
+            margin-bottom: 0.5rem; cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .debug-btn:hover { background-color: #64748b; }
+
+        .info-ui {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+        }
+        .info-ui.visible { opacity: 1; visibility: visible; }
+
+        /* Slider */
+        #allocation-slider-container {
+            width: 200px;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%; background: transparent;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 8px; cursor: pointer;
+            background: #e2e8f0; border-radius: 4px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px; width: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer; margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+    </style>
+</head>
+<body id="game-body">
+    <button id="debug-toggle-btn" class="absolute top-0 left-0 w-16 h-16 z-40 opacity-0"></button>
+
+    <!-- UI -->
+    <div class="absolute top-8 left-4 md:left-8 flex flex-col gap-2">
+        <div class="flex items-center gap-4">
+            <i data-lucide="star" class="w-10 h-10 text-amber-400"></i>
+            <div>
+                <span id="star-count" class="font-mono font-bold text-3xl text-slate-600"></span>
+                <span id="net-star-change" class="block font-mono text-lg text-slate-500">+0/s</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <i data-lucide="atom" class="w-10 h-10 text-sky-500"></i>
+            <div>
+                <span id="science-count" class="font-mono font-bold text-3xl text-slate-600"></span>
+                <span id="net-science-change" class="block font-mono text-lg text-slate-500">+0/s</span>
+            </div>
+        </div>
+        <div id="allocation-slider-container" class="pt-2">
+            <div class="flex justify-between text-xs text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="star" class="w-3 h-3"></i> Industri</span>
+                <span class="flex items-center gap-1">Forskning <i data-lucide="atom" class="w-3 h-3"></i></span>
+            </div>
+            <input type="range" min="0" max="100" value="50" class="w-full" id="allocation-slider">
+        </div>
+    </div>
+    
+    <!-- DEBUG MENU -->
+    <div id="debug-menu">
+        <h3>Debug Meny</h3>
+        <button class="debug-btn" onclick="debug_addResources('stars', 1000000)">+1M Stjärnor</button>
+        <button class="debug-btn" onclick="debug_addResources('science', 100000)">+100k Vetenskap</button>
+        <hr class="border-slate-500 my-2">
+        <button class="debug-btn" onclick="debug_addPopulation(100)">+100 Invånare</button>
+    </div>
+
+    <div class="absolute top-8 right-4 md:right-8 flex flex-col items-end gap-6">
+        <div id="population-ui" class="info-ui flex items-center gap-3">
+             <span id="population-count-total" class="font-mono font-bold text-2xl text-slate-600">0</span>
+             <i data-lucide="users" class="w-6 h-6 text-slate-500"></i>
+        </div>
+        <div id="supplies-ui" class="info-ui flex items-center gap-2">
+            <div class="flex flex-col items-end">
+                <div class="w-24 h-3 bg-slate-300 rounded-full overflow-hidden p-0.5"><div id="supplies-bar" class="h-full bg-green-500 rounded-full transition-all duration-1000" style="width: 100%"></div></div>
+                <div class="flex justify-between w-full px-1">
+                    <span id="supply-consumption" class="font-mono text-xs text-red-600">-0/s</span>
+                    <span id="supply-production" class="font-mono text-xs text-green-600">+0/s</span>
+                </div>
+            </div>
+            <i data-lucide="shopping-basket" class="w-6 h-6 text-green-500"></i>
+        </div>
+    </div>
+    
+    <!-- LAND -->
+    <div class="w-full h-full flex items-center justify-center p-4">
+        <div id="land-grid" class="grid grid-cols-5 gap-4"></div>
+    </div>
+
+    <!-- BUILD MENU -->
+    <div class="absolute bottom-8 right-8 flex flex-col items-end gap-3">
+        <div id="upgrades-container" class="flex flex-col items-end gap-3">
+             <button class="btn hidden" id="computer-upgrade-btn">
+                <i data-lucide="computer" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn hidden" id="car-upgrade-btn">
+                <i data-lucide="car" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+             <button class="btn hidden" id="urbanism-research-btn">
+                <i data-lucide="building-2" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn hidden" id="tool-case-upgrade-btn">
+                <i data-lucide="tool-case" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn hidden" id="expand-land-btn">
+                <i data-lucide="land-plot" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn hidden" id="gmo-upgrade-btn">
+                 <svg class="progress-ring w-full h-full" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="gmo-ring" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #81e6d9;"></circle></svg>
+                <i data-lucide="flask-conical" class="w-7 h-7 absolute"></i>
+                <div class="tooltip"></div>
+            </button>
+        </div>
+        <div id="build-separator" class="w-full h-px bg-slate-300 my-1 hidden"></div>
+        <div id="buildings-container" class="flex flex-col items-end gap-3">
+            <button class="btn" id="build-store-btn">
+                <i data-lucide="store" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn" id="build-home-btn">
+                <i data-lucide="home" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // --- GAME STATE ---
+        const gameState = {
+            stars: 10000,
+            science: 0,
+            population: 0,
+            populationAllocation: 0.5, // 0 = 100% stars, 1 = 100% science
+            supplies: 150,
+            buildings: [],
+            gmoLevel: 0,
+            gmoMaxLevel: 10,
+            verktygUnlocked: false,
+            carUnlocked: false,
+            computerUnlocked: false,
+            urbanismResearched: false,
+            landExpanded: false,
+        };
+        
+        const buildingData = {
+            home: { cost: 10000, capacity: 10 },
+            store: { cost: 30000, upkeep: 20, supply: 20 },
+            apartment: { cost: 50000, capacity: 50 },
+            skyscraper: { cost: 250000, capacity: 500 },
+            superStore: { cost: 200000, upkeep: 50, supply: 60 },
+            gmoUpgrade: { baseCost: 10000, scienceCost: 1000 },
+            verktygUpgrade: { cost: 500000, scienceCost: 5000 },
+            urbanismResearch: { cost: 250000, scienceCost: 25000 },
+            carUpgrade: { cost: 1000000, scienceCost: 100000 },
+            computerUpgrade: { cost: 5000000, scienceCost: 100000 },
+            landExpansion: { cost: 1000000 },
+        };
+
+        // --- UI ELEMENTS ---
+        const ui = {
+            starCount: document.getElementById('star-count'),
+            scienceCount: document.getElementById('science-count'),
+            netStarChange: document.getElementById('net-star-change'),
+            netScienceChange: document.getElementById('net-science-change'),
+            allocationSlider: document.getElementById('allocation-slider'),
+            landGrid: document.getElementById('land-grid'),
+            populationUi: document.getElementById('population-ui'),
+            suppliesUi: document.getElementById('supplies-ui'),
+            populationCountTotal: document.getElementById('population-count-total'),
+            suppliesBar: document.getElementById('supplies-bar'),
+            supplyConsumption: document.getElementById('supply-consumption'),
+            supplyProduction: document.getElementById('supply-production'),
+            debugMenu: document.getElementById('debug-menu'),
+            debugToggleBtn: document.getElementById('debug-toggle-btn'),
+            buildHomeBtn: document.getElementById('build-home-btn'),
+            buildStoreBtn: document.getElementById('build-store-btn'),
+            gmoUpgradeBtn: document.getElementById('gmo-upgrade-btn'),
+            gmoRing: document.getElementById('gmo-ring'),
+            toolCaseUpgradeBtn: document.getElementById('tool-case-upgrade-btn'),
+            urbanismResearchBtn: document.getElementById('urbanism-research-btn'),
+            carUpgradeBtn: document.getElementById('car-upgrade-btn'),
+            computerUpgradeBtn: document.getElementById('computer-upgrade-btn'),
+            expandLandBtn: document.getElementById('expand-land-btn'),
+            buildSeparator: document.getElementById('build-separator'),
+        };
+
+        // --- DEBUG FUNCTIONS ---
+        function debug_addResources(type, amount) { gameState[type] += amount; }
+        function debug_addPopulation(amount) {
+            for (let i = 0; i < amount; i++) {
+                const availableHouse = gameState.buildings.find(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') && b.population < b.capacity);
+                if (availableHouse) availableHouse.population++;
+            }
+        }
+        ui.debugToggleBtn.addEventListener('click', () => {
+            const isHidden = ui.debugMenu.style.display === 'none' || ui.debugMenu.style.display === '';
+            ui.debugMenu.style.display = isHidden ? 'block' : 'none';
+        });
+
+        // --- BUILDING & RENDERING LOGIC ---
+        function createBuildingHTML(building) {
+            let icon = '';
+            let content = '';
+            let classes = 'building';
+            let actionButtons = '';
+            
+            if (building.type !== 'factory' && building.type !== 'bank') {
+                const refund = (buildingData[building.type]?.cost || 0) * 0.7;
+                actionButtons += `<button class="building-action-btn sell-btn" onclick="sellBuilding(event, ${building.id})">-
+                    <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('sv-SE')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div></div>
+                </button>`;
+            }
+
+            let upgradeTarget = null;
+            if (building.type === 'home') { upgradeTarget = 'apartment'; }
+            else if (building.type === 'store') { upgradeTarget = 'superStore'; }
+            else if (building.type === 'apartment' && gameState.urbanismResearched) { upgradeTarget = 'skyscraper'; }
+            
+            if(upgradeTarget) {
+                const upgradeInfo = buildingData[upgradeTarget];
+                const popReq = { apartment: 30, superStore: 50, skyscraper: 200 }[upgradeTarget];
+                const canAfford = gameState.stars >= upgradeInfo.cost;
+                const unlocked = gameState.population >= popReq;
+
+                let effectHTML = '';
+                if (upgradeInfo.capacity && building.capacity) {
+                    effectHTML = `+${upgradeInfo.capacity - building.capacity} <i data-lucide='users' class='w-4 h-4'></i>`;
+                } else if (upgradeInfo.supply && building.supply) {
+                    effectHTML = `+${upgradeInfo.supply - building.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`;
+                }
+
+                if (unlocked) {
+                    actionButtons += `<button class="building-action-btn upgrade-btn" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
+                        <div class="tooltip">
+                            <div class="effect">${effectHTML}</div>
+                            <div class="cost">${upgradeInfo.cost.toLocaleString('sv-SE')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div>
+                        </div>
+                    </button>`;
+                }
+            }
+            
+            switch(building.type) {
+                case 'home': icon = 'home'; break;
+                case 'apartment': icon = 'building'; break;
+                case 'skyscraper': icon = 'building-2'; break;
+                case 'store': icon = 'store'; break;
+                case 'superStore': icon = 'shopping-cart'; break;
+                case 'factory': icon = 'factory'; classes += ' factory'; break;
+                case 'bank': icon = 'landmark'; break;
+            }
+
+            if (building.type === 'home' || building.type === 'apartment' || building.type === 'skyscraper') {
+                 content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #38bdf8;"></circle></svg><i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
+            } else if (icon) {
+                 content = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>`;
+            }
+            
+            const upkeepCost = building.upkeep || (building.type === 'bank' ? 30 : 0);
+            const upkeepHTML = upkeepCost ? `<div class="building-upkeep"><span>-${upkeepCost}</span><i data-lucide="star" class="w-3 h-3 text-amber-400"></i></div>` : '';
+
+            return `<div class="${classes}">${content}${upkeepHTML}${actionButtons}</div>`;
+        }
+        
+        function renderGridSlot(index) {
+            const building = gameState.buildings[index];
+            const slot = ui.landGrid.children[index];
+            if (!slot) return;
+            
+            if(building) {
+                slot.innerHTML = createBuildingHTML(building);
+                slot.classList.remove('empty');
+            } else {
+                slot.innerHTML = '';
+                slot.classList.add('empty');
+            }
+            lucide.createIcons();
+        }
+
+        function renderAllBuildings() {
+            gameState.buildings.forEach((b, i) => renderGridSlot(i));
+        }
+
+        function sellBuilding(event, buildingId) {
+            event.stopPropagation();
+            const index = gameState.buildings.findIndex(b => b && b.id === buildingId);
+            if (index === -1) return;
+            const building = gameState.buildings[index];
+            gameState.stars += (buildingData[building.type]?.cost || 0) * 0.7;
+            if (building.population) gameState.population -= building.population;
+            gameState.buildings[index] = undefined;
+            renderGridSlot(index);
+        }
+        
+        function upgradeBuilding(event, buildingId, targetType) {
+            event.stopPropagation();
+            const index = gameState.buildings.findIndex(b => b && b.id === buildingId);
+            if (index === -1) return;
+            const building = gameState.buildings[index];
+            const upgradeData = buildingData[targetType];
+            if (gameState.stars >= upgradeData.cost) {
+                gameState.stars -= upgradeData.cost;
+                building.type = targetType;
+                Object.keys(upgradeData).forEach(key => {
+                    building[key] = upgradeData[key];
+                });
+                renderGridSlot(index);
+            }
+        }
+        
+        function addBuilding(type) {
+            const index = gameState.buildings.findIndex(b => b === undefined);
+            if (index !== -1 && gameState.stars >= buildingData[type].cost) {
+                gameState.stars -= buildingData[type].cost;
+                const newId = Date.now() + Math.random();
+                gameState.buildings[index] = { id: newId, type, population: 0, ...buildingData[type]};
+                renderGridSlot(index);
+            }
+        }
+
+        // --- TOOLTIP & UI UPDATE LOGIC ---
+        function setTooltip(el, { effect, cost, scienceCost, unlockReq }) {
+            const tooltipEl = el.querySelector('.tooltip');
+            if (!tooltipEl) return;
+            let html = '';
+            if (unlockReq) {
+                html += `<div class="unlock-req">${unlockReq}</div>`;
+            } else {
+                if (effect) html += `<div class="effect">${effect}</div>`;
+                if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('sv-SE')}</span><i data-lucide="star" class="w-4 h-4 text-amber-400"></i></div>`;
+                if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('sv-SE')}</span><i data-lucide="atom" class="w-4 h-4 text-sky-500"></i></div>`;
+            }
+            tooltipEl.innerHTML = html;
+            el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1));
+            el.addEventListener('mouseleave', () => tooltipEl.style.setProperty('--tooltip-opacity', 0));
+        }
+
+        function updateAllUI() {
+            const pop = gameState.population;
+            const canAfford = (item) => gameState.stars >= (item.cost || 0) && gameState.science >= (item.scienceCost || 0);
+            const hasEmptySlot = gameState.buildings.some(b => b === undefined);
+
+            const upgrades = [
+                { btn: ui.toolCaseUpgradeBtn, popReq: 25, flag: 'verktygUnlocked' },
+                { btn: ui.gmoUpgradeBtn, popReq: 50, flag: 'gmoLevel', isMultiLevel: true },
+                { btn: ui.urbanismResearchBtn, popReq: 100, flag: 'urbanismResearched' },
+                { btn: ui.expandLandBtn, popReq: 750, flag: 'landExpanded' },
+                { btn: ui.carUpgradeBtn, popReq: 500, flag: 'carUnlocked' },
+                { btn: ui.computerUpgradeBtn, popReq: 1000, flag: 'computerUnlocked', prereq: 'carUnlocked' },
+            ];
+
+            let anyUpgradeVisible = false;
+            upgrades.forEach(({btn, popReq, flag, isMultiLevel, prereq}) => {
+                const isPurchased = isMultiLevel ? gameState[flag] >= gameState.gmoMaxLevel : gameState[flag];
+                const prereqMet = prereq ? gameState[prereq] : true;
+                const shouldShow = (pop >= popReq || isPurchased) && prereqMet;
+                
+                btn.classList.toggle('hidden', !shouldShow || (isPurchased && !isMultiLevel));
+                if(shouldShow && !(isPurchased && !isMultiLevel)) anyUpgradeVisible = true;
+            });
+            ui.buildSeparator.classList.toggle('hidden', !anyUpgradeVisible);
+
+
+            // Disabled state for basic buildings
+            ui.buildHomeBtn.disabled = !canAfford(buildingData.home) || !hasEmptySlot;
+            ui.buildStoreBtn.disabled = !canAfford(buildingData.store) || !hasEmptySlot;
+
+            // Disabled state for global upgrades
+            ui.toolCaseUpgradeBtn.disabled = !canAfford(buildingData.verktygUpgrade) || pop < 50 || gameState.verktygUnlocked;
+            ui.urbanismResearchBtn.disabled = !canAfford(buildingData.urbanismResearch) || pop < 200 || gameState.urbanismResearched;
+            ui.gmoUpgradeBtn.disabled = !canAfford({cost: buildingData.gmoUpgrade.baseCost * (gameState.gmoLevel + 1), scienceCost: buildingData.gmoUpgrade.scienceCost * (gameState.gmoLevel + 1)}) || pop < 75 || gameState.gmoLevel >= gameState.gmoMaxLevel;
+            ui.carUpgradeBtn.disabled = !canAfford(buildingData.carUpgrade) || pop < 500 || gameState.carUnlocked;
+            ui.computerUpgradeBtn.disabled = !canAfford(buildingData.computerUpgrade) || pop < 1000 || gameState.computerUnlocked;
+            ui.expandLandBtn.disabled = !canAfford(buildingData.landExpansion) || pop < 1000 || gameState.landExpanded;
+
+            // Tooltips
+            setTooltip(ui.buildHomeBtn, { effect: `+${buildingData.home.capacity} <i data-lucide='users' class='w-4 h-4'></i>`, cost: buildingData.home.cost });
+            setTooltip(ui.buildStoreBtn, { effect: `+${buildingData.store.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`, cost: buildingData.store.cost });
+            
+            const gmoInfo = buildingData.gmoUpgrade;
+            setTooltip(ui.gmoUpgradeBtn, pop < 75 && gameState.gmoLevel === 0 ? { unlockReq: `75 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='shopping-basket' class='w-4 h-4'></i> Eff.`, cost: gmoInfo.baseCost * (gameState.gmoLevel + 1), scienceCost: gmoInfo.scienceCost * (gameState.gmoLevel + 1) });
+            
+            setTooltip(ui.toolCaseUpgradeBtn, pop < 50 && !gameState.verktygUnlocked ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.verktygUpgrade.cost, scienceCost: buildingData.verktygUpgrade.scienceCost });
+            
+            setTooltip(ui.urbanismResearchBtn, pop < 200 && !gameState.urbanismResearched ? { unlockReq: `200 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Lås upp <i data-lucide='building-2' class='w-4 h-4'></i>`, cost: buildingData.urbanismResearch.cost, scienceCost: buildingData.urbanismResearch.scienceCost });
+
+            setTooltip(ui.carUpgradeBtn, pop < 500 && !gameState.carUnlocked ? { unlockReq: `500 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+400% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.carUpgrade.cost, scienceCost: buildingData.carUpgrade.scienceCost });
+            
+            setTooltip(ui.computerUpgradeBtn, pop < 1000 || !gameState.carUnlocked ? { unlockReq: `1000 <i data-lucide='users' class='w-4 h-4'></i> & <i data-lucide='car' class='w-4 h-4'></i>` } : { effect: `+1000% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.computerUpgrade.cost, scienceCost: buildingData.computerUpgrade.scienceCost });
+            
+            setTooltip(ui.expandLandBtn, pop < 1000 && !gameState.landExpanded ? { unlockReq: `1000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+5 <i data-lucide='layout-grid' class='w-4 h-4'></i>`, cost: buildingData.landExpansion.cost });
+            
+            lucide.createIcons();
+        }
+
+        // --- MAIN GAME LOOP ---
+        function logicTick() {
+            let baseStarPerPerson = 2;
+            if (gameState.verktygUnlocked) baseStarPerPerson *= 2;
+            if (gameState.carUnlocked) baseStarPerPerson *= 5;
+            if (gameState.computerUnlocked) baseStarPerPerson *= 11;
+            
+            const popForStars = gameState.population * (1 - gameState.populationAllocation);
+            const popForScience = gameState.population * gameState.populationAllocation;
+
+            let netStarChange = popForStars * baseStarPerPerson;
+            let netScienceChange = popForScience * 1;
+
+            let supplyProduction = 0;
+            let currentTotalPopulation = 0;
+            const gmoMultiplier = Math.pow(2, gameState.gmoLevel);
+            
+            gameState.buildings.forEach((b) => {
+                if (!b) return;
+                if (b.type === 'factory') netStarChange += 1680;
+                if (b.type === 'bank') netStarChange -= 30;
+                if (b.type === 'store' || b.type === 'superStore') {
+                    supplyProduction += b.supply * gmoMultiplier;
+                    netStarChange -= b.upkeep;
+                }
+                if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') {
+                    if (gameState.supplies > 0 && b.population < b.capacity) {
+                        let growthRate = 0;
+                        if (b.type === 'skyscraper') growthRate = 5;
+                        else if (b.type === 'apartment') growthRate = 1;
+                        else {
+                            b.prodTimer = (b.prodTimer || 0) + 1;
+                            if (b.prodTimer >= 5) { b.prodTimer = 0; growthRate = 1; }
+                        }
+                        b.population = Math.min(b.capacity, b.population + growthRate);
+                    }
+                    currentTotalPopulation += b.population;
+                }
+            });
+            
+            const oldPop = gameState.population;
+            gameState.population = currentTotalPopulation;
+            if (oldPop !== gameState.population) {
+                renderAllBuildings();
+            }
+
+            gameState.netStarChangePerSecond = netStarChange;
+            gameState.netScienceChangePerSecond = netScienceChange;
+            
+            const supplyConsumption = gameState.population;
+            const netSupplyChange = supplyProduction - supplyConsumption;
+            gameState.supplies = Math.max(0, Math.min(100, gameState.supplies + netSupplyChange));
+
+            if (gameState.supplies <= 0 && gameState.population > 0) {
+                const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') && b.population > 0);
+                if (popBuildings.length > 0) {
+                    popBuildings.sort((a,b) => a.id - b.id)[0].population--;
+                }
+            }
+
+            if (gameState.population >= 5 && !ui.populationUi.classList.contains('visible')) {
+                ui.populationUi.classList.add('visible');
+                ui.suppliesUi.classList.add('visible');
+            }
+        }
+
+        function fastUiTick() {
+            gameState.stars += (gameState.netStarChangePerSecond || 0) / 20;
+            gameState.science += (gameState.netScienceChangePerSecond || 0) / 20;
+            ui.starCount.textContent = Math.floor(gameState.stars).toLocaleString('sv-SE');
+            ui.scienceCount.textContent = Math.floor(gameState.science).toLocaleString('sv-SE');
+            ui.populationCountTotal.textContent = gameState.population.toLocaleString('sv-SE');
+
+            ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('sv-SE')}/s`;
+            ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#16a34a' : '#ef4444';
+            ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('sv-SE')}/s`;
+
+            ui.suppliesBar.style.width = `${gameState.supplies}%`;
+            ui.supplyConsumption.textContent = `-${gameState.population}/s`;
+            const supplyProduction = gameState.buildings.reduce((acc, b) => {
+                if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
+                return acc + (b.supply * Math.pow(2, gameState.gmoLevel));
+            }, 0);
+            ui.supplyProduction.textContent = `+${Math.round(supplyProduction)}/s`;
+
+            gameState.buildings.forEach((b) => {
+                if (!b) return;
+                if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') {
+                    const popRing = document.getElementById(`pop-ring-${b.id}`);
+                    if (popRing) popRing.style.strokeDashoffset = 113 - ((b.population / b.capacity) * 113);
+                }
+            });
+            const gmoPercent = (gameState.gmoLevel / gameState.gmoMaxLevel) * 113;
+            ui.gmoRing.style.strokeDashoffset = 113 - gmoPercent;
+            updateAllUI(); // Check affordability continuously
+        }
+        
+        // --- EVENT LISTENERS ---
+        ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'));
+        ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'));
+        
+        const createUpgradeListener = (flag, upgradeData) => {
+            if (gameState.stars >= (upgradeData.cost || 0) && gameState.science >= (upgradeData.scienceCost || 0) && !gameState[flag]) {
+                gameState.stars -= (upgradeData.cost || 0);
+                gameState.science -= (upgradeData.scienceCost || 0);
+                gameState[flag] = true;
+                if (flag === 'urbanismResearched') {
+                    renderAllBuildings();
+                }
+            }
+        };
+
+        ui.gmoUpgradeBtn.addEventListener('click', () => {
+             const cost = buildingData.gmoUpgrade.baseCost * (gameState.gmoLevel + 1);
+             const scienceCost = buildingData.gmoUpgrade.scienceCost * (gameState.gmoLevel + 1);
+            if (gameState.stars >= cost && gameState.science >= scienceCost && gameState.gmoLevel < gameState.gmoMaxLevel) {
+                gameState.stars -= cost;
+                gameState.science -= scienceCost;
+                gameState.gmoLevel++;
+            }
+        });
+
+        ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('verktygUnlocked', buildingData.verktygUpgrade));
+        ui.urbanismResearchBtn.addEventListener('click', () => createUpgradeListener('urbanismResearched', buildingData.urbanismResearch));
+        ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade));
+        ui.computerUpgradeBtn.addEventListener('click', () => createUpgradeListener('computerUnlocked', buildingData.computerUpgrade));
+        
+        ui.expandLandBtn.addEventListener('click', () => {
+            if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
+                gameState.stars -= buildingData.landExpansion.cost;
+                gameState.landExpanded = true;
+                for (let i = 0; i < 5; i++) gameState.buildings.push(undefined);
+                const grid = ui.landGrid;
+                grid.innerHTML = '';
+                gameState.buildings.forEach((b, i) => {
+                    const slot = document.createElement('div');
+                    slot.className = 'building-slot';
+                    grid.appendChild(slot);
+                    renderGridSlot(i);
+                });
+            }
+        });
+        
+        ui.allocationSlider.addEventListener('input', (e) => {
+            gameState.populationAllocation = e.target.value / 100;
+        });
+
+        function initialize() {
+            gameState.buildings = new Array(10).fill(undefined);
+            const grid = ui.landGrid;
+            gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
+
+            gameState.buildings[0] = {id: 1, type: 'factory'};
+            gameState.buildings[1] = {id: 2, type: 'bank'};
+            renderGridSlot(0);
+            renderGridSlot(1);
+
+            updateAllUI();
+            setInterval(logicTick, 1000);
+            setInterval(fastUiTick, 50);
+        }
+        initialize();
+    </script>
+</body>
+</html>
+
