@@ -26,7 +26,7 @@
             box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
         }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; background-color: #f1f5f9; }
-        .btn i, .building-action-btn i, .building-slot svg { pointer-events: none; }
+        .btn > * { pointer-events: none; }
 
         .tooltip {
             position: absolute; bottom: 110%; left: 50%;
@@ -80,6 +80,7 @@
             transition: all 0.2s ease-in-out;
             z-index: 10;
         }
+        .building-action-btn > * { pointer-events: none; }
         .building-action-btn:hover .tooltip { --tooltip-opacity: 1; }
         
         .sell-btn { top: -8px; left: -8px; background-color: #d1d5db; }
@@ -88,7 +89,7 @@
         .upgrade-btn:hover:not(:disabled) { background-color: #38bdf8; }
         .upgrade-btn:disabled { background-color: #94a3b8 !important; cursor: not-allowed; }
 
-        .progress-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .progress-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .progress-ring-base { stroke: #e2e8f0; }
         .progress-ring-fg { transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.2s linear; }
         
@@ -143,7 +144,7 @@
     <button id="debug-toggle-btn" class="absolute top-0 left-0 w-16 h-16 z-40 opacity-0"></button>
 
     <!-- UI -->
-    <div class="absolute top-8 left-4 md:left-8 flex flex-col gap-2">
+    <div class="absolute top-8 left-4 md:left-8 flex flex-col gap-2 z-20">
         <div class="flex items-center gap-4">
             <i data-lucide="star" class="w-10 h-10 text-amber-400"></i>
             <div>
@@ -170,20 +171,20 @@
     <!-- DEBUG MENU -->
     <div id="debug-menu">
         <h3>Debug Meny</h3>
-        <button class="debug-btn" onclick="debug_addResources('stars', 1000000)">+1M Stjärnor</button>
+        <button class="debug-btn" onclick="debug_addResources('stars', 10000000)">+10M Stjärnor</button>
         <button class="debug-btn" onclick="debug_addResources('science', 100000)">+100k Vetenskap</button>
         <hr class="border-slate-500 my-2">
-        <button class="debug-btn" onclick="debug_addPopulation(100)">+100 Invånare</button>
+        <button class="debug-btn" onclick="debug_addPopulation(1000)">+1k Invånare</button>
     </div>
 
-    <div class="absolute top-8 right-4 md:right-8 flex flex-col items-end gap-6">
+    <div class="absolute top-8 right-4 md:right-8 flex flex-col items-end gap-6 z-20">
         <div id="population-ui" class="info-ui flex items-center gap-3">
              <span id="population-count-total" class="font-mono font-bold text-2xl text-slate-600">0</span>
              <i data-lucide="users" class="w-6 h-6 text-slate-500"></i>
         </div>
         <div id="supplies-ui" class="info-ui flex items-center gap-2">
             <div class="flex flex-col items-end">
-                <div class="w-24 h-3 bg-slate-300 rounded-full overflow-hidden p-0.5"><div id="supplies-bar" class="h-full bg-green-500 rounded-full transition-all duration-1000" style="width: 100%"></div></div>
+                <div class="w-24 h-3 bg-slate-300 rounded-full overflow-hidden p-0.5"><div id="supplies-bar" class="h-full rounded-full transition-all duration-200" style="width: 0%"></div></div>
                 <div class="flex justify-between w-full px-1">
                     <span id="supply-consumption" class="font-mono text-xs text-red-600">-0/s</span>
                     <span id="supply-production" class="font-mono text-xs text-green-600">+0/s</span>
@@ -199,8 +200,12 @@
     </div>
 
     <!-- BUILD MENU -->
-    <div class="absolute bottom-8 right-8 flex flex-col items-end gap-3">
+    <div class="absolute bottom-8 right-8 flex flex-col items-end gap-3 z-20">
         <div id="upgrades-container" class="flex flex-col items-end gap-3">
+             <button class="btn hidden" id="megastructure-research-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                <div class="tooltip"></div>
+            </button>
              <button class="btn hidden" id="computer-upgrade-btn">
                 <i data-lucide="computer" class="w-7 h-7"></i>
                 <div class="tooltip"></div>
@@ -257,6 +262,7 @@
             carUnlocked: false,
             computerUnlocked: false,
             urbanismResearched: false,
+            megastructureResearched: false,
             landExpanded: false,
         };
         
@@ -265,12 +271,14 @@
             store: { cost: 30000, upkeep: 20, supply: 20 },
             apartment: { cost: 50000, capacity: 50 },
             skyscraper: { cost: 250000, capacity: 500 },
+            district: { cost: 10000000, capacity: 100000 },
             superStore: { cost: 200000, upkeep: 50, supply: 60 },
             gmoUpgrade: { baseCost: 10000, scienceCost: 1000 },
             verktygUpgrade: { cost: 500000, scienceCost: 5000 },
             urbanismResearch: { cost: 250000, scienceCost: 25000 },
             carUpgrade: { cost: 1000000, scienceCost: 100000 },
             computerUpgrade: { cost: 5000000, scienceCost: 100000 },
+            megastructureResearch: { cost: 1000000, scienceCost: 100000 },
             landExpansion: { cost: 1000000 },
         };
 
@@ -296,6 +304,7 @@
             gmoRing: document.getElementById('gmo-ring'),
             toolCaseUpgradeBtn: document.getElementById('tool-case-upgrade-btn'),
             urbanismResearchBtn: document.getElementById('urbanism-research-btn'),
+            megastructureResearchBtn: document.getElementById('megastructure-research-btn'),
             carUpgradeBtn: document.getElementById('car-upgrade-btn'),
             computerUpgradeBtn: document.getElementById('computer-upgrade-btn'),
             expandLandBtn: document.getElementById('expand-land-btn'),
@@ -306,7 +315,7 @@
         function debug_addResources(type, amount) { gameState[type] += amount; }
         function debug_addPopulation(amount) {
             for (let i = 0; i < amount; i++) {
-                const availableHouse = gameState.buildings.find(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') && b.population < b.capacity);
+                const availableHouse = gameState.buildings.find(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && b.population < b.capacity);
                 if (availableHouse) availableHouse.population++;
             }
         }
@@ -333,19 +342,22 @@
             if (building.type === 'home') { upgradeTarget = 'apartment'; }
             else if (building.type === 'store') { upgradeTarget = 'superStore'; }
             else if (building.type === 'apartment' && gameState.urbanismResearched) { upgradeTarget = 'skyscraper'; }
+            else if (building.type === 'skyscraper' && gameState.megastructureResearched) { upgradeTarget = 'district'; }
+
             
             if(upgradeTarget) {
                 const upgradeInfo = buildingData[upgradeTarget];
-                const popReq = { apartment: 30, superStore: 50, skyscraper: 200 }[upgradeTarget];
+                const popReq = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 }[upgradeTarget];
                 const canAfford = gameState.stars >= upgradeInfo.cost;
                 const unlocked = gameState.population >= popReq;
 
                 let effectHTML = '';
-                if (upgradeInfo.capacity && building.capacity) {
-                    effectHTML = `+${upgradeInfo.capacity - building.capacity} <i data-lucide='users' class='w-4 h-4'></i>`;
+                 if (upgradeInfo.capacity && building.capacity) {
+                    effectHTML = `+${(upgradeInfo.capacity - building.capacity).toLocaleString('sv-SE')} <i data-lucide='users' class='w-4 h-4'></i>`;
                 } else if (upgradeInfo.supply && building.supply) {
                     effectHTML = `+${upgradeInfo.supply - building.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`;
                 }
+
 
                 if (unlocked) {
                     actionButtons += `<button class="building-action-btn upgrade-btn" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
@@ -361,13 +373,16 @@
                 case 'home': icon = 'home'; break;
                 case 'apartment': icon = 'building'; break;
                 case 'skyscraper': icon = 'building-2'; break;
+                case 'district': icon = 'custom-district'; break;
                 case 'store': icon = 'store'; break;
                 case 'superStore': icon = 'shopping-cart'; break;
                 case 'factory': icon = 'factory'; classes += ' factory'; break;
                 case 'bank': icon = 'landmark'; break;
             }
 
-            if (building.type === 'home' || building.type === 'apartment' || building.type === 'skyscraper') {
+            if (icon === 'custom-district') {
+                content = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`;
+            } else if (building.type === 'home' || building.type === 'apartment' || building.type === 'skyscraper') {
                  content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #38bdf8;"></circle></svg><i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
             } else if (icon) {
                  content = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>`;
@@ -464,6 +479,7 @@
                 { btn: ui.expandLandBtn, popReq: 750, flag: 'landExpanded' },
                 { btn: ui.carUpgradeBtn, popReq: 500, flag: 'carUnlocked' },
                 { btn: ui.computerUpgradeBtn, popReq: 1000, flag: 'computerUnlocked', prereq: 'carUnlocked' },
+                { btn: ui.megastructureResearchBtn, popReq: 5000, flag: 'megastructureResearched'},
             ];
 
             let anyUpgradeVisible = false;
@@ -485,6 +501,7 @@
             // Disabled state for global upgrades
             ui.toolCaseUpgradeBtn.disabled = !canAfford(buildingData.verktygUpgrade) || pop < 50 || gameState.verktygUnlocked;
             ui.urbanismResearchBtn.disabled = !canAfford(buildingData.urbanismResearch) || pop < 200 || gameState.urbanismResearched;
+            ui.megastructureResearchBtn.disabled = !canAfford(buildingData.megastructureResearch) || pop < 5000 || gameState.megastructureResearched;
             ui.gmoUpgradeBtn.disabled = !canAfford({cost: buildingData.gmoUpgrade.baseCost * (gameState.gmoLevel + 1), scienceCost: buildingData.gmoUpgrade.scienceCost * (gameState.gmoLevel + 1)}) || pop < 75 || gameState.gmoLevel >= gameState.gmoMaxLevel;
             ui.carUpgradeBtn.disabled = !canAfford(buildingData.carUpgrade) || pop < 500 || gameState.carUnlocked;
             ui.computerUpgradeBtn.disabled = !canAfford(buildingData.computerUpgrade) || pop < 1000 || gameState.computerUnlocked;
@@ -500,6 +517,8 @@
             setTooltip(ui.toolCaseUpgradeBtn, pop < 50 && !gameState.verktygUnlocked ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.verktygUpgrade.cost, scienceCost: buildingData.verktygUpgrade.scienceCost });
             
             setTooltip(ui.urbanismResearchBtn, pop < 200 && !gameState.urbanismResearched ? { unlockReq: `200 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Lås upp <i data-lucide='building-2' class='w-4 h-4'></i>`, cost: buildingData.urbanismResearch.cost, scienceCost: buildingData.urbanismResearch.scienceCost });
+            
+            setTooltip(ui.megastructureResearchBtn, pop < 5000 && !gameState.megastructureResearched ? { unlockReq: `5000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Lås upp Område`, cost: buildingData.megastructureResearch.cost, scienceCost: buildingData.megastructureResearch.scienceCost });
 
             setTooltip(ui.carUpgradeBtn, pop < 500 && !gameState.carUnlocked ? { unlockReq: `500 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+400% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.carUpgrade.cost, scienceCost: buildingData.carUpgrade.scienceCost });
             
@@ -535,10 +554,11 @@
                     supplyProduction += b.supply * gmoMultiplier;
                     netStarChange -= b.upkeep;
                 }
-                if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') {
+                if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
                     if (gameState.supplies > 0 && b.population < b.capacity) {
                         let growthRate = 0;
-                        if (b.type === 'skyscraper') growthRate = 5;
+                        if (b.type === 'district') growthRate = 25;
+                        else if (b.type === 'skyscraper') growthRate = 5;
                         else if (b.type === 'apartment') growthRate = 1;
                         else {
                             b.prodTimer = (b.prodTimer || 0) + 1;
@@ -561,10 +581,10 @@
             
             const supplyConsumption = gameState.population;
             const netSupplyChange = supplyProduction - supplyConsumption;
-            gameState.supplies = Math.max(0, Math.min(100, gameState.supplies + netSupplyChange));
+            gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange / 20); // Slower supply change
 
             if (gameState.supplies <= 0 && gameState.population > 0) {
-                const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') && b.population > 0);
+                const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && b.population > 0);
                 if (popBuildings.length > 0) {
                     popBuildings.sort((a,b) => a.id - b.id)[0].population--;
                 }
@@ -586,18 +606,25 @@
             ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('sv-SE')}/s`;
             ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#16a34a' : '#ef4444';
             ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('sv-SE')}/s`;
-
-            ui.suppliesBar.style.width = `${gameState.supplies}%`;
-            ui.supplyConsumption.textContent = `-${gameState.population}/s`;
+            
             const supplyProduction = gameState.buildings.reduce((acc, b) => {
                 if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
                 return acc + (b.supply * Math.pow(2, gameState.gmoLevel));
             }, 0);
+            const supplyConsumption = gameState.population;
+            const ratio = supplyProduction > 0 ? Math.min(100, (supplyConsumption / supplyProduction) * 100) : (supplyConsumption > 0 ? 100 : 0);
+
+            ui.suppliesBar.style.width = `${ratio}%`;
+            if (ratio > 95) ui.suppliesBar.style.backgroundColor = '#ef4444';
+            else if (ratio > 75) ui.suppliesBar.style.backgroundColor = '#f59e0b';
+            else ui.suppliesBar.style.backgroundColor = '#22c55e';
+
+            ui.supplyConsumption.textContent = `-${supplyConsumption}/s`;
             ui.supplyProduction.textContent = `+${Math.round(supplyProduction)}/s`;
 
             gameState.buildings.forEach((b) => {
                 if (!b) return;
-                if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper') {
+                if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
                     const popRing = document.getElementById(`pop-ring-${b.id}`);
                     if (popRing) popRing.style.strokeDashoffset = 113 - ((b.population / b.capacity) * 113);
                 }
@@ -616,9 +643,8 @@
                 gameState.stars -= (upgradeData.cost || 0);
                 gameState.science -= (upgradeData.scienceCost || 0);
                 gameState[flag] = true;
-                if (flag === 'urbanismResearched') {
-                    renderAllBuildings();
-                }
+                // Force a full re-render of all buildings when a research that enables upgrades is bought
+                renderAllBuildings();
             }
         };
 
@@ -634,6 +660,7 @@
 
         ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('verktygUnlocked', buildingData.verktygUpgrade));
         ui.urbanismResearchBtn.addEventListener('click', () => createUpgradeListener('urbanismResearched', buildingData.urbanismResearch));
+        ui.megastructureResearchBtn.addEventListener('click', () => createUpgradeListener('megastructureResearched', buildingData.megastructureResearch));
         ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade));
         ui.computerUpgradeBtn.addEventListener('click', () => createUpgradeListener('computerUnlocked', buildingData.computerUpgrade));
         
