@@ -392,6 +392,7 @@ function scheduleUIUpdate() {
             const factoryReady = upgrades.mergeGameBoard.unlockCondition &&
                 upgrades.mergeGameBoard.unlockCondition() &&
                 !upgrades.mergeGameBoard.purchased;
+            const progressionStars = Math.max(starBalance, totalStarsEarned);
             for (const key in upgrades) {
                 const upgrade = upgrades[key];
 
@@ -406,7 +407,7 @@ function scheduleUIUpdate() {
                 }
 
                 let isUnlocked = (upgrade.unlocksAt === 0) ||
-                                 (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
+                                 (upgrade.unlocksAt > 0 && progressionStars >= upgrade.unlocksAt) ||
                                  (upgrade.unlocksAtGames > 0 && totalGamesPlayed >= upgrade.unlocksAtGames) ||
                                  (upgrade.unlocksAtSPS > 0 && getSPS() >= upgrade.unlocksAtSPS) ||
                                  Object.keys(upgrades).some(parentKey => {
@@ -563,6 +564,8 @@ const uiState = {
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = svgMap[icon];
                 const svg = wrapper.firstElementChild;
+                svg.style.width = '100%';
+                svg.style.height = '100%';
                 svg.style.animationDuration = `${duration}ms`;
                 svg.style.animationDelay = `${duration * index}ms`;
                 svg.classList.add('countdown-frame');
