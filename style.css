@@ -70,16 +70,7 @@ body {
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
 .pulse { animation: pulse 1s infinite cubic-bezier(0.4, 0, 0.6, 1); }
 .countdown-pop { animation-name: pop; animation-timing-function: ease-in-out; }
-.countdown-container {
-    position: relative;
-    width: 56px;
-    height: 56px;
-}
-
-.small-icons .countdown-container {
-    width: 32px;
-    height: 32px;
-}
+.countdown-container { position: relative; }
 .countdown-frame { position: absolute; top: 0; left: 0; opacity: 0; animation-name: countdownFade; animation-fill-mode: forwards; }
 @keyframes countdownFade { from { opacity: 1; } to { opacity: 0; } }
 
