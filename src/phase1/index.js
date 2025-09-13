@@ -1,4 +1,5 @@
 import { getIcon } from "../icons.js";
+import { phases, setPhase } from "../gamePhase.js";
 
         // DOM-element
         const gameBoardContainer = document.getElementById('game-board-container');
@@ -125,6 +126,22 @@ const resetBtn = document.getElementById('reset-btn');
                 purchase: function() {
                     this.purchased = true;
                     mergeToMetaBoard();
+                    for (const key in upgrades) {
+                        if (key !== 'bank') {
+                            upgrades[key].element.classList.add('hidden');
+                        }
+                    }
+                }
+            },
+            bank: {
+                cost: 0,
+                purchased: false,
+                unlocksAt: 0,
+                element: document.getElementById('bank'),
+                unlockCondition: () => upgrades.mergeGameBoard.purchased,
+                purchase: function() {
+                    localStorage.setItem('rpi-stars', String(starBalance));
+                    setPhase(phases.CITY);
                 }
             }
         };
