@@ -16,6 +16,9 @@ export async function setPhase(phase) {
       currentModule = await import('./phase1/index.js');
       return currentModule.init();
     case phases.CITY:
+      window.location.href = 'stage-2.html';
+      currentModule = null;
+      return;
     case phases.WAR:
     case phases.ESCAPE:
     default:
