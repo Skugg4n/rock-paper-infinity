@@ -380,10 +380,14 @@
                 case 'bank': icon = 'landmark'; break;
             }
 
-            if (icon === 'custom-district') {
-                content = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`;
-            } else if (building.type === 'home' || building.type === 'apartment' || building.type === 'skyscraper') {
-                 content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #38bdf8;"></circle></svg><i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
+            if (building.type === 'home' || building.type === 'apartment' || building.type === 'skyscraper' || building.type === 'district') {
+                let iconHTML = '';
+                if (icon === 'custom-district') {
+                    iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="relative text-slate-600"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`;
+                } else {
+                    iconHTML = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
+                }
+                content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #38bdf8;"></circle></svg>${iconHTML}`;
             } else if (icon) {
                  content = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>`;
             }
@@ -557,7 +561,7 @@
                 if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
                     if (gameState.supplies > 0 && b.population < b.capacity) {
                         let growthRate = 0;
-                        if (b.type === 'district') growthRate = 25;
+                        if (b.type === 'district') growthRate = 10000;
                         else if (b.type === 'skyscraper') growthRate = 5;
                         else if (b.type === 'apartment') growthRate = 1;
                         else {
