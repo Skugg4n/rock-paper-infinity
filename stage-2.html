@@ -245,11 +245,14 @@
         </div>
     </div>
 
+    <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.7</div>
     <script type="module">
       import { init } from './src/phase2/index.js';
+      import { VERSION } from './src/version.js';
+
       init();
+      document.getElementById('version-info').textContent = VERSION;
     </script>
-    <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.9</div>
 </body>
 </html>
 
