@@ -250,7 +250,7 @@
 
         // --- GAME STATE ---
         const gameState = {
-            stars: 10000,
+            stars: 0, // will be populated from localStorage
             science: 0,
             population: 0,
             populationAllocation: 0.5, // 0 = 100% stars, 1 = 100% science
@@ -265,6 +265,8 @@
             megastructureResearched: false,
             landExpanded: false,
         };
+
+        const phase2Init = import('./src/phase2/index.js').then(({ init }) => init(gameState));
         
         const buildingData = {
             home: { cost: 10000, capacity: 10 },
@@ -702,9 +704,9 @@
             setInterval(logicTick, 1000);
             setInterval(fastUiTick, 50);
         }
-        initialize();
+          phase2Init.then(initialize);
     </script>
-    <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.7</div>
+    <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.8</div>
 </body>
 </html>
 
