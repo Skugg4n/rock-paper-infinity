@@ -5,7 +5,7 @@ let fastUiInterval;
 
 export function init() {
           lucide.createIcons();
-  
+
           // --- GAME STATE ---
           const gameState = {
               stars: 0, // will be populated from localStorage
@@ -23,12 +23,27 @@ export function init() {
               megastructureResearched: false,
               landExpanded: false,
           };
-  
-          
-          const storedStars = localStorage.getItem('rpi-stars');
-          const parsed = storedStars !== null ? Number.parseInt(storedStars, 10) : NaN;
-          gameState.stars = Number.isNaN(parsed) ? 0 : parsed;
-          localStorage.removeItem('rpi-stars');
+
+          const SAVE_KEY = 'rpi-stage2';
+          const storedState = localStorage.getItem(SAVE_KEY);
+          if (storedState) {
+              try {
+                  const parsedState = JSON.parse(storedState);
+                  parsedState.buildings = (parsedState.buildings || []).map(b => b === null ? undefined : b);
+                  Object.assign(gameState, parsedState);
+              } catch (e) {
+                  console.error('Failed to parse save', e);
+              }
+          } else {
+              const storedStars = localStorage.getItem('rpi-stars');
+              const parsed = storedStars !== null ? Number.parseInt(storedStars, 10) : NaN;
+              gameState.stars = Number.isNaN(parsed) ? 0 : parsed;
+              localStorage.removeItem('rpi-stars');
+          }
+
+          function saveGameState() {
+              localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
+          }
           const buildingData = {
               home: { cost: 10000, capacity: 10 },
               store: { cost: 30000, upkeep: 20, supply: 20 },
@@ -61,6 +76,9 @@ export function init() {
               supplyProduction: document.getElementById('supply-production'),
               debugMenu: document.getElementById('debug-menu'),
               debugToggleBtn: document.getElementById('debug-toggle-btn'),
+              menuBtn: document.getElementById('menu-btn'),
+              menuDropdown: document.getElementById('menu-dropdown'),
+              resetBtn: document.getElementById('reset-btn'),
               buildHomeBtn: document.getElementById('build-home-btn'),
               buildStoreBtn: document.getElementById('build-store-btn'),
               gmoUpgradeBtn: document.getElementById('gmo-upgrade-btn'),
@@ -85,6 +103,13 @@ export function init() {
           ui.debugToggleBtn.addEventListener('click', () => {
               const isHidden = ui.debugMenu.style.display === 'none' || ui.debugMenu.style.display === '';
               ui.debugMenu.style.display = isHidden ? 'block' : 'none';
+          });
+
+          ui.menuBtn.addEventListener('click', () => ui.menuDropdown.classList.toggle('hidden'));
+          ui.resetBtn.addEventListener('click', () => {
+              localStorage.removeItem(SAVE_KEY);
+              localStorage.removeItem('rpi-stars');
+              location.reload();
           });
   
           // --- BUILDING & RENDERING LOGIC ---
@@ -361,6 +386,8 @@ export function init() {
                   ui.populationUi.classList.add('visible');
                   ui.suppliesUi.classList.add('visible');
               }
+
+              saveGameState();
           }
   
           function fastUiTick() {
@@ -431,11 +458,11 @@ export function init() {
           ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade));
           ui.computerUpgradeBtn.addEventListener('click', () => createUpgradeListener('computerUnlocked', buildingData.computerUpgrade));
           
-          ui.expandLandBtn.addEventListener('click', () => {
-              if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
-                  gameState.stars -= buildingData.landExpansion.cost;
-                  gameState.landExpanded = true;
-                  for (let i = 0; i < 5; i++) gameState.buildings.push(undefined);
+            ui.expandLandBtn.addEventListener('click', () => {
+                if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
+                    gameState.stars -= buildingData.landExpansion.cost;
+                    gameState.landExpanded = true;
+                    for (let i = 0; i < 5; i++) gameState.buildings.push(undefined);
                   const grid = ui.landGrid;
                   grid.innerHTML = '';
                   gameState.buildings.forEach((b, i) => {
@@ -447,31 +474,33 @@ export function init() {
               }
           });
           
-          ui.allocationSlider.addEventListener('input', (e) => {
-              gameState.populationAllocation = e.target.value / 100;
-          });
+            ui.allocationSlider.addEventListener('input', (e) => {
+                gameState.populationAllocation = e.target.value / 100;
+            });
   
-          function initialize() {
-              gameState.buildings = new Array(10).fill(undefined);
-              const grid = ui.landGrid;
-              gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
-  
-              gameState.buildings[0] = {id: 1, type: 'factory'};
-              gameState.buildings[1] = {id: 2, type: 'bank'};
-              renderGridSlot(0);
-              renderGridSlot(1);
-  
-              updateAllUI();
-          }
+            function initialize() {
+                if (!Array.isArray(gameState.buildings) || gameState.buildings.length === 0) {
+                    gameState.buildings = new Array(10).fill(undefined);
+                    gameState.buildings[0] = {id: 1, type: 'factory'};
+                    gameState.buildings[1] = {id: 2, type: 'bank'};
+                }
+                const grid = ui.landGrid;
+                grid.innerHTML = '';
+                gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
+                gameState.buildings.forEach((_, i) => renderGridSlot(i));
+                updateAllUI();
+                saveGameState();
+            }
 
   window.debug_addResources = debug_addResources;
   window.debug_addPopulation = debug_addPopulation;
   window.sellBuilding = sellBuilding;
   window.upgradeBuilding = upgradeBuilding;
   initialize();
-  logicInterval = setInterval(logicTick, 1000);
-  fastUiInterval = setInterval(fastUiTick, 50);
-}
+    logicInterval = setInterval(logicTick, 1000);
+    fastUiInterval = setInterval(fastUiTick, 50);
+    window.addEventListener('beforeunload', saveGameState);
+  }
 
 export function teardown() {
   clearInterval(logicInterval);
