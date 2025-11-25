@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="sv">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rock, Paper, Infinity - Civilisation Mockup (v5)</title>
+    <title>Rock, Paper, Infinity - Civilization (v5)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -138,6 +138,65 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
 
+        .factory-orbit {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .factory-orbit .orbit-track {
+            position: relative;
+            width: 72px;
+            height: 72px;
+            animation: orbit-spin 6s linear infinite;
+        }
+
+        .factory-orbit .orbit-item {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            color: #334155;
+            opacity: 0.8;
+        }
+
+        .factory-orbit .orbit-item:nth-child(1) { top: 0; left: 50%; transform: translate(-50%, -20%); }
+        .factory-orbit .orbit-item:nth-child(2) { right: -8%; top: 50%; transform: translate(0, -50%); }
+        .factory-orbit .orbit-item:nth-child(3) { bottom: -8%; left: 50%; transform: translate(-50%, 0); }
+
+        @keyframes orbit-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .supplies-track {
+            position: relative;
+            width: 140px;
+            height: 12px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .supplies-track .center-marker {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: rgba(255,255,255,0.8);
+        }
+
+        .supplies-track .balance-fill {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            left: 50%;
+            transform-origin: left center;
+        }
     </style>
 </head>
 <body id="game-body">
@@ -150,6 +209,7 @@
             <div>
                 <span id="star-count" class="font-mono font-bold text-3xl text-slate-600"></span>
                 <span id="net-star-change" class="block font-mono text-lg text-slate-500">+0/s</span>
+                <span id="stars-per-person" class="block font-mono text-xs text-slate-500">0 per person</span>
             </div>
         </div>
         <div class="flex items-center gap-4">
@@ -161,8 +221,8 @@
         </div>
         <div id="allocation-slider-container" class="pt-2">
             <div class="flex justify-between text-xs text-slate-500">
-                <span class="flex items-center gap-1"><i data-lucide="star" class="w-3 h-3"></i> Industri</span>
-                <span class="flex items-center gap-1">Forskning <i data-lucide="atom" class="w-3 h-3"></i></span>
+                <span class="flex items-center gap-1"><i data-lucide="star" class="w-3 h-3"></i> Industry</span>
+                <span class="flex items-center gap-1">Research <i data-lucide="atom" class="w-3 h-3"></i></span>
             </div>
             <input type="range" min="0" max="100" value="50" class="w-full" id="allocation-slider">
         </div>
@@ -170,13 +230,13 @@
     
     <!-- DEBUG MENU -->
       <div id="debug-menu">
-          <h3>Debug Meny</h3>
-          <button class="debug-btn" onclick="debug_addResources('stars', 10000000)">+10M Stjärnor</button>
-          <button class="debug-btn" onclick="debug_addResources('science', 100000)">+100k Vetenskap</button>
+          <h3>Debug Menu</h3>
+          <button class="debug-btn" onclick="debug_addResources('stars', 10000000)">+10M Stars</button>
+          <button class="debug-btn" onclick="debug_addResources('science', 100000)">+100k Science</button>
           <hr class="border-slate-500 my-2">
-          <button class="debug-btn" onclick="debug_addPopulation(1000)">+1k Invånare</button>
+          <button class="debug-btn" onclick="debug_addPopulation(1000)">+1k Population</button>
           <hr class="border-slate-500 my-2">
-          <button class="debug-btn" onclick="window.location.href='index.html'">Till Stage 1</button>
+          <button class="debug-btn" onclick="window.location.href='index.html'">Back to Stage 1</button>
       </div>
 
     <div class="absolute top-8 right-4 md:right-8 flex flex-col items-end gap-6 z-20">
@@ -185,11 +245,15 @@
              <i data-lucide="users" class="w-6 h-6 text-slate-500"></i>
         </div>
         <div id="supplies-ui" class="info-ui flex items-center gap-2">
-            <div class="flex flex-col items-end">
-                <div class="w-24 h-3 bg-slate-300 rounded-full overflow-hidden p-0.5"><div id="supplies-bar" class="h-full rounded-full transition-all duration-200" style="width: 0%"></div></div>
-                <div class="flex justify-between w-full px-1">
-                    <span id="supply-consumption" class="font-mono text-xs text-red-600">-0/s</span>
-                    <span id="supply-production" class="font-mono text-xs text-green-600">+0/s</span>
+            <div class="flex flex-col items-end gap-1">
+                <div class="supplies-track">
+                    <div class="center-marker"></div>
+                    <div id="supplies-bar" class="balance-fill transition-all duration-200"></div>
+                </div>
+                <div class="flex justify-between w-full gap-2 text-[11px]">
+                    <span id="supply-consumption" class="font-mono text-red-600">-0/s</span>
+                    <span id="supply-delta" class="font-mono text-slate-600 text-right">Balanced</span>
+                    <span id="supply-production" class="font-mono text-green-600">+0/s</span>
                 </div>
             </div>
             <i data-lucide="shopping-basket" class="w-6 h-6 text-green-500"></i>
@@ -247,7 +311,7 @@
         </div>
     </div>
 
-      <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.11</div>
+      <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.12</div>
       <!-- Menu button -->
       <div id="menu-wrapper" class="fixed bottom-4 left-4">
           <div class="relative">

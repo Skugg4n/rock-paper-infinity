@@ -63,6 +63,7 @@ export function init() {
           // --- UI ELEMENTS ---
           const ui = {
               starCount: document.getElementById('star-count'),
+              starsPerPerson: document.getElementById('stars-per-person'),
               scienceCount: document.getElementById('science-count'),
               netStarChange: document.getElementById('net-star-change'),
               netScienceChange: document.getElementById('net-science-change'),
@@ -72,6 +73,7 @@ export function init() {
               suppliesUi: document.getElementById('supplies-ui'),
               populationCountTotal: document.getElementById('population-count-total'),
               suppliesBar: document.getElementById('supplies-bar'),
+              supplyDelta: document.getElementById('supply-delta'),
               supplyConsumption: document.getElementById('supply-consumption'),
               supplyProduction: document.getElementById('supply-production'),
               debugMenu: document.getElementById('debug-menu'),
@@ -122,7 +124,7 @@ export function init() {
               if (building.type !== 'factory' && building.type !== 'bank') {
                   const refund = (buildingData[building.type]?.cost || 0) * 0.7;
                   actionButtons += `<button class="building-action-btn sell-btn" onclick="sellBuilding(event, ${building.id})">-
-                      <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('sv-SE')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div></div>
+                      <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div></div>
                   </button>`;
               }
   
@@ -133,15 +135,15 @@ export function init() {
               else if (building.type === 'skyscraper' && gameState.megastructureResearched) { upgradeTarget = 'district'; }
   
               
-              if(upgradeTarget) {
+               if(upgradeTarget) {
                   const upgradeInfo = buildingData[upgradeTarget];
                   const popReq = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 }[upgradeTarget];
                   const canAfford = gameState.stars >= upgradeInfo.cost;
                   const unlocked = gameState.population >= popReq;
-  
+
                   let effectHTML = '';
                    if (upgradeInfo.capacity && building.capacity) {
-                      effectHTML = `+${(upgradeInfo.capacity - building.capacity).toLocaleString('sv-SE')} <i data-lucide='users' class='w-4 h-4'></i>`;
+                      effectHTML = `+${(upgradeInfo.capacity - building.capacity).toLocaleString('en-US')} <i data-lucide='users' class='w-4 h-4'></i>`;
                   } else if (upgradeInfo.supply && building.supply) {
                       effectHTML = `+${upgradeInfo.supply - building.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`;
                   }
@@ -151,7 +153,7 @@ export function init() {
                       actionButtons += `<button class="building-action-btn upgrade-btn" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
                           <div class="tooltip">
                               <div class="effect">${effectHTML}</div>
-                              <div class="cost">${upgradeInfo.cost.toLocaleString('sv-SE')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div>
+                              <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div>
                           </div>
                       </button>`;
                   }
@@ -176,6 +178,17 @@ export function init() {
                       iconHTML = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
                   }
                   content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #38bdf8;"></circle></svg>${iconHTML}`;
+              } else if (building.type === 'factory') {
+                  content = `<div class="relative flex items-center justify-center w-full h-full">
+                      <i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>
+                      <div class="factory-orbit">
+                          <div class="orbit-track">
+                              <i data-lucide="scissors" class="orbit-item"></i>
+                              <i data-lucide="gem" class="orbit-item"></i>
+                              <i data-lucide="file-text" class="orbit-item"></i>
+                          </div>
+                      </div>
+                  </div>`;
               } else if (icon) {
                    content = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>`;
               }
@@ -204,15 +217,23 @@ export function init() {
           function renderAllBuildings() {
               gameState.buildings.forEach((b, i) => renderGridSlot(i));
           }
-  
+
+          function calculateBaseStarPerPerson() {
+              let baseStarPerPerson = 2;
+              if (gameState.verktygUnlocked) baseStarPerPerson *= 2;
+              if (gameState.carUnlocked) baseStarPerPerson *= 5;
+              if (gameState.computerUnlocked) baseStarPerPerson *= 11;
+              return baseStarPerPerson;
+          }
+
           function sellBuilding(event, buildingId) {
               event.stopPropagation();
               const index = gameState.buildings.findIndex(b => b && b.id === buildingId);
               if (index === -1) return;
               const building = gameState.buildings[index];
               gameState.stars += (buildingData[building.type]?.cost || 0) * 0.7;
-              if (building.population) gameState.population -= building.population;
               gameState.buildings[index] = undefined;
+              gameState.population = gameState.buildings.reduce((total, b) => total + (b?.population || 0), 0);
               renderGridSlot(index);
           }
           
@@ -251,8 +272,8 @@ export function init() {
                   html += `<div class="unlock-req">${unlockReq}</div>`;
               } else {
                   if (effect) html += `<div class="effect">${effect}</div>`;
-                  if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('sv-SE')}</span><i data-lucide="star" class="w-4 h-4 text-amber-400"></i></div>`;
-                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('sv-SE')}</span><i data-lucide="atom" class="w-4 h-4 text-sky-500"></i></div>`;
+                  if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('en-US')}</span><i data-lucide="star" class="w-4 h-4 text-amber-400"></i></div>`;
+                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-sky-500"></i></div>`;
               }
               tooltipEl.innerHTML = html;
               el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1));
@@ -308,9 +329,9 @@ export function init() {
               
               setTooltip(ui.toolCaseUpgradeBtn, pop < 50 && !gameState.verktygUnlocked ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.verktygUpgrade.cost, scienceCost: buildingData.verktygUpgrade.scienceCost });
               
-              setTooltip(ui.urbanismResearchBtn, pop < 200 && !gameState.urbanismResearched ? { unlockReq: `200 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Lås upp <i data-lucide='building-2' class='w-4 h-4'></i>`, cost: buildingData.urbanismResearch.cost, scienceCost: buildingData.urbanismResearch.scienceCost });
-              
-              setTooltip(ui.megastructureResearchBtn, pop < 5000 && !gameState.megastructureResearched ? { unlockReq: `5000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Lås upp Område`, cost: buildingData.megastructureResearch.cost, scienceCost: buildingData.megastructureResearch.scienceCost });
+              setTooltip(ui.urbanismResearchBtn, pop < 200 && !gameState.urbanismResearched ? { unlockReq: `200 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Unlock <i data-lucide='building-2' class='w-4 h-4'></i>`, cost: buildingData.urbanismResearch.cost, scienceCost: buildingData.urbanismResearch.scienceCost });
+
+              setTooltip(ui.megastructureResearchBtn, pop < 5000 && !gameState.megastructureResearched ? { unlockReq: `5000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Unlock District`, cost: buildingData.megastructureResearch.cost, scienceCost: buildingData.megastructureResearch.scienceCost });
   
               setTooltip(ui.carUpgradeBtn, pop < 500 && !gameState.carUnlocked ? { unlockReq: `500 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+400% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.carUpgrade.cost, scienceCost: buildingData.carUpgrade.scienceCost });
               
@@ -321,12 +342,9 @@ export function init() {
               lucide.createIcons();
           }
   
-          // --- MAIN GAME LOOP ---
-          function logicTick() {
-              let baseStarPerPerson = 2;
-              if (gameState.verktygUnlocked) baseStarPerPerson *= 2;
-              if (gameState.carUnlocked) baseStarPerPerson *= 5;
-              if (gameState.computerUnlocked) baseStarPerPerson *= 11;
+        // --- MAIN GAME LOOP ---
+        function logicTick() {
+              const baseStarPerPerson = calculateBaseStarPerPerson();
               
               const popForStars = gameState.population * (1 - gameState.populationAllocation);
               const popForScience = gameState.population * gameState.populationAllocation;
@@ -367,7 +385,8 @@ export function init() {
               if (oldPop !== gameState.population) {
                   renderAllBuildings();
               }
-  
+
+              gameState.baseStarPerPerson = baseStarPerPerson;
               gameState.netStarChangePerSecond = netStarChange;
               gameState.netScienceChangePerSecond = netScienceChange;
               
@@ -393,28 +412,53 @@ export function init() {
           function fastUiTick() {
               gameState.stars += (gameState.netStarChangePerSecond || 0) / 20;
               gameState.science += (gameState.netScienceChangePerSecond || 0) / 20;
-              ui.starCount.textContent = Math.floor(gameState.stars).toLocaleString('sv-SE');
-              ui.scienceCount.textContent = Math.floor(gameState.science).toLocaleString('sv-SE');
-              ui.populationCountTotal.textContent = gameState.population.toLocaleString('sv-SE');
-  
-              ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('sv-SE')}/s`;
+              ui.starCount.textContent = Math.floor(gameState.stars).toLocaleString('en-US');
+              ui.scienceCount.textContent = Math.floor(gameState.science).toLocaleString('en-US');
+              ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
+
+              ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('en-US')}/s`;
               ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#16a34a' : '#ef4444';
-              ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('sv-SE')}/s`;
-              
+              ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('en-US')}/s`;
+
+              const baseStarPerPerson = calculateBaseStarPerPerson();
+              const effectivePerPerson = baseStarPerPerson * (1 - gameState.populationAllocation);
+              ui.starsPerPerson.textContent = `${effectivePerPerson.toFixed(1)} stars/person in industry`;
+
               const supplyProduction = gameState.buildings.reduce((acc, b) => {
                   if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
                   return acc + (b.supply * Math.pow(2, gameState.gmoLevel));
               }, 0);
               const supplyConsumption = gameState.population;
-              const ratio = supplyProduction > 0 ? Math.min(100, (supplyConsumption / supplyProduction) * 100) : (supplyConsumption > 0 ? 100 : 0);
-  
-              ui.suppliesBar.style.width = `${ratio}%`;
-              if (ratio > 95) ui.suppliesBar.style.backgroundColor = '#ef4444';
-              else if (ratio > 75) ui.suppliesBar.style.backgroundColor = '#f59e0b';
-              else ui.suppliesBar.style.backgroundColor = '#22c55e';
-  
-              ui.supplyConsumption.textContent = `-${supplyConsumption}/s`;
-              ui.supplyProduction.textContent = `+${Math.round(supplyProduction)}/s`;
+              const netSupplyChange = supplyProduction - supplyConsumption;
+              const maxFlow = Math.max(supplyProduction, supplyConsumption, 1);
+              const magnitudePercent = Math.min(100, (Math.abs(netSupplyChange) / maxFlow) * 100);
+
+              ui.suppliesBar.style.width = `${magnitudePercent}%`;
+              if (netSupplyChange >= 0) {
+                  ui.suppliesBar.style.left = '50%';
+                  ui.suppliesBar.style.right = 'auto';
+                  ui.suppliesBar.style.transformOrigin = 'left center';
+                  ui.suppliesBar.style.backgroundColor = '#22c55e';
+              } else {
+                  ui.suppliesBar.style.left = 'auto';
+                  ui.suppliesBar.style.right = '50%';
+                  ui.suppliesBar.style.transformOrigin = 'right center';
+                  ui.suppliesBar.style.backgroundColor = '#ef4444';
+              }
+
+              if (netSupplyChange === 0) {
+                  ui.supplyDelta.textContent = 'Balanced';
+                  ui.supplyDelta.style.color = '#334155';
+              } else if (netSupplyChange > 0) {
+                  ui.supplyDelta.textContent = `Surplus +${Math.round(netSupplyChange).toLocaleString('en-US')}/s`;
+                  ui.supplyDelta.style.color = '#16a34a';
+              } else {
+                  ui.supplyDelta.textContent = `Deficit ${Math.round(netSupplyChange).toLocaleString('en-US')}/s`;
+                  ui.supplyDelta.style.color = '#ef4444';
+              }
+
+              ui.supplyConsumption.textContent = `-${supplyConsumption.toLocaleString('en-US')}/s`;
+              ui.supplyProduction.textContent = `+${Math.round(supplyProduction).toLocaleString('en-US')}/s`;
   
               gameState.buildings.forEach((b) => {
                   if (!b) return;

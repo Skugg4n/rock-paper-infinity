@@ -606,7 +606,7 @@ const uiState = {
             if (foamChanged) { uiState.foamPercent = foamPercent; uiState.foamReady = foamReady; }
         }
 
-        // FIX: Återställd funktion
+        // FIX: Restored function
         async function runCountdownAnimation(board) {
             const duration = (1.2 / gameSpeed / 3) * 1000;
             let countdownIcons = [];
