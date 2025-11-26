@@ -58,7 +58,8 @@ body {
     z-index: 20;
     opacity: 0;
     transition: opacity 0.2s;
-    white-space: nowrap;
+    white-space: normal;
+    max-width: 240px;
 }
 
 @keyframes reveal { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
