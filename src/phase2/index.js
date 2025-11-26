@@ -2,9 +2,12 @@
 
 let logicInterval;
 let fastUiInterval;
+let savingEnabled = true;
+let beforeUnloadHandler;
 
 export function init() {
           lucide.createIcons();
+          savingEnabled = true;
 
           // --- GAME STATE ---
           const gameState = {
@@ -42,8 +45,10 @@ export function init() {
           }
 
           function saveGameState() {
+              if (!savingEnabled) return;
               localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
           }
+          beforeUnloadHandler = () => saveGameState();
           const buildingData = {
               home: { cost: 10000, capacity: 10 },
               store: { cost: 30000, upkeep: 20, supply: 20 },
@@ -109,9 +114,13 @@ export function init() {
 
           ui.menuBtn.addEventListener('click', () => ui.menuDropdown.classList.toggle('hidden'));
           ui.resetBtn.addEventListener('click', () => {
+              savingEnabled = false;
+              window.removeEventListener('beforeunload', beforeUnloadHandler);
+              clearInterval(logicInterval);
+              clearInterval(fastUiInterval);
               localStorage.removeItem(SAVE_KEY);
               localStorage.removeItem('rpi-stars');
-              location.reload();
+              setTimeout(() => location.reload(), 0);
           });
   
           // --- BUILDING & RENDERING LOGIC ---
@@ -548,12 +557,13 @@ export function init() {
   initialize();
     logicInterval = setInterval(logicTick, 1000);
     fastUiInterval = setInterval(fastUiTick, 50);
-    window.addEventListener('beforeunload', saveGameState);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
   }
 
 export function teardown() {
   clearInterval(logicInterval);
   clearInterval(fastUiInterval);
+  window.removeEventListener('beforeunload', beforeUnloadHandler);
   delete window.debug_addResources;
   delete window.debug_addPopulation;
   delete window.sellBuilding;
