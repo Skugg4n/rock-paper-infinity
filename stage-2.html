@@ -138,37 +138,35 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
 
-        .factory-orbit {
+        .factory-smoke {
             position: absolute;
             inset: 0;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
             pointer-events: none;
+            overflow: visible;
+            gap: 6px;
         }
 
-        .factory-orbit .orbit-track {
-            position: relative;
-            width: 72px;
-            height: 72px;
-            animation: orbit-spin 6s linear infinite;
-        }
-
-        .factory-orbit .orbit-item {
+        .factory-smoke .smoke-icon {
             position: absolute;
-            width: 18px;
-            height: 18px;
+            bottom: 8px;
             color: #334155;
-            opacity: 0.8;
+            opacity: 0;
+            filter: drop-shadow(0 4px 8px rgba(51, 65, 85, 0.12));
+            animation: smoke-rise 3.6s linear infinite;
         }
 
-        .factory-orbit .orbit-item:nth-child(1) { top: 0; left: 50%; transform: translate(-50%, -20%); }
-        .factory-orbit .orbit-item:nth-child(2) { right: -8%; top: 50%; transform: translate(0, -50%); }
-        .factory-orbit .orbit-item:nth-child(3) { bottom: -8%; left: 50%; transform: translate(-50%, 0); }
+        .factory-smoke .smoke-icon.delay-1 { animation-delay: 0.6s; }
+        .factory-smoke .smoke-icon.delay-2 { animation-delay: 1.2s; }
+        .factory-smoke .smoke-icon.delay-3 { animation-delay: 1.8s; }
 
-        @keyframes orbit-spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        @keyframes smoke-rise {
+            0% { transform: translateY(12px) scale(0.7); opacity: 0; }
+            10% { opacity: 0.6; }
+            45% { opacity: 0.8; }
+            100% { transform: translateY(-52px) scale(1.25); opacity: 0; }
         }
 
         .supplies-track {
@@ -193,9 +191,17 @@
             position: absolute;
             top: 0;
             bottom: 0;
-            width: 0%;
+            width: 50%;
             left: 50%;
             transform-origin: left center;
+            transform: scaleX(0);
+            transition: transform 0.25s ease, background-color 0.25s ease, left 0.25s ease, right 0.25s ease;
+        }
+
+        .supplies-track .balance-fill.deficit {
+            left: auto;
+            right: 50%;
+            transform-origin: right center;
         }
     </style>
 </head>
@@ -311,7 +317,7 @@
         </div>
     </div>
 
-      <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.12</div>
+      <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.13</div>
       <!-- Menu button -->
       <div id="menu-wrapper" class="fixed bottom-4 left-4">
           <div class="relative">

@@ -181,12 +181,11 @@ export function init() {
               } else if (building.type === 'factory') {
                   content = `<div class="relative flex items-center justify-center w-full h-full">
                       <i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>
-                      <div class="factory-orbit">
-                          <div class="orbit-track">
-                              <i data-lucide="scissors" class="orbit-item"></i>
-                              <i data-lucide="gem" class="orbit-item"></i>
-                              <i data-lucide="file-text" class="orbit-item"></i>
-                          </div>
+                      <div class="factory-smoke">
+                          <i data-lucide="scissors" class="smoke-icon"></i>
+                          <i data-lucide="gem" class="smoke-icon delay-1"></i>
+                          <i data-lucide="file-text" class="smoke-icon delay-2"></i>
+                          <i data-lucide="scissors" class="smoke-icon delay-3"></i>
                       </div>
                   </div>`;
               } else if (icon) {
@@ -235,6 +234,8 @@ export function init() {
               gameState.buildings[index] = undefined;
               gameState.population = gameState.buildings.reduce((total, b) => total + (b?.population || 0), 0);
               renderGridSlot(index);
+              logicTick(true);
+              updateAllUI();
           }
           
           function upgradeBuilding(event, buildingId, targetType) {
@@ -343,19 +344,19 @@ export function init() {
           }
   
         // --- MAIN GAME LOOP ---
-        function logicTick() {
+        function logicTick(skipGrowth = false) {
               const baseStarPerPerson = calculateBaseStarPerPerson();
-              
+
               const popForStars = gameState.population * (1 - gameState.populationAllocation);
               const popForScience = gameState.population * gameState.populationAllocation;
-  
+
               let netStarChange = popForStars * baseStarPerPerson;
               let netScienceChange = popForScience * 1;
-  
+
               let supplyProduction = 0;
               let currentTotalPopulation = 0;
               const gmoMultiplier = Math.pow(2, gameState.gmoLevel);
-              
+
               gameState.buildings.forEach((b) => {
                   if (!b) return;
                   if (b.type === 'factory') netStarChange += 1680;
@@ -365,7 +366,7 @@ export function init() {
                       netStarChange -= b.upkeep;
                   }
                   if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
-                      if (gameState.supplies > 0 && b.population < b.capacity) {
+                      if (!skipGrowth && gameState.supplies > 0 && b.population < b.capacity) {
                           let growthRate = 0;
                           if (b.type === 'district') growthRate = 10000;
                           else if (b.type === 'skyscraper') growthRate = 5;
@@ -379,7 +380,7 @@ export function init() {
                       currentTotalPopulation += b.population;
                   }
               });
-              
+
               const oldPop = gameState.population;
               gameState.population = currentTotalPopulation;
               if (oldPop !== gameState.population) {
@@ -389,18 +390,21 @@ export function init() {
               gameState.baseStarPerPerson = baseStarPerPerson;
               gameState.netStarChangePerSecond = netStarChange;
               gameState.netScienceChangePerSecond = netScienceChange;
-              
+
               const supplyConsumption = gameState.population;
               const netSupplyChange = supplyProduction - supplyConsumption;
-              gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange / 20); // Slower supply change
-  
-              if (gameState.supplies <= 0 && gameState.population > 0) {
-                  const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && b.population > 0);
-                  if (popBuildings.length > 0) {
-                      popBuildings.sort((a,b) => a.id - b.id)[0].population--;
+
+              if (!skipGrowth) {
+                  gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange / 20); // Slower supply change
+
+                  if (gameState.supplies <= 0 && gameState.population > 0) {
+                      const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && b.population > 0);
+                      if (popBuildings.length > 0) {
+                          popBuildings.sort((a,b) => a.id - b.id)[0].population--;
+                      }
                   }
               }
-  
+
               if (gameState.population >= 5 && !ui.populationUi.classList.contains('visible')) {
                   ui.populationUi.classList.add('visible');
                   ui.suppliesUi.classList.add('visible');
@@ -422,7 +426,7 @@ export function init() {
 
               const baseStarPerPerson = calculateBaseStarPerPerson();
               const effectivePerPerson = baseStarPerPerson * (1 - gameState.populationAllocation);
-              ui.starsPerPerson.textContent = `${effectivePerPerson.toFixed(1)} stars/person in industry`;
+              ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} ★/person (industri: ${effectivePerPerson.toFixed(1)} ★)`;
 
               const supplyProduction = gameState.buildings.reduce((acc, b) => {
                   if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
@@ -431,18 +435,18 @@ export function init() {
               const supplyConsumption = gameState.population;
               const netSupplyChange = supplyProduction - supplyConsumption;
               const maxFlow = Math.max(supplyProduction, supplyConsumption, 1);
-              const magnitudePercent = Math.min(100, (Math.abs(netSupplyChange) / maxFlow) * 100);
+              const magnitudeRatio = Math.min(1, Math.abs(netSupplyChange) / maxFlow);
 
-              ui.suppliesBar.style.width = `${magnitudePercent}%`;
+              ui.suppliesBar.style.transform = `scaleX(${magnitudeRatio})`;
               if (netSupplyChange >= 0) {
+                  ui.suppliesBar.classList.remove('deficit');
                   ui.suppliesBar.style.left = '50%';
                   ui.suppliesBar.style.right = 'auto';
-                  ui.suppliesBar.style.transformOrigin = 'left center';
                   ui.suppliesBar.style.backgroundColor = '#22c55e';
               } else {
+                  ui.suppliesBar.classList.add('deficit');
                   ui.suppliesBar.style.left = 'auto';
                   ui.suppliesBar.style.right = '50%';
-                  ui.suppliesBar.style.transformOrigin = 'right center';
                   ui.suppliesBar.style.backgroundColor = '#ef4444';
               }
 
@@ -532,6 +536,7 @@ export function init() {
                 grid.innerHTML = '';
                 gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
                 gameState.buildings.forEach((_, i) => renderGridSlot(i));
+                logicTick(true);
                 updateAllUI();
                 saveGameState();
             }

@@ -146,6 +146,10 @@ const resetBtn = document.getElementById('reset-btn');
             }
         };
 
+const upgradeDescriptions = {
+    bank: 'Öppna Plånboken (Bank) för att ta med stjärnorna till nästa fas.'
+};
+
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
@@ -1008,9 +1012,17 @@ const uiState = {
             if (key === 'choice') return;
             const upgrade = upgrades[key];
             if (!upgrade || (upgrade.purchased && !upgrade.consumable && !upgrade.level) || (upgrade.level >= upgrade.maxLevel)) return;
-            
+
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
-            tooltip.innerHTML = generateCostVisual(cost);
+            const description = upgradeDescriptions[key];
+            let tooltipHtml = '';
+
+            if (description) {
+                tooltipHtml += `<div class="text-xs text-slate-100 leading-snug mb-1">${description}</div>`;
+            }
+
+            tooltipHtml += generateCostVisual(cost);
+            tooltip.innerHTML = tooltipHtml;
 
 
             
