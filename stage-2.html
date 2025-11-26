@@ -146,27 +146,31 @@
             justify-content: center;
             pointer-events: none;
             overflow: visible;
-            gap: 6px;
+            gap: 0;
+            z-index: 1;
         }
 
         .factory-smoke .smoke-icon {
             position: absolute;
-            bottom: 8px;
-            color: #334155;
+            bottom: 6px;
+            width: 22px;
+            height: 22px;
+            color: #1f2937;
             opacity: 0;
-            filter: drop-shadow(0 4px 8px rgba(51, 65, 85, 0.12));
-            animation: smoke-rise 3.6s linear infinite;
+            filter: drop-shadow(0 4px 8px rgba(51, 65, 85, 0.2));
+            animation: smoke-rise 3.2s ease-in infinite;
+            will-change: transform, opacity;
         }
 
-        .factory-smoke .smoke-icon.delay-1 { animation-delay: 0.6s; }
-        .factory-smoke .smoke-icon.delay-2 { animation-delay: 1.2s; }
-        .factory-smoke .smoke-icon.delay-3 { animation-delay: 1.8s; }
+        .factory-smoke .smoke-icon.delay-1 { animation-delay: 0.55s; }
+        .factory-smoke .smoke-icon.delay-2 { animation-delay: 1.1s; }
+        .factory-smoke .smoke-icon.delay-3 { animation-delay: 1.65s; }
 
         @keyframes smoke-rise {
-            0% { transform: translateY(12px) scale(0.7); opacity: 0; }
-            10% { opacity: 0.6; }
-            45% { opacity: 0.8; }
-            100% { transform: translateY(-52px) scale(1.25); opacity: 0; }
+            0% { transform: translateY(10px) scale(0.75); opacity: 0; }
+            12% { opacity: 0.85; }
+            40% { opacity: 0.9; }
+            100% { transform: translateY(-68px) scale(1.3); opacity: 0; }
         }
 
         .supplies-track {
@@ -317,7 +321,7 @@
         </div>
     </div>
 
-      <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.13</div>
+      <div id="version-info" class="absolute bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.3.14</div>
       <!-- Menu button -->
       <div id="menu-wrapper" class="fixed bottom-4 left-4">
           <div class="relative">
