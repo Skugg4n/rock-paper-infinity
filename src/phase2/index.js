@@ -1,5 +1,7 @@
 /* global lucide */
 
+import { PHASE2_CONSTANTS } from "../constants.js";
+
 let logicInterval;
 let fastUiInterval;
 let savingEnabled = true;
@@ -19,7 +21,7 @@ export function init() {
               buildings: [],
               gmoLevel: 0,
               gmoMaxLevel: 10,
-              verktygUnlocked: false,
+              toolCaseUnlocked: false,
               carUnlocked: false,
               computerUnlocked: false,
               urbanismResearched: false,
@@ -27,7 +29,7 @@ export function init() {
               landExpanded: false,
           };
 
-          const SAVE_KEY = 'rpi-stage2';
+          const { SAVE_KEY, STARS_TRANSFER_KEY } = PHASE2_CONSTANTS;
           const storedState = localStorage.getItem(SAVE_KEY);
           if (storedState) {
               try {
@@ -38,10 +40,10 @@ export function init() {
                   console.error('Failed to parse save', e);
               }
           } else {
-              const storedStars = localStorage.getItem('rpi-stars');
+              const storedStars = localStorage.getItem(STARS_TRANSFER_KEY);
               const parsed = storedStars !== null ? Number.parseInt(storedStars, 10) : NaN;
               gameState.stars = Number.isNaN(parsed) ? 0 : parsed;
-              localStorage.removeItem('rpi-stars');
+              localStorage.removeItem(STARS_TRANSFER_KEY);
           }
 
           function saveGameState() {
@@ -57,7 +59,7 @@ export function init() {
               district: { cost: 10000000, capacity: 100000 },
               superStore: { cost: 200000, upkeep: 50, supply: 60 },
               gmoUpgrade: { baseCost: 10000, scienceCost: 1000 },
-              verktygUpgrade: { cost: 500000, scienceCost: 5000 },
+              toolCaseUpgrade: { cost: 500000, scienceCost: 5000 },
               urbanismResearch: { cost: 250000, scienceCost: 25000 },
               carUpgrade: { cost: 1000000, scienceCost: 100000 },
               computerUpgrade: { cost: 5000000, scienceCost: 100000 },
@@ -119,7 +121,7 @@ export function init() {
               clearInterval(logicInterval);
               clearInterval(fastUiInterval);
               localStorage.removeItem(SAVE_KEY);
-              localStorage.removeItem('rpi-stars');
+              localStorage.removeItem(STARS_TRANSFER_KEY);
               setTimeout(() => location.reload(), 0);
           });
   
@@ -228,7 +230,7 @@ export function init() {
 
           function calculateBaseStarPerPerson() {
               let baseStarPerPerson = 2;
-              if (gameState.verktygUnlocked) baseStarPerPerson *= 2;
+              if (gameState.toolCaseUnlocked) baseStarPerPerson *= 2;
               if (gameState.carUnlocked) baseStarPerPerson *= 5;
               if (gameState.computerUnlocked) baseStarPerPerson *= 11;
               return baseStarPerPerson;
@@ -296,10 +298,10 @@ export function init() {
               const hasEmptySlot = gameState.buildings.some(b => b === undefined);
   
               const upgrades = [
-                  { btn: ui.toolCaseUpgradeBtn, popReq: 25, flag: 'verktygUnlocked' },
-                  { btn: ui.gmoUpgradeBtn, popReq: 50, flag: 'gmoLevel', isMultiLevel: true },
-                  { btn: ui.urbanismResearchBtn, popReq: 100, flag: 'urbanismResearched' },
-                  { btn: ui.expandLandBtn, popReq: 750, flag: 'landExpanded' },
+                  { btn: ui.toolCaseUpgradeBtn, popReq: 50, flag: 'toolCaseUnlocked' },
+                  { btn: ui.gmoUpgradeBtn, popReq: 75, flag: 'gmoLevel', isMultiLevel: true },
+                  { btn: ui.urbanismResearchBtn, popReq: 200, flag: 'urbanismResearched' },
+                  { btn: ui.expandLandBtn, popReq: 1000, flag: 'landExpanded' },
                   { btn: ui.carUpgradeBtn, popReq: 500, flag: 'carUnlocked' },
                   { btn: ui.computerUpgradeBtn, popReq: 1000, flag: 'computerUnlocked', prereq: 'carUnlocked' },
                   { btn: ui.megastructureResearchBtn, popReq: 5000, flag: 'megastructureResearched'},
@@ -322,7 +324,7 @@ export function init() {
               ui.buildStoreBtn.disabled = !canAfford(buildingData.store) || !hasEmptySlot;
   
               // Disabled state for global upgrades
-              ui.toolCaseUpgradeBtn.disabled = !canAfford(buildingData.verktygUpgrade) || pop < 50 || gameState.verktygUnlocked;
+              ui.toolCaseUpgradeBtn.disabled = !canAfford(buildingData.toolCaseUpgrade) || pop < 50 || gameState.toolCaseUnlocked;
               ui.urbanismResearchBtn.disabled = !canAfford(buildingData.urbanismResearch) || pop < 200 || gameState.urbanismResearched;
               ui.megastructureResearchBtn.disabled = !canAfford(buildingData.megastructureResearch) || pop < 5000 || gameState.megastructureResearched;
               ui.gmoUpgradeBtn.disabled = !canAfford({cost: buildingData.gmoUpgrade.baseCost * (gameState.gmoLevel + 1), scienceCost: buildingData.gmoUpgrade.scienceCost * (gameState.gmoLevel + 1)}) || pop < 75 || gameState.gmoLevel >= gameState.gmoMaxLevel;
@@ -337,7 +339,7 @@ export function init() {
               const gmoInfo = buildingData.gmoUpgrade;
               setTooltip(ui.gmoUpgradeBtn, pop < 75 && gameState.gmoLevel === 0 ? { unlockReq: `75 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='shopping-basket' class='w-4 h-4'></i> Eff.`, cost: gmoInfo.baseCost * (gameState.gmoLevel + 1), scienceCost: gmoInfo.scienceCost * (gameState.gmoLevel + 1) });
               
-              setTooltip(ui.toolCaseUpgradeBtn, pop < 50 && !gameState.verktygUnlocked ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.verktygUpgrade.cost, scienceCost: buildingData.verktygUpgrade.scienceCost });
+              setTooltip(ui.toolCaseUpgradeBtn, pop < 50 && !gameState.toolCaseUnlocked ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.toolCaseUpgrade.cost, scienceCost: buildingData.toolCaseUpgrade.scienceCost });
               
               setTooltip(ui.urbanismResearchBtn, pop < 200 && !gameState.urbanismResearched ? { unlockReq: `200 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `Unlock <i data-lucide='building-2' class='w-4 h-4'></i>`, cost: buildingData.urbanismResearch.cost, scienceCost: buildingData.urbanismResearch.scienceCost });
 
@@ -435,7 +437,7 @@ export function init() {
 
               const baseStarPerPerson = calculateBaseStarPerPerson();
               const effectivePerPerson = baseStarPerPerson * (1 - gameState.populationAllocation);
-              ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} ★/person (industri: ${effectivePerPerson.toFixed(1)} ★)`;
+              ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} ★/person (industry: ${effectivePerPerson.toFixed(1)} ★)`;
 
               const supplyProduction = gameState.buildings.reduce((acc, b) => {
                   if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
@@ -509,7 +511,7 @@ export function init() {
               }
           });
   
-          ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('verktygUnlocked', buildingData.verktygUpgrade));
+          ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('toolCaseUnlocked', buildingData.toolCaseUpgrade));
           ui.urbanismResearchBtn.addEventListener('click', () => createUpgradeListener('urbanismResearched', buildingData.urbanismResearch));
           ui.megastructureResearchBtn.addEventListener('click', () => createUpgradeListener('megastructureResearched', buildingData.megastructureResearch));
           ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade));
