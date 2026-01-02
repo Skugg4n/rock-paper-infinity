@@ -1,7 +1,8 @@
 import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
+import { PHASE1_CONSTANTS } from "../constants.js";
 
-        // DOM-element
+        // DOM elements
         const gameBoardContainer = document.getElementById('game-board-container');
         const choiceButtons = document.querySelectorAll('#player-controls-container .choice-btn');
         const winTracker = document.getElementById('win-tracker');
@@ -32,14 +33,13 @@ const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 const resetBtn = document.getElementById('reset-btn');
 
-        // Spelvariabler
+        // Game variables
         let starBalance = 0;
         let totalStarsEarned = 0;
         let totalGamesPlayed = 0;
-        let energy = 100;
+        let energy = PHASE1_CONSTANTS.MAX_ENERGY;
         let reserveEnergy = 0;
-        const MAX_ENERGY = 100;
-        const MAX_RESERVE_ENERGY = 1500;
+        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, HYPER_SPEED_THRESHOLD, SAVE_KEY } = PHASE1_CONSTANTS;
         let autoPlayInterval = null;
         let autoPlayWantsToRun = false;
         let gameSpeed = 1;
@@ -52,9 +52,6 @@ const resetBtn = document.getElementById('reset-btn');
         let isMetaBoardActive = false;
         let starMultiplier = 1;
         let quantumFoam = 0;
-        const MAX_QUANTUM_FOAM = 1000;
-        const HYPER_SPEED_THRESHOLD = 10;
-        const SAVE_KEY = 'rpi-save';
         
         const upgrades = {
             autoPlay: {
@@ -147,7 +144,7 @@ const resetBtn = document.getElementById('reset-btn');
         };
 
 const upgradeDescriptions = {
-    bank: 'Öppna Plånboken (Bank) för att ta med stjärnorna till nästa fas.'
+    bank: 'Open the Bank to transfer your stars to the next phase.'
 };
 
 const choices = ['rock', 'paper', 'scissors'];
