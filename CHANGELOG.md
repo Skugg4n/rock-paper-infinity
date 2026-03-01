@@ -1,9 +1,15 @@
 # Changelog
 
+## v1.4.5 - 2026-03-01
+
+### Improvements
+- **Factory animation reworked** — RPS icons now rise from the bottom inside the factory box (contained, not flying loose). Smoke puffs drift near the top. Inspired by Phase 2's contained animation style.
+- **Phase 2 upgrade "+" animation** — Upgrade buttons now pop in with inverted colors (dark→gray) when they first appear, making it clearer something new is available.
+
 ## v1.4.4 - 2026-03-01
 
 ### New Features
-- **Factory conveyor animation** — Phase 1 factory now shows RPS icons (gem, document, scissors) entering from the right, gold stars exiting to the left, and chimney smoke rising above. Icons scale for perspective depth. Symbolizes the factory converting RPS games into stars.
+- **Factory conveyor animation** — Phase 1 factory shows animated RPS icons and chimney smoke, symbolizing conversion of games into stars.
 
 ### Bug Fixes
 - **Counter/resource-bar overlap** — Games/wins counter was hidden behind energy bars after 10 stars. Fixed by nesting both in a shared parent wrapper div.
