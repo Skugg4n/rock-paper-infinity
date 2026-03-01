@@ -251,16 +251,49 @@ function scheduleUIUpdate() {
             isMetaBoardActive = true;
             if (!fromLoad) starMultiplier *= 10;
             gameBoards.forEach(board => board.element.style.display = 'none');
-            
+
             let metaBoard = document.getElementById('meta-board');
             if (!metaBoard) {
                 metaBoard = document.createElement('div');
                 metaBoard.id = 'meta-board';
                 metaBoard.className = 'rounded-2xl aspect-square w-full h-auto flex justify-center items-center';
-                metaBoard.replaceChildren(getIcon('factory', 'lucide-lg text-black'));
+                metaBoard.replaceChildren(getIcon('factory', 'factory-center-icon'));
+
                 gameBoardContainer.innerHTML = '';
-                gameBoardContainer.className = 'flex-grow grid grid-cols-1 items-center justify-center gap-4 max-w-sm mx-auto';
+                gameBoardContainer.className = 'factory-scene flex-grow max-w-sm mx-auto';
+
+                // RPS icons entering from the right
+                const inputTrack = document.createElement('div');
+                inputTrack.className = 'factory-input';
+                ['gem', 'file-text', 'scissors', 'gem', 'file-text', 'scissors'].forEach((name, i) => {
+                    const icon = getIcon(name, 'factory-rps-icon');
+                    icon.style.animationDelay = `${i * 0.9}s`;
+                    inputTrack.appendChild(icon);
+                });
+
+                // Chimney smoke
+                const smoke = document.createElement('div');
+                smoke.className = 'factory-chimney-smoke';
+                for (let i = 0; i < 3; i++) {
+                    const puff = document.createElement('div');
+                    puff.className = 'smoke-puff';
+                    puff.style.animationDelay = `${i * 1.2}s`;
+                    smoke.appendChild(puff);
+                }
+
+                // Star icons exiting to the left
+                const outputTrack = document.createElement('div');
+                outputTrack.className = 'factory-output';
+                for (let i = 0; i < 6; i++) {
+                    const icon = getIcon('star', 'factory-star-icon');
+                    icon.style.animationDelay = `${i * 0.9}s`;
+                    outputTrack.appendChild(icon);
+                }
+
+                gameBoardContainer.appendChild(inputTrack);
+                gameBoardContainer.appendChild(smoke);
                 gameBoardContainer.appendChild(metaBoard);
+                gameBoardContainer.appendChild(outputTrack);
             }
             metaBoard.style.display = 'flex';
 

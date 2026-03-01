@@ -5,10 +5,12 @@
 ### New Features
 - **Games/Wins counter** — Tracks total games played (⚔) and wins (🏆) with icons, shown top-right. Uses progressive disclosure: appears after first game. Supports large number formatting (k, M, B suffixes).
 - **SPS energy indicator** — SPS display dims (opacity 0.35) when autoplay wants to run but energy is empty, giving visual feedback that star generation is paused.
+- **Factory conveyor animation** — Phase 1 factory now shows RPS icons (gem, document, scissors) entering from the right, gold stars exiting to the left, and chimney smoke rising above. Icons scale for perspective depth. Symbolizes the factory converting RPS games into stars.
 - **Design Principles** documented in CLAUDE.md — icons over text, progressive disclosure, exponential satisfaction, Roman numeral costs.
 
 ### Bug Fixes
 - **Factory unlock too early** — Factory appeared when only speed was maxed, hiding other upgrades. Now requires all three upgrades (speed, energy generator, game boards) at max level.
+- **Counter/resource-bar overlap** — Games/wins counter was hidden behind energy bars after 10 stars. Fixed by nesting both in a shared parent wrapper div.
 
 ### UI/Responsiveness
 - Choice buttons scale down on mobile (48px → 64px at ≥640px)

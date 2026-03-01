@@ -53,5 +53,7 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 
 ## Phase 19: Future Phases
 - [ ] Phase 3: WAR (defined in gamePhase.js but not implemented)
+  - [ ] Factory smoke → environmental impact mechanic (pollution meter, climate consequences)
 - [ ] Phase 4: ESCAPE (defined in gamePhase.js but not implemented)
+  - [ ] Environmental degradation forces player to escape to space
 - [ ] Accessibility improvements (keyboard navigation, ARIA labels)

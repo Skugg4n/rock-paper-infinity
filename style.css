@@ -109,9 +109,120 @@ body {
     border: 4px solid #000;
     background-color: #fff;
     box-shadow: none;
-    overflow: hidden;
+    overflow: visible;
 }
 .meta-active { animation: none; }
+
+/* Factory conveyor animation — scene is the game-board-container */
+.factory-scene {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.factory-center-icon {
+    width: 48px;
+    height: 48px;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+    color: #334155;
+}
+@media (min-width: 640px) {
+    .factory-center-icon { width: 64px; height: 64px; }
+}
+
+/* RPS icons: right side → center */
+.factory-input {
+    position: absolute;
+    top: 50%;
+    right: 10%;
+    width: 35%;
+    height: 0;
+    pointer-events: none;
+}
+.factory-rps-icon {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 22px;
+    height: 22px;
+    color: #475569;
+    opacity: 0;
+    animation: convey-in 5.4s linear infinite;
+}
+@media (min-width: 640px) {
+    .factory-rps-icon { width: 28px; height: 28px; }
+}
+@keyframes convey-in {
+    0%   { transform: translate(0, -50%) scale(0.6); opacity: 0; }
+    5%   { opacity: 0.7; transform: translate(-12px, -50%) scale(0.7); }
+    25%  { opacity: 0.6; transform: translate(-80px, -50%) scale(0.9); }
+    42%  { opacity: 0.3; transform: translate(-140px, -50%) scale(0.5); }
+    48%  { opacity: 0; transform: translate(-160px, -50%) scale(0.3); }
+    100% { opacity: 0; }
+}
+
+/* Star icons: center → left side */
+.factory-output {
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    width: 35%;
+    height: 0;
+    pointer-events: none;
+}
+.factory-star-icon {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 18px;
+    height: 18px;
+    color: #eab308;
+    opacity: 0;
+    animation: convey-out 5.4s linear infinite;
+}
+@media (min-width: 640px) {
+    .factory-star-icon { width: 22px; height: 22px; }
+}
+@keyframes convey-out {
+    0%   { transform: translate(0, -50%) scale(0.3); opacity: 0; }
+    49%  { transform: translate(0, -50%) scale(0.3); opacity: 0; }
+    55%  { opacity: 0.9; transform: translate(-20px, -50%) scale(0.6); }
+    72%  { opacity: 0.7; transform: translate(-80px, -50%) scale(1); }
+    90%  { opacity: 0.3; transform: translate(-140px, -50%) scale(0.9); }
+    100% { opacity: 0; transform: translate(-160px, -50%) scale(0.8); }
+}
+
+/* Chimney smoke — positioned above meta-board */
+.factory-chimney-smoke {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 60px;
+    pointer-events: none;
+    z-index: 3;
+}
+.smoke-puff {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #94a3b8;
+    opacity: 0;
+    animation: puff-rise 3.6s ease-out infinite;
+}
+@keyframes puff-rise {
+    0%   { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+    8%   { opacity: 0.4; }
+    30%  { opacity: 0.25; }
+    60%  { opacity: 0.1; }
+    100% { transform: translate(calc(-50% + 15px), -55px) scale(3); opacity: 0; }
+}
 
 .rate-paused {
     opacity: 0.35;
