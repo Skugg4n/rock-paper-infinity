@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.4.3 - 2026-03-01
+
+### New Features
+- **Games/Wins counter** — Tracks total games played (⚔) and wins (🏆) with icons, shown top-right. Uses progressive disclosure: appears after first game. Supports large number formatting (k, M, B suffixes).
+- **SPS energy indicator** — SPS display dims (opacity 0.35) when autoplay wants to run but energy is empty, giving visual feedback that star generation is paused.
+- **Design Principles** documented in CLAUDE.md — icons over text, progressive disclosure, exponential satisfaction, Roman numeral costs.
+
+### Bug Fixes
+- **Factory unlock too early** — Factory appeared when only speed was maxed, hiding other upgrades. Now requires all three upgrades (speed, energy generator, game boards) at max level.
+
+### UI/Responsiveness
+- Choice buttons scale down on mobile (48px → 64px at ≥640px)
+- Energy bars, rate displays (SPS/EPS/EGPS), and upgrade tray adapted for small screens
+- Win tracker limited to 60vw on mobile to prevent collision with right-side elements
+- Crown/gem icons smaller on mobile with full size restored at ≥640px
+
+### New Assets
+- `graphics/swords.svg` — Crossed swords icon for games counter
+- `graphics/trophy.svg` — Trophy icon for wins counter
+
 ## v1.4.2 - 2026-03-01
 
 ### Medium-Priority Fixes (Phase 1)

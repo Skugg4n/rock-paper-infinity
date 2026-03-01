@@ -26,13 +26,19 @@ body {
 .upgrade-btn:disabled:not(.purchased) { opacity: 0.4; cursor: not-allowed; }
 
 .lucide { width: 32px; height: 32px; stroke-width: 1.5; }
-.lucide-lg { width: 56px; height: 56px; transition: all 0.3s ease-in-out; }
+.lucide-lg { width: 40px; height: 40px; transition: all 0.3s ease-in-out; }
+@media (min-width: 640px) { .lucide-lg { width: 56px; height: 56px; } }
 
 .currency-display { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .lucide-star-small { width: 8px; height: 8px; }
-.lucide-gem-large { width: 32px; height: 32px; }
-.lucide-gem-medium { width: 16px; height: 16px; }
-.lucide-crown-xl { width: 40px; height: 40px; }
+.lucide-gem-large { width: 24px; height: 24px; }
+.lucide-gem-medium { width: 12px; height: 12px; }
+.lucide-crown-xl { width: 28px; height: 28px; }
+@media (min-width: 640px) {
+    .lucide-gem-large { width: 32px; height: 32px; }
+    .lucide-gem-medium { width: 16px; height: 16px; }
+    .lucide-crown-xl { width: 40px; height: 40px; }
+}
 .dot { width: 8px; height: 8px; background-color: #cbd5e1; border-radius: 9999px; }
 .gem-dot { width: 16px; height: 16px; background-color: #cbd5e1; border-radius: 9999px; }
 
@@ -106,6 +112,11 @@ body {
     overflow: hidden;
 }
 .meta-active { animation: none; }
+
+.rate-paused {
+    opacity: 0.35;
+    transition: opacity 0.4s ease;
+}
 
 #collapse-foam-btn {
     position: relative;

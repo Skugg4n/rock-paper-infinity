@@ -18,6 +18,9 @@ import { PHASE1_CONSTANTS } from "../constants.js";
         const egpsContainer = document.getElementById('egps-container');
         const egpsValue = document.getElementById('egps-value');
         const resourceBars = document.getElementById('resource-bars');
+        const gameCounters = document.getElementById('game-counters');
+        const gamesValueEl = document.getElementById('games-value');
+        const winsValueEl = document.getElementById('wins-value');
         const debugTrigger = document.getElementById('debug-trigger');
         const debugMenu = document.getElementById('debug-menu');
         const debugSpeedEl = document.getElementById('debug-speed');
@@ -39,6 +42,7 @@ const resetBtn = document.getElementById('reset-btn');
         let starBalance = 0;
         let totalStarsEarned = 0;
         let totalGamesPlayed = 0;
+        let totalWins = 0;
         let energy = PHASE1_CONSTANTS.MAX_ENERGY;
         let reserveEnergy = 0;
         const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, HYPER_SPEED_THRESHOLD, SAVE_KEY } = PHASE1_CONSTANTS;
@@ -118,10 +122,11 @@ const resetBtn = document.getElementById('reset-btn');
                 cost: 1000, purchased: false,
                 unlocksAt: 0,
                 element: document.getElementById('mergeGameBoard'),
-                // Factory becomes available when both speed and energy
-                // production are 500/s or more, or stars/s exceeds 250.
+                // Factory becomes available when speed, energy generator, and game boards are all maxed.
                 unlockCondition: () =>
-                    ((getEPS() >= 500 && upgrades.energyGenerator.level * 5 >= 500) || getSPS() >= 250),
+                    upgrades.speed.level >= upgrades.speed.maxLevel &&
+                    upgrades.energyGenerator.level >= upgrades.energyGenerator.maxLevel &&
+                    upgrades.addGameBoard.level >= upgrades.addGameBoard.maxLevel,
                 purchase: function() {
                     this.purchased = true;
                     mergeToMetaBoard();
@@ -410,10 +415,11 @@ function scheduleUIUpdate() {
             return gameSpeed * boardMultiplier;
         }
 
-        function updateRateDisplays(sps, eps, egps, autoActive) {
+        function updateRateDisplays(sps, eps, egps, autoActive, energyPaused) {
             if (sps > 0.1) {
                 spsContainer.classList.remove('hidden');
                 spsValue.textContent = sps.toFixed(1);
+                spsContainer.classList.toggle('rate-paused', energyPaused);
             } else {
                 spsContainer.classList.add('hidden');
             }
@@ -527,6 +533,7 @@ function scheduleUIUpdate() {
 
 const uiState = {
     gamesPlayed: 0,
+    totalWins: 0,
     showResources: false,
     energyPercent: -1,
     reservePercent: -1,
@@ -535,6 +542,7 @@ const uiState = {
     eps: -1,
     egps: -1,
     autoPlayActive: false,
+    energyPaused: false,
     speedLevel: -1,
     energyGenLevel: -1,
     addBoardLevel: -1,
@@ -545,8 +553,29 @@ const uiState = {
     foamReady: false
 };
 
+        function formatCount(n) {
+            if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
+            return n.toLocaleString();
+        }
+
         function renderGamesPlayed(value) {
             debugGamesPlayedEl.textContent = value;
+        }
+
+        let counterIconsSet = false;
+        function updateGameCounters(games, wins) {
+            if (games > 0) {
+                gameCounters.classList.remove('hidden');
+                gamesValueEl.textContent = formatCount(games);
+                winsValueEl.textContent = formatCount(wins);
+                if (!counterIconsSet) {
+                    document.getElementById('games-icon').replaceWith(getIcon('swords', 'w-3 h-3 text-slate-400'));
+                    document.getElementById('wins-icon').replaceWith(getIcon('trophy', 'w-3 h-3 text-slate-400'));
+                    counterIconsSet = true;
+                }
+            }
         }
 
         function toggleResourceBars(show) {
@@ -576,29 +605,31 @@ const uiState = {
             const eps = getEPS();
             const egps = upgrades.energyGenerator.level * 5;
             const autoActive = !!autoPlayInterval;
+            const energyPaused = autoPlayWantsToRun && energyEmpty;
             const speedLevel = upgrades.speed.level;
             const energyGenLevel = upgrades.energyGenerator.level;
             const addBoardLevel = upgrades.addGameBoard.level;
             const foamPercent = (quantumFoam / MAX_QUANTUM_FOAM) * 100;
             const foamReady = quantumFoam >= MAX_QUANTUM_FOAM;
 
-            const gamesChanged = games !== uiState.gamesPlayed;
+            const wins = Math.floor(totalWins);
+            const gamesChanged = games !== uiState.gamesPlayed || wins !== uiState.totalWins;
             const resourcesChanged = showResources !== uiState.showResources;
             const energyChanged = energyPercent !== uiState.energyPercent;
             const reserveChanged = reservePercent !== uiState.reservePercent;
             const emptyChanged = energyEmpty !== uiState.energyEmpty;
-            const rateChanged = sps !== uiState.sps || eps !== uiState.eps || egps !== uiState.egps || autoActive !== uiState.autoPlayActive;
+            const rateChanged = sps !== uiState.sps || eps !== uiState.eps || egps !== uiState.egps || autoActive !== uiState.autoPlayActive || energyPaused !== uiState.energyPaused;
             const levelChanged = speedLevel !== uiState.speedLevel || energyGenLevel !== uiState.energyGenLevel || addBoardLevel !== uiState.addBoardLevel;
             const foamChanged = isMetaBoardActive && (foamPercent !== uiState.foamPercent || foamReady !== uiState.foamReady);
             const upgradesChanged = starBalance !== uiState.starBalance || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || levelChanged || isMetaBoardActive !== uiState.isMetaBoardActive;
 
             const tasks = [];
-            if (gamesChanged) tasks.push(() => renderGamesPlayed(games));
+            if (gamesChanged) tasks.push(() => { renderGamesPlayed(games); updateGameCounters(games, wins); });
             if (resourcesChanged) tasks.push(() => toggleResourceBars(showResources));
             if (energyChanged) tasks.push(() => renderEnergy(energyPercent));
             if (reserveChanged) tasks.push(() => renderReserveEnergy(reservePercent));
             if (emptyChanged) tasks.push(() => setEnergyEmpty(energyEmpty));
-            if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive));
+            if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
             if (levelChanged) tasks.push(() => { updateProgressCircles(speedLevel, energyGenLevel, addBoardLevel); updateSellButtons(); });
             if (upgradesChanged) tasks.push(updateUpgrades);
             if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
@@ -609,12 +640,12 @@ const uiState = {
             tasks.push(saveGame);
             tasks.forEach(fn => fn());
 
-            if (gamesChanged) uiState.gamesPlayed = games;
+            if (gamesChanged) { uiState.gamesPlayed = games; uiState.totalWins = wins; }
             if (resourcesChanged) uiState.showResources = showResources;
             if (energyChanged) uiState.energyPercent = energyPercent;
             if (reserveChanged) uiState.reservePercent = reservePercent;
             if (emptyChanged) uiState.energyEmpty = energyEmpty;
-            if (rateChanged) { uiState.sps = sps; uiState.eps = eps; uiState.egps = egps; uiState.autoPlayActive = autoActive; }
+            if (rateChanged) { uiState.sps = sps; uiState.eps = eps; uiState.egps = egps; uiState.autoPlayActive = autoActive; uiState.energyPaused = energyPaused; }
             if (levelChanged) { uiState.speedLevel = speedLevel; uiState.energyGenLevel = energyGenLevel; uiState.addBoardLevel = addBoardLevel; }
             if (upgradesChanged) { uiState.starBalance = starBalance; uiState.totalStarsEarned = totalStarsEarned; uiState.isMetaBoardActive = isMetaBoardActive; }
             if (foamChanged) { uiState.foamPercent = foamPercent; uiState.foamReady = foamReady; }
@@ -676,6 +707,7 @@ const uiState = {
                 starBalance,
                 totalStarsEarned,
                 totalGamesPlayed,
+                totalWins,
                 energy,
                 reserveEnergy,
                 gameSpeed,
@@ -704,6 +736,7 @@ const uiState = {
                 starBalance = data.starBalance ?? starBalance;
                 totalStarsEarned = data.totalStarsEarned ?? totalStarsEarned;
                 totalGamesPlayed = data.totalGamesPlayed ?? totalGamesPlayed;
+                totalWins = data.totalWins ?? totalWins;
                 energy = data.energy ?? energy;
                 reserveEnergy = data.reserveEnergy ?? reserveEnergy;
                 starMultiplier = data.starMultiplier ?? starMultiplier;
@@ -744,6 +777,7 @@ const uiState = {
             starBalance = 0;
             totalStarsEarned = 0;
             totalGamesPlayed = 0;
+            totalWins = 0;
             energy = MAX_ENERGY;
             reserveEnergy = 0;
             starMultiplier = 1;
@@ -810,13 +844,14 @@ const uiState = {
             board.computerEl.replaceChildren(computerWrapper);
 
             if (result === 'win') {
+                totalWins++;
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;
                 totalStarsEarned += starGain;
             }
 
             scheduleUIUpdate();
-            
+
             if (!hasEnergy() && autoPlayInterval) stopAutoPlayInterval();
 
             setTimeout(() => {
@@ -886,7 +921,8 @@ const uiState = {
 
             const wins = energyToConsume / 3;
             const roundedWins = Math.floor(wins) + (Math.random() < (wins % 1) ? 1 : 0);
-            
+            totalWins += roundedWins;
+
             const starGain = roundedWins * starMultiplier;
             starBalance += starGain;
             totalStarsEarned += starGain;

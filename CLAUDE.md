@@ -73,6 +73,13 @@ rock-paper-infinity/
 - Consumption: main drained first → reserve as backup
 - Refund: decrement level first, then `cost() * refundRate`
 
+## Design Principles
+- **Icons over text** — Use icons instead of labels. The UI should feel like a puzzle to discover.
+- **Clean and minimal** — Less is more. No unnecessary decoration or clutter.
+- **Progressive disclosure** — Introduce complexity over time. New elements appear as the player progresses, not all at once.
+- **Exponential satisfaction** — Numbers should grow. Slow at first, then faster, then overwhelmingly fast. The player should feel the acceleration.
+- **Roman numerals for costs** — Costs ≥10 display in Roman numerals. Intentionally cryptic, part of the puzzle feel.
+
 ## Known Issues
 - `src/phase1/index.js` is a monolith (~1,066 lines) — candidate for splitting
 - `stage-2.html` title version ("v5") is inconsistent with actual version

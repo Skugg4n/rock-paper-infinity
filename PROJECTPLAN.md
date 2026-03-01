@@ -45,8 +45,13 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [ ] Set up ESLint config properly and fix linting issues
 - [ ] Unify icon system (remove Lucide CDN dependency or use it everywhere)
 
-## Phase 18: Future Features
+## Phase 18: UX Polish & New Features (v1.5.x)
+- [ ] **P1: Change Bank icon** — Replace wallet (💳) with bank/landmark icon (🏛) for the Bank upgrade
+- [ ] **P1: Remove Bank tooltip text** — Tooltip violates "icons not text" principle, strip verbose text
+- [ ] **P2: "Code Processor" upgrade** — Unlockable upgrade that animates transition from icon-only UI to icon+text labels. Gives in-world justification for Phase 2's text-heavy UI. Example: `2.0 ★/👤 (industry...)` fades in text after purchase.
+- [ ] Mobile responsiveness audit (Phase 1 done in v1.4.3, Phase 2 still needed)
+
+## Phase 19: Future Phases
 - [ ] Phase 3: WAR (defined in gamePhase.js but not implemented)
 - [ ] Phase 4: ESCAPE (defined in gamePhase.js but not implemented)
 - [ ] Accessibility improvements (keyboard navigation, ARIA labels)
-- [ ] Mobile responsiveness audit

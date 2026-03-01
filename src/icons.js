@@ -1,7 +1,8 @@
 const ICONS = [
   'zap', 'star', 'timer', 'zap-off', 'atom', 'gem', 'file-text', 'scissors',
   'battery-charging', 'repeat-2', 'chevrons-right', 'battery-plus',
-  'clover', 'copy', 'menu', 'factory', 'crown', 'minus', 'wallet'
+  'clover', 'copy', 'menu', 'factory', 'crown', 'minus', 'wallet',
+  'swords', 'trophy'
 ];
 
 const cache = {};
