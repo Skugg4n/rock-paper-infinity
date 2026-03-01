@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.4.1 - 2026-03-01
+
+### Critical Fixes (Phase 2)
+- Fixed severe memory leak: `setTooltip()` added duplicate event listeners every 50ms — now uses WeakSet to track and prevent duplicates
+- Fixed performance: `lucide.createIcons()` scanned entire DOM 20+ times/second — now debounced via `requestAnimationFrame`, called only after actual DOM changes
+- Moved `updateAllUI()` from `fastUiTick` (50ms) to `logicTick` (1s) — fast tick now only updates numbers and progress bars
+
+### High-Priority Fixes (Phase 1)
+- Fixed double energy generation: `passiveTick` was filling both energy AND reserve simultaneously — now fills main first, overflow goes to reserve
+- Fixed sell refund calculation: refund was near-zero because `cost()` was called before level decrement — now decrements first, giving correct 75% refund
+- Fixed energy consumption order: reserve was drained before main energy — now drains main first, reserve as backup
+
+### High-Priority Fixes (Phase 2)
+- Fixed supply rate display showing 20x the actual rate (÷20 divisor removed to match display)
+- Fixed background tab throttling: star/science accumulation moved from `fastUiTick` (throttled to 1/s in background) to `logicTick` (consistent 1/s)
+- Fixed `beforeunload` listener leak in Phase 2 teardown
+
+### Cleanup (Both Phases)
+- Phase 1: All event listeners now use AbortController — `teardown()` cleanly removes everything via `abort()`
+- Phase 2: `teardown()` now properly removes `beforeunload` listener via stored reference
+
 ## v1.3.13 - 2025-11-26 07:51 UTC
 - Added a dedicated Plånboken (Bank) hover tooltip so the Stage 1 exit upgrade explains the transition before clicking.
 - Replaced the Stage 2 factory orbit animation with a steady stream of rising rock/paper/scissors icons to read as industrial "rök".

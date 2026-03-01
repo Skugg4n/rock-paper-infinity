@@ -2,6 +2,7 @@
 
 let logicInterval;
 let fastUiInterval;
+let saveGameStateRef;
 
 export function init() {
           lucide.createIcons();
@@ -210,9 +211,9 @@ export function init() {
                   slot.innerHTML = '';
                   slot.classList.add('empty');
               }
-              lucide.createIcons();
+              scheduleIconRefresh();
           }
-  
+
           function renderAllBuildings() {
               gameState.buildings.forEach((b, i) => renderGridSlot(i));
           }
@@ -264,7 +265,20 @@ export function init() {
               }
           }
   
+          // --- ICON REFRESH (debounced) ---
+          let iconRefreshPending = false;
+          function scheduleIconRefresh() {
+              if (iconRefreshPending) return;
+              iconRefreshPending = true;
+              requestAnimationFrame(() => {
+                  lucide.createIcons();
+                  iconRefreshPending = false;
+              });
+          }
+
           // --- TOOLTIP & UI UPDATE LOGIC ---
+          const tooltipListenersAttached = new WeakSet();
+
           function setTooltip(el, { effect, cost, scienceCost, unlockReq }) {
               const tooltipEl = el.querySelector('.tooltip');
               if (!tooltipEl) return;
@@ -277,8 +291,11 @@ export function init() {
                   if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-sky-500"></i></div>`;
               }
               tooltipEl.innerHTML = html;
-              el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1));
-              el.addEventListener('mouseleave', () => tooltipEl.style.setProperty('--tooltip-opacity', 0));
+              if (!tooltipListenersAttached.has(el)) {
+                  el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1));
+                  el.addEventListener('mouseleave', () => tooltipEl.style.setProperty('--tooltip-opacity', 0));
+                  tooltipListenersAttached.add(el);
+              }
           }
   
           function updateAllUI() {
@@ -340,7 +357,7 @@ export function init() {
               
               setTooltip(ui.expandLandBtn, pop < 1000 && !gameState.landExpanded ? { unlockReq: `1000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+5 <i data-lucide='layout-grid' class='w-4 h-4'></i>`, cost: buildingData.landExpansion.cost });
               
-              lucide.createIcons();
+              scheduleIconRefresh();
           }
   
         // --- MAIN GAME LOOP ---
@@ -391,11 +408,16 @@ export function init() {
               gameState.netStarChangePerSecond = netStarChange;
               gameState.netScienceChangePerSecond = netScienceChange;
 
+              if (!skipGrowth) {
+                  gameState.stars += netStarChange;
+                  gameState.science += netScienceChange;
+              }
+
               const supplyConsumption = gameState.population;
               const netSupplyChange = supplyProduction - supplyConsumption;
 
               if (!skipGrowth) {
-                  gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange / 20); // Slower supply change
+                  gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange);
 
                   if (gameState.supplies <= 0 && gameState.population > 0) {
                       const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && b.population > 0);
@@ -410,12 +432,11 @@ export function init() {
                   ui.suppliesUi.classList.add('visible');
               }
 
+              updateAllUI();
               saveGameState();
           }
   
           function fastUiTick() {
-              gameState.stars += (gameState.netStarChangePerSecond || 0) / 20;
-              gameState.science += (gameState.netScienceChangePerSecond || 0) / 20;
               ui.starCount.textContent = Math.floor(gameState.stars).toLocaleString('en-US');
               ui.scienceCount.textContent = Math.floor(gameState.science).toLocaleString('en-US');
               ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
@@ -473,7 +494,6 @@ export function init() {
               });
               const gmoPercent = (gameState.gmoLevel / gameState.gmoMaxLevel) * 113;
               ui.gmoRing.style.strokeDashoffset = 113 - gmoPercent;
-              updateAllUI(); // Check affordability continuously
           }
           
           // --- EVENT LISTENERS ---
@@ -548,12 +568,17 @@ export function init() {
   initialize();
     logicInterval = setInterval(logicTick, 1000);
     fastUiInterval = setInterval(fastUiTick, 50);
-    window.addEventListener('beforeunload', saveGameState);
+    saveGameStateRef = saveGameState;
+    window.addEventListener('beforeunload', saveGameStateRef);
   }
 
 export function teardown() {
   clearInterval(logicInterval);
   clearInterval(fastUiInterval);
+  if (saveGameStateRef) {
+      window.removeEventListener('beforeunload', saveGameStateRef);
+      saveGameStateRef = null;
+  }
   delete window.debug_addResources;
   delete window.debug_addPopulation;
   delete window.sellBuilding;
