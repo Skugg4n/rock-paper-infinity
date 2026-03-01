@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.4.2 - 2026-03-01
+
+### Medium-Priority Fixes (Phase 1)
+- Fixed starMultiplier being overwritten (= 10) instead of multiplied (*= 10) when merging to meta board — luck bonus now preserved across merge and save/load
+- Fixed quantum foam accumulating based on theoretical games instead of actual energy-limited games played
+- Fixed tooltip timeout race condition — hovering between buttons no longer causes tooltips to disappear
+
+### Medium-Priority Fixes (Phase 2)
+- Fixed allocation slider not syncing with saved game state on load — slider now shows correct position
+- Added floor guard: stars and science can no longer go negative from building upkeep
+- Improved starvation mechanics: death rate now scales with 5% of supply deficit instead of fixed 1 person/tick
+
 ## v1.4.1 - 2026-03-01
 
 ### Critical Fixes (Phase 2)

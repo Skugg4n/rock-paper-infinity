@@ -245,9 +245,9 @@ function scheduleUIUpdate() {
             }
         }
 
-        function mergeToMetaBoard() {
+        function mergeToMetaBoard(fromLoad = false) {
             isMetaBoardActive = true;
-            starMultiplier = 10;
+            if (!fromLoad) starMultiplier *= 10;
             gameBoards.forEach(board => board.element.style.display = 'none');
             
             let metaBoard = document.getElementById('meta-board');
@@ -730,7 +730,7 @@ const uiState = {
                 const boards = data.gameBoards || 0;
                 for (let i = 0; i < boards; i++) createGameBoard();
                 if (isMetaBoardActive) {
-                    mergeToMetaBoard();
+                    mergeToMetaBoard(true);
                 }
                 if (upgrades.luck.purchased) {
                     upgrades.luck.element.style.display = 'none';
@@ -895,7 +895,7 @@ const uiState = {
             totalStarsEarned += starGain;
 
             if (isMetaBoardActive) {
-                quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + gamesToPlay);
+                quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + energyToConsume);
             }
             
             if (!isMetaBoardActive) {
@@ -1019,10 +1019,17 @@ const uiState = {
             return html;
         }
 
+        let tooltipHideTimeout = null;
+
         function showTooltip(element, key) {
             if (key === 'choice') return;
             const upgrade = upgrades[key];
             if (!upgrade || (upgrade.purchased && !upgrade.consumable && !upgrade.level) || (upgrade.level >= upgrade.maxLevel)) return;
+
+            if (tooltipHideTimeout) {
+                clearTimeout(tooltipHideTimeout);
+                tooltipHideTimeout = null;
+            }
 
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
             const description = upgradeDescriptions[key];
@@ -1035,8 +1042,6 @@ const uiState = {
             tooltipHtml += generateCostVisual(cost);
             tooltip.innerHTML = tooltipHtml;
 
-
-            
             const rect = element.getBoundingClientRect();
             tooltip.style.display = 'block';
             tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
@@ -1046,7 +1051,7 @@ const uiState = {
 
         function hideTooltip() {
             tooltip.style.opacity = '0';
-            setTimeout(() => { tooltip.style.display = 'none'; }, 200);
+            tooltipHideTimeout = setTimeout(() => { tooltip.style.display = 'none'; }, 200);
         }
 
         export function teardown() {

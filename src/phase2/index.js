@@ -409,8 +409,8 @@ export function init() {
               gameState.netScienceChangePerSecond = netScienceChange;
 
               if (!skipGrowth) {
-                  gameState.stars += netStarChange;
-                  gameState.science += netScienceChange;
+                  gameState.stars = Math.max(0, gameState.stars + netStarChange);
+                  gameState.science = Math.max(0, gameState.science + netScienceChange);
               }
 
               const supplyConsumption = gameState.population;
@@ -420,9 +420,16 @@ export function init() {
                   gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange);
 
                   if (gameState.supplies <= 0 && gameState.population > 0) {
+                      const deficit = Math.abs(netSupplyChange);
+                      const deaths = Math.max(1, Math.ceil(deficit * 0.05));
                       const popBuildings = gameState.buildings.filter(b => b && (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && b.population > 0);
-                      if (popBuildings.length > 0) {
-                          popBuildings.sort((a,b) => a.id - b.id)[0].population--;
+                      let remaining = deaths;
+                      popBuildings.sort((a,b) => a.id - b.id);
+                      for (const b of popBuildings) {
+                          if (remaining <= 0) break;
+                          const kill = Math.min(remaining, b.population);
+                          b.population -= kill;
+                          remaining -= kill;
                       }
                   }
               }
@@ -552,6 +559,7 @@ export function init() {
                     gameState.buildings[0] = {id: 1, type: 'factory'};
                     gameState.buildings[1] = {id: 2, type: 'bank'};
                 }
+                ui.allocationSlider.value = gameState.populationAllocation * 100;
                 const grid = ui.landGrid;
                 grid.innerHTML = '';
                 gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));

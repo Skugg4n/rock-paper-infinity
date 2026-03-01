@@ -6,7 +6,7 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 ## Phase 14: Project Cleanup & Stability (v1.4.0)
 - [x] Set up project documentation (CLAUDE.md, INDEX.md, LESSONS.md, PROJECTPLAN.md)
 - [x] Audit and document known bugs
-- [ ] Run `npm install` and verify `npm test` and `npm run lint` pass
+- [x] Run `npm install` and verify `npm test` and `npm run lint` pass
 - [ ] Clean up legacy root SVGs — move needed ones to `graphics/`, delete duplicates
 - [ ] Remove `firebase-debug.log` and add it to `.gitignore`
 - [ ] Fix `stage-2.html` title version inconsistency
@@ -25,12 +25,12 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [x] **P1: Fix teardown() event listener cleanup** — AbortController removes all listeners
 
 ## Phase 16: Medium-Priority Bug Fixes (v1.4.2)
-- [ ] **P1: Fix starMultiplier overwrite** — mergeToMetaBoard should multiply, not assign
-- [ ] **P1: Fix quantum foam calculation** — use energyToConsume instead of gamesToPlay
-- [ ] **P1: Fix tooltip timeout race** — cancel pending hide when showing new tooltip
-- [ ] **P2: Sync allocation slider on load** — set slider value from saved state
-- [ ] **P2: Floor stars at 0** — prevent negative stars from upkeep
-- [ ] **P2: Improve starvation death rate** — scale with population/deficit severity
+- [x] **P1: Fix starMultiplier overwrite** — mergeToMetaBoard uses *= 10, skips on load
+- [x] **P1: Fix quantum foam calculation** — uses energyToConsume instead of gamesToPlay
+- [x] **P1: Fix tooltip timeout race** — clearTimeout cancels pending hide on new show
+- [x] **P2: Sync allocation slider on load** — slider value set from saved populationAllocation
+- [x] **P2: Floor stars at 0** — Math.max(0, ...) prevents negative stars and science
+- [x] **P2: Improve starvation death rate** — scales with 5% of deficit, min 1 death/tick
 - [ ] **P2: Fix stage-2.html bypassing gamePhase.js**
 
 ## Phase 17: Code Quality (v1.5.0)
