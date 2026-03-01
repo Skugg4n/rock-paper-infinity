@@ -12,9 +12,10 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [x] Extract Phase 2 inline styles to `style-stage2.css` (v1.4.0)
 - [x] Standardize code language to English (v1.4.0)
 - [x] Fix package.json (main, type, description) (v1.4.0)
-- [ ] Remove `firebase-debug.log` and add it to `.gitignore`
-- [ ] Fix `stage-2.html` title version inconsistency
-- [ ] Add `.DS_Store` to `.gitignore`
+- [x] Remove `firebase-debug.log` and add it to `.gitignore` (v1.8.0)
+- [x] Fix `stage-2.html` title version inconsistency — moot, now a redirect (v1.7.0)
+- [x] Add `.DS_Store` to `.gitignore` (v1.8.0)
+- [x] Remove `/graphics/` legacy SVGs (v1.8.0)
 
 ## Phase 15: Critical & High-Priority Bug Fixes (v1.4.1)
 - [x] **P2: Fix event listener memory leak** — WeakSet prevents duplicate listeners in setTooltip()
@@ -35,21 +36,34 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [x] **P2: Sync allocation slider on load** — slider value set from saved populationAllocation
 - [x] **P2: Floor stars at 0** — Math.max(0, ...) prevents negative stars and science
 - [x] **P2: Improve starvation death rate** — scales with 5% of deficit, min 1 death/tick
-- [ ] **P2: Fix stage-2.html bypassing gamePhase.js**
+- [x] **P2: Fix stage-2.html bypassing gamePhase.js** — SPA refactor (v1.7.0)
 
-## Phase 17: Code Quality (v1.5.0)
-- [ ] Split `src/phase1/index.js` into smaller modules
+## Phase 17: Code Quality (v1.5.0 → v1.8.0)
+- [x] Split `src/phase1/index.js` into smaller modules — extracted rates.js, cost-visual.js, countdown.js, persistence.js (v1.8.0)
 - [x] Centralize localStorage key constants (done in `src/constants.js`, v1.4.0)
 - [ ] Add proper error handling for save/load
-- [ ] Improve test coverage beyond `roman.test.js`
-- [ ] Set up ESLint config properly and fix linting issues
-- [ ] Unify icon system (remove Lucide CDN dependency or use it everywhere)
+- [x] Improve test coverage — 24 tests total: roman.js, rates.js, persistence.js (v1.8.0)
+- [x] Set up Jest ESM support — `--experimental-vm-modules`, `jest.config.js` (v1.8.0)
+- [x] Unify icon system — both phases now use Lucide CDN (v1.5.0)
+- [x] Convert `roman.js` to ES module — proper `export`, imported via module chain (v1.8.0)
 
-## Phase 18: UX Polish & New Features (v1.5.x)
-- [ ] **P1: Change Bank icon** — Replace wallet (💳) with bank/landmark icon (🏛) for the Bank upgrade
-- [ ] **P1: Remove Bank tooltip text** — Tooltip violates "icons not text" principle, strip verbose text
-- [ ] **P2: "Code Processor" upgrade** — Unlockable upgrade that animates transition from icon-only UI to icon+text labels. Gives in-world justification for Phase 2's text-heavy UI. Example: `2.0 ★/👤 (industry...)` fades in text after purchase.
-- [ ] Mobile responsiveness audit (Phase 1 done in v1.4.3, Phase 2 still needed)
+## Phase 17b: Phase 2 Endgame Expansion (v1.6.0)
+- [x] **Superconductors upgrade** — 5-level multi-buy, doubles stars/person per level. Unlocks at 10k pop.
+- [x] **Second land expansion** — +5 grid slots at 10k pop, costs 10M stars. Requires first expansion.
+- [x] **Competitor teaser** — Red factory island fades in at 50k pop. Phase 3 (WAR) foreshadowing.
+
+## Phase 17c: SPA Refactor (v1.7.0)
+- [x] **Single HTML shell** — Merged index.html + stage-2.html into one file with phase containers
+- [x] **Phase persistence** — PHASE_KEY in localStorage, reload stays in correct phase
+- [x] **CSS scoping** — Phase 2 conflicting selectors prefixed with #phase-city
+- [x] **stage-2.html redirect** — Backwards compatibility
+- [x] **Phase 2 AbortController** — All event listeners use { signal } for clean teardown
+
+## Phase 18: UX Polish & New Features (v1.8.0)
+- [x] **P1: Change Bank icon** — Replaced wallet with landmark icon (v1.8.0)
+- [x] **P1: Remove Bank tooltip text** — Stripped verbose tooltip (v1.8.0)
+- [x] **P2: Mobile responsiveness** — Building slots, buttons, icons, sliders all responsive 320px–1024px (v1.8.0)
+- [ ] **P2: "Code Processor" upgrade** — Unlockable upgrade that animates transition from icon-only UI to icon+text labels. Gives in-world justification for Phase 2's text-heavy UI.
 
 ## Phase 19: Future Phases
 - [ ] Phase 3: WAR (defined in gamePhase.js but not implemented)

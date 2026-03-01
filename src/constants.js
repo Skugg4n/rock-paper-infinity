@@ -1,3 +1,6 @@
+// Shared constants
+export const PHASE_KEY = 'rpi-phase';
+
 // Game Constants for Phase 1
 export const PHASE1_CONSTANTS = {
     MAX_ENERGY: 100,

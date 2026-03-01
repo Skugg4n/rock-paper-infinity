@@ -1,3 +1,5 @@
+import { PHASE_KEY } from './constants.js';
+
 export const phases = {
   INDUSTRY: 'INDUSTRY',
   CITY: 'CITY',
@@ -11,21 +13,28 @@ export async function setPhase(phase) {
   if (currentModule && typeof currentModule.teardown === 'function') {
     currentModule.teardown();
   }
+
+  // Hide all phase containers
+  document.querySelectorAll('.phase-container').forEach(el => el.classList.add('hidden'));
+
+  // Show the target container
+  const containerMap = {
+    [phases.INDUSTRY]: 'phase-industry',
+    [phases.CITY]: 'phase-city',
+  };
+  const containerId = containerMap[phase];
+  if (containerId) {
+    document.getElementById(containerId)?.classList.remove('hidden');
+  }
+
+  // Persist phase
+  localStorage.setItem(PHASE_KEY, phase);
+
   switch (phase) {
     case phases.INDUSTRY:
-      if (!document.getElementById('game-board-container')) {
-        window.location.href = './index.html';
-        currentModule = null;
-        return;
-      }
       currentModule = await import('./phase1/index.js');
       return currentModule.init();
     case phases.CITY:
-      if (!document.getElementById('land-grid')) {
-        window.location.href = './stage-2.html';
-        currentModule = null;
-        return;
-      }
       currentModule = await import('./phase2/index.js');
       return currentModule.init();
     case phases.WAR:
@@ -35,3 +44,7 @@ export async function setPhase(phase) {
       return;
   }
 }
+
+// Expose for debug buttons
+window.setPhase = setPhase;
+window.phases = phases;

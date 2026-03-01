@@ -10,6 +10,4 @@ function toRoman(num) {
   return str;
 }
 
-if (typeof module !== 'undefined') {
-  module.exports = { toRoman };
-}
+export { toRoman };

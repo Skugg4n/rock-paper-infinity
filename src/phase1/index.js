@@ -1,6 +1,10 @@
 import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
 import { PHASE1_CONSTANTS } from "../constants.js";
+import { getSPS, getEPS, getVisibleDots, formatCount } from "./rates.js";
+import { generateCostVisual } from "./cost-visual.js";
+import { runCountdownAnimation } from "./countdown.js";
+import { serializeGameState, deserializeGameState } from "./persistence.js";
 
         // DOM elements
         const gameBoardContainer = document.getElementById('game-board-container');
@@ -58,6 +62,8 @@ const resetBtn = document.getElementById('reset-btn');
         let isMetaBoardActive = false;
         let starMultiplier = 1;
         let quantumFoam = 0;
+        let revealedUpgrades = new Set();
+        let firstUpgradeUpdateDone = false;
         
         const upgrades = {
             autoPlay: {
@@ -122,8 +128,10 @@ const resetBtn = document.getElementById('reset-btn');
                 cost: 1000, purchased: false,
                 unlocksAt: 0,
                 element: document.getElementById('mergeGameBoard'),
-                // Factory becomes available when speed, energy generator, and game boards are all maxed.
+                // Factory becomes available when ALL upgrades are maxed/purchased.
                 unlockCondition: () =>
+                    upgrades.autoPlay.purchased &&
+                    upgrades.luck.purchased &&
                     upgrades.speed.level >= upgrades.speed.maxLevel &&
                     upgrades.energyGenerator.level >= upgrades.energyGenerator.maxLevel &&
                     upgrades.addGameBoard.level >= upgrades.addGameBoard.maxLevel,
@@ -150,9 +158,7 @@ const resetBtn = document.getElementById('reset-btn');
             }
         };
 
-const upgradeDescriptions = {
-    bank: 'Open the Bank to transfer your stars to the next phase.'
-};
+const upgradeDescriptions = {};
 
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
@@ -163,7 +169,6 @@ const crownTemplate = buildIcon('crown', 'lucide-crown-xl text-slate-800');
 const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
 const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
 const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
-const minusTemplate = buildIcon('minus', 'relative w-6 h-6 text-red-500');
 
 
 
@@ -355,13 +360,6 @@ function scheduleUIUpdate() {
             if (autoPlayInterval) restartAutoPlay();
         }
 
-        function getVisibleDots() {
-            if (totalStarsEarned >= 30) return 100;
-            if (totalStarsEarned >= 10) return 20;
-            if (totalStarsEarned >= 5) return 10;
-            return 5;
-        }
-
         function updateWinVisuals() {
             if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned) return;
             lastStarBalance = starBalance;
@@ -412,7 +410,7 @@ function scheduleUIUpdate() {
                 winTracker.appendChild(container);
             }
 
-            const dotsToShow = getVisibleDots();
+            const dotsToShow = getVisibleDots(totalStarsEarned);
             const gridContainer = document.createElement('div');
             gridContainer.className = 'grid grid-cols-10 gap-1';
             for (let i = 0; i < dotsToShow; i++) {
@@ -430,20 +428,6 @@ function scheduleUIUpdate() {
             winTracker.appendChild(gridContainer);
         }
         
-        function getSPS() {
-            const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
-            const baseWinRate = 1 / 3;
-            const baseSPS = (gameSpeed < HYPER_SPEED_THRESHOLD)
-                ? (1000 / (((1.2 / gameSpeed) * 1000 + 450) / boardMultiplier)) * baseWinRate
-                : (gameSpeed * boardMultiplier) * baseWinRate;
-            return baseSPS * starMultiplier;
-        }
-
-        function getEPS() {
-            const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
-            return gameSpeed * boardMultiplier;
-        }
-
         function updateRateDisplays(sps, eps, egps, autoActive, energyPaused) {
             if (sps > 0.1) {
                 spsContainer.classList.remove('hidden');
@@ -469,27 +453,7 @@ function scheduleUIUpdate() {
         }
 
         function updateSellButtons() {
-            downgradeTray.innerHTML = '';
-            const factoryReady = upgrades.mergeGameBoard.unlockCondition &&
-                upgrades.mergeGameBoard.unlockCondition();
-            if (factoryReady && !upgrades.mergeGameBoard.purchased) return;
-            if (upgrades.energyGenerator.level < upgrades.energyGenerator.maxLevel) return;
-
-            const sellableUpgrades = ['speed', 'addGameBoard'];
-            sellableUpgrades.forEach(key => {
-                const upgrade = upgrades[key];
-                if (upgrade.level > 0 && !isMetaBoardActive) {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn bg-white p-3 rounded-full shadow-lg flex items-center justify-center';
-                    btn.onclick = () => handleSellClick(key);
-                    btn.appendChild(minusTemplate.cloneNode(true));
-                    downgradeTray.appendChild(btn);
-                } else {
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'w-12 h-12';
-                    downgradeTray.appendChild(placeholder);
-                }
-            });
+            // Sell buttons removed — they were confusing to users
         }
 
         function updateProgressCircles(speedLevel, energyGenLevel, addBoardLevel) {
@@ -525,7 +489,7 @@ function scheduleUIUpdate() {
                 let isUnlocked = (upgrade.unlocksAt === 0) ||
                                  (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
                                  (upgrade.unlocksAtGames > 0 && totalGamesPlayed >= upgrade.unlocksAtGames) ||
-                                 (upgrade.unlocksAtSPS > 0 && getSPS() >= upgrade.unlocksAtSPS) ||
+                                 (upgrade.unlocksAtSPS > 0 && getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier) >= upgrade.unlocksAtSPS) ||
                                  Object.keys(upgrades).some(parentKey => {
                                      const parent = upgrades[parentKey];
                                      const parentUnlocked = (parent.level !== undefined && parent.level >= parent.maxLevel) || parent.purchased;
@@ -540,7 +504,18 @@ function scheduleUIUpdate() {
                     if (isMetaBoardActive && (key === 'addGameBoard' || key === 'mergeGameBoard')) {
                         upgrade.element.classList.add('invisible');
                     } else {
+                        const wasHidden = upgrade.element.classList.contains('invisible');
                         upgrade.element.classList.remove('invisible');
+                        if (wasHidden && !revealedUpgrades.has(key)) {
+                            revealedUpgrades.add(key);
+                            if (firstUpgradeUpdateDone) {
+                                upgrade.element.classList.add('materialize');
+                                upgrade.element.addEventListener('animationend', () => {
+                                    upgrade.element.classList.remove('materialize');
+                                }, { once: true });
+                            }
+                        }
+                        revealedUpgrades.add(key);
                     }
 
                     const currentCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
@@ -558,6 +533,7 @@ function scheduleUIUpdate() {
                     upgrade.element.classList.add('invisible');
                 }
             }
+            if (!firstUpgradeUpdateDone) firstUpgradeUpdateDone = true;
         }
 
 const uiState = {
@@ -581,13 +557,6 @@ const uiState = {
     foamPercent: -1,
     foamReady: false
 };
-
-        function formatCount(n) {
-            if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
-            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-            if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
-            return n.toLocaleString();
-        }
 
         function renderGamesPlayed(value) {
             debugGamesPlayedEl.textContent = value;
@@ -630,8 +599,8 @@ const uiState = {
             const energyPercent = (energy / MAX_ENERGY) * 100;
             const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
             const energyEmpty = energy <= 0;
-            const sps = getSPS();
-            const eps = getEPS();
+            const sps = getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier);
+            const eps = getEPS(gameSpeed, isMetaBoardActive, gameBoards.length);
             const egps = upgrades.energyGenerator.level * 5;
             const autoActive = !!autoPlayInterval;
             const energyPaused = autoPlayWantsToRun && energyEmpty;
@@ -680,43 +649,6 @@ const uiState = {
             if (foamChanged) { uiState.foamPercent = foamPercent; uiState.foamReady = foamReady; }
         }
 
-        // FIX: Restored function
-        async function runCountdownAnimation(board) {
-            const duration = (1.2 / gameSpeed / 3) * 1000;
-            let countdownIcons = [];
-
-            if (gameSpeed <= 5) countdownIcons = ["III", "II", "I"];
-            else if (gameSpeed <= 6) countdownIcons = ["III", "II"];
-            else if (gameSpeed <= 7) countdownIcons = ["III"];
-            else if (gameSpeed <= HYPER_SPEED_THRESHOLD) countdownIcons = ["I"];
-
-            if (countdownIcons.length === 0) return;
-
-            const svgMap = {
-                "III": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`,
-                "II": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="22" y1="14" x2="22" y2="42"></line><line x1="34" y1="14" x2="34" y2="42"></line></svg>`,
-                "I": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="28" y1="14" x2="28" y2="42"></line></svg>`
-            };
-
-            const container = document.createElement('div');
-            container.className = 'countdown-container';
-
-            countdownIcons.forEach((icon, index) => {
-                const wrapper = document.createElement('div');
-                wrapper.innerHTML = svgMap[icon];
-                const svg = wrapper.firstElementChild;
-                svg.style.animationDuration = `${duration}ms`;
-                svg.style.animationDelay = `${duration * index}ms`;
-                svg.classList.add('countdown-frame');
-                container.appendChild(svg);
-            });
-
-            board.computerEl.replaceChildren(container.cloneNode(true));
-            board.playerEl.replaceChildren(container);
-
-            await new Promise(resolve => setTimeout(resolve, duration * countdownIcons.length));
-        }
-
         function consumeEnergy(amount = 1) {
             if (energy >= amount) {
                 energy -= amount;
@@ -732,36 +664,19 @@ const uiState = {
         }
 
         function saveGame() {
-            const data = {
-                starBalance,
-                totalStarsEarned,
-                totalGamesPlayed,
-                totalWins,
-                energy,
-                reserveEnergy,
-                gameSpeed,
-                starMultiplier,
-                quantumFoam,
-                isMetaBoardActive,
-                autoPlayWantsToRun,
-                gameBoards: gameBoards.length,
-                upgrades: {}
+            const state = {
+                starBalance, totalStarsEarned, totalGamesPlayed, totalWins,
+                energy, reserveEnergy, gameSpeed, starMultiplier, quantumFoam,
+                isMetaBoardActive, autoPlayWantsToRun,
+                gameBoardsCount: gameBoards.length
             };
-            for (const key in upgrades) {
-                const u = upgrades[key];
-                data.upgrades[key] = {
-                    level: u.level,
-                    purchased: u.purchased
-                };
-            }
-            localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+            localStorage.setItem(SAVE_KEY, serializeGameState(state, upgrades));
         }
 
         function loadGame() {
-            const raw = localStorage.getItem(SAVE_KEY);
-            if (!raw) return;
+            const data = deserializeGameState(localStorage.getItem(SAVE_KEY));
+            if (!data) return;
             try {
-                const data = JSON.parse(raw);
                 starBalance = data.starBalance ?? starBalance;
                 totalStarsEarned = data.totalStarsEarned ?? totalStarsEarned;
                 totalGamesPlayed = data.totalGamesPlayed ?? totalGamesPlayed;
@@ -825,6 +740,8 @@ const uiState = {
                 up.element.disabled = false;
                 up.element.style.display = '';
             }
+            revealedUpgrades = new Set();
+            firstUpgradeUpdateDone = false;
             createGameBoard();
             choiceButtons.forEach(btn => btn.disabled = false);
             menuDropdown.classList.add('hidden');
@@ -844,7 +761,7 @@ const uiState = {
             if (gameSpeed >= HYPER_SPEED_THRESHOLD && autoPlayInterval) {
                 showResult(playerChoice, board, true);
             } else {
-                await runCountdownAnimation(board);
+                await runCountdownAnimation(board, gameSpeed);
                 showResult(playerChoice, board, false);
             }
         }
@@ -868,7 +785,7 @@ const uiState = {
             board.playerEl.replaceChildren(playerWrapper);
 
             const computerWrapper = document.createElement('div');
-            computerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'winner' : ''}`;
+            computerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'enemy-winner' : ''}`;
             computerWrapper.appendChild(getIcon(iconMap[computerChoice], 'lucide-lg text-slate-800'));
             board.computerEl.replaceChildren(computerWrapper);
 
@@ -912,25 +829,6 @@ const uiState = {
             }
         }
         
-        function handleSellClick(key) {
-            const upgrade = upgrades[key];
-            if (upgrade.level === undefined || upgrade.level <= 0) return;
-
-            upgrade.level--;
-            const refundAmount = Math.floor(upgrade.cost() * 0.75);
-
-            starBalance += refundAmount;
-
-            if (key === 'speed') gameSpeed -= 1;
-            if (key === 'addGameBoard') {
-                const boardToRemove = gameBoards.pop();
-                if (boardToRemove) boardToRemove.element.remove();
-                adjustBoardLayout();
-            }
-            
-            scheduleUIUpdate();
-            if (key === 'speed') updateAnimationSpeed();
-        }
 
         function processBulkGames() {
             const now = performance.now();
@@ -972,7 +870,7 @@ const uiState = {
         function collapseFoam() {
             if (quantumFoam < MAX_QUANTUM_FOAM) return;
             
-            const bonus = Math.floor(getSPS() * 10);
+            const bonus = Math.floor(getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier) * 10);
             addStars(bonus);
             quantumFoam = 0;
             
@@ -1050,37 +948,6 @@ const uiState = {
             manageAutoPlay();
         }
         
-        const tallySVGs = {
-            1: `<svg width="8" height="16" viewBox="0 0 8 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
-            2: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
-            3: `<svg width="24" height="16" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M20 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
-            4: `<svg width="32" height="16" viewBox="0 0 32 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M20 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M28 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
-            5: `<svg width="34" height="16" viewBox="0 0 34 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M12 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M20 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M28 2V14" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M2 13L32 3" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`
-        };
-
-        function generateCostVisual(cost) {
-              let html = `<div class="flex items-center gap-2">${getIcon('star','w-4 h-4 text-white fill-current').outerHTML}<span class="font-bold text-lg">×</span>`;
-            if (cost === 0) return 'Gratis';
-            if (cost >= 10) {
-                html += `<span class="font-mono text-lg">${toRoman(cost)}</span>`;
-            } else {
-                html += `<div class="flex items-center gap-1">`;
-                let remaining = cost;
-                while(remaining > 0) {
-                    if (remaining >= 5) {
-                        html += tallySVGs[5];
-                        remaining -= 5;
-                    } else {
-                        if(tallySVGs[remaining]) html += tallySVGs[remaining];
-                        remaining = 0;
-                    }
-                }
-                html += `</div>`;
-            }
-            html += `</div>`;
-            return html;
-        }
-
         let tooltipHideTimeout = null;
 
         function showTooltip(element, key) {
@@ -1102,6 +969,7 @@ const uiState = {
             }
 
             tooltipHtml += generateCostVisual(cost);
+            if (!tooltipHtml.trim()) return;
             tooltip.innerHTML = tooltipHtml;
 
             const rect = element.getBoundingClientRect();

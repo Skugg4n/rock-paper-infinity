@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.8.0 - 2026-03-01
+
+### Code Quality
+- **Phase 1 module split** — Extracted 4 modules from the `phase1/index.js` monolith (1146 → 1036 lines):
+  - `rates.js` — Pure calculation functions (getSPS, getEPS, getVisibleDots, formatCount)
+  - `cost-visual.js` — Tally SVGs and Roman numeral cost display
+  - `countdown.js` — RPS countdown animation
+  - `persistence.js` — Game state serialization/deserialization
+- **Test coverage** — Added 23 new tests for `rates.js` and `persistence.js`. Total: 24 tests (was 1).
+- **Jest ESM support** — Configured `--experimental-vm-modules` and `transform: {}` for native ES module testing.
+- **roman.js → ES module** — Converted from CJS-compatible global to proper ES module with `export`.
+
+### UX Polish
+- **Bank icon** — Changed from wallet (💳) to landmark (🏛) for clearer thematic fit.
+- **Bank tooltip removed** — Stripped verbose text description, aligning with "icons not text" principle.
+- **Phase 2 mobile responsive** — Building slots, buttons, icons, text, sliders, and build menu all scale for 320px–1024px viewports.
+
+### Cleanup
+- **`.gitignore`** — Added `.DS_Store`, `firebase-debug.log`, `.playwright-mcp/`.
+- **Removed `/graphics/`** — 21 legacy SVG files deleted (replaced by Lucide CDN in v1.5.0).
+- **Removed `<script src="roman.js">`** — Now imported via ES module chain.
+
+## v1.7.0 - 2026-03-01
+
+### Breaking Changes
+- **SPA refactor** — Consolidated from two HTML files (`index.html` + `stage-2.html`) into a single HTML shell. Phase transitions now use show/hide on `<div class="phase-container">` instead of `window.location.href` navigation. Prepares architecture for Phase 3 (WAR).
+
+### Improvements
+- **Phase persistence** — New `rpi-phase` localStorage key remembers which phase the player is in. Reloading stays in the correct phase.
+- **CSS scoping** — Phase 2 conflicting selectors (`.btn`, `.upgrade-btn`, `.tooltip`) prefixed with `#phase-city` to prevent style bleeding into Phase 1.
+- **Shared elements** — Menu, version display, and tooltip live outside phase containers. Single source of truth.
+- **stage-2.html redirect** — Old URL now redirects to `index.html` for backwards compatibility.
+
+## v1.6.0 - 2026-03-01
+
+### New Features
+- **Superconductors upgrade** — Multi-level upgrade (5 levels) available at 10,000 population. Each level doubles stars/person output. Cost scales exponentially: 5,000 × 5^level stars. Progress ring shows completion.
+- **Second land expansion** — Available at 10,000 population (requires first expansion). Costs 10,000,000 stars. Adds 5 more grid slots for a total of 20.
+- **Competitor teaser (Phase 3 hook)** — At 50,000 population, a mysterious red factory island fades in below the player's grid. No interaction yet — pure atmosphere and foreshadowing.
+
 ## v1.5.0 - 2026-03-01
 
 ### Breaking Changes

@@ -1,14 +1,16 @@
 /* global lucide */
 
-import { PHASE2_CONSTANTS } from "../constants.js";
+import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 
 let logicInterval;
 let fastUiInterval;
 let savingEnabled = true;
 let beforeUnloadHandler;
+let abortController;
 
 export function init() {
-          lucide.createIcons();
+          abortController = new AbortController();
+          const signal = abortController.signal;
           savingEnabled = true;
 
           // --- GAME STATE ---
@@ -27,6 +29,9 @@ export function init() {
               urbanismResearched: false,
               megastructureResearched: false,
               landExpanded: false,
+              landExpansion2: false,
+              superconductorLevel: 0,
+              competitorSpawned: false,
           };
 
           const { SAVE_KEY, STARS_TRANSFER_KEY } = PHASE2_CONSTANTS;
@@ -65,6 +70,8 @@ export function init() {
               computerUpgrade: { cost: 5000000, scienceCost: 100000 },
               megastructureResearch: { cost: 1000000, scienceCost: 100000 },
               landExpansion: { cost: 1000000 },
+              superconductor: { baseCost: 5000, maxLevel: 5 },
+              landExpansion2: { cost: 10000000 },
           };
   
           // --- UI ELEMENTS ---
@@ -83,7 +90,7 @@ export function init() {
               supplyDelta: document.getElementById('supply-delta'),
               supplyConsumption: document.getElementById('supply-consumption'),
               supplyProduction: document.getElementById('supply-production'),
-              debugMenu: document.getElementById('debug-menu'),
+              debugMenu: document.getElementById('p2-debug-menu'),
               debugToggleBtn: document.getElementById('debug-toggle-btn'),
               menuBtn: document.getElementById('menu-btn'),
               menuDropdown: document.getElementById('menu-dropdown'),
@@ -98,6 +105,12 @@ export function init() {
               carUpgradeBtn: document.getElementById('car-upgrade-btn'),
               computerUpgradeBtn: document.getElementById('computer-upgrade-btn'),
               expandLandBtn: document.getElementById('expand-land-btn'),
+              expandLand2Btn: document.getElementById('expand-land-2-btn'),
+              superconductorBtn: document.getElementById('superconductor-btn'),
+              superconductorRing: document.getElementById('superconductor-ring'),
+              competitorIsland: document.getElementById('competitor-island'),
+              scienceRow: document.getElementById('science-row'),
+              allocationSliderContainer: document.getElementById('allocation-slider-container'),
               buildSeparator: document.getElementById('build-separator'),
           };
   
@@ -112,9 +125,9 @@ export function init() {
           ui.debugToggleBtn.addEventListener('click', () => {
               const isHidden = ui.debugMenu.style.display === 'none' || ui.debugMenu.style.display === '';
               ui.debugMenu.style.display = isHidden ? 'block' : 'none';
-          });
+          }, { signal });
 
-          ui.menuBtn.addEventListener('click', () => ui.menuDropdown.classList.toggle('hidden'));
+          ui.menuBtn.addEventListener('click', () => ui.menuDropdown.classList.toggle('hidden'), { signal });
           ui.resetBtn.addEventListener('click', () => {
               savingEnabled = false;
               window.removeEventListener('beforeunload', beforeUnloadHandler);
@@ -122,6 +135,7 @@ export function init() {
               clearInterval(fastUiInterval);
               localStorage.removeItem(SAVE_KEY);
               localStorage.removeItem(STARS_TRANSFER_KEY);
+              localStorage.removeItem(PHASE_KEY);
               setTimeout(() => location.reload(), 0);
           });
   
@@ -138,7 +152,7 @@ export function init() {
               if (building.type !== 'factory' && building.type !== 'bank') {
                   const refund = (buildingData[building.type]?.cost || 0) * 0.7;
                   actionButtons += `<button class="building-action-btn sell-btn" onclick="sellBuilding(event, ${building.id})">-
-                      <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div></div>
+                      <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
                   </button>`;
               }
   
@@ -154,6 +168,7 @@ export function init() {
                   const popReq = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 }[upgradeTarget];
                   const canAfford = gameState.stars >= upgradeInfo.cost;
                   const unlocked = gameState.population >= popReq;
+                  if (unlocked && canAfford) classes += ' upgradeable';
 
                   let effectHTML = '';
                    if (upgradeInfo.capacity && building.capacity) {
@@ -170,7 +185,7 @@ export function init() {
                       actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
                           <div class="tooltip">
                               <div class="effect">${effectHTML}</div>
-                              <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div>
+                              <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
                           </div>
                       </button>`;
                   }
@@ -194,7 +209,7 @@ export function init() {
                   } else {
                       iconHTML = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
                   }
-                  content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #38bdf8;"></circle></svg>${iconHTML}`;
+                  content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #94a3b8;"></circle></svg>${iconHTML}`;
               } else if (building.type === 'factory') {
                   content = `<div class="relative flex items-center justify-center w-full h-full">
                       <i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>
@@ -210,7 +225,7 @@ export function init() {
               }
               
               const upkeepCost = building.upkeep || (building.type === 'bank' ? 30 : 0);
-              const upkeepHTML = upkeepCost ? `<div class="building-upkeep"><span>-${upkeepCost}</span><i data-lucide="star" class="w-3 h-3 text-amber-400"></i></div>` : '';
+              const upkeepHTML = upkeepCost ? `<div class="building-upkeep"><span>-${upkeepCost}</span><i data-lucide="star" class="w-3 h-3 text-slate-300"></i></div>` : '';
   
               return `<div class="${classes}">${content}${upkeepHTML}${actionButtons}</div>`;
           }
@@ -239,6 +254,7 @@ export function init() {
               if (gameState.toolCaseUnlocked) baseStarPerPerson *= 2;
               if (gameState.carUnlocked) baseStarPerPerson *= 5;
               if (gameState.computerUnlocked) baseStarPerPerson *= 11;
+              baseStarPerPerson *= Math.pow(2, gameState.superconductorLevel);
               return baseStarPerPerson;
           }
 
@@ -303,8 +319,8 @@ export function init() {
                   html += `<div class="unlock-req">${unlockReq}</div>`;
               } else {
                   if (effect) html += `<div class="effect">${effect}</div>`;
-                  if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('en-US')}</span><i data-lucide="star" class="w-4 h-4 text-amber-400"></i></div>`;
-                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-sky-500"></i></div>`;
+                  if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('en-US')}</span><i data-lucide="star" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-slate-300"></i></div>`;
               }
               tooltipEl.innerHTML = html;
               if (!tooltipListenersAttached.has(el)) {
@@ -319,22 +335,26 @@ export function init() {
               const canAfford = (item) => gameState.stars >= (item.cost || 0) && gameState.science >= (item.scienceCost || 0);
               const hasEmptySlot = gameState.buildings.some(b => b === undefined);
   
+              const superconductorMaxLevel = buildingData.superconductor.maxLevel;
+              // showAt = appear grayed out, popReq = actually usable
               const upgrades = [
-                  { btn: ui.toolCaseUpgradeBtn, popReq: 50, flag: 'toolCaseUnlocked' },
-                  { btn: ui.gmoUpgradeBtn, popReq: 75, flag: 'gmoLevel', isMultiLevel: true },
-                  { btn: ui.urbanismResearchBtn, popReq: 200, flag: 'urbanismResearched' },
-                  { btn: ui.expandLandBtn, popReq: 1000, flag: 'landExpanded' },
-                  { btn: ui.carUpgradeBtn, popReq: 500, flag: 'carUnlocked' },
-                  { btn: ui.computerUpgradeBtn, popReq: 1000, flag: 'computerUnlocked', prereq: 'carUnlocked' },
-                  { btn: ui.megastructureResearchBtn, popReq: 5000, flag: 'megastructureResearched'},
+                  { btn: ui.toolCaseUpgradeBtn, showAt: 25, popReq: 50, flag: 'toolCaseUnlocked' },
+                  { btn: ui.gmoUpgradeBtn, showAt: 40, popReq: 75, flag: 'gmoLevel', isMultiLevel: true, maxLevel: gameState.gmoMaxLevel },
+                  { btn: ui.urbanismResearchBtn, showAt: 100, popReq: 200, flag: 'urbanismResearched' },
+                  { btn: ui.expandLandBtn, showAt: 500, popReq: 1000, flag: 'landExpanded' },
+                  { btn: ui.carUpgradeBtn, showAt: 250, popReq: 500, flag: 'carUnlocked' },
+                  { btn: ui.computerUpgradeBtn, showAt: 500, popReq: 1000, flag: 'computerUnlocked', prereq: 'carUnlocked' },
+                  { btn: ui.megastructureResearchBtn, showAt: 2000, popReq: 5000, flag: 'megastructureResearched'},
+                  { btn: ui.superconductorBtn, showAt: 5000, popReq: 10000, flag: 'superconductorLevel', isMultiLevel: true, maxLevel: superconductorMaxLevel },
+                  { btn: ui.expandLand2Btn, showAt: 5000, popReq: 10000, flag: 'landExpansion2', prereq: 'landExpanded' },
               ];
-  
+
               let anyUpgradeVisible = false;
-              upgrades.forEach(({btn, popReq, flag, isMultiLevel, prereq}) => {
-                  const isPurchased = isMultiLevel ? gameState[flag] >= gameState.gmoMaxLevel : gameState[flag];
+              upgrades.forEach(({btn, showAt, flag, isMultiLevel, maxLevel, prereq}) => {
+                  const isPurchased = isMultiLevel ? gameState[flag] >= maxLevel : gameState[flag];
                   const prereqMet = prereq ? gameState[prereq] : true;
-                  const shouldShow = (pop >= popReq || isPurchased) && prereqMet;
-                  
+                  const shouldShow = (pop >= showAt || isPurchased) && prereqMet;
+
                   btn.classList.toggle('hidden', !shouldShow || (isPurchased && !isMultiLevel));
                   if(shouldShow && !(isPurchased && !isMultiLevel)) anyUpgradeVisible = true;
               });
@@ -353,7 +373,11 @@ export function init() {
               ui.carUpgradeBtn.disabled = !canAfford(buildingData.carUpgrade) || pop < 500 || gameState.carUnlocked;
               ui.computerUpgradeBtn.disabled = !canAfford(buildingData.computerUpgrade) || pop < 1000 || gameState.computerUnlocked;
               ui.expandLandBtn.disabled = !canAfford(buildingData.landExpansion) || pop < 1000 || gameState.landExpanded;
-  
+
+              const scCost = buildingData.superconductor.baseCost * Math.pow(5, gameState.superconductorLevel);
+              ui.superconductorBtn.disabled = gameState.stars < scCost || pop < 10000 || gameState.superconductorLevel >= superconductorMaxLevel;
+              ui.expandLand2Btn.disabled = !canAfford(buildingData.landExpansion2) || pop < 10000 || gameState.landExpansion2 || !gameState.landExpanded;
+
               // Tooltips
               setTooltip(ui.buildHomeBtn, { effect: `+${buildingData.home.capacity} <i data-lucide='users' class='w-4 h-4'></i>`, cost: buildingData.home.cost });
               setTooltip(ui.buildStoreBtn, { effect: `+${buildingData.store.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`, cost: buildingData.store.cost });
@@ -372,7 +396,30 @@ export function init() {
               setTooltip(ui.computerUpgradeBtn, pop < 1000 || !gameState.carUnlocked ? { unlockReq: `1000 <i data-lucide='users' class='w-4 h-4'></i> & <i data-lucide='car' class='w-4 h-4'></i>` } : { effect: `+1000% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.computerUpgrade.cost, scienceCost: buildingData.computerUpgrade.scienceCost });
               
               setTooltip(ui.expandLandBtn, pop < 1000 && !gameState.landExpanded ? { unlockReq: `1000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+5 <i data-lucide='layout-grid' class='w-4 h-4'></i>`, cost: buildingData.landExpansion.cost });
-              
+
+              setTooltip(ui.superconductorBtn, pop < 10000 && gameState.superconductorLevel === 0 ? { unlockReq: `10,000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: scCost });
+
+              setTooltip(ui.expandLand2Btn, pop < 10000 && !gameState.landExpansion2 ? { unlockReq: `10,000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+5 <i data-lucide='layout-grid' class='w-4 h-4'></i>`, cost: buildingData.landExpansion2.cost });
+
+              // Hide science UI when all science-costing upgrades are purchased
+              const allScienceDone = gameState.toolCaseUnlocked
+                  && gameState.gmoLevel >= gameState.gmoMaxLevel
+                  && gameState.urbanismResearched
+                  && gameState.carUnlocked
+                  && gameState.computerUnlocked
+                  && gameState.megastructureResearched;
+              if (allScienceDone) {
+                  ui.scienceRow.style.opacity = '0.15';
+                  ui.allocationSliderContainer.style.opacity = '0.15';
+                  if (gameState.populationAllocation > 0) {
+                      gameState.populationAllocation = 0;
+                      ui.allocationSlider.value = 0;
+                  }
+              } else {
+                  ui.scienceRow.style.opacity = '1';
+                  ui.allocationSliderContainer.style.opacity = '1';
+              }
+
               scheduleIconRefresh();
           }
   
@@ -455,6 +502,17 @@ export function init() {
                   ui.suppliesUi.classList.add('visible');
               }
 
+              // Competitor spawn
+              if (gameState.population >= 50000 && !gameState.competitorSpawned) {
+                  gameState.competitorSpawned = true;
+                  ui.competitorIsland.classList.remove('hidden');
+                  // Trigger fade-in on next frame
+                  requestAnimationFrame(() => {
+                      ui.competitorIsland.classList.add('visible');
+                      scheduleIconRefresh();
+                  });
+              }
+
               updateAllUI();
               saveGameState();
           }
@@ -465,12 +523,12 @@ export function init() {
               ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
 
               ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('en-US')}/s`;
-              ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#16a34a' : '#ef4444';
+              ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#64748b' : '#94a3b8';
               ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('en-US')}/s`;
 
               const baseStarPerPerson = calculateBaseStarPerPerson();
               const effectivePerPerson = baseStarPerPerson * (1 - gameState.populationAllocation);
-              ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} ★/person (industry: ${effectivePerPerson.toFixed(1)} ★)`;
+              ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} /person (industry: ${effectivePerPerson.toFixed(1)})`;
 
               const supplyProduction = gameState.buildings.reduce((acc, b) => {
                   if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
@@ -496,13 +554,13 @@ export function init() {
 
               if (netSupplyChange === 0) {
                   ui.supplyDelta.textContent = 'Balanced';
-                  ui.supplyDelta.style.color = '#334155';
+                  ui.supplyDelta.style.color = '#64748b';
               } else if (netSupplyChange > 0) {
                   ui.supplyDelta.textContent = `Surplus +${Math.round(netSupplyChange).toLocaleString('en-US')}/s`;
-                  ui.supplyDelta.style.color = '#16a34a';
+                  ui.supplyDelta.style.color = '#475569';
               } else {
                   ui.supplyDelta.textContent = `Deficit ${Math.round(netSupplyChange).toLocaleString('en-US')}/s`;
-                  ui.supplyDelta.style.color = '#ef4444';
+                  ui.supplyDelta.style.color = '#94a3b8';
               }
 
               ui.supplyConsumption.textContent = `-${supplyConsumption.toLocaleString('en-US')}/s`;
@@ -517,11 +575,14 @@ export function init() {
               });
               const gmoPercent = (gameState.gmoLevel / gameState.gmoMaxLevel) * 113;
               ui.gmoRing.style.strokeDashoffset = 113 - gmoPercent;
+
+              const scPercent = (gameState.superconductorLevel / buildingData.superconductor.maxLevel) * 113;
+              ui.superconductorRing.style.strokeDashoffset = 113 - scPercent;
           }
           
           // --- EVENT LISTENERS ---
-          ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'));
-          ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'));
+          ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'), { signal });
+          ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'), { signal });
           
           const createUpgradeListener = (flag, upgradeData) => {
               if (gameState.stars >= (upgradeData.cost || 0) && gameState.science >= (upgradeData.scienceCost || 0) && !gameState[flag]) {
@@ -541,14 +602,22 @@ export function init() {
                   gameState.science -= scienceCost;
                   gameState.gmoLevel++;
               }
-          });
-  
-          ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('toolCaseUnlocked', buildingData.toolCaseUpgrade));
-          ui.urbanismResearchBtn.addEventListener('click', () => createUpgradeListener('urbanismResearched', buildingData.urbanismResearch));
-          ui.megastructureResearchBtn.addEventListener('click', () => createUpgradeListener('megastructureResearched', buildingData.megastructureResearch));
-          ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade));
-          ui.computerUpgradeBtn.addEventListener('click', () => createUpgradeListener('computerUnlocked', buildingData.computerUpgrade));
-          
+          }, { signal });
+
+          ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('toolCaseUnlocked', buildingData.toolCaseUpgrade), { signal });
+          ui.urbanismResearchBtn.addEventListener('click', () => createUpgradeListener('urbanismResearched', buildingData.urbanismResearch), { signal });
+          ui.megastructureResearchBtn.addEventListener('click', () => createUpgradeListener('megastructureResearched', buildingData.megastructureResearch), { signal });
+          ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade), { signal });
+          ui.computerUpgradeBtn.addEventListener('click', () => createUpgradeListener('computerUnlocked', buildingData.computerUpgrade), { signal });
+
+          ui.superconductorBtn.addEventListener('click', () => {
+              const cost = buildingData.superconductor.baseCost * Math.pow(5, gameState.superconductorLevel);
+              if (gameState.stars >= cost && gameState.superconductorLevel < buildingData.superconductor.maxLevel) {
+                  gameState.stars -= cost;
+                  gameState.superconductorLevel++;
+              }
+          }, { signal });
+
             ui.expandLandBtn.addEventListener('click', () => {
                 if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
                     gameState.stars -= buildingData.landExpansion.cost;
@@ -563,12 +632,28 @@ export function init() {
                       renderGridSlot(i);
                   });
               }
-          });
-          
+          }, { signal });
+
+          ui.expandLand2Btn.addEventListener('click', () => {
+              if (gameState.stars >= buildingData.landExpansion2.cost && !gameState.landExpansion2 && gameState.landExpanded) {
+                  gameState.stars -= buildingData.landExpansion2.cost;
+                  gameState.landExpansion2 = true;
+                  for (let i = 0; i < 5; i++) gameState.buildings.push(undefined);
+                  const grid = ui.landGrid;
+                  grid.innerHTML = '';
+                  gameState.buildings.forEach((b, i) => {
+                      const slot = document.createElement('div');
+                      slot.className = 'building-slot';
+                      grid.appendChild(slot);
+                      renderGridSlot(i);
+                  });
+              }
+          }, { signal });
+
             ui.allocationSlider.addEventListener('input', (e) => {
                 gameState.populationAllocation = e.target.value / 100;
-            });
-  
+            }, { signal });
+
             function initialize() {
                 if (!Array.isArray(gameState.buildings) || gameState.buildings.length === 0) {
                     gameState.buildings = new Array(10).fill(undefined);
@@ -580,6 +665,12 @@ export function init() {
                 grid.innerHTML = '';
                 gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
                 gameState.buildings.forEach((_, i) => renderGridSlot(i));
+                // Restore competitor visibility if already spawned
+                if (gameState.competitorSpawned) {
+                    ui.competitorIsland.classList.remove('hidden');
+                    ui.competitorIsland.classList.add('visible');
+                    scheduleIconRefresh();
+                }
                 initialLoadDone = true;
                 logicTick(true);
                 updateAllUI();
@@ -597,6 +688,7 @@ export function init() {
   }
 
 export function teardown() {
+  if (abortController) abortController.abort();
   clearInterval(logicInterval);
   clearInterval(fastUiInterval);
   window.removeEventListener('beforeunload', beforeUnloadHandler);

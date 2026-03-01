@@ -1,5 +1,5 @@
 /* eslint-env jest */
-const { toRoman } = require('./roman');
+import { toRoman } from './roman.js';
 
 describe('toRoman', () => {
   test('converts numbers to Roman numerals', () => {
