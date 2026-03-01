@@ -33,6 +33,40 @@
 - Phase 1: All event listeners now use AbortController — `teardown()` cleanly removes everything via `abort()`
 - Phase 2: `teardown()` now properly removes `beforeunload` listener via stored reference
 
+## v1.4.0 - 2026-01-02 12:06 UTC
+### Major Code Quality Improvements
+- **CRITICAL FIX:** Fixed population requirement inconsistencies in Stage 2 where upgrade buttons appeared before actual unlock thresholds
+  - Tool Case: Now correctly appears at 50 population (was showing at 25)
+  - GMO Upgrade: Now correctly appears at 75 population (was showing at 50)
+  - Land Expansion: Now correctly appears at 1000 population (was showing at 750)
+  - Urbanism Research: Now correctly appears at 200 population (was correct)
+- **package.json fixes:** Corrected main entry point from non-existent "index.js" to "main.js", changed type from "commonjs" to "module" to match ES module usage, added proper description and keywords
+- **Cleanup:** Deleted 37 duplicate SVG files from project root (kept only /graphics directory versions)
+- **Internationalization:** Standardized all code to English
+  - Changed Swedish comments ("Spelvariabler", "DOM-element") to English
+  - Translated UI text ("Öppna Plånboken" → "Open the Bank")
+  - Renamed Swedish variables (`verktygUnlocked` → `toolCaseUnlocked`, `verktygUpgrade` → `toolCaseUpgrade`)
+  - Fixed Swedish UI text in Stage 2 ("industri" → "industry")
+- **Architecture improvements:**
+  - Extracted Stage 2 inline styles (200+ lines) to separate `style-stage2.css` file for better maintainability
+  - Created `src/constants.js` to centralize magic numbers (MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, HYPER_SPEED_THRESHOLD, save keys)
+  - Both Phase 1 and Phase 2 now import constants from centralized file
+- **Documentation:** Added comprehensive README.md with project overview, setup instructions, architecture documentation, and development guidelines
+
+### Why These Changes
+- Population requirement bug was confusing for players - buttons showed up but were disabled with no clear explanation
+- package.json errors prevented proper module recognition and could cause issues with tooling
+- Duplicate SVG files wasted 800KB+ of repository space and created confusion about canonical sources
+- Language mixing (Swedish/English) made code harder to maintain and collaborate on
+- Inline styles in HTML made Stage 2 harder to maintain and debug
+- Magic numbers scattered throughout code made game balance difficult to adjust
+- Missing README made it hard for new developers to understand and contribute to the project
+
+## v1.3.14 - 2025-11-26 09:14 UTC
+- Restored the Stage 2 factory smoke animation with darker, larger plumes and staggered timing so the icon stream is visible again.
+- Made Stage 2 reset fully clear saves by disabling auto-save before reload, stopping timers, and removing stored progress keys.
+- Bumped version metadata to v1.3.14 to reflect the fixes.
+
 ## v1.3.13 - 2025-11-26 07:51 UTC
 - Added a dedicated Plånboken (Bank) hover tooltip so the Stage 1 exit upgrade explains the transition before clicking.
 - Replaced the Stage 2 factory orbit animation with a steady stream of rising rock/paper/scissors icons to read as industrial "rök".
