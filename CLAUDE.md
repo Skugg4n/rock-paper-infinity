@@ -79,6 +79,8 @@ rock-paper-infinity/
 - **Progressive disclosure** — Introduce complexity over time. New elements appear as the player progresses, not all at once.
 - **Exponential satisfaction** — Numbers should grow. Slow at first, then faster, then overwhelmingly fast. The player should feel the acceleration.
 - **Roman numerals for costs** — Costs ≥10 display in Roman numerals. Intentionally cryptic, part of the puzzle feel.
+- **Contained animations** — Animations must stay within their parent element boundaries. No icons or effects flying loose across the screen. Everything should feel attached to its container.
+- **Animate state changes** — When something new appears or changes, animate it in (fade, pop, color transition). The player should always notice that something happened.
 
 ## Known Issues
 - `src/phase1/index.js` is a monolith (~1,066 lines) — candidate for splitting

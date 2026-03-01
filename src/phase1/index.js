@@ -262,8 +262,8 @@ function scheduleUIUpdate() {
                 const anim = document.createElement('div');
                 anim.className = 'factory-animation';
 
-                // RPS icons rising from bottom (staggered horizontally)
-                const rpsPositions = [20, 45, 70, 30, 55, 75];
+                // RPS icons rising from bottom (tight column, slight horizontal drift)
+                const rpsPositions = [38, 48, 58, 42, 52, 55];
                 ['gem', 'file-text', 'scissors', 'gem', 'file-text', 'scissors'].forEach((name, i) => {
                     const icon = getIcon(name, 'factory-rps-icon');
                     icon.style.animationDelay = `${i * 0.55}s`;
