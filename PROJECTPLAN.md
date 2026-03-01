@@ -7,7 +7,11 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [x] Set up project documentation (CLAUDE.md, INDEX.md, LESSONS.md, PROJECTPLAN.md)
 - [x] Audit and document known bugs
 - [x] Run `npm install` and verify `npm test` and `npm run lint` pass
-- [ ] Clean up legacy root SVGs — move needed ones to `graphics/`, delete duplicates
+- [x] Clean up legacy root SVGs — 37 duplicates deleted (v1.4.0)
+- [x] Centralize constants in `src/constants.js` (v1.4.0)
+- [x] Extract Phase 2 inline styles to `style-stage2.css` (v1.4.0)
+- [x] Standardize code language to English (v1.4.0)
+- [x] Fix package.json (main, type, description) (v1.4.0)
 - [ ] Remove `firebase-debug.log` and add it to `.gitignore`
 - [ ] Fix `stage-2.html` title version inconsistency
 - [ ] Add `.DS_Store` to `.gitignore`
@@ -35,7 +39,7 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 
 ## Phase 17: Code Quality (v1.5.0)
 - [ ] Split `src/phase1/index.js` into smaller modules
-- [ ] Centralize localStorage key constants
+- [x] Centralize localStorage key constants (done in `src/constants.js`, v1.4.0)
 - [ ] Add proper error handling for save/load
 - [ ] Improve test coverage beyond `roman.test.js`
 - [ ] Set up ESLint config properly and fix linting issues

@@ -2,32 +2,35 @@
 
 ## Overview
 Incremental idle game with rock-paper-scissors core mechanic. Two game phases:
-- **Phase 1 (Industry)**: RPS mini-game with upgrade progression
-- **Phase 2 (City)**: Civilization-building with population and resources
+- **Phase 1 (Industry)**: RPS mini-game with upgrade progression (`index.html`)
+- **Phase 2 (City)**: Civilization-building with population and resources (`stage-2.html`)
 
 ## Version Management
 
 ### Version Bump Checklist
-All three must be updated together on every release:
+All must be updated together on every release:
 - [ ] `src/version.js` — `export const VERSION = 'vX.Y.Z'`
-- [ ] `index.html` — `<div id="version-info">vX.Y.Z</div>` (line ~76)
+- [ ] `index.html` — `<div id="version-info">vX.Y.Z</div>`
 - [ ] `package.json` — `"version": "X.Y.Z"`
 - [ ] `CHANGELOG.md` — Add new version entry
-
-**Note:** `stage-2.html` title says "v5" — this is a legacy label, not the actual version.
 
 ### Version Format
 - `X.Y.Z` — production releases
 - Bump Z for bugfixes, Y for features, X for breaking changes
 
 ## Tech Stack
-- **Language**: Pure JavaScript (ES6 modules, no framework)
-- **CSS**: Tailwind CSS v3 (via CDN)
-- **Icons**: Custom SVG preloading system (Lucide-based icons in `graphics/`)
-- **Testing**: Jest v30.0.5
-- **Linting**: ESLint v9.33.0
-- **Storage**: localStorage (`rpi-save`, `rpi-stage2`, `rpi-stars`)
-- **Module system**: ES modules in browser, CommonJS in package.json (for Jest)
+- **Language**: Pure JavaScript (ES6 modules)
+- **CSS**: Tailwind CSS v3 (CDN) + `style.css` (Phase 1) + `style-stage2.css` (Phase 2)
+- **Icons**: Phase 1 uses custom SVG preloading (`src/icons.js` + `graphics/`). Phase 2 uses Lucide CDN.
+- **Testing**: Jest v30, ESLint v9
+- **Storage**: localStorage (keys centralized in `src/constants.js`)
+- **Module system**: ES modules (`"type": "module"` in package.json)
+
+## Commands
+```bash
+npm test          # Run Jest tests
+npm run lint      # Run ESLint
+```
 
 ## File Structure
 ```
@@ -35,52 +38,50 @@ rock-paper-infinity/
 ├── index.html              # Phase 1 UI
 ├── stage-2.html            # Phase 2 UI
 ├── main.js                 # Bootstrap: loads icons, initializes game
-├── style.css               # Shared styles, animations, layout
+├── style.css               # Phase 1 styles, shared animations
+├── style-stage2.css        # Phase 2 styles (extracted from inline)
 ├── roman.js                # Roman numeral utility
 ├── src/
-│   ├── version.js          # VERSION constant (single source of truth)
+│   ├── constants.js        # Centralized magic numbers + localStorage keys
+│   ├── version.js          # VERSION constant
 │   ├── gamePhase.js        # Phase state machine (INDUSTRY → CITY → WAR → ESCAPE)
-│   ├── icons.js            # SVG icon preloading and caching
+│   ├── icons.js            # SVG icon preloading and caching (Phase 1 only)
 │   ├── phase1/index.js     # Phase 1 game logic (~1,066 lines)
-│   └── phase2/index.js     # Phase 2 game logic (~561 lines)
-├── graphics/               # SVG icons (19 files, used by icons.js)
-└── *.svg                   # Legacy root SVGs (building icons for Phase 2)
+│   └── phase2/index.js     # Phase 2 game logic (~600 lines)
+├── graphics/               # SVG icons (used by icons.js)
+├── README.md               # Project overview and architecture docs
+└── CODE_REVIEW.md          # Code review notes
 ```
 
-## Key Source Files
-- `src/phase1/index.js` — Core game loop, upgrades, energy, bulk processing, UI
-- `src/phase2/index.js` — City builder: buildings, population, research, supplies
-- `src/gamePhase.js` — Phase transitions (page navigation between index.html ↔ stage-2.html)
-- `src/icons.js` — Icon cache system (preload → clone → inject)
+## Established Patterns
 
-## localStorage Keys
-- `rpi-save` — Phase 1 game state (stars, energy, upgrades, boards)
-- `rpi-stage2` — Phase 2 game state (buildings, population, research)
-- `rpi-stars` — Star transfer between phases
+### Tick separation
+- `logicTick` (1s) — ALL game mechanics: resource generation, population, supplies, save
+- `fastUiTick` (50ms) — ONLY rendering: number displays, progress bars, visual state
 
-## Commands
-```bash
-npm test          # Run Jest tests
-npm run lint      # Run ESLint
-```
-**Note:** Run `npm install` first — devDependencies must be installed.
+### Event listener safety
+- **Phase 1**: `AbortController` — all listeners use `{ signal }`, `teardown()` calls `abort()`
+- **Phase 2**: `WeakSet` prevents duplicate tooltip listeners. `beforeUnloadHandler` ref for clean removal.
+- **Phase 2**: `savingEnabled` flag — set false before reset to prevent save-on-unload race
 
-## Conventions
-- Swedish comments and variable names appear in some places, English in others — prefer English for new code
-- UI text is in English (switched from Swedish in v1.3.12)
-- Upgrade definitions use object literals with `cost`, `level`, `maxLevel`, `unlocksAt` etc.
-- UI updates via manual `uiState` dirty-tracking (no reactive framework)
-- Game state saved to localStorage on every meaningful change
+### Icon refresh
+- `scheduleIconRefresh()` — debounces `lucide.createIcons()` via `requestAnimationFrame`
+- Never call `lucide.createIcons()` directly in tick loops
+
+### Resource flow
+- Energy: main pool fills first → overflow to reserve
+- Consumption: main drained first → reserve as backup
+- Refund: decrement level first, then `cost() * refundRate`
 
 ## Known Issues
-- `src/phase1/index.js` is a monolithic 1,066-line file — candidate for splitting
-- 46 legacy SVG files in root directory (duplicates of `graphics/` + building icons)
+- `src/phase1/index.js` is a monolith (~1,066 lines) — candidate for splitting
 - `stage-2.html` title version ("v5") is inconsistent with actual version
-- `firebase-debug.log` in root is leftover from abandoned Firebase setup
+- `stage-2.html` can be navigated to directly, bypassing `gamePhase.js`
+- `firebase-debug.log` and `.DS_Store` should be in `.gitignore`
+- Two different icon systems (custom SVG vs Lucide CDN) — unification pending
 
 ## Documents
 - Check [LESSONS.md](LESSONS.md) when debugging
-- Check [TODO.md](TODO.md) for pending input (when it exists)
 - Update [CHANGELOG.md](CHANGELOG.md) on every release
 - See [PROJECTPLAN.md](PROJECTPLAN.md) for current progress
 - See [INDEX.md](INDEX.md) for document overview
