@@ -258,24 +258,29 @@ function scheduleUIUpdate() {
                 metaBoard.id = 'meta-board';
                 metaBoard.className = 'rounded-2xl w-48 h-48 sm:w-72 sm:h-72 flex justify-center items-center relative';
 
-                // Animation container (inside the box, behind factory icon)
+                // Conveyor belt animation (inside the box, behind factory icon)
                 const anim = document.createElement('div');
                 anim.className = 'factory-animation';
 
-                // RPS icons rising from bottom (tight column, slight horizontal drift)
-                const rpsPositions = [38, 48, 58, 42, 52, 55];
-                ['gem', 'file-text', 'scissors', 'gem', 'file-text', 'scissors'].forEach((name, i) => {
+                // RPS icons: enter from right, move toward center
+                ['gem', 'file-text', 'scissors', 'gem'].forEach((name, i) => {
                     const icon = getIcon(name, 'factory-rps-icon');
-                    icon.style.animationDelay = `${i * 0.55}s`;
-                    icon.style.left = `${rpsPositions[i]}%`;
+                    icon.style.animationDelay = `${i * 0.9}s`;
                     anim.appendChild(icon);
                 });
 
-                // Smoke puffs near the top
-                for (let i = 0; i < 3; i++) {
+                // Star icons: emerge from center, exit to left
+                for (let i = 0; i < 4; i++) {
+                    const icon = getIcon('star', 'factory-star-icon');
+                    icon.style.animationDelay = `${i * 0.9}s`;
+                    anim.appendChild(icon);
+                }
+
+                // Subtle smoke puffs
+                for (let i = 0; i < 2; i++) {
                     const puff = document.createElement('div');
                     puff.className = 'factory-smoke-puff';
-                    puff.style.animationDelay = `${i * 1.2}s`;
+                    puff.style.animationDelay = `${i * 1.8}s`;
                     anim.appendChild(puff);
                 }
 

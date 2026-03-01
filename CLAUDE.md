@@ -80,7 +80,9 @@ rock-paper-infinity/
 - **Exponential satisfaction** — Numbers should grow. Slow at first, then faster, then overwhelmingly fast. The player should feel the acceleration.
 - **Roman numerals for costs** — Costs ≥10 display in Roman numerals. Intentionally cryptic, part of the puzzle feel.
 - **Contained animations** — Animations must stay within their parent element boundaries. No icons or effects flying loose across the screen. Everything should feel attached to its container.
-- **Animate state changes** — When something new appears or changes, animate it in (fade, pop, color transition). The player should always notice that something happened.
+- **Discreet, not distracting** — Animations should be subtle and calm. No looping attention-grabbers on UI elements. One-shot animations are OK for state changes; constant blinking/pulsing is not. The game's visual tone is clean and quiet.
+- **Directional clarity** — Animations that represent a process (like a factory) must have clear direction. Input → process → output. Think conveyor belt, not chaos. The player should read the flow at a glance.
+- **Tone plates, not lines** — Use background color areas with subtle shadows for structure. Never use visible border lines for layout. Lines are only acceptable as super-discreet dividers (1px, very low contrast). Containers should feel like floating cards, not boxed-in frames.
 
 ## Known Issues
 - `src/phase1/index.js` is a monolith (~1,066 lines) — candidate for splitting

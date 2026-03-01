@@ -106,9 +106,9 @@ body {
 }
 
 #meta-board {
-    border: 4px solid #000;
+    border: none;
     background-color: #fff;
-    box-shadow: none;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     overflow: hidden;
 }
 .meta-active { animation: none; }
@@ -134,44 +134,85 @@ body {
     z-index: 1;
 }
 
-/* RPS icons rising from bottom (like Phase 2) */
+/* RPS icons: conveyor belt, right → center */
 .factory-rps-icon {
     position: absolute;
-    bottom: 8%;
-    width: 20px;
-    height: 20px;
-    color: #64748b;
+    right: 6%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    color: #94a3b8;
     opacity: 0;
-    animation: factory-rise 3.3s ease-in infinite;
+    animation: convey-in 3.6s linear infinite;
 }
 @media (min-width: 640px) {
-    .factory-rps-icon { width: 24px; height: 24px; }
+    .factory-rps-icon { width: 20px; height: 20px; }
 }
-@keyframes factory-rise {
-    0%   { transform: translate(0, 8px) scale(0.75); opacity: 0; }
-    10%  { opacity: 0.7; }
-    40%  { opacity: 0.5; transform: translate(4px, -80px) scale(1); }
-    75%  { opacity: 0.15; }
-    100% { transform: translate(-4px, -200px) scale(1.15); opacity: 0; }
+@keyframes convey-in {
+    0%   { transform: translate(0, -50%); opacity: 0; }
+    8%   { opacity: 0.5; }
+    40%  { opacity: 0.3; }
+    48%  { opacity: 0; transform: translate(-100px, -50%) scale(0.6); }
+    100% { opacity: 0; }
+}
+@media (min-width: 640px) {
+    @keyframes convey-in {
+        0%   { transform: translate(0, -50%); opacity: 0; }
+        8%   { opacity: 0.5; }
+        40%  { opacity: 0.3; }
+        48%  { opacity: 0; transform: translate(-130px, -50%) scale(0.6); }
+        100% { opacity: 0; }
+    }
 }
 
-/* Smoke puffs near top of box */
+/* Star icons: conveyor belt, center → left */
+.factory-star-icon {
+    position: absolute;
+    left: 44%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    color: #eab308;
+    opacity: 0;
+    animation: convey-out 3.6s linear infinite;
+}
+@media (min-width: 640px) {
+    .factory-star-icon { width: 18px; height: 18px; }
+}
+@keyframes convey-out {
+    0%   { transform: translate(0, -50%); opacity: 0; }
+    50%  { transform: translate(0, -50%); opacity: 0; }
+    58%  { opacity: 0.6; }
+    85%  { opacity: 0.3; }
+    100% { opacity: 0; transform: translate(-100px, -50%); }
+}
+@media (min-width: 640px) {
+    @keyframes convey-out {
+        0%   { transform: translate(0, -50%); opacity: 0; }
+        50%  { transform: translate(0, -50%); opacity: 0; }
+        58%  { opacity: 0.6; }
+        85%  { opacity: 0.3; }
+        100% { opacity: 0; transform: translate(-130px, -50%); }
+    }
+}
+
+/* Subtle smoke puffs */
 .factory-smoke-puff {
     position: absolute;
-    top: 12%;
-    left: 50%;
-    width: 10px;
-    height: 10px;
+    top: 18%;
+    left: 48%;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: #94a3b8;
+    background: #cbd5e1;
     opacity: 0;
     animation: smoke-drift 3.6s ease-out infinite;
 }
 @keyframes smoke-drift {
-    0%   { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-    10%  { opacity: 0.3; }
-    40%  { opacity: 0.15; }
-    100% { transform: translate(calc(-50% + 10px), -30px) scale(2); opacity: 0; }
+    0%   { transform: translate(0, 0) scale(0.5); opacity: 0; }
+    10%  { opacity: 0.2; }
+    40%  { opacity: 0.1; }
+    100% { transform: translate(6px, -20px) scale(1.5); opacity: 0; }
 }
 
 .rate-paused {
