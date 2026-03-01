@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.4.2 - 2026-03-01
+
+### Medium-Priority Fixes (Phase 1)
+- Fixed starMultiplier being overwritten (= 10) instead of multiplied (*= 10) when merging to meta board — luck bonus now preserved across merge and save/load
+- Fixed quantum foam accumulating based on theoretical games instead of actual energy-limited games played
+- Fixed tooltip timeout race condition — hovering between buttons no longer causes tooltips to disappear
+
+### Medium-Priority Fixes (Phase 2)
+- Fixed allocation slider not syncing with saved game state on load — slider now shows correct position
+- Added floor guard: stars and science can no longer go negative from building upkeep
+- Improved starvation mechanics: death rate now scales with 5% of supply deficit instead of fixed 1 person/tick
+
+## v1.4.1 - 2026-03-01
+
+### Critical Fixes (Phase 2)
+- Fixed severe memory leak: `setTooltip()` added duplicate event listeners every 50ms — now uses WeakSet to track and prevent duplicates
+- Fixed performance: `lucide.createIcons()` scanned entire DOM 20+ times/second — now debounced via `requestAnimationFrame`, called only after actual DOM changes
+- Moved `updateAllUI()` from `fastUiTick` (50ms) to `logicTick` (1s) — fast tick now only updates numbers and progress bars
+
+### High-Priority Fixes (Phase 1)
+- Fixed double energy generation: `passiveTick` was filling both energy AND reserve simultaneously — now fills main first, overflow goes to reserve
+- Fixed sell refund calculation: refund was near-zero because `cost()` was called before level decrement — now decrements first, giving correct 75% refund
+- Fixed energy consumption order: reserve was drained before main energy — now drains main first, reserve as backup
+
+### High-Priority Fixes (Phase 2)
+- Fixed supply rate display showing 20x the actual rate (÷20 divisor removed to match display)
+- Fixed background tab throttling: star/science accumulation moved from `fastUiTick` (throttled to 1/s in background) to `logicTick` (consistent 1/s)
+- Fixed `beforeunload` listener leak in Phase 2 teardown
+
+### Cleanup (Both Phases)
+- Phase 1: All event listeners now use AbortController — `teardown()` cleanly removes everything via `abort()`
+- Phase 2: `teardown()` now properly removes `beforeunload` listener via stored reference
+
 ## v1.4.0 - 2026-01-02 12:06 UTC
 ### Major Code Quality Improvements
 - **CRITICAL FIX:** Fixed population requirement inconsistencies in Stage 2 where upgrade buttons appeared before actual unlock thresholds

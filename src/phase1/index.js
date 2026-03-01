@@ -33,6 +33,8 @@ const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 const resetBtn = document.getElementById('reset-btn');
 
+        let listenerController = null;
+
         // Game variables
         let starBalance = 0;
         let totalStarsEarned = 0;
@@ -172,6 +174,7 @@ function scheduleUIUpdate() {
 }
 
         function setupButtons() {
+            const signal = listenerController.signal;
             document.querySelectorAll('button').forEach(btn => {
                 const choice = btn.dataset.choice;
                 const upgrade = btn.dataset.upgrade;
@@ -180,21 +183,22 @@ function scheduleUIUpdate() {
                     e.preventDefault();
                     if (choice) playGame(choice);
                     else handleUpgradeClick(upgrade);
-                });
+                }, { signal });
                 btn.addEventListener('mouseenter', () => {
                     const key = choice ? 'choice' : upgrade;
                     if (key) showTooltip(btn, key);
-                });
-                btn.addEventListener('mouseleave', hideTooltip);
+                }, { signal });
+                btn.addEventListener('mouseleave', hideTooltip, { signal });
             });
         }
 
         function setupDebugButtons() {
+            const signal = listenerController.signal;
             document.querySelectorAll('#debug-menu [data-add-stars]').forEach(btn => {
-                btn.addEventListener('click', () => addStars(parseInt(btn.dataset.addStars, 10)));
+                btn.addEventListener('click', () => addStars(parseInt(btn.dataset.addStars, 10)), { signal });
             });
             document.querySelectorAll('#debug-menu [data-change-speed]').forEach(btn => {
-                btn.addEventListener('click', () => changeSpeed(parseInt(btn.dataset.changeSpeed, 10)));
+                btn.addEventListener('click', () => changeSpeed(parseInt(btn.dataset.changeSpeed, 10)), { signal });
             });
         }
 
@@ -238,9 +242,9 @@ function scheduleUIUpdate() {
             }
         }
 
-        function mergeToMetaBoard() {
+        function mergeToMetaBoard(fromLoad = false) {
             isMetaBoardActive = true;
-            starMultiplier = 10;
+            if (!fromLoad) starMultiplier *= 10;
             gameBoards.forEach(board => board.element.style.display = 'none');
             
             let metaBoard = document.getElementById('meta-board');
@@ -259,27 +263,36 @@ function scheduleUIUpdate() {
         }
 
         export function init() {
+            listenerController = new AbortController();
+            const signal = listenerController.signal;
+
             loadGame();
             if (gameBoards.length === 0) createGameBoard();
             setupButtons();
             setupDebugButtons();
-            collapseFoamBtn.addEventListener('click', collapseFoam);
-            menuBtn.addEventListener('click', () => menuDropdown.classList.toggle('hidden'));
-            resetBtn.addEventListener('click', resetGame);
+            collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
+            menuBtn.addEventListener('click', () => menuDropdown.classList.toggle('hidden'), { signal });
+            resetBtn.addEventListener('click', resetGame, { signal });
 
             updateAnimationSpeed();
             scheduleUIUpdate();
-            debugTrigger.addEventListener('click', () => debugMenu.classList.toggle('hidden'));
+            debugTrigger.addEventListener('click', () => debugMenu.classList.toggle('hidden'), { signal });
             manageAutoPlay();
             passiveInterval = setInterval(passiveTick, 1000);
-            document.addEventListener('visibilitychange', handleVisibilityChange);
+            document.addEventListener('visibilitychange', handleVisibilityChange, { signal });
         }
 
         function passiveTick() {
             const energyGen = upgrades.energyGenerator.level * 5;
             if (energyGen > 0) {
-                energy = Math.min(MAX_ENERGY, energy + energyGen);
-                reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + energyGen);
+                const newEnergy = energy + energyGen;
+                if (newEnergy <= MAX_ENERGY) {
+                    energy = newEnergy;
+                } else {
+                    const overflow = newEnergy - MAX_ENERGY;
+                    energy = MAX_ENERGY;
+                    reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + overflow);
+                }
             }
             manageAutoPlay();
             scheduleUIUpdate();
@@ -645,12 +658,12 @@ const uiState = {
         }
 
         function consumeEnergy(amount = 1) {
-            if (reserveEnergy >= amount) {
-                reserveEnergy -= amount;
+            if (energy >= amount) {
+                energy -= amount;
             } else {
-                const remaining = amount - reserveEnergy;
-                reserveEnergy = 0;
-                energy = Math.max(0, energy - remaining);
+                const remaining = amount - energy;
+                energy = 0;
+                reserveEnergy = Math.max(0, reserveEnergy - remaining);
             }
         }
 
@@ -714,7 +727,7 @@ const uiState = {
                 const boards = data.gameBoards || 0;
                 for (let i = 0; i < boards; i++) createGameBoard();
                 if (isMetaBoardActive) {
-                    mergeToMetaBoard();
+                    mergeToMetaBoard(true);
                 }
                 if (upgrades.luck.purchased) {
                     upgrades.luck.element.style.display = 'none';
@@ -839,11 +852,9 @@ const uiState = {
             const upgrade = upgrades[key];
             if (upgrade.level === undefined || upgrade.level <= 0) return;
 
-            const costOfLastLevel = upgrade.cost(); 
             upgrade.level--;
-            const costOfNewLevel = upgrade.cost(); 
-            const refundAmount = Math.floor((costOfLastLevel - costOfNewLevel) * 0.75); 
-            
+            const refundAmount = Math.floor(upgrade.cost() * 0.75);
+
             starBalance += refundAmount;
 
             if (key === 'speed') gameSpeed -= 1;
@@ -881,7 +892,7 @@ const uiState = {
             totalStarsEarned += starGain;
 
             if (isMetaBoardActive) {
-                quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + gamesToPlay);
+                quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + energyToConsume);
             }
             
             if (!isMetaBoardActive) {
@@ -1005,10 +1016,17 @@ const uiState = {
             return html;
         }
 
+        let tooltipHideTimeout = null;
+
         function showTooltip(element, key) {
             if (key === 'choice') return;
             const upgrade = upgrades[key];
             if (!upgrade || (upgrade.purchased && !upgrade.consumable && !upgrade.level) || (upgrade.level >= upgrade.maxLevel)) return;
+
+            if (tooltipHideTimeout) {
+                clearTimeout(tooltipHideTimeout);
+                tooltipHideTimeout = null;
+            }
 
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
             const description = upgradeDescriptions[key];
@@ -1021,8 +1039,6 @@ const uiState = {
             tooltipHtml += generateCostVisual(cost);
             tooltip.innerHTML = tooltipHtml;
 
-
-            
             const rect = element.getBoundingClientRect();
             tooltip.style.display = 'block';
             tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
@@ -1032,7 +1048,7 @@ const uiState = {
 
         function hideTooltip() {
             tooltip.style.opacity = '0';
-            setTimeout(() => { tooltip.style.display = 'none'; }, 200);
+            tooltipHideTimeout = setTimeout(() => { tooltip.style.display = 'none'; }, 200);
         }
 
         export function teardown() {
@@ -1041,7 +1057,10 @@ const uiState = {
                 clearInterval(passiveInterval);
                 passiveInterval = null;
             }
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (listenerController) {
+                listenerController.abort();
+                listenerController = null;
+            }
         }
 
         // --- DEBUG FUNCTIONS ---
