@@ -21,7 +21,7 @@ All must be updated together on every release:
 ## Tech Stack
 - **Language**: Pure JavaScript (ES6 modules)
 - **CSS**: Tailwind CSS v3 (CDN) + `style.css` (Phase 1) + `style-stage2.css` (Phase 2)
-- **Icons**: Phase 1 uses custom SVG preloading (`src/icons.js` + `graphics/`). Phase 2 uses Lucide CDN.
+- **Icons**: Both phases use Lucide CDN. `src/icons.js` builds SVGs from Lucide icon data and caches them for `getIcon()`. Phase 2 also uses `<i data-lucide>` tags with `lucide.createIcons()`.
 - **Testing**: Jest v30, ESLint v9
 - **Storage**: localStorage (keys centralized in `src/constants.js`)
 - **Module system**: ES modules (`"type": "module"` in package.json)
@@ -89,7 +89,7 @@ rock-paper-infinity/
 - `stage-2.html` title version ("v5") is inconsistent with actual version
 - `stage-2.html` can be navigated to directly, bypassing `gamePhase.js`
 - `firebase-debug.log` and `.DS_Store` should be in `.gitignore`
-- Two different icon systems (custom SVG vs Lucide CDN) — unification pending
+- `/graphics/` directory contains legacy custom SVGs — no longer used, can be cleaned up
 
 ## Documents
 - Check [LESSONS.md](LESSONS.md) when debugging

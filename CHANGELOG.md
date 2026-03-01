@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.5.0 - 2026-03-01
+
+### Breaking Changes
+- **Unified icon system** — Phase 1 now uses Lucide CDN instead of custom SVGs from `/graphics/`. Both phases share the same icon set. `icons.js` rewritten to build SVGs from Lucide icon data.
+
+### Improvements
+- **Factory animation: binary opacity** — Icons snap on/off instead of fading. No gradual opacity transitions.
+- **Phase 2 upgrade flash** — One-shot blue flash when an upgrade button first appears on a building. Uses Set tracking to avoid repeating. Skipped during initial load.
+
 ## v1.4.6 - 2026-03-01
 
 ### Improvements

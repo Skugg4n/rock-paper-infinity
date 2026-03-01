@@ -164,6 +164,14 @@ body {
     cursor: not-allowed;
 }
 
+.upgrade-btn.upgrade-new {
+    animation: upgrade-flash 0.5s ease-out;
+}
+@keyframes upgrade-flash {
+    0%   { background-color: #38bdf8; transform: scale(1.4); }
+    100% { background-color: #d1d5db; transform: scale(1); }
+}
+
 .progress-ring {
     position: absolute;
     top: 0;

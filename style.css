@@ -149,19 +149,19 @@ body {
     .factory-rps-icon { width: 20px; height: 20px; }
 }
 @keyframes convey-in {
-    0%   { transform: translate(0, -50%); opacity: 0; }
-    8%   { opacity: 0.5; }
-    40%  { opacity: 0.3; }
-    48%  { opacity: 0; transform: translate(-100px, -50%) scale(0.6); }
-    100% { opacity: 0; }
+    0%    { transform: translate(0, -50%); opacity: 0; }
+    5%    { transform: translate(0, -50%); opacity: 0.4; }
+    43%   { transform: translate(-100px, -50%) scale(0.7); opacity: 0.4; }
+    43.1% { opacity: 0; }
+    100%  { opacity: 0; }
 }
 @media (min-width: 640px) {
     @keyframes convey-in {
-        0%   { transform: translate(0, -50%); opacity: 0; }
-        8%   { opacity: 0.5; }
-        40%  { opacity: 0.3; }
-        48%  { opacity: 0; transform: translate(-130px, -50%) scale(0.6); }
-        100% { opacity: 0; }
+        0%    { transform: translate(0, -50%); opacity: 0; }
+        5%    { transform: translate(0, -50%); opacity: 0.4; }
+        43%   { transform: translate(-130px, -50%) scale(0.7); opacity: 0.4; }
+        43.1% { opacity: 0; }
+        100%  { opacity: 0; }
     }
 }
 
@@ -180,19 +180,21 @@ body {
     .factory-star-icon { width: 18px; height: 18px; }
 }
 @keyframes convey-out {
-    0%   { transform: translate(0, -50%); opacity: 0; }
-    50%  { transform: translate(0, -50%); opacity: 0; }
-    58%  { opacity: 0.6; }
-    85%  { opacity: 0.3; }
-    100% { opacity: 0; transform: translate(-100px, -50%); }
+    0%    { transform: translate(0, -50%); opacity: 0; }
+    50%   { transform: translate(0, -50%); opacity: 0; }
+    50.1% { transform: translate(0, -50%); opacity: 0.5; }
+    93%   { transform: translate(-100px, -50%); opacity: 0.5; }
+    93.1% { opacity: 0; }
+    100%  { opacity: 0; }
 }
 @media (min-width: 640px) {
     @keyframes convey-out {
-        0%   { transform: translate(0, -50%); opacity: 0; }
-        50%  { transform: translate(0, -50%); opacity: 0; }
-        58%  { opacity: 0.6; }
-        85%  { opacity: 0.3; }
-        100% { opacity: 0; transform: translate(-130px, -50%); }
+        0%    { transform: translate(0, -50%); opacity: 0; }
+        50%   { transform: translate(0, -50%); opacity: 0; }
+        50.1% { transform: translate(0, -50%); opacity: 0.5; }
+        93%   { transform: translate(-130px, -50%); opacity: 0.5; }
+        93.1% { opacity: 0; }
+        100%  { opacity: 0; }
     }
 }
 
@@ -209,10 +211,11 @@ body {
     animation: smoke-drift 3.6s ease-out infinite;
 }
 @keyframes smoke-drift {
-    0%   { transform: translate(0, 0) scale(0.5); opacity: 0; }
-    10%  { opacity: 0.2; }
-    40%  { opacity: 0.1; }
-    100% { transform: translate(6px, -20px) scale(1.5); opacity: 0; }
+    0%    { transform: translate(0, 0) scale(0.5); opacity: 0; }
+    10%   { transform: translate(0, 0) scale(0.6); opacity: 0.15; }
+    60%   { transform: translate(4px, -12px) scale(1.2); opacity: 0.15; }
+    60.1% { opacity: 0; }
+    100%  { opacity: 0; }
 }
 
 .rate-paused {

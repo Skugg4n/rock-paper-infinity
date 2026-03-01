@@ -126,6 +126,9 @@ export function init() {
           });
   
           // --- BUILDING & RENDERING LOGIC ---
+          const notifiedUpgrades = new Set();
+          let initialLoadDone = false;
+
           function createBuildingHTML(building) {
               let icon = '';
               let content = '';
@@ -161,7 +164,10 @@ export function init() {
   
   
                   if (unlocked) {
-                      actionButtons += `<button class="building-action-btn upgrade-btn" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
+                      const upgradeKey = `${building.id}-${upgradeTarget}`;
+                      const isNew = initialLoadDone && !notifiedUpgrades.has(upgradeKey);
+                      notifiedUpgrades.add(upgradeKey);
+                      actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
                           <div class="tooltip">
                               <div class="effect">${effectHTML}</div>
                               <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-amber-400'></i></div>
@@ -574,6 +580,7 @@ export function init() {
                 grid.innerHTML = '';
                 gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
                 gameState.buildings.forEach((_, i) => renderGridSlot(i));
+                initialLoadDone = true;
                 logicTick(true);
                 updateAllUI();
                 saveGameState();

@@ -1,3 +1,5 @@
+/* global lucide */
+
 const ICONS = [
   'zap', 'star', 'timer', 'zap-off', 'atom', 'gem', 'file-text', 'scissors',
   'battery-charging', 'repeat-2', 'chevrons-right', 'battery-plus',
@@ -7,16 +9,44 @@ const ICONS = [
 
 const cache = {};
 
+function toPascalCase(name) {
+  return name.replace(/(^|-)(\w)/g, (_, __, c) => c.toUpperCase());
+}
+
+function buildSvg(iconChildren) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('xmlns', ns);
+  svg.setAttribute('width', '24');
+  svg.setAttribute('height', '24');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  for (const [childTag, childAttrs] of iconChildren) {
+    const el = document.createElementNS(ns, childTag);
+    for (const [key, val] of Object.entries(childAttrs)) el.setAttribute(key, val);
+    svg.appendChild(el);
+  }
+  return svg;
+}
+
 export async function preloadIcons() {
-  await Promise.all(
-    ICONS.map(async name => {
-      const res = await fetch(`graphics/${name}.svg`);
-      const text = await res.text();
-      const template = document.createElement('template');
-      template.innerHTML = text.trim();
-      cache[name] = template.content.firstElementChild;
-    })
-  );
+  if (typeof lucide === 'undefined' || !lucide.icons) {
+    console.error('Lucide CDN not loaded');
+    return;
+  }
+  for (const name of ICONS) {
+    const pascalName = toPascalCase(name);
+    const iconData = lucide.icons[pascalName];
+    if (!iconData) {
+      console.warn(`Lucide icon not found: ${name} (${pascalName})`);
+      continue;
+    }
+    cache[name] = buildSvg(iconData);
+  }
 }
 
 export function getIcon(name, className = '') {
@@ -29,9 +59,7 @@ export function getIcon(name, className = '') {
 }
 
 export function replaceIcons(root = document) {
-  root.querySelectorAll('i[data-lucide]').forEach(el => {
-    const name = el.getAttribute('data-lucide');
-    const svg = getIcon(name, el.getAttribute('class'));
-    el.replaceWith(svg);
-  });
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
