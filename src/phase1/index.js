@@ -153,7 +153,7 @@ const resetBtn = document.getElementById('reset-btn');
                 element: document.getElementById('bank'),
                 unlockCondition: () => upgrades.mergeGameBoard.purchased,
                 purchase: function() {
-                    localStorage.setItem('rpi-stars', String(starBalance));
+                    localStorage.setItem(PHASE2_CONSTANTS.STARS_TRANSFER_KEY, String(starBalance));
                     // Persist phase change immediately so a reload during the chapter card
                     // doesn't leave the player stranded in Phase 1 with bank already purchased.
                     localStorage.setItem(PHASE_KEY, phases.CITY);
