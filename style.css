@@ -101,12 +101,12 @@ body {
 .small-icons .lucide-lg { width: 32px; height: 32px; }
 
 .result-wrapper.winner {
-    border: 4px solid #475569;
+    box-shadow: 0 0 0 4px rgba(71, 85, 105, 0.18), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
     border-radius: 9999px;
     padding: 8px;
 }
 .result-wrapper.enemy-winner {
-    border: 4px solid #ef4444;
+    box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.32), 0 4px 12px -2px rgba(0, 0, 0, 0.12);
     border-radius: 9999px;
     padding: 8px;
 }
@@ -260,11 +260,11 @@ body {
 #collapse-foam-btn {
     position: relative;
     background-color: #e2e8f0;
-    border: 2px solid #94a3b8;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.4);
 }
 #collapse-foam-btn.ready {
     background-color: #fff;
-    border-color: #475569;
+    box-shadow: inset 0 0 0 1px #475569;
     cursor: pointer;
 }
 #collapse-foam-btn.ready:hover {
