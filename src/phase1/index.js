@@ -151,7 +151,10 @@ const resetBtn = document.getElementById('reset-btn');
                 purchased: false,
                 unlocksAt: 0,
                 element: document.getElementById('bank'),
-                unlockCondition: () => upgrades.mergeGameBoard.purchased,
+                // Gate: factory must be purchased AND player must have accumulated
+                // enough stars to ensure a meaningful pause between factory and bank.
+                // 5x the factory cost above the minimum-to-buy-factory threshold.
+                unlockCondition: () => upgrades.mergeGameBoard.purchased && totalStarsEarned >= 50000,
                 purchase: function() {
                     localStorage.setItem(PHASE2_CONSTANTS.STARS_TRANSFER_KEY, String(starBalance));
                     // Persist phase change immediately so a reload during the chapter card
