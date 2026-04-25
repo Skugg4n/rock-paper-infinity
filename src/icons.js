@@ -58,7 +58,7 @@ export function getIcon(name, className = '') {
   return svg;
 }
 
-export function replaceIcons(root = document) {
+export function replaceIcons() {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
