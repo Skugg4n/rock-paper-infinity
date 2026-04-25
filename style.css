@@ -1,6 +1,12 @@
 /* Settle Tailwind hidden/flex class precedence: hidden always wins */
 .hidden { display: none !important; }
 
+/* Mobile: narrow energy bars so they don't collide with the win-tracker at <480px */
+@media (max-width: 479px) {
+    #energy-container { width: 8px !important; height: 80px !important; padding: 2px !important; }
+    #reserve-energy-container { width: 10px !important; height: 88px !important; padding: 2px !important; }
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     touch-action: manipulation;
