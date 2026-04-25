@@ -1,5 +1,12 @@
 /* eslint-env jest */
-import { serializeGameState, deserializeGameState } from './persistence.js';
+import { jest } from '@jest/globals';
+import {
+    serializeGameState,
+    deserializeGameState,
+    saveToStorage,
+    loadFromStorage,
+    SCHEMA_VERSION,
+} from './persistence.js';
 
 describe('persistence', () => {
     describe('serializeGameState', () => {
@@ -97,5 +104,69 @@ describe('persistence', () => {
             expect(result.isMetaBoardActive).toBe(true);
             expect(result.upgrades.speed.level).toBe(10);
         });
+    });
+});
+
+describe('schema versioning', () => {
+    test('serialized state includes schemaVersion', () => {
+        const state = {
+            starBalance: 0, totalStarsEarned: 0, totalGamesPlayed: 0, totalWins: 0,
+            energy: 100, reserveEnergy: 0, gameSpeed: 1, starMultiplier: 1,
+            quantumFoam: 0, isMetaBoardActive: false, autoPlayWantsToRun: false,
+            gameBoardsCount: 1,
+        };
+        const json = serializeGameState(state, {});
+        const parsed = JSON.parse(json);
+        expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
+    });
+
+    test('save with no schemaVersion (legacy) is treated as v1', () => {
+        const legacy = JSON.stringify({ starBalance: 42, upgrades: {} });
+        const result = deserializeGameState(legacy);
+        expect(result).not.toBeNull();
+        expect(result.starBalance).toBe(42);
+    });
+
+    test('save with higher schemaVersion than known returns null', () => {
+        const future = JSON.stringify({ schemaVersion: 999, starBalance: 1 });
+        const result = deserializeGameState(future);
+        expect(result).toBeNull();
+    });
+});
+
+describe('storage wrappers', () => {
+    let storage;
+    beforeEach(() => {
+        storage = {};
+        global.localStorage = {
+            getItem: (k) => storage[k] ?? null,
+            setItem: (k, v) => { storage[k] = v; },
+            removeItem: (k) => { delete storage[k]; },
+        };
+    });
+    afterEach(() => { delete global.localStorage; });
+
+    test('saveToStorage returns true on success', () => {
+        expect(saveToStorage('test-key', '{"a":1}')).toBe(true);
+        expect(storage['test-key']).toBe('{"a":1}');
+    });
+
+    test('saveToStorage returns false on QuotaExceededError, does not throw', () => {
+        global.localStorage.setItem = () => {
+            const err = new Error('quota'); err.name = 'QuotaExceededError'; throw err;
+        };
+        expect(() => saveToStorage('test-key', '{}')).not.toThrow();
+        expect(saveToStorage('test-key', '{}')).toBe(false);
+    });
+
+    test('loadFromStorage returns null for corrupt JSON, leaves key alone', () => {
+        storage['test-key'] = 'not valid json';
+        const result = loadFromStorage('test-key');
+        expect(result).toBeNull();
+        expect(storage['test-key']).toBe('not valid json');
+    });
+
+    test('loadFromStorage returns null for missing key', () => {
+        expect(loadFromStorage('nope')).toBeNull();
     });
 });

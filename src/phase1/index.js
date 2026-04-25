@@ -5,7 +5,7 @@ import { PHASE1_CONSTANTS } from "../constants.js";
 import { getSPS, getEPS, getVisibleDots, formatCount } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
-import { serializeGameState, deserializeGameState } from "./persistence.js";
+import { serializeGameState, saveToStorage, loadFromStorage } from "./persistence.js";
 
         // DOM elements
         const gameBoardContainer = document.getElementById('game-board-container');
@@ -686,11 +686,11 @@ const uiState = {
                 isMetaBoardActive, autoPlayWantsToRun,
                 gameBoardsCount: gameBoards.length
             };
-            localStorage.setItem(SAVE_KEY, serializeGameState(state, upgrades));
+            saveToStorage(SAVE_KEY, serializeGameState(state, upgrades));
         }
 
         function loadGame() {
-            const data = deserializeGameState(localStorage.getItem(SAVE_KEY));
+            const data = loadFromStorage(SAVE_KEY);
             if (!data) return;
             try {
                 starBalance = data.starBalance ?? starBalance;
