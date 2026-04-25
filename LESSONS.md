@@ -62,6 +62,30 @@
 **Lesson:** Allt som `init()` sätter upp måste `teardown()` riva ner.
 **Rule:** Varje addEventListener i init() kräver en matchande removeEventListener i teardown().
 
+### #11 — Disabling saves before the save-with-new-state runs
+**Problem:** Phase 2's WAR-wall trigger set `savingEnabled = false` before the next `saveGameState()` call in the same tick. The 50k+ population state never persisted; reloads bypassed the wall.
+**Cause:** The trigger sequence assumed saves would happen "later" but the same tick re-runs through the save path immediately.
+**Lesson:** When disabling persistence, persist the trigger-causing state first, then disable.
+**Rule:** "Save once with the trigger state, then disable saves."
+
+### #12 — Cross-phase state writes must precede chapter cards
+**Problem:** Bank-click started the II·CAPITAL chapter card; `setPhase(phases.CITY)` ran at midpoint (~600ms in). A reload during that window left `PHASE_KEY = INDUSTRY` while bank.purchased was already saved — player stranded in Phase 1.
+**Cause:** Chapter cards are visual transitions; cross-phase state transitions need to commit before the visual.
+**Lesson:** localStorage writes that affect which phase the player loads into must happen at the click moment, not during the card animation.
+**Rule:** "PHASE_KEY and cross-phase transfer keys are written synchronously at the trigger, never deferred to chapter card midpoints."
+
+### #13 — Animation features need a falsifiable trigger condition
+**Problem:** Factory pause-on-idle in Phase 2 used `netStarChangePerSecond <= 0` as the idle signal. The factory's base +1680/s made the condition essentially unreachable; the feature shipped but never visibly fired.
+**Cause:** The trigger condition wasn't validated against actual gameplay numbers.
+**Lesson:** Before shipping an animation that depends on a game-state condition, verify the condition can actually be reached in normal play.
+**Rule:** "If a feature triggers on a numeric threshold, sanity-check the threshold against the relevant base values before shipping."
+
+### #14 — setInterval keeps running behind a "permanent" overlay
+**Problem:** Phase 2's WAR card was a never-resolving Promise (the wall), but `logicInterval` and `fastUiInterval` continued ticking behind it — population, stars, science kept incrementing invisibly.
+**Cause:** The overlay was visual-only; the underlying loops were not stopped.
+**Lesson:** A "permanent" UI state must also stop the underlying simulation, not just hide it.
+**Rule:** "When triggering a wall/end state, clear all intervals and timers explicitly."
+
 ## Rules Checklist
 - [ ] Never bump version without updating all files in the checklist
 - [ ] Keep modules focused — one concern per file
@@ -73,3 +97,7 @@
 - [ ] If a rate is displayed as "per second", ensure it's actually applied per second
 - [ ] All balance-affecting game logic in the same tick
 - [ ] Every addEventListener in init() requires a matching removeEventListener in teardown()
+- [ ] Save once with the trigger state, then disable saves
+- [ ] Cross-phase localStorage writes happen synchronously at the trigger, not at chapter card midpoints
+- [ ] Sanity-check numeric trigger conditions against actual game values before shipping
+- [ ] Clear all intervals/timers when triggering wall/end states

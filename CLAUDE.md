@@ -78,6 +78,12 @@ rock-paper-infinity/
 - Consumption: main drained first → reserve as backup
 - Refund: decrement level first, then `cost() * refundRate`
 
+### Chapter cards
+- Single module: `src/chapterCard.js`. Always invoke via `playChapterCard({ roman, title, mode, onMidpoint })`.
+- Use `mode: 'to-come'` for unimplemented chapters — the promise never resolves.
+- State transitions across phases happen inside the `onMidpoint` callback during the card's hold phase.
+- Exception: cross-phase localStorage writes (e.g. `rpi-stars`, `PHASE_KEY`) should happen BEFORE the card starts so a reload during the card lands the player in the correct state.
+
 ## Design Principles
 - **Icons over text** — Use icons instead of labels. The UI should feel like a puzzle to discover.
 - **Clean and minimal** — Less is more. No unnecessary decoration or clutter.
@@ -88,6 +94,8 @@ rock-paper-infinity/
 - **Discreet, not distracting** — Animations should be subtle and calm. No looping attention-grabbers on UI elements. One-shot animations are OK for state changes; constant blinking/pulsing is not. The game's visual tone is clean and quiet.
 - **Directional clarity** — Animations that represent a process (like a factory) must have clear direction. Input → process → output. Think conveyor belt, not chaos. The player should read the flow at a glance.
 - **Tone plates, not lines** — Use background color areas with subtle shadows for structure. Never use visible border lines for layout. Lines are only acceptable as super-discreet dividers (1px, very low contrast). Containers should feel like floating cards, not boxed-in frames.
+- **Tooltips render icon and Roman cost only.** No descriptive text. If a feature requires explanation, the feature is wrong, not the tooltip.
+- **Animations that represent ongoing process loop only while the process is live.** Animations for state changes are one-shot. Decorative pulse loops on UI elements are forbidden.
 
 ## Game Design Taxonomy
 

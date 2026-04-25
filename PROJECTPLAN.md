@@ -41,7 +41,7 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 ## Phase 17: Code Quality (v1.5.0 → v1.8.0)
 - [x] Split `src/phase1/index.js` into smaller modules — extracted rates.js, cost-visual.js, countdown.js, persistence.js (v1.8.0)
 - [x] Centralize localStorage key constants (done in `src/constants.js`, v1.4.0)
-- [ ] Add proper error handling for save/load
+- [x] Add proper error handling for save/load (v1.9.0)
 - [x] Improve test coverage — 24 tests total: roman.js, rates.js, persistence.js (v1.8.0)
 - [x] Set up Jest ESM support — `--experimental-vm-modules`, `jest.config.js` (v1.8.0)
 - [x] Unify icon system — both phases now use Lucide CDN (v1.5.0)
@@ -65,7 +65,18 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [x] **P2: Mobile responsiveness** — Building slots, buttons, icons, sliders all responsive 320px–1024px (v1.8.0)
 - [ ] **P2: "Code Processor" upgrade** — Unlockable upgrade that animates transition from icon-only UI to icon+text labels. Gives in-world justification for Phase 2's text-heavy UI.
 
-## Phase 19: Future Phases
+## Phase 19: v1.9.0 Polish Release
+- [x] Chapter card transition system (0→I, I→II, II→III to-come)
+- [x] Phase 2 progression rework — every unlock has a tease
+- [x] Phase 1 Quantum Foam tease before factory unlock
+- [x] Text discipline — drop tooltip descriptions, drop industry parenthetical
+- [x] Phase 2 animation reliability — competitor pulse settled, factory pause attempted then reverted (deemed dead code)
+- [x] Save/load hardening — schema version, silent corruption fallback
+- [x] Critical fixes: WAR wall persistence, Bank-click reload trap, Phase 2 ticks stop on WAR
+- [x] Repo cleanup — *.png in .gitignore
+- [ ] GitHub Pages deployment (Task 20)
+
+## Phase 20: Future Phases
 - [ ] Phase 3: WAR (defined in gamePhase.js but not implemented)
   - [ ] Factory smoke → environmental impact mechanic (pollution meter, climate consequences)
 - [ ] Phase 4: ESCAPE (defined in gamePhase.js but not implemented)

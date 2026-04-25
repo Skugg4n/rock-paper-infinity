@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.9.0 - 2026-04-25
+
+### New Features
+- **Chapter card transitions** — Bombastic fade-to-white card with bold condensed block-letter typography (Bebas Neue). Plays at game start (`I · TRIVIAL`), on Bank commit (`I → II · CAPITAL`), and at 50k population in Phase 2 (`II → III · WAR · to come`). The III · WAR card ends on a black wall — game pauses there until Phase 3 is built.
+- **Past-threshold WAR wall** — Saves loaded already past 50k pop land directly on the WAR wall on init. The state is persisted before saves are disabled, so the wall is replay-safe across reloads.
+
+### Improvements
+- **Phase 2 progression** — Every unlock now has a preceding tease. Land Expansion teased earlier (750), Megastructure (2500), Land Expansion 2 (7500). Competitor island moved from 50k to 40k pop spawn — gives the player a mystery beat before the WAR card reveals at 50k.
+- **Phase 1 Quantum Foam tease** — Foam appears in a locked/dim state when the factory becomes purchaseable, instead of popping fully formed only after factory purchase.
+- **Text discipline** — Tooltip descriptions removed entirely from Phase 1. Phase 2 "Unlock" prefixes stripped. Stars-per-person no longer shows the (industry: X.X) parenthetical.
+- **Animation reliability** — Competitor island no longer pulses indefinitely; fades in once at 40k pop and sits still until WAR card.
+- **Save/load hardening** — All saves now carry a `schemaVersion` field. Corrupt or future-versioned saves fall back silently to fresh state. `QuotaExceededError` no longer crashes init. Phase 2 persistence extracted to `src/phase2/persistence.js` mirroring Phase 1.
+
+### Critical fixes (during release)
+- **WAR wall persistence** — The 50k+ population state now saves once before saves are disabled, so reload re-fires the wall correctly.
+- **Bank-click reload trap** — `PHASE_KEY` is now persisted at bank-click time, not at chapter-card midpoint, so reloading during the transition card no longer strands the player in Phase 1 with the bank already purchased.
+- **Phase 2 ticks stop on WAR** — Logic and UI intervals are cleared when the WAR card fires, so the simulation actually halts behind the wall.
+
+### Reverted
+- **Factory pause-on-idle** (initially shipped as Task 12) was removed: the trigger condition (`netStarChangePerSecond ≤ 0`) almost never fires given the factory's +1680/s base output, making the feature dead code. Better to acknowledge the factory always runs.
+
+### Cleanup
+- `.gitignore` ignores `*.png` artifacts from Playwright sessions.
+- Bebas Neue font added (Google Fonts).
+- `vision.md` added — codifies the chapter arc, design beliefs, and non-goals as the project's source of truth.
+
+### Tests
+- Test count rises from 24 to 44. New suites: `chapterCard.test.js`, `phase2/persistence.test.js`. Phase 1 persistence extended.
+
+### Deployment
+- Prepared for GitHub Pages deployment (Task 20-21 of the v1.9.0 plan).
+
 ## v1.8.0 - 2026-03-01
 
 ### Code Quality

@@ -20,6 +20,17 @@ Rock Paper Infinity is a browser-based incremental game that starts with the cla
 - Balance workers between star production and scientific research
 - Expand your city with housing, commerce, and districts
 
+## Chapters
+
+The game is structured around four chapters that unfold as you progress:
+
+- **I · TRIVIAL** — Industry phase. RPS mini-game, upgrades, factory.
+- **II · CAPITAL** — City phase. Civilization building, population, resources.
+- **III · WAR** — Coming soon. (Foreshadowed by the competitor island at 40k+ population.)
+- **IV · ESCAPE** — Coming soon.
+
+A bombastic chapter card plays at each transition. See [vision.md](vision.md) for the full arc and design philosophy.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -47,22 +58,28 @@ Rock Paper Infinity is a browser-based incremental game that starts with the cla
 
 ```
 rock-paper-infinity/
+├── index.html                # Single-page shell: both phase containers + shared elements
+├── stage-2.html              # Redirect → index.html (backwards compat)
+├── main.js                   # Bootstrap: loads icons, detects phase, calls setPhase()
+├── style.css                 # Shared styles + Phase 1 styles
+├── style-stage2.css          # Phase 2 styles (scoped with #phase-city for conflicts)
+├── roman.js                  # Roman numeral utility (ES module)
+├── jest.config.js            # Jest config: native ESM, no transform
 ├── src/
+│   ├── constants.js          # Centralized magic numbers + localStorage keys
+│   ├── version.js            # VERSION constant
+│   ├── gamePhase.js          # Phase state machine: show/hide containers, persist to localStorage
+│   ├── icons.js              # SVG icon preloading and caching (Phase 1 only)
+│   ├── chapterCard.js        # Chapter card transition animations
 │   ├── phase1/
-│   │   └── index.js          # Stage 1 game logic
-│   ├── phase2/
-│   │   └── index.js          # Stage 2 game logic
-│   ├── gamePhase.js          # Phase management & routing
-│   ├── icons.js              # SVG icon preloading & caching
-│   ├── constants.js          # Game constants
-│   └── version.js            # Version number
-├── graphics/                 # SVG icon assets
-├── index.html                # Stage 1 entry point
-├── stage-2.html              # Stage 2 entry point
-├── main.js                   # Bootstrap script
-├── style.css                 # Stage 1 styles
-├── style-stage2.css          # Stage 2 styles
-├── roman.js                  # Roman numeral utility
+│   │   ├── index.js          # Phase 1 orchestrator: init, teardown, upgrades, UI
+│   │   ├── rates.js          # Pure calculations: getSPS, getEPS, getVisibleDots, formatCount
+│   │   ├── cost-visual.js    # Tally SVGs + Roman numeral cost display
+│   │   ├── countdown.js      # RPS countdown animation
+│   │   └── persistence.js    # Game state serialization/deserialization
+│   └── phase2/
+│       ├── index.js          # Phase 2 game logic
+│       └── persistence.js    # Phase 2 state serialization/deserialization
 ├── package.json              # Dependencies & scripts
 ├── CHANGELOG.md              # Version history
 └── README.md                 # This file
@@ -149,7 +166,7 @@ ISC License
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-Current Version: **v1.4.0**
+Current Version: **v1.9.0**
 
 ---
 
