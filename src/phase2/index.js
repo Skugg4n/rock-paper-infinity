@@ -516,6 +516,8 @@ export function init() {
                   _warCardTriggered = true;
                   saveGameState(); // persist 50k+ state before disabling saves
                   savingEnabled = false;
+                  if (logicInterval) clearInterval(logicInterval);
+                  if (fastUiInterval) clearInterval(fastUiInterval);
                   playChapterCard({
                       roman: 'III',
                       title: 'WAR',
@@ -685,6 +687,8 @@ export function init() {
                 if (gameState.population >= 50000) {
                     _warCardTriggered = true;
                     savingEnabled = false;
+                    if (logicInterval) clearInterval(logicInterval);
+                    if (fastUiInterval) clearInterval(fastUiInterval);
                     playChapterCard({
                         roman: 'III',
                         title: 'WAR',
