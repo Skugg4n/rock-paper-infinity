@@ -7,12 +7,18 @@
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "lint": "eslint ."
   },
-  "keywords": ["game", "incremental", "idle", "rock-paper-scissors"],
+  "keywords": [
+    "game",
+    "incremental",
+    "idle",
+    "rock-paper-scissors"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
   "devDependencies": {
     "eslint": "^9.33.0",
-    "jest": "^30.0.5"
+    "jest": "^30.0.5",
+    "jsdom": "^25.0.1"
   }
 }
