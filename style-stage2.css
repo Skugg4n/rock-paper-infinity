@@ -418,12 +418,6 @@ input[type=range]::-webkit-slider-thumb {
 .enemy-factory {
     background: linear-gradient(135deg, #fef2f2, #fee2e2);
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
-    animation: enemy-pulse 3s ease-in-out infinite;
-}
-
-@keyframes enemy-pulse {
-    0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.15); }
-    50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.25); }
 }
 
 #competitor-island {
