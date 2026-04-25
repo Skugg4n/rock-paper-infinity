@@ -82,3 +82,11 @@ See git history (49 merged PRs). Core game loop, upgrade system, Phase 2 city bu
 - [ ] Phase 4: ESCAPE (defined in gamePhase.js but not implemented)
   - [ ] Environmental degradation forces player to escape to space
 - [ ] Accessibility improvements (keyboard navigation, ARIA labels)
+
+## Phase 20: v1.10.0 candidates (from v1.9.0 PDF feedback)
+
+These were flagged by the user but deferred from v1.9.0 because they require either substantial design dialogue or clarifying input.
+
+- [ ] **Phase 1 + Phase 2 factory animations** — current animations described as "hackiga, otydliga, fula". Needs new design direction. The Phase 1 conveyor and the Phase 2 rising-icons smoke both fall under this.
+- [ ] **Color palette overhaul** — drop Claude-primary colors (red `#ef4444`, green `#16a34a`/`+1,650/s` text, yellow stars, blue science atom) for a more sophisticated, monochrome-leaning palette consistent with vision.md "Minimalist · Clean · Unexpected". Goes deep — every status text, icon tint, and accent.
+- [ ] **"Win-ring" animation** — user feedback ended mid-sentence ("När spelaren vinner. Låt ringen runt"); needs clarification before implementation. Likely intent: when the player wins an RPS round, animate the ring around the chosen button (or around the winner). Confirm before building.
