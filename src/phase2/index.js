@@ -514,6 +514,7 @@ export function init() {
               // III·WAR chapter card at 50k population
               if (gameState.population >= 50000 && !_warCardTriggered) {
                   _warCardTriggered = true;
+                  saveGameState(); // persist 50k+ state before disabling saves
                   savingEnabled = false;
                   playChapterCard({
                       roman: 'III',
