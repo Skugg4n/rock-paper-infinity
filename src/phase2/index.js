@@ -127,6 +127,7 @@ export function init() {
 
           ui.menuBtn.addEventListener('click', () => ui.menuDropdown.classList.toggle('hidden'), { signal });
           ui.resetBtn.addEventListener('click', () => {
+              if (!confirm('Reset all progress? This cannot be undone.')) return;
               savingEnabled = false;
               window.removeEventListener('beforeunload', beforeUnloadHandler);
               clearInterval(logicInterval);

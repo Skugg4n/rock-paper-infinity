@@ -734,6 +734,7 @@ const uiState = {
         }
 
         function resetGame() {
+            if (!confirm('Reset all progress? This cannot be undone.')) return;
             stopAutoPlayInterval();
             autoPlayWantsToRun = false;
             localStorage.removeItem(SAVE_KEY);
