@@ -171,15 +171,15 @@
     }
 }
 
-/* Scale down building icons on mobile */
-.building-slot .building [data-lucide],
-.building-slot .building svg:not(.progress-ring) {
+/* Scale building main icons on mobile — direct child only */
+.building-slot .building > [data-lucide],
+.building-slot .building > svg:not(.progress-ring) {
     width: 24px;
     height: 24px;
 }
 @media (min-width: 640px) {
-    .building-slot .building [data-lucide],
-    .building-slot .building svg:not(.progress-ring) {
+    .building-slot .building > [data-lucide],
+    .building-slot .building > svg:not(.progress-ring) {
         width: 40px;
         height: 40px;
     }

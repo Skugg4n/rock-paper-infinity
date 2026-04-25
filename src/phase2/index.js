@@ -209,10 +209,10 @@ export function init() {
                   } else {
                       iconHTML = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
                   }
-                  content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="4" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #94a3b8;"></circle></svg>${iconHTML}`;
+                  content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="2" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #94a3b8;"></circle></svg>${iconHTML}`;
               } else if (building.type === 'factory') {
                   content = `<div class="relative flex items-center justify-center w-full h-full">
-                      <i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>
+                      <i data-lucide="${icon}" class="w-6 h-6 sm:w-10 sm:h-10 text-slate-600"></i>
                       <div class="factory-smoke">
                           <i data-lucide="scissors" class="smoke-icon"></i>
                           <i data-lucide="gem" class="smoke-icon delay-1"></i>
