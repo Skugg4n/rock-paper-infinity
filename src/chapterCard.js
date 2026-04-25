@@ -1,4 +1,4 @@
-const PHASE_DURATIONS = {
+export const PHASE_DURATIONS = {
     veilIn: 300,
     titleIn: 300,
     hold: 1000,
