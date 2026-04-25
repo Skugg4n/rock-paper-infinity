@@ -224,7 +224,7 @@ export function init() {
               }
               
               const upkeepCost = building.upkeep || (building.type === 'bank' ? 30 : 0);
-              const upkeepHTML = upkeepCost ? `<div class="building-upkeep"><span>-${upkeepCost}</span><i data-lucide="star" class="w-3 h-3 text-slate-300"></i></div>` : '';
+              const upkeepHTML = upkeepCost ? `<div class="building-upkeep"><span>-${upkeepCost}/s</span><i data-lucide="star" class="w-3 h-3 text-slate-300"></i></div>` : '';
   
               return `<div class="${classes}">${content}${upkeepHTML}${actionButtons}</div>`;
           }
