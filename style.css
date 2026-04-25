@@ -272,3 +272,64 @@ body {
     background-color: #67e8f9;
     transition: height 0.3s ease-in-out;
 }
+
+/* Chapter card transition (vision §"Chapter transitions") */
+.chapter-card {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chapter-card.is-active {
+    pointer-events: auto;
+}
+
+.chapter-card__veil {
+    position: absolute;
+    inset: 0;
+    background: #ffffff;
+    opacity: 0;
+    transition: opacity 300ms ease, background 300ms ease;
+}
+
+.chapter-card__content {
+    position: relative;
+    text-align: center;
+    color: #0f172a;
+    opacity: 0;
+    transition: opacity 300ms ease, color 300ms ease;
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    letter-spacing: 0.04em;
+}
+
+.chapter-card__roman {
+    font-size: clamp(28px, 6vw, 56px);
+    font-weight: 400;
+    opacity: 0.7;
+    margin-bottom: 0.5em;
+}
+
+.chapter-card__title {
+    font-size: clamp(64px, 14vw, 160px);
+    font-weight: 400;
+    line-height: 0.9;
+}
+
+.chapter-card__suffix {
+    margin-top: 1em;
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: 300;
+    letter-spacing: 0.12em;
+}
+
+.chapter-card.is-to-come .chapter-card__veil {
+    background: #000000;
+}
+
+.chapter-card.is-to-come .chapter-card__content {
+    color: #ffffff;
+}

@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rock, Paper, Infinity</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style id="dynamic-styles"></style> <!-- For dynamic animation timings -->
@@ -293,6 +296,15 @@
 
     <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.8.0</div>
     <div id="tooltip"></div>
+
+    <div id="chapter-card" class="chapter-card" aria-hidden="true">
+      <div class="chapter-card__veil"></div>
+      <div class="chapter-card__content">
+        <div class="chapter-card__roman"></div>
+        <div class="chapter-card__title"></div>
+        <div class="chapter-card__suffix" hidden>to come</div>
+      </div>
+    </div>
 
     <script type="module" src="main.js"></script>
 </body>
