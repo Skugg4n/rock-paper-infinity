@@ -223,10 +223,7 @@ export function init() {
                    content = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600"></i>`;
               }
               
-              const upkeepCost = building.upkeep || (building.type === 'bank' ? 30 : 0);
-              const upkeepHTML = upkeepCost ? `<div class="building-upkeep"><span>-${upkeepCost}/s</span><i data-lucide="star" class="w-3 h-3 text-slate-300"></i></div>` : '';
-  
-              return `<div class="${classes}">${content}${upkeepHTML}${actionButtons}</div>`;
+              return `<div class="${classes}">${content}${actionButtons}</div>`;
           }
           
           function renderGridSlot(index) {

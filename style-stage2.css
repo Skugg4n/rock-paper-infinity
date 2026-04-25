@@ -150,28 +150,6 @@
     box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.3), 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
-.building-upkeep {
-    position: absolute;
-    bottom: 2px;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    font-size: 9px;
-    font-family: monospace;
-    color: #475569;
-    background: rgba(255, 255, 255, 0.7);
-    padding: 1px 3px;
-    border-radius: 4px;
-}
-@media (min-width: 640px) {
-    .building-upkeep {
-        bottom: 4px;
-        gap: 4px;
-        font-size: 12px;
-        padding: 1px 4px;
-    }
-}
-
 /* Scale building main icons on mobile — direct child only */
 .building-slot .building > [data-lucide],
 .building-slot .building > svg:not(.progress-ring) {
