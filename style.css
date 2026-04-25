@@ -251,6 +251,12 @@ body {
     transition: opacity 0.4s ease;
 }
 
+.is-locked {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(0.7);
+}
+
 #collapse-foam-btn {
     position: relative;
     background-color: #e2e8f0;

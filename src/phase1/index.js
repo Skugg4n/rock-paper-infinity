@@ -539,6 +539,19 @@ function scheduleUIUpdate() {
                 }
             }
             if (!firstUpgradeUpdateDone) firstUpgradeUpdateDone = true;
+
+            // Tease Quantum Foam before factory is purchased:
+            // show locked (greyed) when factory is purchaseable, show fully when purchased.
+            if (upgrades.mergeGameBoard.purchased) {
+                // mergeToMetaBoard() already removes 'hidden'; just ensure no locked state
+                quantumFoamContainer.classList.remove('is-locked');
+            } else if (factoryReady) {
+                quantumFoamContainer.classList.remove('hidden');
+                quantumFoamContainer.classList.add('is-locked');
+            } else {
+                quantumFoamContainer.classList.add('hidden');
+                quantumFoamContainer.classList.remove('is-locked');
+            }
         }
 
 const uiState = {
@@ -734,6 +747,7 @@ const uiState = {
             gameSpeed = 1;
             isMetaBoardActive = false;
             quantumFoamContainer.classList.add('hidden');
+            quantumFoamContainer.classList.remove('is-locked');
             gameBoards = [];
             gameBoardContainer.className = 'pointer-events-none flex-grow grid grid-cols-1 items-center justify-center gap-4';
             gameBoardContainer.innerHTML = '';
