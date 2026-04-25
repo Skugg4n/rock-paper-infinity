@@ -1,12 +1,14 @@
 /* global lucide */
 
 import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
+import { playChapterCard } from '../chapterCard.js';
 
 let logicInterval;
 let fastUiInterval;
 let savingEnabled = true;
 let beforeUnloadHandler;
 let abortController;
+let _warCardTriggered = false;
 
 export function init() {
           abortController = new AbortController();
@@ -513,6 +515,18 @@ export function init() {
                   });
               }
 
+              // III·WAR chapter card at 50k population
+              if (gameState.population >= 50000 && !_warCardTriggered) {
+                  _warCardTriggered = true;
+                  savingEnabled = false;
+                  playChapterCard({
+                      roman: 'III',
+                      title: 'WAR',
+                      mode: 'to-come',
+                      onMidpoint: () => { /* saving already disabled above */ },
+                  });
+              }
+
               updateAllUI();
               saveGameState();
           }
@@ -671,6 +685,17 @@ export function init() {
                     ui.competitorIsland.classList.add('visible');
                     scheduleIconRefresh();
                 }
+                // Past-threshold load: player closed the tab on the WAR wall and came back.
+                if (gameState.population >= 50000) {
+                    _warCardTriggered = true;
+                    savingEnabled = false;
+                    playChapterCard({
+                        roman: 'III',
+                        title: 'WAR',
+                        mode: 'to-come',
+                        onMidpoint: () => { /* saving already disabled */ },
+                    });
+                }
                 initialLoadDone = true;
                 logicTick(true);
                 updateAllUI();
@@ -696,4 +721,6 @@ export function teardown() {
   delete window.debug_addPopulation;
   delete window.sellBuilding;
   delete window.upgradeBuilding;
+  _warCardTriggered = false;
+  savingEnabled = true;
 }
