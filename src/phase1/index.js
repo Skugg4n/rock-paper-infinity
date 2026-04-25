@@ -939,20 +939,19 @@ const uiState = {
         function manageAutoPlay() {
             if (autoPlayWantsToRun && !autoPlayInterval && hasEnergy()) {
                 choiceButtons.forEach(btn => btn.disabled = true);
-                upgrades.autoPlay.element.classList.add('toggled', 'pulse');
+                upgrades.autoPlay.element.classList.add('toggled');
                 lastTick = performance.now();
                 restartAutoPlay();
             } else if (!autoPlayWantsToRun && autoPlayInterval) {
                 stopAutoPlayInterval();
-                upgrades.autoPlay.element.classList.remove('toggled', 'pulse');
+                upgrades.autoPlay.element.classList.remove('toggled');
             }
         }
-        
+
         function stopAutoPlayInterval() {
             if (!autoPlayInterval) return;
             cancelAnimationFrame(autoPlayInterval);
             autoPlayInterval = null;
-            upgrades.autoPlay.element.classList.remove('pulse');
             if (!isMetaBoardActive) {
                 choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
                 gameBoards.forEach(board => {
