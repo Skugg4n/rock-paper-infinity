@@ -6,6 +6,18 @@ import { playChapterCard } from './src/chapterCard.js';
 
 document.getElementById('version-info').textContent = VERSION;
 
+// Hide debug menus unless ?debug is in the URL
+if (!window.location.search.includes('debug')) {
+  const debugMenu = document.getElementById('debug-menu');
+  const debugTrigger = document.getElementById('debug-trigger');
+  const p2DebugMenu = document.getElementById('p2-debug-menu');
+  const p2DebugToggle = document.getElementById('debug-toggle-btn');
+  if (debugMenu) debugMenu.style.display = 'none';
+  if (debugTrigger) debugTrigger.style.display = 'none';
+  if (p2DebugMenu) p2DebugMenu.style.display = 'none';
+  if (p2DebugToggle) p2DebugToggle.style.display = 'none';
+}
+
 async function bootstrap() {
   try {
     await preloadIcons();
