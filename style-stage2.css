@@ -212,6 +212,13 @@
 
 .building-action-btn > * { pointer-events: none; }
 .building-action-btn:hover .tooltip { --tooltip-opacity: 1; }
+/* Sticky tooltip: delay hide by 250ms on hover-out */
+.building-action-btn .tooltip {
+    transition: opacity 0.15s ease 0ms;
+}
+.building-action-btn:not(:hover) .tooltip {
+    transition: opacity 0.15s ease 250ms;
+}
 
 .sell-btn {
     top: -8px;
