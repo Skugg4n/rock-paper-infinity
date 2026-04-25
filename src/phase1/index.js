@@ -163,8 +163,6 @@ const resetBtn = document.getElementById('reset-btn');
             }
         };
 
-const upgradeDescriptions = {};
-
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
 
@@ -980,14 +978,7 @@ const uiState = {
             }
 
             const cost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
-            const description = upgradeDescriptions[key];
-            let tooltipHtml = '';
-
-            if (description) {
-                tooltipHtml += `<div class="text-xs text-slate-100 leading-snug mb-1">${description}</div>`;
-            }
-
-            tooltipHtml += generateCostVisual(cost);
+            const tooltipHtml = generateCostVisual(cost);
             if (!tooltipHtml.trim()) return;
             tooltip.innerHTML = tooltipHtml;
 
