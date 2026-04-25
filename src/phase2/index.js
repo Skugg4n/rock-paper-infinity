@@ -11,6 +11,11 @@ let beforeUnloadHandler;
 let abortController;
 let _warCardTriggered = false;
 
+// Smooth counter rolling — lerp displayed values toward actual values each fastUiTick
+let _displayedStars = 0;
+let _displayedScience = 0;
+const COUNTER_LERP = 0.18;
+
 export function init() {
           abortController = new AbortController();
           const signal = abortController.signal;
@@ -533,8 +538,13 @@ export function init() {
           }
   
           function fastUiTick() {
-              ui.starCount.textContent = Math.floor(gameState.stars).toLocaleString('en-US');
-              ui.scienceCount.textContent = Math.floor(gameState.science).toLocaleString('en-US');
+              // Smooth counter rolling: lerp toward actual values for a "spinning numbers" effect
+              _displayedStars += (gameState.stars - _displayedStars) * COUNTER_LERP;
+              _displayedScience += (gameState.science - _displayedScience) * COUNTER_LERP;
+              if (Math.abs(gameState.stars - _displayedStars) < 0.5) _displayedStars = gameState.stars;
+              if (Math.abs(gameState.science - _displayedScience) < 0.5) _displayedScience = gameState.science;
+              ui.starCount.textContent = Math.round(_displayedStars).toLocaleString('en-US');
+              ui.scienceCount.textContent = Math.round(_displayedScience).toLocaleString('en-US');
               ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
 
               ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('en-US')}/s`;
@@ -723,4 +733,6 @@ export function teardown() {
   delete window.upgradeBuilding;
   _warCardTriggered = false;
   savingEnabled = true;
+  _displayedStars = 0;
+  _displayedScience = 0;
 }
