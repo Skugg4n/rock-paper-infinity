@@ -1,5 +1,6 @@
 import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
+import { playChapterCard } from "../chapterCard.js";
 import { PHASE1_CONSTANTS } from "../constants.js";
 import { getSPS, getEPS, getVisibleDots, formatCount } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
@@ -153,7 +154,11 @@ const resetBtn = document.getElementById('reset-btn');
                 unlockCondition: () => upgrades.mergeGameBoard.purchased,
                 purchase: function() {
                     localStorage.setItem('rpi-stars', String(starBalance));
-                    setPhase(phases.CITY);
+                    playChapterCard({
+                        roman: 'II',
+                        title: 'CAPITAL',
+                        onMidpoint: () => setPhase(phases.CITY),
+                    });
                 }
             }
         };
