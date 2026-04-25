@@ -557,12 +557,12 @@ export function init() {
                   ui.suppliesBar.classList.remove('deficit');
                   ui.suppliesBar.style.left = '50%';
                   ui.suppliesBar.style.right = 'auto';
-                  ui.suppliesBar.style.backgroundColor = '#22c55e';
+                  ui.suppliesBar.style.backgroundColor = '#64748b';
               } else {
                   ui.suppliesBar.classList.add('deficit');
                   ui.suppliesBar.style.left = 'auto';
                   ui.suppliesBar.style.right = '50%';
-                  ui.suppliesBar.style.backgroundColor = '#ef4444';
+                  ui.suppliesBar.style.backgroundColor = '#94a3b8';
               }
 
               if (netSupplyChange === 0) {

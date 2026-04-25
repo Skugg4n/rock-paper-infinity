@@ -209,7 +209,7 @@ body {
     top: 50%;
     width: 14px;
     height: 14px;
-    color: #eab308;
+    color: #b8860b;
     opacity: 0;
     animation: convey-out 3.6s linear infinite;
 }

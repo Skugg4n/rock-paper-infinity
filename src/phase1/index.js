@@ -608,8 +608,8 @@ const uiState = {
         }
 
         function setEnergyEmpty(empty) {
-            energyFillEl.classList.toggle('bg-red-500', empty);
-            energyFillEl.classList.toggle('bg-emerald-500', !empty);
+            energyFillEl.classList.toggle('bg-slate-700', empty);
+            energyFillEl.classList.toggle('bg-slate-500', !empty);
         }
 
         function updateUI() {
