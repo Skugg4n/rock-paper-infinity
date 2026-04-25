@@ -350,6 +350,12 @@ input[type=range]::-webkit-slider-thumb {
 .factory-smoke .smoke-icon.delay-2 { animation-delay: 1.6s; }
 .factory-smoke .smoke-icon.delay-3 { animation-delay: 2.4s; }
 
+/* Factory idle state — pause conveyor and dim icons */
+.building.factory.is-idle .factory-smoke .smoke-icon {
+    animation-play-state: paused;
+    opacity: 0.15;
+}
+
 @keyframes p2-convey {
     0%    { transform: translate(0, -50%); opacity: 0; }
     8%    { transform: translate(0, -50%); opacity: 0.6; }
