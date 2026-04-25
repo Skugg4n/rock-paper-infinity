@@ -1,7 +1,7 @@
 import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
 import { playChapterCard } from "../chapterCard.js";
-import { PHASE1_CONSTANTS, PHASE_KEY } from "../constants.js";
+import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { getSPS, getEPS, getVisibleDots, formatCount } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
@@ -738,6 +738,9 @@ const uiState = {
             stopAutoPlayInterval();
             autoPlayWantsToRun = false;
             localStorage.removeItem(SAVE_KEY);
+            localStorage.removeItem(PHASE2_CONSTANTS.SAVE_KEY);
+            localStorage.removeItem(PHASE2_CONSTANTS.STARS_TRANSFER_KEY);
+            localStorage.removeItem(PHASE_KEY);
             starBalance = 0;
             totalStarsEarned = 0;
             totalGamesPlayed = 0;
