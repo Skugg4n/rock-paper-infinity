@@ -39,7 +39,7 @@
 
 #phase-city .btn:disabled {
     opacity: 0.4;
-    cursor: not-allowed;
+    cursor: default;
     background-color: #f1f5f9;
 }
 
@@ -89,8 +89,9 @@
 #phase-city .upgrade-btn:hover:not(:disabled) { background-color: #94a3b8; }
 #phase-city .upgrade-btn:disabled {
     background-color: #94a3b8 !important;
-    cursor: not-allowed;
+    cursor: default;
 }
+#phase-city button:disabled { cursor: default; }
 
 #phase-city .upgrade-btn.upgrade-new {
     animation: upgrade-flash 0.5s ease-out;
