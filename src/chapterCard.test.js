@@ -82,9 +82,7 @@ test('onMidpoint fires at start of hold phase', async () => {
         onMidpoint: () => { firedAt = Date.now() - startTime; },
     });
     await jest.advanceTimersByTimeAsync(700);
-    expect(firedAt).not.toBeNull();
-    expect(firedAt).toBeGreaterThanOrEqual(550); // veilIn(300) + titleIn(300) -50ms slack
-    expect(firedAt).toBeLessThanOrEqual(700);
+    expect(firedAt).toBe(PHASE_DURATIONS.veilIn + PHASE_DURATIONS.titleIn);
     await jest.advanceTimersByTimeAsync(2000);
     await promise;
 });
@@ -100,6 +98,35 @@ test('onMidpoint errors do not break the animation', async () => {
     promise.then(() => { resolved = true; });
     await jest.advanceTimersByTimeAsync(2300);
     expect(resolved).toBe(true);
-    expect(errorSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('chapterCard onMidpoint'),
+        expect.any(Error),
+    );
     errorSpy.mockRestore();
+});
+
+test('second call while first is active is ignored', async () => {
+    const first = playChapterCard({ roman: 'I', title: 'TRIVIAL' });
+    let secondMidpointFired = false;
+    const second = playChapterCard({
+        roman: 'II',
+        title: 'CAPITAL',
+        onMidpoint: () => { secondMidpointFired = true; },
+    });
+    await jest.advanceTimersByTimeAsync(2300);
+    await first;
+    await second;
+    expect(secondMidpointFired).toBe(false);
+    expect(document.querySelector('.chapter-card__title').textContent).toBe('TRIVIAL');
+});
+
+test('to-come mode shows suffix and stays on wall', async () => {
+    const promise = playChapterCard({ roman: 'III', title: 'WAR', mode: 'to-come' });
+    let resolved = false;
+    promise.then(() => { resolved = true; });
+    // Advance past the full normal-mode duration
+    await jest.advanceTimersByTimeAsync(3000);
+    expect(resolved).toBe(false);
+    expect(document.querySelector('.chapter-card__suffix').hidden).toBe(false);
+    expect(document.querySelector('.chapter-card').classList.contains('is-to-come')).toBe(true);
 });
