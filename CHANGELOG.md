@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.9.1 - 2026-04-26
+
+### Polish & Cleanup
+- **Reset confirmation** — Both Phase 1 and Phase 2 now require `confirm()` before wiping progress.
+- **Phase 1 full reset** — Reset now clears all save keys (Phase 1 + Phase 2 + PHASE_KEY), mirroring Phase 2 behavior.
+- **Bank constant** — Phase 1 bank purchase uses `STARS_TRANSFER_KEY` constant instead of a hardcoded string.
+- **icons.js** — Dropped unused `root` parameter from `replaceIcons()`.
+- **Tailwind `hidden` precedence** — Added `.hidden { display: none !important; }` to settle ambiguous `hidden flex` combinations.
+- **Debug menus** — Hidden by default; appear only when `?debug` is in the URL.
+- **Building upkeep** — Shows `-30/s ★` instead of `-30 ★` to clarify it's per-second.
+- **Sell-button tooltip** — 250ms hover-out delay so tooltip doesn't vanish on a hesitant hover.
+- **Mobile energy bars** — Narrowed at <480px to prevent collision with the win-tracker.
+- **Win-ring animation** — One-shot `win-ring-pulse` keyframe plays when `.result-wrapper.winner` is applied. Subtle pop-out → settle. No infinite loop.
+- **Color cleanup** — Dropped Claude-primary chromatic palette (emerald/sky/red/yellow/pink) in favor of slate spectrum. Stars remain the single warm accent (`#b8860b` desaturated gold). Enemy factory loses red glow; sell button loses red hover; upkeep text and unlock-req labels go slate.
+
 ## v1.9.0 - 2026-04-25
 
 ### New Features
