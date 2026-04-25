@@ -44,12 +44,15 @@ Every chapter change uses the same bombastic card. It is the most expensive piec
 4. **Title fades out** (300 ms).
 5. **Fade out white → next scene** (300 ms).
 
+**Typography.** The chapter title is set in a **bold, condensed, block-letter sans-serif** (Bebas Neue, Oswald Black, Barlow Condensed Black, or equivalent). The Roman numeral above is the same family at a lighter weight and smaller size. The card is the only place in the game that uses display typography of this weight; everywhere else, the UI stays light.
+
 **Triggers:**
-- `I → II` fires when the player commits to the Bank in chapter I.
+- **Game start (`0 → I`)** — the very first thing the player sees. Before any UI loads, the chapter card plays through `I · TRIVIAL`. Only after the card resolves does the player land in chapter I.
+- `I → II` fires when the player commits to the Bank in chapter I. The state transfer (Phase 1 teardown, Phase 2 init) happens during the hold phase of the card — the card *is* the bridge.
 - `II → III` fires when the player reaches **50,000 population** in chapter II.
 - Future: `III → IV` fires at the corresponding endgame trigger of chapter III.
 
-**Initial chapter I has no opening card.** The player lands directly in the game; the first card the player ever sees is the one that ends chapter I.
+**Replays.** A returning player who already has a save does not see the opening `0 → I` card again on subsequent loads — they go straight back to wherever they were. The opening card is a first-time experience.
 
 ## The "to come" wall
 
