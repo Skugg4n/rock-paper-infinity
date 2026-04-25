@@ -505,7 +505,7 @@ export function init() {
               }
 
               // Competitor spawn
-              if (gameState.population >= 50000 && !gameState.competitorSpawned) {
+              if (gameState.population >= 40000 && !gameState.competitorSpawned) {
                   gameState.competitorSpawned = true;
                   ui.competitorIsland.classList.remove('hidden');
                   // Trigger fade-in on next frame
