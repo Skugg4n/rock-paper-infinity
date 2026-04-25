@@ -1,7 +1,7 @@
 import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
 import { playChapterCard } from "../chapterCard.js";
-import { PHASE1_CONSTANTS } from "../constants.js";
+import { PHASE1_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { getSPS, getEPS, getVisibleDots, formatCount } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
@@ -154,6 +154,9 @@ const resetBtn = document.getElementById('reset-btn');
                 unlockCondition: () => upgrades.mergeGameBoard.purchased,
                 purchase: function() {
                     localStorage.setItem('rpi-stars', String(starBalance));
+                    // Persist phase change immediately so a reload during the chapter card
+                    // doesn't leave the player stranded in Phase 1 with bank already purchased.
+                    localStorage.setItem(PHASE_KEY, phases.CITY);
                     playChapterCard({
                         roman: 'II',
                         title: 'CAPITAL',
