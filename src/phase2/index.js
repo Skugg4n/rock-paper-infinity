@@ -636,31 +636,29 @@ export function init() {
                 if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
                     gameState.stars -= buildingData.landExpansion.cost;
                     gameState.landExpanded = true;
-                    for (let i = 0; i < 5; i++) gameState.buildings.push(undefined);
-                  const grid = ui.landGrid;
-                  grid.innerHTML = '';
-                  gameState.buildings.forEach((b, i) => {
-                      const slot = document.createElement('div');
-                      slot.className = 'building-slot';
-                      grid.appendChild(slot);
-                      renderGridSlot(i);
-                  });
-              }
-          }, { signal });
+                    const grid = ui.landGrid;
+                    for (let i = 0; i < 5; i++) {
+                        gameState.buildings.push(undefined);
+                        const slot = document.createElement('div');
+                        slot.className = 'building-slot empty';
+                        grid.appendChild(slot);
+                    }
+                    updateAllUI();
+                }
+            }, { signal });
 
           ui.expandLand2Btn.addEventListener('click', () => {
               if (gameState.stars >= buildingData.landExpansion2.cost && !gameState.landExpansion2 && gameState.landExpanded) {
                   gameState.stars -= buildingData.landExpansion2.cost;
                   gameState.landExpansion2 = true;
-                  for (let i = 0; i < 5; i++) gameState.buildings.push(undefined);
                   const grid = ui.landGrid;
-                  grid.innerHTML = '';
-                  gameState.buildings.forEach((b, i) => {
+                  for (let i = 0; i < 5; i++) {
+                      gameState.buildings.push(undefined);
                       const slot = document.createElement('div');
-                      slot.className = 'building-slot';
+                      slot.className = 'building-slot empty';
                       grid.appendChild(slot);
-                      renderGridSlot(i);
-                  });
+                  }
+                  updateAllUI();
               }
           }, { signal });
 
