@@ -790,6 +790,39 @@ const uiState = {
             }
         }
 
+        function fireStarAnimation(sourceEl) {
+            // Spawn a star that flies from the source element to the win-tracker (top-left)
+            const targetEl = winTracker;
+            if (!sourceEl || !targetEl) return;
+            const fromRect = sourceEl.getBoundingClientRect();
+            const toRect = targetEl.getBoundingClientRect();
+
+            // Source: center of the source element
+            const fromX = fromRect.left + fromRect.width / 2 - 12;
+            const fromY = fromRect.top + fromRect.height / 2 - 12;
+
+            // Target: center of win-tracker
+            const toX = toRect.left + toRect.width / 2 - 12;
+            const toY = toRect.top + toRect.height / 2 - 12;
+
+            const star = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            star.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            star.setAttribute('width', '24');
+            star.setAttribute('height', '24');
+            star.setAttribute('viewBox', '0 0 24 24');
+            star.setAttribute('fill', 'currentColor');
+            star.setAttribute('stroke', 'none');
+            star.innerHTML = '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>';
+            star.className = 'star-fly';
+            star.style.setProperty('--from-x', `${fromX}px`);
+            star.style.setProperty('--from-y', `${fromY}px`);
+            star.style.setProperty('--to-x', `${toX}px`);
+            star.style.setProperty('--to-y', `${toY}px`);
+
+            document.body.appendChild(star);
+            star.addEventListener('animationend', () => star.remove(), { once: true });
+        }
+
         function showResult(playerChoice, board, instant = false) {
             const computerChoice = choices[Math.floor(Math.random() * choices.length)];
             let result;
@@ -818,6 +851,11 @@ const uiState = {
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;
                 totalStarsEarned += starGain;
+                // Flying-star animation: only for the first 10 stars earned
+                if (totalStarsEarned <= 10) {
+                    // Source: the player result area on this board
+                    fireStarAnimation(board.playerEl);
+                }
             }
 
             scheduleUIUpdate();
