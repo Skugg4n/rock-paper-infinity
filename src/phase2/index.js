@@ -576,16 +576,11 @@ export function init() {
               ui.supplyConsumption.textContent = `-${supplyConsumption.toLocaleString('en-US')}/s`;
               ui.supplyProduction.textContent = `+${Math.round(supplyProduction).toLocaleString('en-US')}/s`;
   
-              const factoryIdle = (gameState.netStarChangePerSecond || 0) <= 0;
               gameState.buildings.forEach((b) => {
                   if (!b) return;
                   if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
                       const popRing = document.getElementById(`pop-ring-${b.id}`);
                       if (popRing) popRing.style.strokeDashoffset = 113 - ((b.population / b.capacity) * 113);
-                  }
-                  if (b.type === 'factory') {
-                      const factoryEl = ui.landGrid.querySelector('.building.factory');
-                      if (factoryEl) factoryEl.classList.toggle('is-idle', factoryIdle);
                   }
               });
               const gmoPercent = (gameState.gmoLevel / gameState.gmoMaxLevel) * 113;
