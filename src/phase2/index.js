@@ -501,6 +501,7 @@ export function init() {
               // Competitor spawn
               if (gameState.population >= 40000 && !gameState.competitorSpawned) {
                   gameState.competitorSpawned = true;
+                  gameState.competitorSpawnedAt = Date.now();
                   ui.competitorIsland.classList.remove('hidden');
                   // Trigger fade-in on next frame
                   requestAnimationFrame(() => {
@@ -510,7 +511,10 @@ export function init() {
               }
 
               // III·WAR chapter card at 50k population
-              if (gameState.population >= 50000 && !_warCardTriggered) {
+              // Requires competitor island to have been visible for at least 5 seconds
+              const competitorVisibleLongEnough = gameState.competitorSpawned &&
+                  (Date.now() - (gameState.competitorSpawnedAt || 0)) >= 5000;
+              if (gameState.population >= 50000 && !_warCardTriggered && competitorVisibleLongEnough) {
                   _warCardTriggered = true;
                   saveGameState(); // persist 50k+ state before disabling saves
                   savingEnabled = false;
