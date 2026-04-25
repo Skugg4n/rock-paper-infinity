@@ -343,12 +343,12 @@ export function init() {
                   { btn: ui.toolCaseUpgradeBtn, showAt: 25, popReq: 50, flag: 'toolCaseUnlocked' },
                   { btn: ui.gmoUpgradeBtn, showAt: 40, popReq: 75, flag: 'gmoLevel', isMultiLevel: true, maxLevel: gameState.gmoMaxLevel },
                   { btn: ui.urbanismResearchBtn, showAt: 100, popReq: 200, flag: 'urbanismResearched' },
-                  { btn: ui.expandLandBtn, showAt: 500, popReq: 1000, flag: 'landExpanded' },
+                  { btn: ui.expandLandBtn, showAt: 750, popReq: 1000, flag: 'landExpanded' },
                   { btn: ui.carUpgradeBtn, showAt: 250, popReq: 500, flag: 'carUnlocked' },
                   { btn: ui.computerUpgradeBtn, showAt: 500, popReq: 1000, flag: 'computerUnlocked', prereq: 'carUnlocked' },
-                  { btn: ui.megastructureResearchBtn, showAt: 2000, popReq: 5000, flag: 'megastructureResearched'},
+                  { btn: ui.megastructureResearchBtn, showAt: 2500, popReq: 5000, flag: 'megastructureResearched'},
                   { btn: ui.superconductorBtn, showAt: 5000, popReq: 10000, flag: 'superconductorLevel', isMultiLevel: true, maxLevel: superconductorMaxLevel },
-                  { btn: ui.expandLand2Btn, showAt: 5000, popReq: 10000, flag: 'landExpansion2', prereq: 'landExpanded' },
+                  { btn: ui.expandLand2Btn, showAt: 7500, popReq: 10000, flag: 'landExpansion2', prereq: 'landExpanded' },
               ];
 
               let anyUpgradeVisible = false;
