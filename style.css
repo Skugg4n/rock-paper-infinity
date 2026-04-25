@@ -1,3 +1,6 @@
+/* Settle Tailwind hidden/flex class precedence: hidden always wins */
+.hidden { display: none !important; }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     touch-action: manipulation;
