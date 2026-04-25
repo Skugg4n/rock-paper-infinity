@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.10.0 - 2026-04-23
+
+### Polish & Animation Pass (PDF feedback "edit 2")
+
+- **Disabled buttons** — Override browser's `cursor: not-allowed` to `cursor: default`. Disabled buttons are already visually grayed out; the pointer changes nothing.
+- **AutoPlay pulse removed** — AutoPlay button no longer pulses infinitely while active. The pressed/toggled state (`background + inset shadow`) remains. One-shot animations on toggle-on are unaffected.
+- **Phase 2 building upkeep labels** — Removed the per-building `-X ⭐/s` text from building cells. Net upkeep is already visible in the global supply/economy bar. Tooltip on sell/upgrade buttons still shows cost detail. Removed unused `.building-upkeep` CSS.
+- **WAR card race condition** — WAR card at 50k pop now requires competitor island to have been visible for ≥5 seconds before firing. Prevents the island appearing and immediately disappearing during a debug-menu skip. Spawn timestamp (`competitorSpawnedAt`) is auto-persisted with saves.
+- **Land Expansion ring bug** — Existing building progress rings no longer flash empty when land is expanded. Fixed by appending new empty slots directly to the grid instead of wiping and rebuilding all DOM — existing building elements keep their ring state intact.
+- **Flying-star animation** — On the first 10 stars earned in Phase 1, a star icon animates from the player result area to the win-tracker (top-left). Creates "brand the win" moment at game start. No spam: disabled once totalStarsEarned > 10.
+- **Smooth counter rolling** — Phase 2 star and science counters now lerp at 18% per frame (50ms tick) instead of snapping once per second. At high SPS (millions+), digits visibly roll and blur — growth feels exponential and physical.
+- **Bank unlock gated** — Bank upgrade now requires `totalStarsEarned >= 50000` in addition to factory purchase. Prevents Bank appearing immediately after Factory; gives the player a meaningful pause on the meta board before the phase transition.
+
 ## v1.9.1 - 2026-04-26
 
 ### Polish & Cleanup
