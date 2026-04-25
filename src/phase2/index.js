@@ -2,6 +2,7 @@
 
 import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { playChapterCard } from '../chapterCard.js';
+import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 
 let logicInterval;
 let fastUiInterval;
@@ -37,15 +38,10 @@ export function init() {
           };
 
           const { SAVE_KEY, STARS_TRANSFER_KEY } = PHASE2_CONSTANTS;
-          const storedState = localStorage.getItem(SAVE_KEY);
-          if (storedState) {
-              try {
-                  const parsedState = JSON.parse(storedState);
-                  parsedState.buildings = (parsedState.buildings || []).map(b => b === null ? undefined : b);
-                  Object.assign(gameState, parsedState);
-              } catch (e) {
-                  console.error('Failed to parse save', e);
-              }
+          const parsedSave = loadFromStorage(SAVE_KEY);
+          if (parsedSave) {
+              parsedSave.buildings = (parsedSave.buildings || []).map(b => b === null ? undefined : b);
+              Object.assign(gameState, parsedSave);
           } else {
               const storedStars = localStorage.getItem(STARS_TRANSFER_KEY);
               const parsed = storedStars !== null ? Number.parseInt(storedStars, 10) : NaN;
@@ -55,7 +51,7 @@ export function init() {
 
           function saveGameState() {
               if (!savingEnabled) return;
-              localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
+              saveToStorage(SAVE_KEY, serializePhase2(gameState));
           }
           beforeUnloadHandler = () => saveGameState();
           const buildingData = {
