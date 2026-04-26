@@ -239,13 +239,16 @@ export function init() {
               const building = gameState.buildings[index];
               const slot = ui.landGrid.children[index];
               if (!slot) return;
-              
+
               if(building) {
                   slot.innerHTML = createBuildingHTML(building);
                   slot.classList.remove('empty');
+                  const typeLabel = building.type.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/^./, c => c.toUpperCase());
+                  slot.setAttribute('aria-label', `Building: ${typeLabel}`);
               } else {
                   slot.innerHTML = '';
                   slot.classList.add('empty');
+                  slot.setAttribute('aria-label', 'Empty land');
               }
               scheduleIconRefresh();
           }
