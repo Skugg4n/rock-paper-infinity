@@ -254,6 +254,52 @@ export function init() {
               gameState.buildings.forEach((b, i) => renderGridSlot(i));
           }
 
+          // Refresh only the action buttons (sell/upgrade disabled state + upgradeable class)
+          // on an existing building cell — does NOT touch the ring or icon, so no flärp.
+          function refreshBuildingActions(building, slot) {
+              if (!building || !slot) return;
+              const innerDiv = slot.querySelector('.building');
+              if (!innerDiv) return;
+
+              let upgradeTarget = null;
+              if (building.type === 'home') upgradeTarget = 'apartment';
+              else if (building.type === 'store') upgradeTarget = 'superStore';
+              else if (building.type === 'apartment' && gameState.urbanismResearched) upgradeTarget = 'skyscraper';
+              else if (building.type === 'skyscraper' && gameState.megastructureResearched) upgradeTarget = 'district';
+
+              if (upgradeTarget) {
+                  const upgradeInfo = buildingData[upgradeTarget];
+                  const popReq = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 }[upgradeTarget];
+                  const canAfford = gameState.stars >= upgradeInfo.cost;
+                  const unlocked = gameState.population >= popReq;
+
+                  // Upgradeable highlight class on wrapper
+                  if (unlocked && canAfford) innerDiv.classList.add('upgradeable');
+                  else innerDiv.classList.remove('upgradeable');
+
+                  // Keep upgrade button disabled state current
+                  const upgradeBtn = innerDiv.querySelector('.upgrade-btn');
+                  if (upgradeBtn) {
+                      upgradeBtn.disabled = !canAfford;
+                  } else if (unlocked) {
+                      // Upgrade button doesn't exist yet (newly unlocked by research purchase).
+                      // Fall back to full re-render for this slot only.
+                      renderGridSlot(gameState.buildings.indexOf(building));
+                  }
+              } else {
+                  innerDiv.classList.remove('upgradeable');
+              }
+          }
+
+          // Refresh action buttons on all existing buildings without rebuilding their HTML.
+          function refreshAllBuildingActions() {
+              gameState.buildings.forEach((b, i) => {
+                  if (!b) return;
+                  const slot = ui.landGrid.children[i];
+                  refreshBuildingActions(b, slot);
+              });
+          }
+
           function calculateBaseStarPerPerson() {
               let baseStarPerPerson = 2;
               if (gameState.toolCaseUnlocked) baseStarPerPerson *= 2;
@@ -473,7 +519,10 @@ export function init() {
               const oldPop = gameState.population;
               gameState.population = currentTotalPopulation;
               if (oldPop !== gameState.population) {
-                  renderAllBuildings();
+                  // Only refresh action button states — rings are kept alive by fastUiTick,
+                  // so rebuilding the full HTML (renderAllBuildings) would cause the
+                  // "flärp" ring reset the user reported.
+                  refreshAllBuildingActions();
               }
 
               gameState.baseStarPerPerson = baseStarPerPerson;
@@ -634,8 +683,17 @@ export function init() {
                   gameState.stars -= (upgradeData.cost || 0);
                   gameState.science -= (upgradeData.scienceCost || 0);
                   gameState[flag] = true;
-                  // Force a full re-render of all buildings when a research that enables upgrades is bought
-                  renderAllBuildings();
+                  // Re-render only the buildings that gain a new upgrade option from this
+                  // research. Urbanisim enables home→apartment and apartment→skyscraper
+                  // upgrade buttons; Megastructure enables skyscraper→district. Other buildings
+                  // are unaffected and must not be touched — rebuilding them resets their rings.
+                  gameState.buildings.forEach((b, i) => {
+                      if (!b) return;
+                      const affected =
+                          (flag === 'urbanismResearched' && (b.type === 'home' || b.type === 'apartment')) ||
+                          (flag === 'megastructureResearched' && b.type === 'skyscraper');
+                      if (affected) renderGridSlot(i);
+                  });
               }
           };
   
