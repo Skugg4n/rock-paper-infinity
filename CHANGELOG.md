@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.19.0 - 2026-04-23
+
+### Phase 1: three UX improvements
+
+- **Outward dashes replace progress ring** — Speed (55 levels), EnergyGen (100 levels), AddGameBoard (8 levels) now show N small radial "sun-ray" dashes around their buttons instead of a circular fill ring. Each dash = one remaining purchase. As the player buys, dashes fade out one by one. New `src/phase1/upgrade-dashes.js` module with `setupDashes` / `updateDashes`. Per user: *"som en sol, fast korta korta — ett streck för varje köp man kan göra."*
+
+- **Tooltip hides on upgrade button click** — The tooltip was clipping into the `.click-pulse` scale animation when an upgrade was purchased. Now the tooltip is hidden immediately at the start of `handleUpgradeClick()` and reappears on the next mouseenter.
+
+- **Luck upgrade now actually biases RNG toward player wins** — Previously called `starMultiplier *= 1.5` — an anonymous star-payout multiplier that didn't match the clover icon or the mechanic name. Now: after Luck is purchased, each round has a 50% chance to force the computer into the move that loses to the player's choice. Win rate jumps from ~33% to ~67%. The clover icon now matches the mechanic. The `multiplyStars` callback is removed from the Luck upgrade.
+
 ## v1.18.3 - 2026-04-26
 
 ### Polish
