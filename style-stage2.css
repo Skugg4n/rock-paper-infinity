@@ -187,11 +187,25 @@
     transition: all 0.2s ease-in-out;
     z-index: 10;
 }
+/* Expand tap target to 44×44px via pseudo-element without changing visual size */
+.building-action-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+}
 @media (min-width: 640px) {
     .building-action-btn {
         width: 24px;
         height: 24px;
         font-size: 18px;
+    }
+    .building-action-btn::after {
+        width: 44px;
+        height: 44px;
     }
 }
 
