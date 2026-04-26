@@ -517,7 +517,7 @@ function scheduleUIUpdate() {
                                 upgrade.element.classList.add('materialize');
                                 upgrade.element.addEventListener('animationend', () => {
                                     upgrade.element.classList.remove('materialize');
-                                }, { once: true });
+                                }, { once: true, signal: listenerController.signal });
                             }
                         }
                         revealedUpgrades.add(key);
