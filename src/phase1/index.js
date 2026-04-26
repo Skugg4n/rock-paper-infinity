@@ -743,6 +743,16 @@ const uiState = {
             quantumFoam = 0;
             gameSpeed = 1;
             isMetaBoardActive = false;
+            // Invalidate uiState cache so the next updateUI() does a full re-render.
+            // Without this, dirty cached values from before the reset cause some UI
+            // renders to be skipped on the first post-reset update.
+            Object.assign(uiState, {
+                gamesPlayed: -1, totalWins: -1, showResources: false,
+                energyPercent: -1, reservePercent: -1, energyEmpty: null,
+                sps: -1, eps: -1, egps: -1, autoPlayActive: false,
+                energyPaused: false, starBalance: -1, totalStarsEarned: -1,
+                isMetaBoardActive: false, foamPercent: -1, foamReady: false,
+            });
             quantumFoamContainer.classList.add('hidden');
             quantumFoamContainer.classList.remove('is-locked');
             gameBoards = [];
