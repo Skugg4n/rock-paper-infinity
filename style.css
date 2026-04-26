@@ -46,6 +46,19 @@ button:disabled,
     cursor: default;
 }
 
+/* Keyboard focus ring — only for keyboard nav (:focus-visible), not mouse clicks */
+button:focus-visible,
+.btn:focus-visible {
+    outline: 2px solid #475569;
+    outline-offset: 2px;
+}
+
+/* Slider thumb focus ring */
+input[type=range]:focus-visible {
+    outline: 2px solid #475569;
+    outline-offset: 2px;
+}
+
 .lucide { width: 32px; height: 32px; stroke-width: 1.5; }
 .lucide-lg { width: 40px; height: 40px; transition: all 0.3s ease-in-out; }
 @media (min-width: 640px) { .lucide-lg { width: 56px; height: 56px; } }
