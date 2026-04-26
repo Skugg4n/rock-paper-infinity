@@ -22,6 +22,7 @@ import {
     resetCounterIconState,
     renderUpgrades,
 } from "./rendering.js";
+import { timed, counter } from "../perf.js";
 
         // DOM elements
         const gameBoardContainer = document.getElementById('game-board-container');
@@ -112,7 +113,8 @@ function scheduleUIUpdate() {
         uiUpdatePending = true;
         requestAnimationFrame(() => {
             uiUpdatePending = false;
-            updateUI();
+            counter('p1:rAF');
+            timed('p1:fastUiTick', updateUI);
         });
     }
 }
@@ -257,19 +259,21 @@ function scheduleUIUpdate() {
         }
 
         function passiveTick() {
-            const energyGen = upgrades.energyGenerator.level * 5;
-            if (energyGen > 0) {
-                const newEnergy = energy + energyGen;
-                if (newEnergy <= MAX_ENERGY) {
-                    energy = newEnergy;
-                } else {
-                    const overflow = newEnergy - MAX_ENERGY;
-                    energy = MAX_ENERGY;
-                    reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + overflow);
+            timed('p1:logicTick', () => {
+                const energyGen = upgrades.energyGenerator.level * 5;
+                if (energyGen > 0) {
+                    const newEnergy = energy + energyGen;
+                    if (newEnergy <= MAX_ENERGY) {
+                        energy = newEnergy;
+                    } else {
+                        const overflow = newEnergy - MAX_ENERGY;
+                        energy = MAX_ENERGY;
+                        reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + overflow);
+                    }
                 }
-            }
-            manageAutoPlay();
-            saveGame();
+                manageAutoPlay();
+                saveGame();
+            });
             scheduleUIUpdate();
         }
 

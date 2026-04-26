@@ -3,8 +3,10 @@ import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS } from './src/constants.j
 import { preloadIcons, replaceIcons } from './src/icons.js';
 import { VERSION } from './src/version.js';
 import { playChapterCard } from './src/chapterCard.js';
+import { initPerf } from './src/perf.js';
 
 document.getElementById('version-info').textContent = VERSION;
+initPerf();
 
 // Hide debug menus unless ?debug is in the URL
 if (!window.location.search.includes('debug')) {

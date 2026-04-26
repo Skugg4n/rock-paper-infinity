@@ -5,6 +5,7 @@ import { playChapterCard } from '../chapterCard.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
 import { buildingData } from './buildings-config.js';
+import { timed, counter } from '../perf.js';
 
 let logicInterval;
 let fastUiInterval;
@@ -505,6 +506,9 @@ export function init() {
   
         // --- MAIN GAME LOOP ---
         function logicTick(skipGrowth = false) {
+          timed('p2:logicTick', () => _logicTickBody(skipGrowth));
+        }
+        function _logicTickBody(skipGrowth) {
               const baseStarPerPerson = calculateBaseStarPerPerson();
 
               const popForStars = gameState.population * (1 - gameState.populationAllocation);
@@ -637,6 +641,10 @@ export function init() {
           }
   
           function fastUiTick() {
+              counter('p2:fastUiTick');
+              timed('p2:fastUiTick', _fastUiTickBody);
+          }
+          function _fastUiTickBody() {
               // Smooth counter rolling: lerp toward actual values for a "spinning numbers" effect
               _displayedStars += (gameState.stars - _displayedStars) * COUNTER_LERP;
               _displayedScience += (gameState.science - _displayedScience) * COUNTER_LERP;
