@@ -378,8 +378,8 @@ export function init() {
               }
               tooltipEl.innerHTML = html;
               if (!tooltipListenersAttached.has(el)) {
-                  el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1));
-                  el.addEventListener('mouseleave', () => tooltipEl.style.setProperty('--tooltip-opacity', 0));
+                  el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1), { signal });
+                  el.addEventListener('mouseleave', () => tooltipEl.style.setProperty('--tooltip-opacity', 0), { signal });
                   tooltipListenersAttached.add(el);
               }
           }
