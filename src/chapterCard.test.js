@@ -130,3 +130,27 @@ test('to-come mode shows suffix and stays on wall', async () => {
     expect(document.querySelector('.chapter-card__suffix').hidden).toBe(false);
     expect(document.querySelector('.chapter-card').classList.contains('is-to-come')).toBe(true);
 });
+
+test('to-come mode: title stays visible — display not none, suffix revealed', async () => {
+    // Regression guard for v1.14.1 fix: in to-come mode the title must remain on
+    // screen alongside the "to come" suffix. Both elements must be visible together.
+    const promise = playChapterCard({ roman: 'III', title: 'WAR', mode: 'to-come' });
+    // Advance past veilIn + titleIn + hold + the 300ms to-come settle delay
+    await jest.advanceTimersByTimeAsync(PHASE_DURATIONS.veilIn + PHASE_DURATIONS.titleIn + PHASE_DURATIONS.hold + 400);
+
+    const titleEl = document.querySelector('.chapter-card__title');
+    const suffixEl = document.querySelector('.chapter-card__suffix');
+
+    // Title must not be hidden
+    expect(titleEl.style.display).not.toBe('none');
+    expect(titleEl.textContent).toBe('WAR');
+
+    // Suffix must be revealed
+    expect(suffixEl.hidden).toBe(false);
+
+    // Card still active (promise unresolved)
+    let resolved = false;
+    promise.then(() => { resolved = true; });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(resolved).toBe(false);
+});

@@ -4,6 +4,7 @@ import {
     saveToStorage,
     loadFromStorage,
     SCHEMA_VERSION,
+    migrate,
 } from './persistence.js';
 
 test('serializePhase2 includes schemaVersion', () => {
@@ -24,6 +25,24 @@ test('deserializePhase2 returns null for higher schemaVersion', () => {
 
 test('deserializePhase2 returns null for corrupt JSON', () => {
     expect(deserializePhase2('not json')).toBeNull();
+});
+
+describe('migration scaffold', () => {
+    test('migrate returns parsed object with schemaVersion set to current', () => {
+        // Migration policy: if saved version === SCHEMA_VERSION, no-op.
+        // MIGRATIONS map is empty for now (no v1→v2 migration needed yet).
+        const input = { schemaVersion: SCHEMA_VERSION, population: 42 };
+        const result = migrate(input);
+        expect(result.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(result.population).toBe(42);
+    });
+
+    test('migrate on legacy save (no schemaVersion) stamps current version', () => {
+        const input = { population: 10 };
+        const result = migrate(input);
+        expect(result.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(result.population).toBe(10);
+    });
 });
 
 describe('storage wrappers', () => {

@@ -6,6 +6,7 @@ import {
     saveToStorage,
     loadFromStorage,
     SCHEMA_VERSION,
+    migrate,
 } from './persistence.js';
 
 describe('persistence', () => {
@@ -67,7 +68,10 @@ describe('persistence', () => {
         test('returns parsed object from valid JSON', () => {
             const data = { starBalance: 42, energy: 100 };
             const result = deserializeGameState(JSON.stringify(data));
-            expect(result).toEqual(data);
+            // migrate() stamps schemaVersion onto the result
+            expect(result.starBalance).toBe(42);
+            expect(result.energy).toBe(100);
+            expect(result.schemaVersion).toBe(SCHEMA_VERSION);
         });
 
         test('returns null for null input', () => {
@@ -104,6 +108,22 @@ describe('persistence', () => {
             expect(result.isMetaBoardActive).toBe(true);
             expect(result.upgrades.speed.level).toBe(10);
         });
+    });
+});
+
+describe('migration scaffold', () => {
+    test('migrate returns object with schemaVersion stamped to current', () => {
+        const input = { schemaVersion: SCHEMA_VERSION, starBalance: 99 };
+        const result = migrate(input);
+        expect(result.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(result.starBalance).toBe(99);
+    });
+
+    test('migrate on legacy save (no schemaVersion) stamps current version', () => {
+        const input = { starBalance: 10 };
+        const result = migrate(input);
+        expect(result.schemaVersion).toBe(SCHEMA_VERSION);
+        expect(result.starBalance).toBe(10);
     });
 });
 
