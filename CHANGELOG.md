@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.18.1 - 2026-04-26
+
+### Hotfix
+
+- **Revert v1.18.0 game-logic split** — Phase 1 RPS animation/result-reveal stopped showing visible icons after v1.18.0's `game-logic.js` extraction. Symptoms: empty white card after each round, no countdown visible, no clash icons. Reverting the split restores the working flow. The split will be retried later with proper test coverage and a real browser session.
+
 ## v1.18.0 - 2026-04-23
 
 ### Phase 1: game-logic.js extracted
