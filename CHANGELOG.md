@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.17.0 - 2026-04-23
+
+### Phase 1: rendering.js extracted
+
+- **`src/phase1/rendering.js` added** — `renderWinTracker`, `renderRateDisplays`, `renderProgressCircles`, `renderCollapseFoam`, `renderResourceBarsVisibility`, `renderEnergyBar`, `renderReserveBar`, `renderEnergyEmpty`, `renderGameCounters`, `resetCounterIconState`, `renderUpgrades` moved from `index.js`. Each accepts data as parameters; no direct closures over orchestrator state. `index.js`: 966 → 798 lines (−168).
+
+### Phase 2: buildings-config.js extracted
+
+- **`src/phase2/buildings-config.js` added** — Static `buildingData` object (costs, capacities, upkeep, science costs for all buildings and upgrades) moved out of `init()` closure. Pure data module — no callbacks, no DOM. `index.js`: 892 → 876 lines.
+
+### Phase 2: window.sellBuilding race fixed
+
+- **Event delegation on `#land-grid`** — Inline `onclick="sellBuilding(event, id)"` and `onclick="upgradeBuilding(..."` attributes replaced with one delegated click listener using `{ signal }`. Listener is cleaned up by AbortController on `teardown()`. `window.sellBuilding` and `window.upgradeBuilding` globals removed. `data-building-id` and `data-upgrade-target` data attributes carry the parameters. Fixes the teardown race described in Phase 24 deferred items.
+
+### Performance instrumentation
+
+- **`src/perf.js` added** — `initPerf()`, `timed(label, fn)`, `counter(label)`. Enabled only with `?debug&perf` URL flags; all helpers are no-ops otherwise. `initPerf()` called at top of `main.js` bootstrap. `timed('p1:logicTick')` wraps Phase 1 `passiveTick` body; `timed('p1:fastUiTick')` wraps the rAF `updateUI` call. `timed('p2:logicTick')` and `timed('p2:fastUiTick')` wrap Phase 2 tick bodies; `counter('p2:fastUiTick')` tracks call frequency.
+
+### Docs
+
+- CLAUDE.md, README.md file structures updated with all new modules.
+- Stale `src/phase1/index.js` line count and known-issue entries corrected.
+- PROJECTPLAN.md Phase 24 filled in; Phase 25 deferred items seeded.
+
 ## v1.16.0 - 2026-04-23
 
 ### Bug hunt round 2 (Phase 23 fixes)
