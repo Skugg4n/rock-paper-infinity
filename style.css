@@ -7,6 +7,17 @@
     #reserve-energy-container { width: 10px !important; height: 88px !important; padding: 2px !important; }
 }
 
+/* Upgrade tray: prevent overflow on short screens (landscape or small Android).
+   Clamp height to viewport minus bottom offset + footer; allow quiet scroll if taller. */
+#upgrade-tray {
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Hide scrollbar visually — content is still scrollable via swipe */
+    scrollbar-width: none;
+}
+#upgrade-tray::-webkit-scrollbar { display: none; }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     touch-action: manipulation;
