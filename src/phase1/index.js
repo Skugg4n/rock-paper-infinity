@@ -816,7 +816,7 @@ const uiState = {
             star.setAttribute('fill', 'currentColor');
             star.setAttribute('stroke', 'none');
             star.innerHTML = '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>';
-            star.className = 'star-fly';
+            star.setAttribute('class', 'star-fly');
             star.style.setProperty('--from-x', `${fromX}px`);
             star.style.setProperty('--from-y', `${fromY}px`);
             star.style.setProperty('--to-x', `${toX}px`);
@@ -856,8 +856,12 @@ const uiState = {
                 totalStarsEarned += starGain;
                 // Flying-star animation: only for the first 10 stars earned
                 if (totalStarsEarned <= 10) {
-                    // Source: the player result area on this board
-                    fireStarAnimation(board.playerEl);
+                    try {
+                        // Source: the player result area on this board
+                        fireStarAnimation(board.playerEl);
+                    } catch (e) {
+                        console.error('fireStarAnimation failed:', e);
+                    }
                 }
             }
 

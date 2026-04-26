@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.11.1 - 2026-04-25
+
+### Hotfix
+
+- **Game freeze on win** — Phase 1 game stopped responding after every win (autoplay too). Cause: `star.className = 'star-fly'` on an SVG element silently throws because `className` on SVGElement is a read-only `SVGAnimatedString`. The thrown error stopped `showResult()` before resetting `board.isAnimating = false`, leaving the board permanently in "animating" state until reload. Fixed by using `setAttribute('class', ...)`. Also wrapped `fireStarAnimation()` in try/catch as defense-in-depth so future bugs there can't break the game flow.
+
 ## v1.11.0 - 2026-04-23
 
 ### Enemy Signature & Phase 2 Progressive Disclosure
