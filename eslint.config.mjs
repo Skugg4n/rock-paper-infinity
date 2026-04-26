@@ -16,6 +16,12 @@ export default [
         toRoman: "readonly",
       },
     },
-    rules: {},
+    rules: {
+      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-console": ["warn", { "allow": ["warn", "error"] }],
+      "prefer-const": "warn",
+      "no-var": "warn",
+      "eqeqeq": ["warn", "always", { "null": "ignore" }],
+    },
   },
 ];

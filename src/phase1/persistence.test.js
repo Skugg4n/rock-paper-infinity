@@ -1,5 +1,4 @@
 /* eslint-env jest */
-import { jest } from '@jest/globals';
 import {
     serializeGameState,
     deserializeGameState,

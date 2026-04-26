@@ -1,5 +1,4 @@
 /* eslint-env jest */
-import { jest } from '@jest/globals';
 import { exportSave, importSave } from './save-export.js';
 
 // Minimal localStorage mock

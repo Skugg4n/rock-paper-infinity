@@ -256,10 +256,6 @@ export function init() {
               scheduleIconRefresh();
           }
 
-          function renderAllBuildings() {
-              gameState.buildings.forEach((b, i) => renderGridSlot(i));
-          }
-
           // Refresh only the action buttons (sell/upgrade disabled state + upgradeable class)
           // on an existing building cell — does NOT touch the ring or icon, so no flärp.
           function refreshBuildingActions(building, slot) {
@@ -531,7 +527,7 @@ export function init() {
               const popForScience = gameState.population * gameState.populationAllocation;
 
               let netStarChange = popForStars * baseStarPerPerson;
-              let netScienceChange = popForScience * 1;
+              const netScienceChange = popForScience * 1;
 
               let supplyProduction = 0;
               let currentTotalPopulation = 0;
@@ -565,8 +561,7 @@ export function init() {
               gameState.population = currentTotalPopulation;
               if (oldPop !== gameState.population) {
                   // Only refresh action button states — rings are kept alive by fastUiTick,
-                  // so rebuilding the full HTML (renderAllBuildings) would cause the
-                  // "flärp" ring reset the user reported.
+                  // so a full DOM rebuild would cause the "flärp" ring reset.
                   refreshAllBuildingActions();
               }
 

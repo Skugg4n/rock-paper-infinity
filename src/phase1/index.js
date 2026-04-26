@@ -37,7 +37,6 @@ import { mountSaveButtons } from "../save-export.js";
         const speedProgressCircle = document.getElementById('speed-progress');
         const energyGenProgressCircle = document.getElementById('energy-gen-progress');
         const addBoardProgressCircle = document.getElementById('add-board-progress');
-        const downgradeTray = document.getElementById('downgrade-tray');
 const tooltip = document.getElementById('tooltip');
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
