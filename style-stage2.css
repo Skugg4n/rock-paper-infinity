@@ -362,6 +362,21 @@ input[type=range]::-webkit-slider-thumb {
     }
 }
 
+/* Building grid horizontal scroll at very narrow viewports (>10 slots) */
+@media (max-width: 399px) {
+    #land-grid {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+        /* Keep slots at minimum usable size regardless of viewport */
+        min-width: max-content;
+        padding-bottom: 4px; /* room for scrollbar on Android */
+    }
+    #land-grid .building-slot {
+        scroll-snap-align: start;
+    }
+}
+
 /* Phase 2 factory — contained conveyor animation */
 .factory-smoke {
     position: absolute;
