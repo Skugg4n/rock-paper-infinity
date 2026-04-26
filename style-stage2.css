@@ -427,3 +427,17 @@ input[type=range]::-webkit-slider-thumb {
 #competitor-island.visible {
     opacity: 1;
 }
+
+/* =========================================================
+   REDUCED MOTION — honour prefers-reduced-motion: reduce
+   Phase 2 has its own keyframes (p2-convey, upgrade-flash).
+   Same rule applies: collapse all to ~0ms.
+   ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

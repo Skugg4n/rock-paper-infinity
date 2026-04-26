@@ -1,10 +1,10 @@
-export const PHASE_DURATIONS = {
-    veilIn: 300,
-    titleIn: 300,
-    hold: 1000,
-    titleOut: 300,
-    veilOut: 300,
-};
+const REDUCED_MOTION = typeof window !== 'undefined'
+    && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+export const PHASE_DURATIONS = REDUCED_MOTION
+    ? { veilIn: 100, titleIn: 100, hold: 200, titleOut: 100, veilOut: 100 }
+    : { veilIn: 300, titleIn: 300, hold: 1000, titleOut: 300, veilOut: 300 };
 
 let _cardActive = false;
 
