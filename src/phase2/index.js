@@ -3,6 +3,7 @@
 import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { playChapterCard } from '../chapterCard.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
+import { mountSaveButtons } from '../save-export.js';
 
 let logicInterval;
 let fastUiInterval;
@@ -875,6 +876,7 @@ export function init() {
       fastUiInterval = setInterval(fastUiTick, 50);
   }
   window.addEventListener('beforeunload', beforeUnloadHandler);
+  mountSaveButtons(ui.debugMenu);
   }
 
 export function teardown() {

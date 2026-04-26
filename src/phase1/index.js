@@ -8,6 +8,7 @@ import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
+import { mountSaveButtons } from "../save-export.js";
 
         // DOM elements
         const gameBoardContainer = document.getElementById('game-board-container');
@@ -249,6 +250,7 @@ function scheduleUIUpdate() {
             manageAutoPlay();
             passiveInterval = setInterval(passiveTick, 1000);
             document.addEventListener('visibilitychange', handleVisibilityChange, { signal });
+            mountSaveButtons(debugMenu);
         }
 
         function passiveTick() {
