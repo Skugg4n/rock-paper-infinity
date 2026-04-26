@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.15.0 - 2026-04-23
+
+### Phase 21 bug-hunt fixes
+
+- **P2: setTooltip listeners now use AbortController signal** — `mouseenter`/`mouseleave` handlers inside `setTooltip()` previously bypassed the phase's AbortController. On teardown these listeners survived on hidden DOM nodes. They now receive `{ signal }` and are cleaned up with all other Phase 2 listeners.
+- **P1: saveGame moved out of rAF/fastUiTick into logicTick** — `saveGame()` was called inside `updateUI()` which runs inside `requestAnimationFrame`. Per hot-path discipline: saves belong in the slow tick. Moved to `passiveTick()` (1s interval), removed from the rAF path.
+- **P2: supply calculation cached in logicTick** — `fastUiTick` (50ms) duplicated the `supplyProduction/supplyConsumption/netSupplyChange` calculation already done in `logicTick`. Now `logicTick` stores the results on `gameState.cached*`, and `fastUiTick` reads from cache only.
+
+### Phase 22 mobile follow-ups
+
+- **P2: sell-button two-tap confirmation for touch** — Touch taps on the sell `−` button now require a second tap within 3 seconds to confirm. First tap: button highlights and shows refund amount. Second tap: sell executes. Tap elsewhere or wait 3s: cancel. Non-touch (hover-capable) devices sell immediately as before (tooltip shows refund on hover). CSS `.sell-confirm` state added.
+- **P2: +/- buttons on allocation slider for mobile precision** — Two small `−`/`+` buttons flank the allocation slider, visible only at `<640px` (`sm:hidden`). Each tap adjusts allocation by 5%. Slider remains for coarse drag adjustment on all sizes.
+- **P2: horizontal scroll for building grid at <400px** — At viewport widths below 400px, `#land-grid` gains `overflow-x: auto` with touch scroll and snap-to-start. Prevents slot cramping after Land Expansion 1 and 2 (15/20 slots).
+
+### Tests (63 total, was 58)
+
+- **Chapter card to-come regression guard** — New test asserts that in `to-come` mode the title element is not hidden and the suffix is revealed simultaneously. Guards the v1.14.1 fix.
+- **Persistence migration scaffold tests** — Both Phase 1 and Phase 2 migration tests verify `migrate()` stamps `schemaVersion` correctly and handles legacy saves (no schemaVersion field).
+
+### Code quality
+
+- **Persistence: migration scaffold** — Both `src/phase1/persistence.js` and `src/phase2/persistence.js` now export a `migrate(parsed)` function and a `MIGRATIONS` map (empty for now). `deserializeGameState`/`deserializePhase2` run `migrate()` after the version check. Structure is ready for future v1→v2 migrations without touching calling code.
+
 ## v1.14.1 - 2026-04-26
 
 ### WAR wall fixes

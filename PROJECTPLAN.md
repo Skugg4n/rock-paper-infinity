@@ -99,15 +99,22 @@ These were flagged by the user but deferred from v1.9.0 because they require eit
 
 Items identified during v1.13.0 bug hunt that are not immediately fixable:
 
-- **P2: fastUiTick duplicates supply calculation** — Supply production is computed both in `logicTick` (for game state) and `fastUiTick` (for display). Should be stored on `gameState` in logicTick and read in fastUiTick, like `netStarChangePerSecond`. Low priority — calculation is cheap.
-- **P2: setTooltip listeners not using AbortController signal** — `el.addEventListener('mouseenter/mouseleave', ...)` inside `setTooltip` use a WeakSet guard to prevent duplicates but are not tied to the AbortController. On teardown the DOM elements are hidden (not removed), so these listeners technically persist on elements that are invisible. No functional regression but leaks are possible if the building grid is rebuilt and the old elements are GC'd. Medium priority; fix requires passing signal into setTooltip.
-- **P1: saveGame called in updateUI (rAF)** — saveGame() is called inside the UI render path (updateUI → saveGame). This means saves happen synchronously inside requestAnimationFrame callbacks whenever any display value changes. Should be moved to passiveTick (1s) to align with the hot-path discipline. Low impact because the browser handles localStorage fast, but it's not the right separation.
+- [x] **P2: fastUiTick duplicates supply calculation** — Fixed in v1.15.0: cached on `gameState` in `logicTick`, read by `fastUiTick`.
+- [x] **P2: setTooltip listeners not using AbortController signal** — Fixed in v1.15.0: `{ signal }` passed to both `mouseenter`/`mouseleave` handlers.
+- [x] **P1: saveGame called in updateUI (rAF)** — Fixed in v1.15.0: moved to `passiveTick()` (1s interval).
 
 ## Phase 22: v1.14.0 deferred mobile items
 
 Items identified in the v1.14.0 mobile audit that require design decisions before implementation:
 
-- **P2: Building action button tooltip on touch** — `.building-action-btn:hover .tooltip` only triggers on pointer hover; touch devices never see the sell/upgrade tooltips. Options: (a) show price inline on the building slot when tapped (selection state), (b) show a long-press tooltip, (c) show a confirmation popover on sell-tap (tap once → shows refund cost, tap again → confirms). Option (c) is the safest from accidental sells. Needs design input before implementation. See `docs/mobile-audit-v1.14.0.md`.
-- **P1: Upgrade tray overflow on landscape** — With 7 buttons (408px) plus bottom offset, the tray can overflow on landscape phones with <500px height. v1.14.0 adds a scrollable overflow guard, but the UX of a scrollable tray isn't ideal. Alternative: reduce gap to `gap-2` at <500px height (needs `@media (max-height: ...)`) or cap the tray to the most recently unlocked N buttons. Needs design input.
-- **P2: Building grid at >10 slots on 320px** — After Land Expansion 1 (15 slots) and Land Expansion 2 (20 slots), the 5-column grid grows to 3 or 4 rows. At 320px the width still fits (5×52px+4×4px=276px); it's height that becomes the concern — 4 rows × 52px + 3 × 4px = 220px, which is fine. However the overall layout (stats top, grid center, build menu bottom-right) gets tight. Consider switching to a 4-col or auto-fill grid at >10 slots when viewport < 640px. Defer to v1.15+.
-- **P2: Allocation slider thumb target size** — Increased to 28px in v1.14.0, still below 44px ideal. Making the thumb 44px on a 150px-wide track would be visually odd (30% of track width). Best long-term solution: replace the slider with a pair of +/- buttons at <640px, keeping the slider only on desktop. Needs design input.
+- [x] **P2: Building action button tooltip on touch** — Fixed in v1.15.0: two-tap confirmation on touch (first tap shows refund + highlight, second tap confirms sell within 3s).
+- **P1: Upgrade tray overflow on landscape** — Overflow guard added in v1.14.0 (scrollable). UX improvement still open: reduce gap to `gap-2` at <500px height. Deferred to Phase 23.
+- [x] **P2: Building grid at >10 slots on 320px** — Fixed in v1.15.0: `overflow-x: auto` + scroll snap at <400px.
+- [x] **P2: Allocation slider thumb target size** — Fixed in v1.15.0: +/- step buttons (±5%) added at <640px, sm:hidden on desktop.
+
+## Phase 23: v1.16.0 candidates
+
+Deferred from v1.15.0:
+
+- **P1: Upgrade tray UX on landscape phones** — Current scrollable overflow guard works but is not ideal UX. Option: `@media (max-height: 500px)` reduces `gap` to `gap-2`, fitting more buttons without scroll. Needs testing on actual landscape Android.
+- **P2: upgrade button tooltip on touch** — `.building-action-btn:hover .tooltip` is hover-only. Touch still doesn't show the upgrade cost tooltip (the sell button now has two-tap confirmation showing cost, but upgrade button's tooltip is never shown on touch). Consider showing upgrade cost inline when the building slot is tapped (selection state), similar to sell confirm pattern.
