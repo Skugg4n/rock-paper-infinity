@@ -10,12 +10,14 @@ beforeEach(async () => {
     global.document = dom.window.document;
     global.window = dom.window;
 
+    jest.useFakeTimers();
     jest.resetModules();
     const mod = await import('./star-animation.js');
     fireStarAnimation = mod.fireStarAnimation;
 });
 
 afterEach(() => {
+    jest.useRealTimers();
     delete global.document;
     delete global.window;
 });

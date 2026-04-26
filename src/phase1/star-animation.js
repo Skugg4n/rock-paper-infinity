@@ -36,5 +36,10 @@ export function fireStarAnimation(sourceEl, targetEl) {
     star.style.setProperty('--to-y', `${toY}px`);
 
     document.body.appendChild(star);
-    star.addEventListener('animationend', () => star.remove(), { once: true });
+    // Primary cleanup: animationend fires when the CSS animation completes.
+    // Fallback: remove after 2s in case animationend never fires (e.g. tab hidden
+    // while animation is in-flight, or prefers-reduced-motion collapses duration).
+    const cleanup = () => { if (star.parentNode) star.remove(); };
+    star.addEventListener('animationend', cleanup, { once: true });
+    setTimeout(cleanup, 2000);
 }
