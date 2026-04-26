@@ -112,9 +112,17 @@ Items identified in the v1.14.0 mobile audit that require design decisions befor
 - [x] **P2: Building grid at >10 slots on 320px** — Fixed in v1.15.0: `overflow-x: auto` + scroll snap at <400px.
 - [x] **P2: Allocation slider thumb target size** — Fixed in v1.15.0: +/- step buttons (±5%) added at <640px, sm:hidden on desktop.
 
-## Phase 23: v1.16.0 candidates
+## Phase 23: v1.16.0
 
-Deferred from v1.15.0:
+### Shipped in v1.16.0
+- [x] **Bug hunt round 2** — NaN/Infinity guard in P1 save-load, materialize animationend signal fix, uiState reset, star-animation fallback cleanup.
+- [x] **P1: upgrades-config.js extracted** — createUpgrades(actions) factory. index.js: 1044 → 965 lines.
+- [x] **Tests: 63 → 84** — sanitizeNumber suite, edge cases (empty string, "undefined"), chapter card chained calls, save export/import round-trip.
+- [x] **Save export/import** — exportSave/importSave, mountSaveButtons in both debug menus.
+- [x] **Lint rules** — no-unused-vars, no-console, prefer-const, no-var, eqeqeq. Dead code removed.
+
+### Deferred to Phase 24
 
 - **P1: Upgrade tray UX on landscape phones** — Current scrollable overflow guard works but is not ideal UX. Option: `@media (max-height: 500px)` reduces `gap` to `gap-2`, fitting more buttons without scroll. Needs testing on actual landscape Android.
-- **P2: upgrade button tooltip on touch** — `.building-action-btn:hover .tooltip` is hover-only. Touch still doesn't show the upgrade cost tooltip (the sell button now has two-tap confirmation showing cost, but upgrade button's tooltip is never shown on touch). Consider showing upgrade cost inline when the building slot is tapped (selection state), similar to sell confirm pattern.
+- **P2: upgrade button tooltip on touch** — `.building-action-btn:hover .tooltip` is hover-only. Touch still doesn't show the upgrade cost tooltip. Consider showing upgrade cost inline when the building slot is tapped (selection state), similar to sell confirm pattern.
+- **P2: window.sellBuilding / upgradeBuilding onclick race** — Phase 2 inlines `onclick="sellBuilding(event, id)"` in dynamically created HTML strings. These onclick attributes fire independently of the AbortController. On teardown `delete window.sellBuilding` removes the global; if a user taps a building in the brief window between teardown and the container hiding, the onclick fires and throws a ReferenceError. Low severity. Future fix: event delegation on `#land-grid` instead of inline onclick attributes.

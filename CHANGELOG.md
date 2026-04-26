@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.16.0 - 2026-04-23
+
+### Bug hunt round 2 (Phase 23 fixes)
+
+- **P1: NaN/Infinity guard in save-load** — `sanitizeNumber()` added to `src/phase1/persistence.js`. All numeric fields loaded from storage now pass through it; non-finite values (NaN, Infinity) fall back to their in-memory default instead of poisoning game state. Also guards empty-string raw input in `deserializeGameState`.
+- **P1: materialize animationend listener uses AbortController signal** — The one-shot `animationend` listener added when an upgrade element first reveals was missing `{signal}`. On phase teardown it would remain attached to a hidden element. Now cleaned up with all other Phase 1 listeners.
+- **P1: reset invalidates uiState cache** — After `resetGame()` the `uiState` object held stale values from the pre-reset session. Some render tasks were skipped on the first post-reset `updateUI()` because cached values still matched. `Object.assign` now resets all cached fields to sentinel values.
+- **P1: star-animation fallback cleanup** — `fireStarAnimation` adds a 2s `setTimeout` fallback to remove the star SVG from `document.body` in case `animationend` never fires (tab hidden, motion-reduced, etc.). `star-animation.test.js` now uses `jest.useFakeTimers` so the fallback doesn't leak into the test runner.
+
+### Phase 1 module split
+
+- **`src/phase1/upgrades-config.js` extracted** — The `upgrades` object definition (cost formulas, level caps, unlock conditions, purchase functions) moved out of `index.js` and into a `createUpgrades(actions)` factory. Purchase side-effects that mutate orchestrator state are passed in via callbacks, keeping the config module free of closures over `index.js` variables. `index.js`: 1044 → 965 lines.
+
+### Tests (84 total, was 63)
+
+- **Chapter card: to-come followed by normal call** — New test verifies that a normal `playChapterCard` call made while a `to-come` card holds the wall is a no-op: midpoint never fires, DOM stays on WAR title.
+- **Persistence: `sanitizeNumber` suite** — 4 tests covering finite pass-through and NaN/Infinity/non-number null returns.
+- **Persistence: edge cases** — Empty string, whitespace, `"undefined"`, `"null"` string literals all return null. NaN/Infinity in saves (JSON serialises to null) tested against `sanitizeNumber`.
+- **Save export/import: 10 new tests** — Round-trip encode/decode, error cases (null, garbage base64, future schema version), key restoration, empty-key removal.
+
+### Save export/import
+
+- **`src/save-export.js`** — `exportSave()` serialises all four save keys into a base64 blob. `importSave(encoded)` validates and restores. `mountSaveButtons(menuEl)` wires Export/Import buttons into a debug menu. Clipboard API with textarea fallback. Wired into both Phase 1 (`#debug-menu`) and Phase 2 (`#p2-debug-menu`) debug menus (visible only with `?debug` in URL).
+
+### Lint
+
+- **ESLint rules added**: `no-unused-vars` (warn), `no-console` (warn, allow warn/error), `prefer-const` (warn), `no-var` (warn), `eqeqeq` (warn, null:ignore).
+- **Dead code removed**: `downgradeTray` stale DOM ref (Phase 1), `renderAllBuildings` function (Phase 2, superseded by `refreshAllBuildingActions` in v1.12.0). Unused `jest` imports in two test files.
+- **Phase 2 fix**: `netScienceChange` in `logicTick` changed from `let` to `const`.
+
 ## v1.15.0 - 2026-04-23
 
 ### Phase 21 bug-hunt fixes
