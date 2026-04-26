@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.18.0 - 2026-04-23
+
+### Phase 1: game-logic.js extracted
+
+- **`src/phase1/game-logic.js` added** — `showResult` and `iconMap` extracted from `index.js` into a `createGameLogic({ getStarMultiplier, getTotalStarsEarned, onWin, onResultShown, getIcon, fireStarAnimation, winTracker })` factory. Win callbacks and UI scheduling stay as orchestrator-owned. `index.js`: 802 → 769 lines (−33, net after wiring).
+
+### Phase 2: rendering.js extracted
+
+- **`src/phase2/rendering.js` added** — `createBuildingHTML`, `renderGridSlot`, `refreshBuildingActions`, `refreshAllBuildingActions` moved out of the `init()` closure. Wrapped in a `createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades })` factory. `scheduleIconRefresh` also moved to its natural position (before `createRenderer` wiring). `index.js`: 899 → 756 lines (−143).
+
+### JSDoc on public APIs
+
+- **`src/chapterCard.js`** — `playChapterCard` and `_resetForTesting` documented with `@param` / `@returns`.
+- **`src/phase1/persistence.js`** — `migrate`, `serializeGameState`, `deserializeGameState`, `saveToStorage`, `loadFromStorage` all documented.
+- **`src/phase2/persistence.js`** — Same set: `migrate`, `serializePhase2`, `deserializePhase2`, `saveToStorage`, `loadFromStorage`.
+- **`src/phase1/rates.js`** — `getSPS`, `getEPS`, `getVisibleDots`, `formatCount` documented (previously only `fillFraction` had JSDoc).
+- **`src/phase2/buildings-config.js`** — `buildingData` export expanded with `@type` and field descriptions.
+
+### Bug hunt round 3
+
+- **`playChapterCard` null-guard** — If `#chapter-card` is not in the DOM (called before bootstrap), the function now logs a warning and returns `Promise.resolve()` instead of throwing on `card.classList`.
+- **Phase 2 `initialize()` error recovery** — Wrapped in `try/catch`; on failure, clears corrupt save keys and reloads to a clean Phase 2 state. Previously an unhandled throw would leave ticks unstarted and `beforeunload` unwired.
+- **`bootstrap()` `.catch`** — `main.js` now attaches `.catch(err => console.error(...))` to the top-level bootstrap call, converting any unhandled bootstrap rejection into a logged error.
+
+### PROJECTPLAN cleanup
+
+- Collapsed all completed phases (14–24) into a `## Completed` section.
+- Phase 25 (current) filled in with shipped items and deferred items.
+- New `## Backlog` section lists design-heavy deferred items (factory animations, enemy triangle, Sims movement, Code Processor, color refinement) without phase numbers.
+- Duplicate "Phase 20" sections merged.
+
 ## v1.17.0 - 2026-04-23
 
 ### Phase 1: rendering.js extracted
