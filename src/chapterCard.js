@@ -49,22 +49,20 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = 
             }
             await delay(PHASE_DURATIONS.hold);
 
-            // Phase 4: title out
-            content.style.opacity = '0';
-            await delay(PHASE_DURATIONS.titleOut);
-
             if (mode === 'to-come') {
-                // Replace phase 5: veil to black, suffix in, never resolve
+                // Replace phase 4+5: keep title visible, fade veil to black,
+                // reveal "to come" subtitle below the title. Both stay on
+                // the wall together. Promise never resolves.
                 veil.style.background = '#000000';
                 content.style.color = '#ffffff';
-                await delay(300);
                 suffixEl.hidden = false;
-                content.style.opacity = '1';
-                titleEl.style.display = 'none';
-                romanEl.style.display = 'none';
                 await delay(300);
                 return new Promise(() => {});
             }
+
+            // Phase 4: title out
+            content.style.opacity = '0';
+            await delay(PHASE_DURATIONS.titleOut);
 
             // Phase 5 (normal): veil out
             veil.style.opacity = '0';

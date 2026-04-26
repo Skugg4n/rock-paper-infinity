@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.14.1 - 2026-04-26
+
+### WAR wall fixes
+
+- **Title stays visible on the WAR wall** — Previously the chapter card faded the title out before showing the "to come" suffix, leaving only "TO COME" on a black field with no context. Now in `to-come` mode the title (e.g. "WAR" with its Roman numeral) stays on screen and "to come" appears below it as the subtitle. Both stay together until reload.
+- **Debug menus reachable from chapter card overlays** — Bumped `#debug-menu`, `#debug-trigger`, `#debug-toggle-btn`, `#p2-debug-menu`, `#p2-debug-trigger` to `z-index: 1500` (above the chapter card's 1000). Players who reach the WAR wall with `?debug` in the URL can now click Reset to wipe progress and start over without manually clearing localStorage.
+
 ## v1.14.0 - 2026-04-23
 
 ### Mobile responsiveness (systematic pass for Android Chrome priority)
