@@ -16,6 +16,10 @@ let _displayedStars = 0;
 let _displayedScience = 0;
 const COUNTER_LERP = 0.18;
 
+// Progressive disclosure — track which thresholds have already fired
+let _starsPerPersonRevealed = false;
+let _scienceRevealed = false;
+
 export function init() {
           abortController = new AbortController();
           const signal = abortController.signal;
@@ -402,23 +406,27 @@ export function init() {
 
               setTooltip(ui.expandLand2Btn, pop < 10000 && !gameState.landExpansion2 ? { unlockReq: `10,000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+5 <i data-lucide='layout-grid' class='w-4 h-4'></i>`, cost: buildingData.landExpansion2.cost });
 
-              // Hide science UI when all science-costing upgrades are purchased
+              // Fade out science UI when all science-costing upgrades are purchased
+              // (Only touch opacity after the disclosure threshold has fired — before
+              //  that, the p2-disclose class keeps them hidden via CSS)
               const allScienceDone = gameState.toolCaseUnlocked
                   && gameState.gmoLevel >= gameState.gmoMaxLevel
                   && gameState.urbanismResearched
                   && gameState.carUnlocked
                   && gameState.computerUnlocked
                   && gameState.megastructureResearched;
-              if (allScienceDone) {
-                  ui.scienceRow.style.opacity = '0.15';
-                  ui.allocationSliderContainer.style.opacity = '0.15';
-                  if (gameState.populationAllocation > 0) {
-                      gameState.populationAllocation = 0;
-                      ui.allocationSlider.value = 0;
+              if (_scienceRevealed) {
+                  if (allScienceDone) {
+                      ui.scienceRow.style.opacity = '0.15';
+                      ui.allocationSliderContainer.style.opacity = '0.15';
+                      if (gameState.populationAllocation > 0) {
+                          gameState.populationAllocation = 0;
+                          ui.allocationSlider.value = 0;
+                      }
+                  } else {
+                      ui.scienceRow.style.opacity = '1';
+                      ui.allocationSliderContainer.style.opacity = '1';
                   }
-              } else {
-                  ui.scienceRow.style.opacity = '1';
-                  ui.allocationSliderContainer.style.opacity = '1';
               }
 
               scheduleIconRefresh();
@@ -501,6 +509,19 @@ export function init() {
               if (gameState.population >= 5 && !ui.populationUi.classList.contains('visible')) {
                   ui.populationUi.classList.add('visible');
                   ui.suppliesUi.classList.add('visible');
+              }
+
+              // Progressive disclosure: stars-per-person at pop ≥ 5
+              if (gameState.population >= 5 && !_starsPerPersonRevealed) {
+                  _starsPerPersonRevealed = true;
+                  ui.starsPerPerson.classList.add('p2-visible');
+              }
+
+              // Progressive disclosure: science + slider at pop ≥ 100
+              if (gameState.population >= 100 && !_scienceRevealed) {
+                  _scienceRevealed = true;
+                  ui.scienceRow.classList.add('p2-visible');
+                  ui.allocationSliderContainer.classList.add('p2-visible');
               }
 
               // Competitor spawn
@@ -687,6 +708,18 @@ export function init() {
                 grid.innerHTML = '';
                 gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
                 gameState.buildings.forEach((_, i) => renderGridSlot(i));
+
+                // Past-threshold load: reveal disclosed elements immediately (no fade-in)
+                if (gameState.population >= 5) {
+                    _starsPerPersonRevealed = true;
+                    ui.starsPerPerson.classList.add('p2-instant', 'p2-visible');
+                }
+                if (gameState.population >= 100) {
+                    _scienceRevealed = true;
+                    ui.scienceRow.classList.add('p2-instant', 'p2-visible');
+                    ui.allocationSliderContainer.classList.add('p2-instant', 'p2-visible');
+                }
+
                 // Restore competitor visibility if already spawned
                 if (gameState.competitorSpawned) {
                     ui.competitorIsland.classList.remove('hidden');
@@ -735,4 +768,6 @@ export function teardown() {
   savingEnabled = true;
   _displayedStars = 0;
   _displayedScience = 0;
+  _starsPerPersonRevealed = false;
+  _scienceRevealed = false;
 }

@@ -393,6 +393,26 @@ input[type=range]::-webkit-slider-thumb {
     transform-origin: right center;
 }
 
+/* Progressive disclosure — elements hidden until population thresholds */
+.p2-disclose {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 0.5s ease, max-height 0.5s ease;
+}
+
+.p2-disclose.p2-visible {
+    opacity: 1;
+    max-height: 200px;
+    pointer-events: auto;
+}
+
+/* Skip fade-in for past-threshold loads */
+.p2-disclose.p2-instant {
+    transition: none;
+}
+
 /* Enemy competitor island */
 .enemy-factory {
     background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
