@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.14.0 - 2026-04-23
+
+### Mobile responsiveness (systematic pass for Android Chrome priority)
+
+Audit document: `docs/mobile-audit-v1.14.0.md`
+
+- **Phase 2 building grid overflow at 320px** — 5-column grid with 56px slots + 6px gaps totalled 304px, overflowing the 288px usable width. Fixed: slots shrink to 52px at <400px (restores to 56px at 400px+), gap reduced to 4px on mobile (`gap-1 sm:gap-4`). New layout fits with 12px margin.
+- **Phase 2 build panel buttons: 40px → 44px** — All `.btn` elements in the Phase 2 build/upgrade panel were 40×40px, 4px below the Apple HIG minimum. Bumped to 44×44px on mobile; 56px on desktop unchanged.
+- **Phase 2 building action buttons: expanded tap target to 44px** — Sell (−) and upgrade (+) corner buttons on building slots are visually 18px (24px at ≥640px). Visual size unchanged to preserve minimal aesthetic. Added `::after` pseudo-element (44×44px, transparent, centered) that expands the hit area without visually changing the button.
+- **Allocation slider thumb: 20px → 28px on mobile** — Slider thumb was 20×20px at all sizes, well below minimum. Increased to 28×28px at <640px with corrected `margin-top: -10px` to stay centered on the 8px track. Desktop retains 20px. (Note: 28px is an improvement but still below the 44px ideal; full fix deferred to PROJECTPLAN.)
+- **Supplies bar text: 11px → 12px** — The supply balance labels (-0/s, Balanced, +0/s) were 11px — below comfortable Android reading size. Bumped to 12px.
+- **Phase 1 upgrade tray overflow guard** — With 7 upgrade buttons, the tray can reach 408px tall, overflowing on landscape phones. Added `max-height: calc(100dvh - 6rem)` and `overflow-y: auto` with hidden scrollbar so the tray quietly scrolls rather than clipping off-screen.
+
+### Deferred items (see PROJECTPLAN.md Phase 22)
+- Building action button tooltip on touch (hover-only, no touch equivalent)
+- Upgrade tray UX on landscape (overflow guard added but scroll UX not ideal)
+- Building grid at >10 slots on 320px
+- Allocation slider thumb below 44px ideal
+
 ## v1.13.0 - 2026-04-23
 
 ### Accessibility
