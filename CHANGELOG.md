@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.18.3 - 2026-04-26
+
+### Polish
+
+- **Upgrade-button click pulse no longer clips into tooltip** — Speed and Battery purchases were applying `.pop-item` for click feedback. That keyframe scales `0 → 1.2 → 1`, meaning the button briefly vanished, then grew 20% larger than its boundary (clipping into the tooltip text above), then settled. Replaced with a new `.click-pulse` keyframe that stays at scale 1+ throughout (`1 → 1.06 → 1`) — subtle confirmation pulse without overlap. `.pop-item` is preserved for its other use (meta-board reveal on foam collapse, where the dramatic "appear from nothing" feel is the point).
+
 ## v1.18.2 - 2026-04-26
 
 ### Hotfix — countdown animation now visible

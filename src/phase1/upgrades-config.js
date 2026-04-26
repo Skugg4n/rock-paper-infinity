@@ -46,8 +46,8 @@ export function createUpgrades(actions) {
             purchase: function() {
                 this.level++;
                 incrementSpeed();
-                this.element.classList.add('pop-item');
-                setTimeout(() => this.element.classList.remove('pop-item'), 500);
+                this.element.classList.add('click-pulse');
+                setTimeout(() => this.element.classList.remove('click-pulse'), 320);
             }
         },
         buyBattery: {
@@ -56,8 +56,8 @@ export function createUpgrades(actions) {
             element: document.getElementById('buyBattery'),
             purchase: function() {
                 addReserve();
-                this.element.classList.add('pop-item');
-                setTimeout(() => this.element.classList.remove('pop-item'), 500);
+                this.element.classList.add('click-pulse');
+                setTimeout(() => this.element.classList.remove('click-pulse'), 320);
             }
         },
         luck: {

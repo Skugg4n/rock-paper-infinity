@@ -116,6 +116,16 @@ input[type=range]:focus-visible {
 .reveal-item { animation: reveal 0.4s ease-out forwards; }
 @keyframes pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
 .pop-item { animation: pop 0.5s cubic-bezier(0.77, 0, 0.175, 1) forwards; }
+
+/* Click-pulse: subtle feedback for buttons that already exist (e.g. upgrade
+   purchase). Stays at scale 1+ throughout so the button never disappears,
+   and peaks at 1.06 so it doesn't clip into adjacent UI like tooltips. */
+@keyframes click-pulse {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+.click-pulse { animation: click-pulse 0.32s ease-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .fade-in { animation: fadeIn 0.5s ease-in-out forwards; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
