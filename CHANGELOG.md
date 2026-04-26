@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.11.0 - 2026-04-23
+
+### Enemy Signature & Phase 2 Progressive Disclosure
+
+- **Enemy red triangle** — When the enemy wins a Phase 1 RPS round, a red triangle appears behind their winning move icon. One-shot fade-in animation; no loop. `#b91c1c` red is the only intentional red in the palette — reserved for "enemy/threat". The same triangle will reappear in Phase 3 (WAR) so players with memory recognize the connection.
+- **Phase 2 progressive disclosure** — Stripped back the Phase 2 entry view to reduce information overload. Stars counter and building grid are always visible. Stars-per-person text appears at pop ≥ 5 (same moment as population/supplies indicators). Science counter, Industry/Research allocation labels, and the slider all wait until pop ≥ 100, when Urbanism first teases research and science becomes meaningful. Each element fades in once on first threshold crossing. Returning saves past threshold skip the fade — go straight to revealed state.
+
 ## v1.10.0 - 2026-04-23
 
 ### Polish & Animation Pass (PDF feedback "edit 2")

@@ -1,6 +1,6 @@
 {
   "name": "rock-paper-infinity",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "An incremental rock-paper-scissors game with multiple stages of progression",
   "main": "main.js",
   "scripts": {
