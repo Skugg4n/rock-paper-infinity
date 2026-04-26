@@ -4,6 +4,17 @@
  * Pure data — no DOM refs, no game-state closures.
  * Import this object wherever building costs, capacities, or upgrade
  * parameters need to be read.
+ *
+ * Each entry is keyed by building/upgrade type. Fields vary by type:
+ * - `cost` — star cost to build or purchase
+ * - `capacity` — max population (residential buildings)
+ * - `supply` — supply units produced per second (stores)
+ * - `upkeep` — star drain per second (stores)
+ * - `baseCost` — base cost for multi-level upgrades (scaled per level)
+ * - `scienceCost` — science cost for research upgrades
+ * - `maxLevel` — max purchase level (multi-level upgrades)
+ *
+ * @type {Object.<string, {cost?: number, capacity?: number, supply?: number, upkeep?: number, baseCost?: number, scienceCost?: number, maxLevel?: number}>}
  */
 export const buildingData = {
     home:                 { cost: 10000,    capacity: 10 },

@@ -16,6 +16,16 @@ function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Plays a full chapter-card transition sequence.
+ *
+ * @param {object} [opts={}]
+ * @param {string} opts.roman - Roman numeral displayed above the title, e.g. "I" or "II"
+ * @param {string} opts.title - Chapter title (uppercased automatically)
+ * @param {'normal' | 'to-come'} [opts.mode='normal'] - Transition mode; 'to-come' ends on a permanent black wall
+ * @param {Function} [opts.onMidpoint] - Callback fired during the hold phase (e.g. to trigger phase switch)
+ * @returns {Promise<void>} Resolves after the card exits (normal mode only; never resolves for to-come)
+ */
 export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = {}) {
     if (_cardActive) return Promise.resolve();
     _cardActive = true;
@@ -80,6 +90,10 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = 
     })();
 }
 
+/**
+ * Resets internal `_cardActive` flag. Test use only.
+ * @returns {void}
+ */
 export function _resetForTesting() {
     _cardActive = false;
 }

@@ -8,6 +8,13 @@ const MIGRATIONS = {
     // placeholder: no migrations needed yet for v1 → v2
 };
 
+/**
+ * Runs all pending schema migrations on a parsed Phase 2 save object.
+ * Stamps `schemaVersion` to the current version on return.
+ *
+ * @param {object} parsed - Parsed (but possibly stale) save object
+ * @returns {object} Migrated save object with `schemaVersion` set
+ */
 export function migrate(parsed) {
     let version = parsed.schemaVersion ?? 1;
     while (version < SCHEMA_VERSION && MIGRATIONS[version]) {
@@ -18,6 +25,12 @@ export function migrate(parsed) {
     return parsed;
 }
 
+/**
+ * Serializes the full Phase 2 game state into a JSON string.
+ *
+ * @param {object} state - Full gameState object from init()
+ * @returns {string} JSON string ready for localStorage
+ */
 export function serializePhase2(state) {
     return JSON.stringify({
         schemaVersion: SCHEMA_VERSION,
@@ -25,6 +38,13 @@ export function serializePhase2(state) {
     });
 }
 
+/**
+ * Parses and validates a raw localStorage string into a Phase 2 game state object.
+ * Runs schema migrations and returns null for invalid/corrupt input.
+ *
+ * @param {string | null} raw - Raw string from localStorage (may be null or corrupt)
+ * @returns {object | null} Parsed and migrated state, or null on failure
+ */
 export function deserializePhase2(raw) {
     if (!raw) return null;
     let parsed;
@@ -39,6 +59,13 @@ export function deserializePhase2(raw) {
     return migrate(parsed);
 }
 
+/**
+ * Writes a value to localStorage, silently swallowing QuotaExceededError.
+ *
+ * @param {string} key - localStorage key
+ * @param {string} value - Serialized value to store
+ * @returns {boolean} true on success, false if the write failed
+ */
 export function saveToStorage(key, value) {
     try {
         localStorage.setItem(key, value);
@@ -49,6 +76,12 @@ export function saveToStorage(key, value) {
     }
 }
 
+/**
+ * Loads and deserializes the Phase 2 game state from localStorage.
+ *
+ * @param {string} key - localStorage key to read
+ * @returns {object | null} Parsed game state, or null if absent or corrupt
+ */
 export function loadFromStorage(key) {
     let raw;
     try {
