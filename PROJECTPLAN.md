@@ -94,3 +94,11 @@ These were flagged by the user but deferred from v1.9.0 because they require eit
 - [ ] **Sims-style pedestrian movement (Phase 2)** — Jacks SimsSpel-inspired: small circles representing people moving between houses, factories, shops. Substantial new feature; canvas overlay or SVG. Defer to v1.14+ at least. (PDF 2 #8)
 - [x] **Phase 1 upgrade rings fill toward next purchase** — rings for Speed, EnergyGen, AddGameBoard now fill as starBalance grows toward next cost. Shipped v1.12.0. (PDF 1 #5, originally misinterpreted)
 - [x] **Phase 2 building ring flärp** — ring reset on every purchase/upgrade fixed by targeted DOM updates. renderAllBuildings() removed from logicTick population-change path; research purchases only re-render affected building slots. Shipped v1.12.0. (PDF 2 #7)
+
+## Phase 21: v1.13.0 follow-ups
+
+Items identified during v1.13.0 bug hunt that are not immediately fixable:
+
+- **P2: fastUiTick duplicates supply calculation** — Supply production is computed both in `logicTick` (for game state) and `fastUiTick` (for display). Should be stored on `gameState` in logicTick and read in fastUiTick, like `netStarChangePerSecond`. Low priority — calculation is cheap.
+- **P2: setTooltip listeners not using AbortController signal** — `el.addEventListener('mouseenter/mouseleave', ...)` inside `setTooltip` use a WeakSet guard to prevent duplicates but are not tied to the AbortController. On teardown the DOM elements are hidden (not removed), so these listeners technically persist on elements that are invisible. No functional regression but leaks are possible if the building grid is rebuilt and the old elements are GC'd. Medium priority; fix requires passing signal into setTooltip.
+- **P1: saveGame called in updateUI (rAF)** — saveGame() is called inside the UI render path (updateUI → saveGame). This means saves happen synchronously inside requestAnimationFrame callbacks whenever any display value changes. Should be moved to passiveTick (1s) to align with the hot-path discipline. Low impact because the browser handles localStorage fast, but it's not the right separation.
