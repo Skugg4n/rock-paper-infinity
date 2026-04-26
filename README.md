@@ -71,14 +71,20 @@ rock-paper-infinity/
 │   ├── gamePhase.js          # Phase state machine: show/hide containers, persist to localStorage
 │   ├── icons.js              # SVG icon preloading and caching (Phase 1 only)
 │   ├── chapterCard.js        # Chapter card transition animations
+│   ├── save-export.js        # exportSave / importSave + mountSaveButtons (debug menus)
+│   ├── perf.js               # Lightweight perf helpers — active only with ?debug&perf URL
 │   ├── phase1/
-│   │   ├── index.js          # Phase 1 orchestrator: init, teardown, upgrades, UI
+│   │   ├── index.js          # Phase 1 orchestrator: init, teardown, game loop (~800 lines)
+│   │   ├── rendering.js      # All Phase 1 DOM renderers (win tracker, upgrades, bars, counters)
+│   │   ├── upgrades-config.js # createUpgrades(actions) factory — static config + purchase callbacks
 │   │   ├── rates.js          # Pure calculations: getSPS, getEPS, getVisibleDots, formatCount
+│   │   ├── star-animation.js # Flying-star DOM animation
 │   │   ├── cost-visual.js    # Tally SVGs + Roman numeral cost display
 │   │   ├── countdown.js      # RPS countdown animation
 │   │   └── persistence.js    # Game state serialization/deserialization
 │   └── phase2/
-│       ├── index.js          # Phase 2 game logic
+│       ├── index.js          # Phase 2 orchestrator: init, teardown, city logic (~880 lines)
+│       ├── buildings-config.js # Static building/upgrade cost + capacity data
 │       └── persistence.js    # Phase 2 state serialization/deserialization
 ├── package.json              # Dependencies & scripts
 ├── CHANGELOG.md              # Version history
@@ -140,8 +146,7 @@ The game automatically saves progress to browser localStorage:
 
 ## 🐛 Known Issues
 
-- Global function exposure in Stage 2 (uses inline onclick handlers)
-- No module bundler - raw ES modules loaded directly
+- No module bundler — raw ES modules loaded directly
 
 ## 📝 Contributing
 
@@ -166,7 +171,7 @@ ISC License
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-Current Version: **v1.9.0**
+Current Version: **v1.17.0**
 
 ---
 

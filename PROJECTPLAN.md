@@ -125,4 +125,16 @@ Items identified in the v1.14.0 mobile audit that require design decisions befor
 
 - **P1: Upgrade tray UX on landscape phones** — Current scrollable overflow guard works but is not ideal UX. Option: `@media (max-height: 500px)` reduces `gap` to `gap-2`, fitting more buttons without scroll. Needs testing on actual landscape Android.
 - **P2: upgrade button tooltip on touch** — `.building-action-btn:hover .tooltip` is hover-only. Touch still doesn't show the upgrade cost tooltip. Consider showing upgrade cost inline when the building slot is tapped (selection state), similar to sell confirm pattern.
-- **P2: window.sellBuilding / upgradeBuilding onclick race** — Phase 2 inlines `onclick="sellBuilding(event, id)"` in dynamically created HTML strings. These onclick attributes fire independently of the AbortController. On teardown `delete window.sellBuilding` removes the global; if a user taps a building in the brief window between teardown and the container hiding, the onclick fires and throws a ReferenceError. Low severity. Future fix: event delegation on `#land-grid` instead of inline onclick attributes.
+- **P2: window.sellBuilding / upgradeBuilding onclick race** — Fixed in v1.17.0: event delegation on `#land-grid`. ~~inline onclick attributes~~.
+
+## Phase 24: v1.17.0
+
+### Shipped in v1.17.0
+- [x] **P1: rendering.js extracted** — renderWinTracker, renderUpgrades, renderProgressCircles, rate/energy/counter renderers moved to `src/phase1/rendering.js`. index.js: 966 → 798 lines.
+- [x] **P2: buildings-config.js extracted** — Static `buildingData` object moved to `src/phase2/buildings-config.js`. index.js: 892 → 876 lines.
+- [x] **P2: window.sellBuilding race fixed** — Event delegation on `#land-grid` replaces inline `onclick` attributes. No more globals; cleaned up by AbortController on teardown.
+- [x] **perf.js added** — `initPerf()`, `timed()`, `counter()` helpers in `src/perf.js`. Active only with `?debug&perf` URL. Wired into Phase 1 passiveTick/rAF and Phase 2 logicTick/fastUiTick.
+- [x] **Docs pass** — CLAUDE.md, README.md file structures updated; stale line-count and known-issues entries corrected.
+
+### Deferred to Phase 25
+- **P1: Upgrade tray UX on landscape phones** — Still unresolved. `@media (max-height: 500px)` gap reduction needs testing on actual landscape Android device.

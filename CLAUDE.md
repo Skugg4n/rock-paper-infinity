@@ -47,14 +47,22 @@ rock-paper-infinity/
 │   ├── version.js          # VERSION constant
 │   ├── gamePhase.js        # Phase state machine: show/hide containers, persist to localStorage
 │   ├── icons.js            # SVG icon preloading and caching (Phase 1 only)
+│   ├── chapterCard.js      # Chapter card transition animations (I·TRIVIAL, II·CAPITAL …)
+│   ├── save-export.js      # exportSave / importSave + mountSaveButtons (debug menus)
+│   ├── perf.js             # Perf instrumentation helpers — active only with ?debug&perf URL
 │   ├── phase1/
-│   │   ├── index.js          # Phase 1 orchestrator: init, teardown, upgrades, UI (~1,000 lines)
+│   │   ├── index.js          # Phase 1 orchestrator: init, teardown, game loop (~800 lines)
+│   │   ├── rendering.js      # All Phase 1 DOM renderers (win tracker, upgrades, bars, counters)
+│   │   ├── upgrades-config.js # createUpgrades(actions) factory — static config + purchase callbacks
 │   │   ├── rates.js          # Pure calculations: getSPS, getEPS, getVisibleDots, formatCount, fillFraction
 │   │   ├── star-animation.js # Flying-star DOM animation (extracted for testability)
 │   │   ├── cost-visual.js    # Tally SVGs + Roman numeral cost display
 │   │   ├── countdown.js      # RPS countdown animation
 │   │   └── persistence.js    # Game state serialization/deserialization
-│   └── phase2/index.js     # Phase 2 game logic (~700 lines)
+│   └── phase2/
+│       ├── index.js          # Phase 2 orchestrator: init, teardown, city logic (~880 lines)
+│       ├── buildings-config.js # Static building/upgrade cost + capacity data
+│       └── persistence.js    # Phase 2 state serialization/deserialization
 ├── README.md               # Project overview and architecture docs
 └── CODE_REVIEW.md          # Code review notes
 ```
@@ -85,7 +93,7 @@ rock-paper-infinity/
 - **Cache DOM references** — query `document.getElementById` once at module load (or inside `init()`), store in a `const` or `ui` object. Never querySelector inside a tick function.
 - **Don't create elements in tick** — only mutate existing elements' style, textContent, className. Creating elements in tick causes GC pressure and layout thrashing.
 - **Don't call `lucide.createIcons()` directly** — always use `scheduleIconRefresh()` which debounces via rAF. Direct calls in loops will trigger redundant Lucide passes.
-- **Phase 2 audit (v1.13.0)**: fastUiTick correctly reads display state; logicTick correctly owns game mutations. One known violation: Phase 1 `saveGame()` is called inside `updateUI()` (rAF path) — should move to `passiveTick` (1s) in a future refactor.
+- **Phase 2 audit (v1.13.0)**: fastUiTick correctly reads display state; logicTick correctly owns game mutations. Phase 1 `saveGame()` moved to `passiveTick()` (1s) in v1.15.0 — no known violations remain.
 
 ### Chapter cards
 - Single module: `src/chapterCard.js`. Always invoke via `playChapterCard({ roman, title, mode, onMidpoint })`.
@@ -135,7 +143,7 @@ rock-paper-infinity/
 - **Phase 2 debug menu** — Uses `#p2-debug-menu` (not `#debug-menu`) to avoid ID collision with Phase 1.
 
 ## Known Issues
-- `src/phase1/index.js` still large (~1,036 lines) — further splitting requires shared state pattern refactor
+- `src/phase1/index.js` is ~800 lines — game-loop and board-management code could be further split if needed
 
 ## Documents
 - Check [LESSONS.md](LESSONS.md) when debugging
