@@ -32,7 +32,6 @@ import { serializeGameState, saveToStorage, loadFromStorage } from "./persistenc
         const debugGamesPlayedEl = document.getElementById('debug-games-played');
         const dynamicStyles = document.getElementById('dynamic-styles');
         const speedProgressCircle = document.getElementById('speed-progress');
-        const speedEarlyProgressCircle = document.getElementById('speed-early-progress');
         const energyGenProgressCircle = document.getElementById('energy-gen-progress');
         const addBoardProgressCircle = document.getElementById('add-board-progress');
         const downgradeTray = document.getElementById('downgrade-tray');
@@ -465,16 +464,17 @@ function scheduleUIUpdate() {
             // Sell buttons removed — they were confusing to users
         }
 
-        function updateProgressCircles(speedLevel, energyGenLevel, addBoardLevel) {
+        function fillFraction(balance, upgrade) {
+            if (upgrade.level >= upgrade.maxLevel) return 1;
+            const nextCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
+            return Math.min(1, balance / nextCost);
+        }
+
+        function updateProgressCircles(balance) {
             const circumference = 100.5;
-            speedProgressCircle.style.strokeDashoffset = circumference * (1 - (speedLevel / upgrades.speed.maxLevel));
-            const earlyFraction = Math.min(speedLevel, HYPER_SPEED_THRESHOLD) / HYPER_SPEED_THRESHOLD;
-            speedEarlyProgressCircle.style.strokeDashoffset = circumference * (1 - earlyFraction);
-            speedEarlyProgressCircle.style.display = speedLevel < HYPER_SPEED_THRESHOLD ? 'block' : 'none';
-
-            energyGenProgressCircle.style.strokeDashoffset = circumference * (1 - (energyGenLevel / upgrades.energyGenerator.maxLevel));
-
-            addBoardProgressCircle.style.strokeDashoffset = circumference * (1 - (addBoardLevel / upgrades.addGameBoard.maxLevel));
+            speedProgressCircle.style.strokeDashoffset = circumference * (1 - fillFraction(balance, upgrades.speed));
+            energyGenProgressCircle.style.strokeDashoffset = circumference * (1 - fillFraction(balance, upgrades.energyGenerator));
+            addBoardProgressCircle.style.strokeDashoffset = circumference * (1 - fillFraction(balance, upgrades.addGameBoard));
         }
 
         function updateCollapseFoam(percent, ready) {
@@ -570,9 +570,6 @@ const uiState = {
     egps: -1,
     autoPlayActive: false,
     energyPaused: false,
-    speedLevel: -1,
-    energyGenLevel: -1,
-    addBoardLevel: -1,
     starBalance: -1,
     totalStarsEarned: -1,
     isMetaBoardActive: false,
@@ -626,9 +623,6 @@ const uiState = {
             const egps = upgrades.energyGenerator.level * 5;
             const autoActive = !!autoPlayInterval;
             const energyPaused = autoPlayWantsToRun && energyEmpty;
-            const speedLevel = upgrades.speed.level;
-            const energyGenLevel = upgrades.energyGenerator.level;
-            const addBoardLevel = upgrades.addGameBoard.level;
             const foamPercent = (quantumFoam / MAX_QUANTUM_FOAM) * 100;
             const foamReady = quantumFoam >= MAX_QUANTUM_FOAM;
 
@@ -639,9 +633,9 @@ const uiState = {
             const reserveChanged = reservePercent !== uiState.reservePercent;
             const emptyChanged = energyEmpty !== uiState.energyEmpty;
             const rateChanged = sps !== uiState.sps || eps !== uiState.eps || egps !== uiState.egps || autoActive !== uiState.autoPlayActive || energyPaused !== uiState.energyPaused;
-            const levelChanged = speedLevel !== uiState.speedLevel || energyGenLevel !== uiState.energyGenLevel || addBoardLevel !== uiState.addBoardLevel;
+            const balanceChanged = starBalance !== uiState.starBalance;
             const foamChanged = isMetaBoardActive && (foamPercent !== uiState.foamPercent || foamReady !== uiState.foamReady);
-            const upgradesChanged = starBalance !== uiState.starBalance || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || levelChanged || isMetaBoardActive !== uiState.isMetaBoardActive;
+            const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive;
 
             const tasks = [];
             if (gamesChanged) tasks.push(() => { renderGamesPlayed(games); updateGameCounters(games, wins); });
@@ -650,7 +644,7 @@ const uiState = {
             if (reserveChanged) tasks.push(() => renderReserveEnergy(reservePercent));
             if (emptyChanged) tasks.push(() => setEnergyEmpty(energyEmpty));
             if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
-            if (levelChanged) tasks.push(() => { updateProgressCircles(speedLevel, energyGenLevel, addBoardLevel); updateSellButtons(); });
+            if (balanceChanged) tasks.push(() => { updateProgressCircles(starBalance); updateSellButtons(); });
             if (upgradesChanged) tasks.push(updateUpgrades);
             if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
 
@@ -666,8 +660,8 @@ const uiState = {
             if (reserveChanged) uiState.reservePercent = reservePercent;
             if (emptyChanged) uiState.energyEmpty = energyEmpty;
             if (rateChanged) { uiState.sps = sps; uiState.eps = eps; uiState.egps = egps; uiState.autoPlayActive = autoActive; uiState.energyPaused = energyPaused; }
-            if (levelChanged) { uiState.speedLevel = speedLevel; uiState.energyGenLevel = energyGenLevel; uiState.addBoardLevel = addBoardLevel; }
-            if (upgradesChanged) { uiState.starBalance = starBalance; uiState.totalStarsEarned = totalStarsEarned; uiState.isMetaBoardActive = isMetaBoardActive; }
+            if (balanceChanged) uiState.starBalance = starBalance;
+            if (upgradesChanged) { uiState.totalStarsEarned = totalStarsEarned; uiState.isMetaBoardActive = isMetaBoardActive; }
             if (foamChanged) { uiState.foamPercent = foamPercent; uiState.foamReady = foamReady; }
         }
 

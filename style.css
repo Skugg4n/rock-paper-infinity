@@ -71,7 +71,6 @@ button:disabled,
     transform-origin: 50% 50%;
     transition: stroke-dashoffset 0.3s ease;
 }
-.progress-ring-pre { stroke: #94a3b8; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.3s ease; }
 
 #tooltip {
     position: absolute;
