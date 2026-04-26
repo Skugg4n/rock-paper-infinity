@@ -1,5 +1,23 @@
 export const SCHEMA_VERSION = 1;
 
+// Migration map: keyed by the version being migrated FROM.
+// Each function takes the parsed state and returns an updated state.
+// Add entries here when SCHEMA_VERSION is bumped:
+//   1: (state) => ({ ...state, newField: defaultValue }),
+const MIGRATIONS = {
+    // placeholder: no migrations needed yet for v1 → v2
+};
+
+export function migrate(parsed) {
+    let version = parsed.schemaVersion ?? 1;
+    while (version < SCHEMA_VERSION && MIGRATIONS[version]) {
+        parsed = MIGRATIONS[version](parsed);
+        version++;
+    }
+    parsed.schemaVersion = SCHEMA_VERSION;
+    return parsed;
+}
+
 export function serializeGameState(state, upgrades) {
     const data = {
         schemaVersion: SCHEMA_VERSION,
@@ -35,7 +53,7 @@ export function deserializeGameState(raw) {
     if (parsed == null || typeof parsed !== 'object') return null;
     const version = parsed.schemaVersion ?? 1; // missing = legacy v1
     if (version > SCHEMA_VERSION) return null;
-    return parsed;
+    return migrate(parsed);
 }
 
 export function saveToStorage(key, value) {
