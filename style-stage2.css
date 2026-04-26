@@ -315,13 +315,20 @@ input[type=range]::-webkit-slider-runnable-track {
 
 input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    height: 20px;
-    width: 20px;
+    height: 28px;
+    width: 28px;
     border-radius: 50%;
     background: white;
     cursor: pointer;
-    margin-top: -6px;
+    margin-top: -10px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+@media (min-width: 640px) {
+    input[type=range]::-webkit-slider-thumb {
+        height: 20px;
+        width: 20px;
+        margin-top: -6px;
+    }
 }
 
 /* Phase 2 factory — contained conveyor animation */
