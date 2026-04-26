@@ -104,8 +104,8 @@
 /* === Unscoped Phase 2 selectors (unique, no conflict) === */
 
 .building-slot {
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
     border-radius: 0.75rem;
     display: flex;
     flex-direction: column;
@@ -113,6 +113,12 @@
     justify-content: center;
     transition: all 0.3s ease-in-out;
     position: relative;
+}
+@media (min-width: 400px) {
+    .building-slot {
+        width: 56px;
+        height: 56px;
+    }
 }
 @media (min-width: 640px) {
     .building-slot {
