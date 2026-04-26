@@ -5,7 +5,7 @@ import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { getSPS, getEPS, getVisibleDots, formatCount, fillFraction } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
-import { serializeGameState, saveToStorage, loadFromStorage } from "./persistence.js";
+import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 
         // DOM elements
@@ -688,14 +688,14 @@ const uiState = {
             const data = loadFromStorage(SAVE_KEY);
             if (!data) return;
             try {
-                starBalance = data.starBalance ?? starBalance;
-                totalStarsEarned = data.totalStarsEarned ?? totalStarsEarned;
-                totalGamesPlayed = data.totalGamesPlayed ?? totalGamesPlayed;
-                totalWins = data.totalWins ?? totalWins;
-                energy = data.energy ?? energy;
-                reserveEnergy = data.reserveEnergy ?? reserveEnergy;
-                starMultiplier = data.starMultiplier ?? starMultiplier;
-                quantumFoam = data.quantumFoam ?? quantumFoam;
+                starBalance = sanitizeNumber(data.starBalance) ?? starBalance;
+                totalStarsEarned = sanitizeNumber(data.totalStarsEarned) ?? totalStarsEarned;
+                totalGamesPlayed = sanitizeNumber(data.totalGamesPlayed) ?? totalGamesPlayed;
+                totalWins = sanitizeNumber(data.totalWins) ?? totalWins;
+                energy = sanitizeNumber(data.energy) ?? energy;
+                reserveEnergy = sanitizeNumber(data.reserveEnergy) ?? reserveEnergy;
+                starMultiplier = sanitizeNumber(data.starMultiplier) ?? starMultiplier;
+                quantumFoam = sanitizeNumber(data.quantumFoam) ?? quantumFoam;
                 isMetaBoardActive = data.isMetaBoardActive ?? isMetaBoardActive;
                 autoPlayWantsToRun = data.autoPlayWantsToRun ?? autoPlayWantsToRun;
                 if (data.upgrades) {

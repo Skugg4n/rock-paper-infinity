@@ -42,8 +42,20 @@ export function serializeGameState(state, upgrades) {
     return JSON.stringify(data);
 }
 
+/**
+ * Sanitizes a numeric value from a save: returns the value if it is a finite
+ * number, otherwise returns null so callers can fall back to a default.
+ * Guards against NaN and Infinity that can appear in corrupted saves.
+ */
+export function sanitizeNumber(value) {
+    if (typeof value !== 'number') return null;
+    if (!isFinite(value)) return null;
+    return value;
+}
+
 export function deserializeGameState(raw) {
     if (!raw) return null;
+    if (typeof raw === 'string' && raw.trim() === '') return null;
     let parsed;
     try {
         parsed = JSON.parse(raw);
