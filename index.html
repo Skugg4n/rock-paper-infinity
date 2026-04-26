@@ -178,7 +178,11 @@
                     <span class="flex items-center gap-1"><i data-lucide="star" class="w-3 h-3"></i> Industry</span>
                     <span class="flex items-center gap-1">Research <i data-lucide="atom" class="w-3 h-3"></i></span>
                 </div>
-                <input type="range" min="0" max="100" value="50" class="w-full" id="allocation-slider" aria-label="Population allocation: Industry vs Research">
+                <div class="flex items-center gap-1">
+                    <button id="allocation-dec-btn" class="allocation-step-btn sm:hidden" aria-label="Decrease research allocation by 5%">−</button>
+                    <input type="range" min="0" max="100" value="50" class="w-full" id="allocation-slider" aria-label="Population allocation: Industry vs Research">
+                    <button id="allocation-inc-btn" class="allocation-step-btn sm:hidden" aria-label="Increase research allocation by 5%">+</button>
+                </div>
             </div>
         </div>
 

@@ -89,6 +89,8 @@ export function init() {
               netStarChange: document.getElementById('net-star-change'),
               netScienceChange: document.getElementById('net-science-change'),
               allocationSlider: document.getElementById('allocation-slider'),
+              allocationDecBtn: document.getElementById('allocation-dec-btn'),
+              allocationIncBtn: document.getElementById('allocation-inc-btn'),
               landGrid: document.getElementById('land-grid'),
               populationUi: document.getElementById('population-ui'),
               suppliesUi: document.getElementById('supplies-ui'),
@@ -797,6 +799,18 @@ export function init() {
 
             ui.allocationSlider.addEventListener('input', (e) => {
                 gameState.populationAllocation = e.target.value / 100;
+            }, { signal });
+
+            ui.allocationDecBtn.addEventListener('click', () => {
+                const newVal = Math.max(0, Math.round(gameState.populationAllocation * 100) - 5);
+                gameState.populationAllocation = newVal / 100;
+                ui.allocationSlider.value = newVal;
+            }, { signal });
+
+            ui.allocationIncBtn.addEventListener('click', () => {
+                const newVal = Math.min(100, Math.round(gameState.populationAllocation * 100) + 5);
+                gameState.populationAllocation = newVal / 100;
+                ui.allocationSlider.value = newVal;
             }, { signal });
 
             function initialize() {

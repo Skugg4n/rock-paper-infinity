@@ -309,6 +309,25 @@
     }
 }
 
+/* +/- step buttons for allocation slider — mobile only, hidden on sm+ via Tailwind sm:hidden */
+.allocation-step-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    background-color: #e2e8f0;
+    color: #475569;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.allocation-step-btn:hover { background-color: #cbd5e1; }
+.allocation-step-btn:active { background-color: #94a3b8; }
+
 input[type=range] {
     -webkit-appearance: none;
     width: 100%;
