@@ -540,6 +540,11 @@ export function init() {
               const supplyConsumption = gameState.population;
               const netSupplyChange = supplyProduction - supplyConsumption;
 
+              // Cache supply values for fastUiTick to read — avoids recomputing every 50ms
+              gameState.cachedSupplyProduction = supplyProduction;
+              gameState.cachedSupplyConsumption = supplyConsumption;
+              gameState.cachedNetSupplyChange = netSupplyChange;
+
               if (!skipGrowth) {
                   gameState.supplies = Math.max(0, gameState.supplies + netSupplyChange);
 
@@ -627,12 +632,9 @@ export function init() {
               const baseStarPerPerson = calculateBaseStarPerPerson();
               ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} /person`;
 
-              const supplyProduction = gameState.buildings.reduce((acc, b) => {
-                  if(!b || !(b.type === 'store' || b.type === 'superStore')) return acc;
-                  return acc + (b.supply * Math.pow(2, gameState.gmoLevel));
-              }, 0);
-              const supplyConsumption = gameState.population;
-              const netSupplyChange = supplyProduction - supplyConsumption;
+              const supplyProduction = gameState.cachedSupplyProduction || 0;
+              const supplyConsumption = gameState.cachedSupplyConsumption || 0;
+              const netSupplyChange = gameState.cachedNetSupplyChange || 0;
               const maxFlow = Math.max(supplyProduction, supplyConsumption, 1);
               const magnitudeRatio = Math.min(1, Math.abs(netSupplyChange) / maxFlow);
 
