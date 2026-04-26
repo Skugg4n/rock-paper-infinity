@@ -145,7 +145,7 @@ export function init() {
               localStorage.removeItem(STARS_TRANSFER_KEY);
               localStorage.removeItem(PHASE_KEY);
               setTimeout(() => location.reload(), 0);
-          });
+          }, { signal });
   
           // --- BUILDING & RENDERING LOGIC ---
           const notifiedUpgrades = new Set();
@@ -811,9 +811,15 @@ export function init() {
   window.sellBuilding = sellBuilding;
   window.upgradeBuilding = upgradeBuilding;
   initialize();
-    logicInterval = setInterval(logicTick, 1000);
-    fastUiInterval = setInterval(fastUiTick, 50);
-    window.addEventListener('beforeunload', beforeUnloadHandler);
+  // Only start ticks if initialize() did not trigger the WAR end-state.
+  // When returning to a ≥50k population save, initialize() sets savingEnabled=false
+  // and calls playChapterCard(to-come). Starting ticks in that case would run the
+  // game logic behind the WAR card and allow population to keep growing.
+  if (savingEnabled) {
+      logicInterval = setInterval(logicTick, 1000);
+      fastUiInterval = setInterval(fastUiTick, 50);
+  }
+  window.addEventListener('beforeunload', beforeUnloadHandler);
   }
 
 export function teardown() {
