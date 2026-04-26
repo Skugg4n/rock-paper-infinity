@@ -7,6 +7,7 @@ import {
     loadFromStorage,
     SCHEMA_VERSION,
     migrate,
+    sanitizeNumber,
 } from './persistence.js';
 
 describe('persistence', () => {
@@ -151,6 +152,80 @@ describe('schema versioning', () => {
         const future = JSON.stringify({ schemaVersion: 999, starBalance: 1 });
         const result = deserializeGameState(future);
         expect(result).toBeNull();
+    });
+});
+
+describe('sanitizeNumber', () => {
+    test('returns the value for finite numbers', () => {
+        expect(sanitizeNumber(0)).toBe(0);
+        expect(sanitizeNumber(42)).toBe(42);
+        expect(sanitizeNumber(-5)).toBe(-5);
+        expect(sanitizeNumber(1.5)).toBe(1.5);
+    });
+
+    test('returns null for NaN', () => {
+        expect(sanitizeNumber(NaN)).toBeNull();
+    });
+
+    test('returns null for Infinity', () => {
+        expect(sanitizeNumber(Infinity)).toBeNull();
+        expect(sanitizeNumber(-Infinity)).toBeNull();
+    });
+
+    test('returns null for non-number types', () => {
+        expect(sanitizeNumber('42')).toBeNull();
+        expect(sanitizeNumber(null)).toBeNull();
+        expect(sanitizeNumber(undefined)).toBeNull();
+        expect(sanitizeNumber({})).toBeNull();
+    });
+});
+
+describe('persistence edge cases', () => {
+    test('deserializeGameState returns null for empty string ""', () => {
+        expect(deserializeGameState('')).toBeNull();
+    });
+
+    test('deserializeGameState returns null for whitespace-only string', () => {
+        expect(deserializeGameState('   ')).toBeNull();
+    });
+
+    test('deserializeGameState returns null for literal "undefined" string', () => {
+        // localStorage.getItem() can return "undefined" if someone called
+        // localStorage.setItem(key, undefined) — the value is stringified.
+        expect(deserializeGameState('undefined')).toBeNull();
+    });
+
+    test('deserializeGameState returns null for literal "null" string', () => {
+        expect(deserializeGameState('null')).toBeNull();
+    });
+
+    test('save with NaN starBalance: sanitizeNumber falls back to default', () => {
+        // A corrupted save that somehow has NaN in a numeric field.
+        // deserializeGameState still parses it, but the load code should
+        // use sanitizeNumber() to reject NaN and fall back to its default.
+        const corrupt = JSON.stringify({ schemaVersion: 1, starBalance: NaN, energy: 50 });
+        // JSON.stringify converts NaN to null, so what arrives is null — not a number.
+        const result = deserializeGameState(corrupt);
+        expect(result).not.toBeNull();
+        // starBalance would be null (JSON stringifies NaN as null)
+        expect(result.starBalance).toBeNull();
+        // sanitizeNumber(null) returns null, so callers fall back to default
+        expect(sanitizeNumber(result.starBalance)).toBeNull();
+    });
+
+    test('save with Infinity: JSON stringifies to null, sanitizeNumber rejects', () => {
+        const state = {
+            starBalance: Infinity,
+            totalStarsEarned: 0, totalGamesPlayed: 0, totalWins: 0,
+            energy: 100, reserveEnergy: 0, gameSpeed: 1, starMultiplier: 1,
+            quantumFoam: 0, isMetaBoardActive: false, autoPlayWantsToRun: false,
+            gameBoardsCount: 1,
+        };
+        const json = serializeGameState(state, {});
+        const result = deserializeGameState(json);
+        // JSON.stringify converts Infinity to null
+        expect(result.starBalance).toBeNull();
+        expect(sanitizeNumber(result.starBalance)).toBeNull();
     });
 });
 

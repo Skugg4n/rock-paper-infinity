@@ -154,3 +154,40 @@ test('to-come mode: title stays visible — display not none, suffix revealed', 
     await jest.advanceTimersByTimeAsync(0);
     expect(resolved).toBe(false);
 });
+
+test('to-come followed by normal call: normal is no-op while to-come holds wall', async () => {
+    // The first call enters to-come mode (never resolves). The second call should
+    // be ignored because _cardActive is still true. The normal call's midpoint must
+    // never fire and the DOM must show the original to-come title.
+    const toComeProm = playChapterCard({ roman: 'III', title: 'WAR', mode: 'to-come' });
+
+    // Advance enough for to-come to have fully settled (veilIn + titleIn + hold + 300ms settle)
+    await jest.advanceTimersByTimeAsync(PHASE_DURATIONS.veilIn + PHASE_DURATIONS.titleIn + PHASE_DURATIONS.hold + 400);
+
+    // Now try a follow-up normal call — should be a no-op
+    let normalMidpointFired = false;
+    let normalResolved = false;
+    const normalProm = playChapterCard({
+        roman: 'II',
+        title: 'CAPITAL',
+        onMidpoint: () => { normalMidpointFired = true; },
+    });
+    normalProm.then(() => { normalResolved = true; });
+
+    // Advance past the full normal sequence
+    await jest.advanceTimersByTimeAsync(3000);
+    await normalProm;
+
+    // Normal call resolves immediately (returns Promise.resolve())
+    expect(normalResolved).toBe(true);
+    // But its midpoint never fired
+    expect(normalMidpointFired).toBe(false);
+    // DOM still shows WAR, not CAPITAL
+    expect(document.querySelector('.chapter-card__title').textContent).toBe('WAR');
+
+    // to-come promise still unresolved
+    let toComeDone = false;
+    toComeProm.then(() => { toComeDone = true; });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(toComeDone).toBe(false);
+});
