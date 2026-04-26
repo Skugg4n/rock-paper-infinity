@@ -2,7 +2,7 @@ import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
 import { playChapterCard } from "../chapterCard.js";
 import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
-import { getSPS, getEPS, getVisibleDots, formatCount } from "./rates.js";
+import { getSPS, getEPS, getVisibleDots, formatCount, fillFraction } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage } from "./persistence.js";
@@ -462,12 +462,6 @@ function scheduleUIUpdate() {
 
         function updateSellButtons() {
             // Sell buttons removed — they were confusing to users
-        }
-
-        function fillFraction(balance, upgrade) {
-            if (upgrade.level >= upgrade.maxLevel) return 1;
-            const nextCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
-            return Math.min(1, balance / nextCost);
         }
 
         function updateProgressCircles(balance) {

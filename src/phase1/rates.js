@@ -29,3 +29,17 @@ export function formatCount(n) {
     if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
     return n.toLocaleString();
 }
+
+/**
+ * Returns the fill fraction (0–1) for a progress ring, representing how
+ * far the player's star balance is toward the next purchase cost.
+ * Clamped at 1. Returns 1 if the upgrade is already at maxLevel.
+ *
+ * @param {number} balance - Current star balance
+ * @param {{ cost: number|function, level?: number, maxLevel?: number }} upgrade
+ */
+export function fillFraction(balance, upgrade) {
+    if (upgrade.maxLevel !== undefined && upgrade.level >= upgrade.maxLevel) return 1;
+    const nextCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
+    return Math.min(1, balance / nextCost);
+}
