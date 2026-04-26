@@ -343,6 +343,7 @@ function scheduleUIUpdate() {
                 }
             }
             manageAutoPlay();
+            saveGame();
             scheduleUIUpdate();
         }
 
@@ -646,7 +647,6 @@ const uiState = {
             if (!tasks.length) return;
 
             tasks.push(updateWinVisuals);
-            tasks.push(saveGame);
             tasks.forEach(fn => fn());
 
             if (gamesChanged) { uiState.gamesPlayed = games; uiState.totalWins = wins; }
