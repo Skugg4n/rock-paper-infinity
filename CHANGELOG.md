@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.11.2 - 2026-04-25
+
+### Polish
+
+- **Enemy red triangle removed (for now)** — The triangle backdrop on enemy wins clashed with the existing slate ring around the wrapper, producing a noisy "stökigt och fult" visual. Reverted both the `::before` triangle and its keyframe. The enemy still gets the slate-shadow ring as a visual cue, just no triangle. Documented as a v1.12+ candidate in PROJECTPLAN.md — needs proper design (smaller, subtler, possibly outside the wrapper).
+- **Win-ring pulse limited to first 3 wins** — The pulse animation on `.result-wrapper.winner` now only fires while `totalStarsEarned < 3`. Static ring still appears on every win as the visual cue; pulse is reserved for the early "first wins" celebration moment. Avoids the cue going stale in late game.
+
 ## v1.11.1 - 2026-04-25
 
 ### Hotfix

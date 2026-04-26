@@ -123,34 +123,18 @@ button:disabled,
 }
 
 .result-wrapper.winner {
-    animation: win-ring-pulse 600ms ease-out;
     box-shadow: 0 0 0 4px rgba(71, 85, 105, 0.18), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
     border-radius: 9999px;
     padding: 8px;
 }
+/* Pulse only on the first few wins, gated by JS adding .celebrate */
+.result-wrapper.winner.celebrate {
+    animation: win-ring-pulse 600ms ease-out;
+}
 .result-wrapper.enemy-winner {
-    position: relative;
     box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.32), 0 4px 12px -2px rgba(0, 0, 0, 0.12);
     border-radius: 9999px;
     padding: 8px;
-    isolation: isolate;
-}
-
-/* Red triangle backdrop — enemy's visual signature (reused in Phase 3 WAR) */
-.result-wrapper.enemy-winner::before {
-    content: '';
-    position: absolute;
-    inset: -16%;
-    background: #b91c1c;
-    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-    z-index: -1;
-    opacity: 0;
-    animation: enemy-triangle-fade 400ms ease-out forwards;
-}
-
-@keyframes enemy-triangle-fade {
-    0%   { opacity: 0; transform: scale(0.85); }
-    100% { opacity: 0.85; transform: scale(1); }
 }
 
 .small-icons .result-wrapper.winner,

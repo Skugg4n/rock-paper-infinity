@@ -839,8 +839,10 @@ const uiState = {
             else result = 'lose';
 
             const revealClass = instant ? '' : 'reveal-item';
+            // Celebrate (one-shot pulse) only on the first 3 wins — keeps the cue special
+            const celebrateClass = result === 'win' && totalStarsEarned < 3 ? 'celebrate' : '';
             const playerWrapper = document.createElement('div');
-            playerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''}`;
+            playerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''} ${celebrateClass}`.trim();
             playerWrapper.appendChild(getIcon(iconMap[playerChoice], 'lucide-lg text-slate-800'));
             board.playerEl.replaceChildren(playerWrapper);
 
