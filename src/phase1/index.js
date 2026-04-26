@@ -2,13 +2,26 @@ import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
 import { playChapterCard } from "../chapterCard.js";
 import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
-import { getSPS, getEPS, getVisibleDots, formatCount, fillFraction } from "./rates.js";
+import { getSPS, getEPS } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
 import { mountSaveButtons } from "../save-export.js";
+import {
+    renderWinTracker,
+    renderRateDisplays,
+    renderProgressCircles,
+    renderCollapseFoam,
+    renderResourceBarsVisibility,
+    renderEnergyBar,
+    renderReserveBar,
+    renderEnergyEmpty,
+    renderGameCounters,
+    resetCounterIconState,
+    renderUpgrades,
+} from "./rendering.js";
 
         // DOM elements
         const gameBoardContainer = document.getElementById('game-board-container');
@@ -92,15 +105,6 @@ const resetBtn = document.getElementById('reset-btn');
 
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
-
-const buildIcon = (name, className = '') => getIcon(name, className);
-
-const crownTemplate = buildIcon('crown', 'lucide-crown-xl text-slate-800');
-const gemLargeTemplate = buildIcon('gem', 'lucide-gem-large text-slate-800');
-const gemMediumTemplate = buildIcon('gem', 'lucide-gem-medium text-slate-800');
-const starSmallTemplate = buildIcon('star', 'lucide-star-small text-slate-800');
-
-
 
 let uiUpdatePending = false;
 function scheduleUIUpdate() {
@@ -296,184 +300,43 @@ function scheduleUIUpdate() {
             if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned) return;
             lastStarBalance = starBalance;
             lastTotalStarsEarned = totalStarsEarned;
-
-            winTracker.innerHTML = '';
-            const crowns = Math.floor(starBalance / 10000);
-            const gems = Math.floor((starBalance % 10000) / 100);
-            const smallStars = starBalance % 100;
-
-            if (crowns > 0) {
-                const container = document.createElement('div');
-                container.className = 'grid grid-cols-5 gap-1 items-center';
-                const displayedCrowns = Math.min(crowns, 10);
-                for (let i = 0; i < displayedCrowns; i++) {
-                    const wrap = document.createElement('div');
-                    wrap.appendChild(crownTemplate.cloneNode(true));
-                    container.appendChild(wrap);
-                }
-                winTracker.appendChild(container);
-                if (crowns > 10) {
-                    const extra = document.createElement('div');
-                    extra.className = 'flex items-center gap-1 text-slate-800';
-                    extra.appendChild(crownTemplate.cloneNode(true));
-                    const span = document.createElement('span');
-                    span.className = 'text-sm';
-                    span.textContent = `x ${crowns - 10}`;
-                    extra.appendChild(span);
-                    winTracker.appendChild(extra);
-                }
-            }
-
-            const showGemPlaceholders = totalStarsEarned >= 10000;
-            if (gems > 0 || showGemPlaceholders) {
-                const container = document.createElement('div');
-                container.className = 'grid grid-cols-10 gap-1 items-center';
-                const gemTemplate = gems > 5 ? gemMediumTemplate : gemLargeTemplate;
-                const totalSlots = showGemPlaceholders ? 100 : gems;
-                for (let i = 0; i < totalSlots; i++) {
-                    const slot = document.createElement('div');
-                    if (i < gems) {
-                        slot.appendChild(gemTemplate.cloneNode(true));
-                    } else {
-                        slot.className = 'gem-dot';
-                    }
-                    container.appendChild(slot);
-                }
-                winTracker.appendChild(container);
-            }
-
-            const dotsToShow = getVisibleDots(totalStarsEarned);
-            const gridContainer = document.createElement('div');
-            gridContainer.className = 'grid grid-cols-10 gap-1';
-            for (let i = 0; i < dotsToShow; i++) {
-                const slot = document.createElement('div');
-                if (i < smallStars) {
-                    const star = starSmallTemplate.cloneNode(true);
-                    star.setAttribute('fill', 'currentColor');
-                    star.setAttribute('stroke', 'none');
-                    slot.appendChild(star);
-                } else {
-                    slot.className = 'dot';
-                }
-                gridContainer.appendChild(slot);
-            }
-            winTracker.appendChild(gridContainer);
+            renderWinTracker({ winTracker }, starBalance, totalStarsEarned);
         }
         
         function updateRateDisplays(sps, eps, egps, autoActive, energyPaused) {
-            if (sps > 0.1) {
-                spsContainer.classList.remove('hidden');
-                spsValue.textContent = sps.toFixed(1);
-                spsContainer.classList.toggle('rate-paused', energyPaused);
-            } else {
-                spsContainer.classList.add('hidden');
-            }
-
-            if (autoActive) {
-                epsContainer.classList.remove('hidden');
-                epsValue.textContent = eps.toFixed(1);
-            } else {
-                epsContainer.classList.add('hidden');
-            }
-
-            if (egps > 0) {
-                egpsContainer.classList.remove('hidden');
-                egpsValue.textContent = egps.toFixed(1);
-            } else {
-                egpsContainer.classList.add('hidden');
-            }
-        }
-
-        function updateSellButtons() {
-            // Sell buttons removed — they were confusing to users
+            renderRateDisplays(
+                { spsContainer, spsValue, epsContainer, epsValue, egpsContainer, egpsValue },
+                sps, eps, egps, autoActive, energyPaused
+            );
         }
 
         function updateProgressCircles(balance) {
-            const circumference = 100.5;
-            speedProgressCircle.style.strokeDashoffset = circumference * (1 - fillFraction(balance, upgrades.speed));
-            energyGenProgressCircle.style.strokeDashoffset = circumference * (1 - fillFraction(balance, upgrades.energyGenerator));
-            addBoardProgressCircle.style.strokeDashoffset = circumference * (1 - fillFraction(balance, upgrades.addGameBoard));
+            renderProgressCircles(
+                { speedProgressCircle, energyGenProgressCircle, addBoardProgressCircle },
+                balance, upgrades
+            );
         }
 
         function updateCollapseFoam(percent, ready) {
-            collapseFoamFill.style.height = `${percent}%`;
-            collapseFoamBtn.disabled = !ready;
-            collapseFoamBtn.classList.toggle('ready', ready);
+            renderCollapseFoam({ collapseFoamFill, collapseFoamBtn }, percent, ready);
         }
 
         function updateUpgrades() {
-            const factoryReady = upgrades.mergeGameBoard.unlockCondition &&
-                upgrades.mergeGameBoard.unlockCondition() &&
-                !upgrades.mergeGameBoard.purchased;
-            for (const key in upgrades) {
-                const upgrade = upgrades[key];
-
-                if (factoryReady && key !== 'mergeGameBoard') {
-                    upgrade.element.classList.add('invisible');
-                    continue;
-                }
-
-                let isUnlocked = (upgrade.unlocksAt === 0) ||
-                                 (upgrade.unlocksAt > 0 && totalStarsEarned >= upgrade.unlocksAt) ||
-                                 (upgrade.unlocksAtGames > 0 && totalGamesPlayed >= upgrade.unlocksAtGames) ||
-                                 (upgrade.unlocksAtSPS > 0 && getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier) >= upgrade.unlocksAtSPS) ||
-                                 Object.keys(upgrades).some(parentKey => {
-                                     const parent = upgrades[parentKey];
-                                     const parentUnlocked = (parent.level !== undefined && parent.level >= parent.maxLevel) || parent.purchased;
-                                     return parent.unlocks && parent.unlocks.includes(key) && parentUnlocked;
-                                 });
-
-                if (typeof upgrade.unlockCondition === 'function') {
-                    isUnlocked = isUnlocked && upgrade.unlockCondition();
-                }
-
-                if (isUnlocked) {
-                    if (isMetaBoardActive && (key === 'addGameBoard' || key === 'mergeGameBoard')) {
-                        upgrade.element.classList.add('invisible');
-                    } else {
-                        const wasHidden = upgrade.element.classList.contains('invisible');
-                        upgrade.element.classList.remove('invisible');
-                        if (wasHidden && !revealedUpgrades.has(key)) {
-                            revealedUpgrades.add(key);
-                            if (firstUpgradeUpdateDone) {
-                                upgrade.element.classList.add('materialize');
-                                upgrade.element.addEventListener('animationend', () => {
-                                    upgrade.element.classList.remove('materialize');
-                                }, { once: true, signal: listenerController.signal });
-                            }
-                        }
-                        revealedUpgrades.add(key);
-                    }
-
-                    const currentCost = typeof upgrade.cost === 'function' ? upgrade.cost() : upgrade.cost;
-
-                    if (upgrade.level !== undefined) {
-                        upgrade.element.disabled = (starBalance < currentCost) || (upgrade.level >= upgrade.maxLevel);
-                        if (upgrade.level >= upgrade.maxLevel) upgrade.element.classList.add('purchased');
-                    } else if (upgrade.consumable) {
-                        upgrade.element.disabled = starBalance < currentCost;
-                    } else {
-                        upgrade.element.disabled = (starBalance < currentCost) || upgrade.purchased;
-                        if (upgrade.purchased) upgrade.element.classList.add('purchased');
-                    }
-                } else {
-                    upgrade.element.classList.add('invisible');
-                }
-            }
+            renderUpgrades({
+                upgrades,
+                starBalance,
+                totalStarsEarned,
+                totalGamesPlayed,
+                gameSpeed,
+                isMetaBoardActive,
+                boardCount: gameBoards.length,
+                starMultiplier,
+                revealedUpgrades,
+                firstDone: firstUpgradeUpdateDone,
+                signal: listenerController.signal,
+                quantumFoamContainer,
+            });
             if (!firstUpgradeUpdateDone) firstUpgradeUpdateDone = true;
-
-            // Tease Quantum Foam before factory is purchased:
-            // show locked (greyed) when factory is purchaseable, show fully when purchased.
-            if (upgrades.mergeGameBoard.purchased) {
-                // mergeToMetaBoard() already removes 'hidden'; just ensure no locked state
-                quantumFoamContainer.classList.remove('is-locked');
-            } else if (factoryReady) {
-                quantumFoamContainer.classList.remove('hidden');
-                quantumFoamContainer.classList.add('is-locked');
-            } else {
-                quantumFoamContainer.classList.add('hidden');
-                quantumFoamContainer.classList.remove('is-locked');
-            }
         }
 
 const uiState = {
@@ -494,41 +357,6 @@ const uiState = {
     foamPercent: -1,
     foamReady: false
 };
-
-        function renderGamesPlayed(value) {
-            debugGamesPlayedEl.textContent = value;
-        }
-
-        let counterIconsSet = false;
-        function updateGameCounters(games, wins) {
-            if (games > 0) {
-                gameCounters.classList.remove('hidden');
-                gamesValueEl.textContent = formatCount(games);
-                winsValueEl.textContent = formatCount(wins);
-                if (!counterIconsSet) {
-                    document.getElementById('games-icon').replaceWith(getIcon('swords', 'w-3 h-3 text-slate-400'));
-                    document.getElementById('wins-icon').replaceWith(getIcon('trophy', 'w-3 h-3 text-slate-400'));
-                    counterIconsSet = true;
-                }
-            }
-        }
-
-        function toggleResourceBars(show) {
-            resourceBars.classList.toggle('hidden', !show);
-        }
-
-        function renderEnergy(percent) {
-            energyFillEl.style.height = `${percent}%`;
-        }
-
-        function renderReserveEnergy(percent) {
-            reserveEnergyFillEl.style.height = `${percent}%`;
-        }
-
-        function setEnergyEmpty(empty) {
-            energyFillEl.classList.toggle('bg-slate-700', empty);
-            energyFillEl.classList.toggle('bg-slate-500', !empty);
-        }
 
         function updateUI() {
             const games = Math.floor(totalGamesPlayed);
@@ -556,13 +384,16 @@ const uiState = {
             const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive;
 
             const tasks = [];
-            if (gamesChanged) tasks.push(() => { renderGamesPlayed(games); updateGameCounters(games, wins); });
-            if (resourcesChanged) tasks.push(() => toggleResourceBars(showResources));
-            if (energyChanged) tasks.push(() => renderEnergy(energyPercent));
-            if (reserveChanged) tasks.push(() => renderReserveEnergy(reservePercent));
-            if (emptyChanged) tasks.push(() => setEnergyEmpty(energyEmpty));
+            if (gamesChanged) tasks.push(() => {
+                debugGamesPlayedEl.textContent = games;
+                renderGameCounters({ gameCounters, gamesValueEl, winsValueEl }, games, wins);
+            });
+            if (resourcesChanged) tasks.push(() => renderResourceBarsVisibility(resourceBars, showResources));
+            if (energyChanged) tasks.push(() => renderEnergyBar(energyFillEl, energyPercent));
+            if (reserveChanged) tasks.push(() => renderReserveBar(reserveEnergyFillEl, reservePercent));
+            if (emptyChanged) tasks.push(() => renderEnergyEmpty(energyFillEl, energyEmpty));
             if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
-            if (balanceChanged) tasks.push(() => { updateProgressCircles(starBalance); updateSellButtons(); });
+            if (balanceChanged) tasks.push(() => updateProgressCircles(starBalance));
             if (upgradesChanged) tasks.push(updateUpgrades);
             if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
 
@@ -690,6 +521,7 @@ const uiState = {
             }
             revealedUpgrades = new Set();
             firstUpgradeUpdateDone = false;
+            resetCounterIconState();
             createGameBoard();
             choiceButtons.forEach(btn => btn.disabled = false);
             menuDropdown.classList.add('hidden');
