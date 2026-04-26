@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.13.0 - 2026-04-23
+
+### Accessibility
+- **prefers-reduced-motion** — Added `@media (prefers-reduced-motion: reduce)` blocks to `style.css` and `style-stage2.css`. All keyframe animations and transitions collapse to 0.01ms for users with motion sensitivity. The chapter-card transition is kept at 100ms so the phase change remains perceptible. JS-driven chapter-card sequence also respects the media query: total duration shrinks from ~2200ms to ~600ms.
+- **ARIA labels** — Phase 1 choice buttons (`aria-label="Rock/Paper/Scissors"`), upgrade buttons (Speed, EnergyGen, BuyBattery, etc.), energy/reserve bars (`role="progressbar"`), win-tracker, games/wins counters all have accessible names. Phase 2 star/science counters and allocation slider labelled. Building slots in Phase 2 announce their type or "Empty land" via `aria-label` set in `renderGridSlot`. Decorative icons marked `aria-hidden="true"`.
+- **aria-live regions** — Win-tracker and games/wins counters use `aria-live="polite"`. Phase 2 star and science counters use `aria-live="polite"` so screen readers announce value changes.
+- **Keyboard focus ring** — Added `:focus-visible` rules to `style.css` for `button` and `.btn`. 2px slate-600 outline with 2px offset. Uses `:focus-visible` (not `:focus`) so mouse users don't see the ring. Range inputs also get a focus-visible ring.
+
+### Tests
+- **fillFraction** — Extracted `fillFraction(balance, upgrade)` from Phase 1's private scope into `rates.js` as a named export. Added `fill-fraction.test.js` with 8 tests: balance at 0/half/equal/exceeding cost, upgrade at maxLevel, cost as function, upgrade without maxLevel.
+- **flying-star animation** — Extracted `fireStarAnimation(sourceEl, targetEl)` from Phase 1's closure into `src/phase1/star-animation.js`. Added `star-animation.test.js` with 6 tests: SVG appended to body, `setAttribute('class')` used (not `.className` — that was the v1.11.1 bug), CSS custom properties set correctly, `animationend` removes element, null guard.
+- **Total tests: 58** (was 44 in v1.12.0).
+
+### Bug fixes
+- **Phase 2: game ticks start behind WAR card on reload** — When returning to a ≥50k population save, `initialize()` triggered the WAR chapter card (to-come mode) but `logicInterval` and `fastUiInterval` were started unconditionally after `initialize()` returned. Game logic kept running behind the permanent overlay. Fixed: ticks only start when `savingEnabled` is still true after `initialize()` returns.
+- **Phase 2: reset button listener leaked across phase switches** — `ui.resetBtn.addEventListener('click', ...)` was missing `{ signal }`, so the listener accumulated with each Phase 2 init. Added `{ signal }` to match all other Phase 2 event listeners.
+
+### Performance / code health
+- **Hot path discipline documented** — Added "Hot path discipline" section to CLAUDE.md's Established Patterns. Rules: fast tick reads state and writes to display only; slow tick writes to localStorage; cache DOM refs at init; don't create elements in tick; always use `scheduleIconRefresh()`.
+- **Audit findings**: both phases comply. One known violation noted for follow-up: Phase 1 `saveGame()` is called inside `updateUI()` (rAF path); should move to `passiveTick`.
+
 ## v1.12.0 - 2026-04-23
 
 ### Fixes (from PDF feedback audit)
