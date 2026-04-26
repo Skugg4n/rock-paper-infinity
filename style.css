@@ -425,6 +425,7 @@ input[type=range]:focus-visible {
    still perceptible without being a long sit.
    ========================================================= */
 @media (prefers-reduced-motion: reduce) {
+    /* Kill decorative loops and long transitions */
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
@@ -437,6 +438,19 @@ input[type=range]:focus-visible {
     .chapter-card__veil,
     .chapter-card__content {
         transition-duration: 100ms !important;
+    }
+    /* Gameplay-critical animations: keep perceptible. Without these, the
+       countdown between RPS rounds disappears entirely and the screen flashes
+       white between every round. Same for reveal/celebrate/materialize —
+       these are the cues that tell the player something happened. */
+    .countdown-frame,
+    .reveal-item,
+    .winner.celebrate,
+    .pop-item,
+    .star-fly,
+    .materialize,
+    .materialize > * {
+        animation-duration: 200ms !important;
     }
 }
 

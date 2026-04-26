@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.18.2 - 2026-04-26
+
+### Hotfix — countdown animation now visible
+
+Two issues conspired to make the RPS round transition look like "white → result" with no animation between rounds:
+
+- **`prefers-reduced-motion` rule was too aggressive.** The universal `*, *::before, *::after { animation-duration: 0.01ms !important }` killed countdown frames, reveal-item, and other gameplay-critical animations to invisibility. Result: countdown SVGs in the DOM but transparent. Now reduced-motion users still get a 200ms perceptible flash for countdown, reveal, celebrate, materialize, star-fly, and pop-item — only decorative loops are killed.
+- **Countdown skipped entirely past `HYPER_SPEED_THRESHOLD`** (gameSpeed > 10). Plus per-frame duration scaled with speed, so even at speed 8-10 frames lasted 40ms — perceptually invisible. Fixed: per-frame duration has a 120ms floor, and at least one "I" frame always plays regardless of speed. Players always see a clear round divider.
+
 ## v1.18.1 - 2026-04-26
 
 ### Hotfix
