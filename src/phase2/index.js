@@ -727,7 +727,17 @@ export function init() {
 
   window.debug_addResources = debug_addResources;
   window.debug_addPopulation = debug_addPopulation;
-  initialize();
+  try {
+      initialize();
+  } catch (e) {
+      console.error('Phase 2 init: initialize() failed — clearing corrupt save and restarting', e);
+      savingEnabled = false;
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(STARS_TRANSFER_KEY);
+      // Let the page reload to a fresh Phase 2 state
+      setTimeout(() => location.reload(), 0);
+      return;
+  }
   // Only start ticks if initialize() did not trigger the WAR end-state.
   // When returning to a ≥50k population save, initialize() sets savingEnabled=false
   // and calls playChapterCard(to-come). Starting ticks in that case would run the

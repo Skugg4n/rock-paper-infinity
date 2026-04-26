@@ -28,9 +28,15 @@ function delay(ms) {
  */
 export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = {}) {
     if (_cardActive) return Promise.resolve();
-    _cardActive = true;
 
     const card = el('#chapter-card');
+    if (!card) {
+        console.warn('playChapterCard: #chapter-card not found in DOM — skipping');
+        return Promise.resolve();
+    }
+
+    _cardActive = true;
+
     const veil = el('.chapter-card__veil');
     const content = el('.chapter-card__content');
     const romanEl = el('.chapter-card__roman');

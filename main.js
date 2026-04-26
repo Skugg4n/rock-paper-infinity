@@ -40,4 +40,4 @@ async function bootstrap() {
   await setPhase(savedPhase);
 }
 
-bootstrap();
+bootstrap().catch(err => console.error('bootstrap failed', err));
