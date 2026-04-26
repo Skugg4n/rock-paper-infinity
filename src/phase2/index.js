@@ -146,7 +146,7 @@ export function init() {
               
               if (building.type !== 'factory' && building.type !== 'bank') {
                   const refund = (buildingData[building.type]?.cost || 0) * 0.7;
-                  actionButtons += `<button class="building-action-btn sell-btn" onclick="sellBuilding(event, ${building.id})">-
+                  actionButtons += `<button class="building-action-btn sell-btn" data-building-id="${building.id}">-
                       <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
                   </button>`;
               }
@@ -177,7 +177,7 @@ export function init() {
                       const upgradeKey = `${building.id}-${upgradeTarget}`;
                       const isNew = initialLoadDone && !notifiedUpgrades.has(upgradeKey);
                       notifiedUpgrades.add(upgradeKey);
-                      actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" onclick="upgradeBuilding(event, ${building.id}, '${upgradeTarget}')" ${canAfford ? '' : 'disabled'}>+
+                      actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" data-building-id="${building.id}" data-upgrade-target="${upgradeTarget}" ${canAfford ? '' : 'disabled'}>+
                           <div class="tooltip">
                               <div class="effect">${effectHTML}</div>
                               <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
@@ -315,7 +315,7 @@ export function init() {
           }
 
           function sellBuilding(event, buildingId) {
-              event.stopPropagation();
+              // buildingId is always a number (parsed from data-building-id at the call site)
               const index = gameState.buildings.findIndex(b => b && b.id === buildingId);
               if (index === -1) return;
               const building = gameState.buildings[index];
@@ -348,7 +348,7 @@ export function init() {
           }
           
           function upgradeBuilding(event, buildingId, targetType) {
-              event.stopPropagation();
+              // buildingId is always a number (parsed from data-building-id at the call site)
               const index = gameState.buildings.findIndex(b => b && b.id === buildingId);
               if (index === -1) return;
               const building = gameState.buildings[index];
@@ -701,6 +701,25 @@ export function init() {
           }
           
           // --- EVENT LISTENERS ---
+
+          // Event delegation for sell / upgrade buttons inside building slots.
+          // Replaces inline onclick="sellBuilding(event, id)" / onclick="upgradeBuilding(...)".
+          // One listener on the grid, cleaned up by AbortController on teardown — no globals needed.
+          ui.landGrid.addEventListener('click', (e) => {
+              const sellBtn = e.target.closest('.sell-btn');
+              if (sellBtn) {
+                  const buildingId = Number(sellBtn.dataset.buildingId);
+                  if (!Number.isNaN(buildingId)) sellBuilding(e, buildingId);
+                  return;
+              }
+              const upgradeBtn = e.target.closest('.upgrade-btn');
+              if (upgradeBtn) {
+                  const buildingId = Number(upgradeBtn.dataset.buildingId);
+                  const upgradeTarget = upgradeBtn.dataset.upgradeTarget;
+                  if (!Number.isNaN(buildingId) && upgradeTarget) upgradeBuilding(e, buildingId, upgradeTarget);
+              }
+          }, { signal });
+
           ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'), { signal });
           ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'), { signal });
           
@@ -843,8 +862,6 @@ export function init() {
 
   window.debug_addResources = debug_addResources;
   window.debug_addPopulation = debug_addPopulation;
-  window.sellBuilding = sellBuilding;
-  window.upgradeBuilding = upgradeBuilding;
   initialize();
   // Only start ticks if initialize() did not trigger the WAR end-state.
   // When returning to a ≥50k population save, initialize() sets savingEnabled=false
@@ -865,8 +882,6 @@ export function teardown() {
   window.removeEventListener('beforeunload', beforeUnloadHandler);
   delete window.debug_addResources;
   delete window.debug_addPopulation;
-  delete window.sellBuilding;
-  delete window.upgradeBuilding;
   _warCardTriggered = false;
   savingEnabled = true;
   _displayedStars = 0;
