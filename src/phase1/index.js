@@ -8,11 +8,11 @@ import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
+import { setupDashes, updateDashes } from "./upgrade-dashes.js";
 import { mountSaveButtons } from "../save-export.js";
 import {
     renderWinTracker,
     renderRateDisplays,
-    renderProgressCircles,
     renderCollapseFoam,
     renderResourceBarsVisibility,
     renderEnergyBar,
@@ -48,9 +48,6 @@ import { timed, counter } from "../perf.js";
         const debugSpeedEl = document.getElementById('debug-speed');
         const debugGamesPlayedEl = document.getElementById('debug-games-played');
         const dynamicStyles = document.getElementById('dynamic-styles');
-        const speedProgressCircle = document.getElementById('speed-progress');
-        const energyGenProgressCircle = document.getElementById('energy-gen-progress');
-        const addBoardProgressCircle = document.getElementById('add-board-progress');
 const tooltip = document.getElementById('tooltip');
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
@@ -97,7 +94,6 @@ const resetBtn = document.getElementById('reset-btn');
             rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 10); },
             addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 700); },
             incrementSpeed:    () => { gameSpeed += 1; },
-            multiplyStars:     () => { starMultiplier *= 1.5; },
             createGameBoard:   () => createGameBoard(),
             mergeToMetaBoard:  () => mergeToMetaBoard(),
             setPhaseToCity:    () => doSetPhaseToCity(),
@@ -243,6 +239,9 @@ function scheduleUIUpdate() {
 
             loadGame();
             if (gameBoards.length === 0) createGameBoard();
+            setupDashes(upgrades.speed.element, upgrades.speed.maxLevel);
+            setupDashes(upgrades.energyGenerator.element, upgrades.energyGenerator.maxLevel);
+            setupDashes(upgrades.addGameBoard.element, upgrades.addGameBoard.maxLevel);
             setupButtons();
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
@@ -314,11 +313,10 @@ function scheduleUIUpdate() {
             );
         }
 
-        function updateProgressCircles(balance) {
-            renderProgressCircles(
-                { speedProgressCircle, energyGenProgressCircle, addBoardProgressCircle },
-                balance, upgrades
-            );
+        function updateProgressCircles(_balance) {
+            updateDashes(upgrades.speed.element, upgrades.speed.level);
+            updateDashes(upgrades.energyGenerator.element, upgrades.energyGenerator.level);
+            updateDashes(upgrades.addGameBoard.element, upgrades.addGameBoard.level);
         }
 
         function updateCollapseFoam(percent, ready) {
@@ -551,7 +549,14 @@ const uiState = {
         }
 
         function showResult(playerChoice, board, instant = false) {
-            const computerChoice = choices[Math.floor(Math.random() * choices.length)];
+            let computerChoice;
+            if (upgrades.luck.purchased && Math.random() < 0.5) {
+                // 50% chance: pick the move that loses to the player's choice
+                const losingForComputer = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+                computerChoice = losingForComputer[playerChoice];
+            } else {
+                computerChoice = choices[Math.floor(Math.random() * choices.length)];
+            }
             let result;
 
             if (playerChoice === computerChoice) result = 'draw';
@@ -603,6 +608,10 @@ const uiState = {
         }
         
         function handleUpgradeClick(key) {
+            // Hide tooltip immediately so it doesn't clip into the click-pulse animation
+            tooltip.style.opacity = '0';
+            tooltip.style.display = 'none';
+
             const upgrade = upgrades[key];
             if (key === 'autoPlay' && upgrade.purchased) {
                 toggleAutoPlayState();

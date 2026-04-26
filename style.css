@@ -88,12 +88,24 @@ input[type=range]:focus-visible {
 .gem-dot { width: 16px; height: 16px; background-color: #cbd5e1; border-radius: 9999px; }
 
 
-.progress-ring-bg { stroke: #e2e8f0; }
-.progress-ring-fg {
+/* Outward dashes — one per remaining purchase. Replaces the level/maxLevel
+   ring for multi-buy upgrades. As player buys, dashes fade out. */
+.upgrade-dashes {
+    position: absolute;
+    inset: -8px;
+    width: calc(100% + 16px);
+    height: calc(100% + 16px);
+    pointer-events: none;
+    overflow: visible;
+}
+.upgrade-dash {
     stroke: #475569;
-    transform: rotate(-90deg);
-    transform-origin: 50% 50%;
-    transition: stroke-dashoffset 0.3s ease;
+    stroke-width: 2;
+    stroke-linecap: round;
+    transition: opacity 0.4s ease;
+}
+.upgrade-dash.is-spent {
+    opacity: 0;
 }
 
 #tooltip {

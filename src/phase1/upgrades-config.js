@@ -10,7 +10,6 @@
  * @param {function} actions.rechargeEnergy  - Adds energy (manualRecharge)
  * @param {function} actions.addReserve      - Adds reserve energy (buyBattery)
  * @param {function} actions.incrementSpeed  - Bumps gameSpeed by 1 (speed)
- * @param {function} actions.multiplyStars   - Multiplies starMultiplier (luck)
  * @param {function} actions.createGameBoard - Adds a new game board (addGameBoard)
  * @param {function} actions.mergeToMetaBoard - Activates the meta board (mergeGameBoard)
  * @param {function} actions.setPhaseToCity  - Transitions to Phase 2 (bank)
@@ -21,7 +20,6 @@ export function createUpgrades(actions) {
         rechargeEnergy,
         addReserve,
         incrementSpeed,
-        multiplyStars,
         createGameBoard,
         mergeToMetaBoard,
         setPhaseToCity,
@@ -64,7 +62,7 @@ export function createUpgrades(actions) {
             cost: 50, purchased: false, unlocksAtGames: 100, unlocks: [],
             element: document.getElementById('luck'),
             purchase: function() {
-                multiplyStars();
+                // Real luck: bias RNG toward player wins. See showResult in index.js.
                 this.element.style.display = 'none';
             }
         },
