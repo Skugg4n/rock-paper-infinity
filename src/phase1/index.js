@@ -8,6 +8,7 @@ import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
+import { createGameLogic, iconMap } from "./game-logic.js";
 import { mountSaveButtons } from "../save-export.js";
 import {
     renderWinTracker,
@@ -105,7 +106,20 @@ const resetBtn = document.getElementById('reset-btn');
         });
 
 const choices = ['rock', 'paper', 'scissors'];
-const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
+
+const { showResult } = createGameLogic({
+    getStarMultiplier: () => starMultiplier,
+    getTotalStarsEarned: () => totalStarsEarned,
+    onWin: (starGain) => {
+        totalWins++;
+        starBalance += starGain;
+        totalStarsEarned += starGain;
+    },
+    onResultShown: () => scheduleUIUpdate(),
+    getIcon,
+    fireStarAnimation,
+    winTracker,
+});
 
 let uiUpdatePending = false;
 function scheduleUIUpdate() {
@@ -539,59 +553,12 @@ const uiState = {
             board.isAnimating = true;
             consumeEnergy();
             totalGamesPlayed++;
-            
+
             choiceButtons.forEach(btn => btn.disabled = true);
 
-            if (gameSpeed >= HYPER_SPEED_THRESHOLD && autoPlayInterval) {
-                showResult(playerChoice, board, true);
-            } else {
-                await runCountdownAnimation(board, gameSpeed);
-                showResult(playerChoice, board, false);
-            }
-        }
-
-        function showResult(playerChoice, board, instant = false) {
-            const computerChoice = choices[Math.floor(Math.random() * choices.length)];
-            let result;
-
-            if (playerChoice === computerChoice) result = 'draw';
-            else if (
-                (playerChoice === 'rock' && computerChoice === 'scissors') ||
-                (playerChoice === 'scissors' && computerChoice === 'paper') ||
-                (playerChoice === 'paper' && computerChoice === 'rock')
-            ) result = 'win';
-            else result = 'lose';
-
-            const revealClass = instant ? '' : 'reveal-item';
-            // Celebrate (one-shot pulse) only on the first 3 wins — keeps the cue special
-            const celebrateClass = result === 'win' && totalStarsEarned < 3 ? 'celebrate' : '';
-            const playerWrapper = document.createElement('div');
-            playerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''} ${celebrateClass}`.trim();
-            playerWrapper.appendChild(getIcon(iconMap[playerChoice], 'lucide-lg text-slate-800'));
-            board.playerEl.replaceChildren(playerWrapper);
-
-            const computerWrapper = document.createElement('div');
-            computerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'enemy-winner' : ''}`;
-            computerWrapper.appendChild(getIcon(iconMap[computerChoice], 'lucide-lg text-slate-800'));
-            board.computerEl.replaceChildren(computerWrapper);
-
-            if (result === 'win') {
-                totalWins++;
-                const starGain = 1 * starMultiplier;
-                starBalance += starGain;
-                totalStarsEarned += starGain;
-                // Flying-star animation: only for the first 10 stars earned
-                if (totalStarsEarned <= 10) {
-                    try {
-                        // Source: the player result area on this board; target: win-tracker
-                        fireStarAnimation(board.playerEl, winTracker);
-                    } catch (e) {
-                        console.error('fireStarAnimation failed:', e);
-                    }
-                }
-            }
-
-            scheduleUIUpdate();
+            const instant = gameSpeed >= HYPER_SPEED_THRESHOLD && !!autoPlayInterval;
+            if (!instant) await runCountdownAnimation(board, gameSpeed);
+            showResult(playerChoice, board, instant);
 
             if (!hasEnergy() && autoPlayInterval) stopAutoPlayInterval();
 
