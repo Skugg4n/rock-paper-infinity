@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.12.0 - 2026-04-23
+
+### Fixes (from PDF feedback audit)
+
+- **Phase 1 upgrade rings: fill toward next purchase cost** — Rings around Speed, EnergyGen, and AddGameBoard now fill smoothly as the player's star balance grows toward the cost of the next level. Each RPS win visibly advances the ring; full ring means you can buy. After buying, the ring drops back to wherever the remaining balance sits relative to the new (higher) cost. Previously rings filled based on `level / maxLevel` — 1/55th of a jump per purchase — so most wins didn't visibly advance anything. Also dropped the speed pre-ring (`speed-early-progress`) — the new semantics make it redundant and the dual-ring stack was visually noisy. Per PDF 1 feedback: "Låt ringen runt..." (clarified: rings fill on purchase progress).
+
+- **Phase 2: stop the "flärp" on every purchase** — Building progress rings were resetting to empty and refilling on every purchase or upgrade, because `renderAllBuildings()` (full DOM rebuild) was called too aggressively. Two sources fixed:
+  1. `logicTick` called `renderAllBuildings()` on every population change (every second). Replaced with `refreshAllBuildingActions()` which only updates action-button disabled states and the `.upgradeable` CSS class — rings are left intact because `fastUiTick` already updates them via `pop-ring-${id}` directly.
+  2. Research purchases (`urbanismResearched`, `megastructureResearched`) called `renderAllBuildings()`. Now only re-renders the specific building slots that gain a new upgrade button from that research. Other buildings are never touched. Per PDF 2 feedback: "Animera bara när det ska animeras."
+
 ## v1.11.2 - 2026-04-25
 
 ### Polish
