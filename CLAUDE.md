@@ -48,11 +48,12 @@ rock-paper-infinity/
 │   ├── gamePhase.js        # Phase state machine: show/hide containers, persist to localStorage
 │   ├── icons.js            # SVG icon preloading and caching (Phase 1 only)
 │   ├── phase1/
-│   │   ├── index.js        # Phase 1 orchestrator: init, teardown, upgrades, UI (~1,036 lines)
-│   │   ├── rates.js        # Pure calculations: getSPS, getEPS, getVisibleDots, formatCount
-│   │   ├── cost-visual.js  # Tally SVGs + Roman numeral cost display
-│   │   ├── countdown.js    # RPS countdown animation
-│   │   └── persistence.js  # Game state serialization/deserialization
+│   │   ├── index.js          # Phase 1 orchestrator: init, teardown, upgrades, UI (~1,000 lines)
+│   │   ├── rates.js          # Pure calculations: getSPS, getEPS, getVisibleDots, formatCount, fillFraction
+│   │   ├── star-animation.js # Flying-star DOM animation (extracted for testability)
+│   │   ├── cost-visual.js    # Tally SVGs + Roman numeral cost display
+│   │   ├── countdown.js      # RPS countdown animation
+│   │   └── persistence.js    # Game state serialization/deserialization
 │   └── phase2/index.js     # Phase 2 game logic (~700 lines)
 ├── README.md               # Project overview and architecture docs
 └── CODE_REVIEW.md          # Code review notes
@@ -77,6 +78,14 @@ rock-paper-infinity/
 - Energy: main pool fills first → overflow to reserve
 - Consumption: main drained first → reserve as backup
 - Refund: decrement level first, then `cost() * refundRate`
+
+### Hot path discipline
+- **Fast tick (50ms)**: read game state, write to display only — no localStorage, no game state mutation, no new DOM elements
+- **Slow tick (1s)**: write game state, save to localStorage, recompute derived values, trigger UI rebuilds
+- **Cache DOM references** — query `document.getElementById` once at module load (or inside `init()`), store in a `const` or `ui` object. Never querySelector inside a tick function.
+- **Don't create elements in tick** — only mutate existing elements' style, textContent, className. Creating elements in tick causes GC pressure and layout thrashing.
+- **Don't call `lucide.createIcons()` directly** — always use `scheduleIconRefresh()` which debounces via rAF. Direct calls in loops will trigger redundant Lucide passes.
+- **Phase 2 audit (v1.13.0)**: fastUiTick correctly reads display state; logicTick correctly owns game mutations. One known violation: Phase 1 `saveGame()` is called inside `updateUI()` (rAF path) — should move to `passiveTick` (1s) in a future refactor.
 
 ### Chapter cards
 - Single module: `src/chapterCard.js`. Always invoke via `playChapterCard({ roman, title, mode, onMidpoint })`.
