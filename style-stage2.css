@@ -223,9 +223,21 @@
     top: -8px;
     left: -8px;
     background-color: #d1d5db;
+    white-space: nowrap;
+    overflow: visible;
+    font-size: 9px;
 }
 
 .sell-btn:hover { background-color: #cbd5e1; }
+
+/* Two-tap confirm state: button highlights and shows refund amount */
+.sell-btn.sell-confirm {
+    background-color: #64748b;
+    color: #f8fafc;
+    font-size: 8px;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.4);
+}
 
 .progress-ring {
     position: absolute;

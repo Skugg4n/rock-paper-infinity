@@ -312,11 +312,50 @@ export function init() {
               return baseStarPerPerson;
           }
 
+          // Two-tap sell confirmation: keyed by building id → { timeout, slot }
+          const _pendingSell = new Map();
+
+          function cancelPendingSell(buildingId) {
+              const pending = _pendingSell.get(buildingId);
+              if (!pending) return;
+              clearTimeout(pending.timeout);
+              _pendingSell.delete(buildingId);
+              // Reset visual state
+              const slot = pending.slot;
+              if (slot) {
+                  const sellBtn = slot.querySelector('.sell-btn');
+                  if (sellBtn) {
+                      sellBtn.textContent = '-';
+                      sellBtn.classList.remove('sell-confirm');
+                  }
+              }
+          }
+
           function sellBuilding(event, buildingId) {
               event.stopPropagation();
               const index = gameState.buildings.findIndex(b => b && b.id === buildingId);
               if (index === -1) return;
               const building = gameState.buildings[index];
+
+              // On touch (no hover), use two-tap confirmation.
+              // On pointer devices that can hover, sell immediately (tooltip already shows refund).
+              const isTouch = event.pointerType === 'touch';
+              if (isTouch && !_pendingSell.has(buildingId)) {
+                  // First tap: enter confirm state
+                  const refund = Math.floor((buildingData[building.type]?.cost || 0) * 0.7);
+                  const slot = ui.landGrid.children[index];
+                  const sellBtn = slot ? slot.querySelector('.sell-btn') : null;
+                  if (sellBtn) {
+                      sellBtn.textContent = `${refund >= 1000 ? Math.round(refund / 1000) + 'k' : refund}★`;
+                      sellBtn.classList.add('sell-confirm');
+                  }
+                  const timeout = setTimeout(() => cancelPendingSell(buildingId), 3000);
+                  _pendingSell.set(buildingId, { timeout, slot });
+                  return;
+              }
+
+              // Second tap (touch) or any non-touch tap: execute sell
+              cancelPendingSell(buildingId);
               gameState.stars += (buildingData[building.type]?.cost || 0) * 0.7;
               gameState.buildings[index] = undefined;
               gameState.population = gameState.buildings.reduce((total, b) => total + (b?.population || 0), 0);
