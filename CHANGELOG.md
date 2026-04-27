@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.19.1 - 2026-04-27
+
+### Polish
+
+- **Upgrade dashes shorter and the background ring restored** — v1.19.0 dashes were too long (~4px) and visibly extended past the viewport on the right-side upgrade tray. Worse, the bg ring (the subtle slate-200 track inside the button perimeter) was removed, so the button lost its quiet edge definition. Now: each dash is ~1.6px (almost dot-sized, per the original "nästan som prickar" spec) and starts 1px outside the button edge. The bg ring is drawn back in as a faint slate-200 circle at the button's edge so the button keeps its halo even when no dashes have been spent.
+
 ## v1.19.0 - 2026-04-23
 
 ### Phase 1: three UX improvements

@@ -15,8 +15,19 @@ export function setupDashes(buttonEl, maxLevel) {
     svg.setAttribute('class', 'upgrade-dashes');
     svg.setAttribute('viewBox', '-30 -30 60 60');
 
-    const r0 = 26; // inner end (just outside button edge — button is ~24px radius)
-    const r1 = 30; // outer end (4px outward)
+    // Subtle background ring (the "andra linjen" — kept as a quiet button-edge cue)
+    const bgRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    bgRing.setAttribute('class', 'upgrade-dash-bg');
+    bgRing.setAttribute('cx', '0');
+    bgRing.setAttribute('cy', '0');
+    bgRing.setAttribute('r', '23.5');
+    bgRing.setAttribute('fill', 'none');
+    svg.appendChild(bgRing);
+
+    // Dashes — short outward radial ticks, almost dot-sized.
+    // Each dash extends from r0 (just outside button) to r1 (a sliver further).
+    const r0 = 25;   // 1px outside button edge
+    const r1 = 26.5; // ~1.5 units = ~1.6px long, "almost like dots" per spec
 
     for (let i = 0; i < maxLevel; i++) {
         const angle = (i / maxLevel) * Math.PI * 2 - Math.PI / 2; // start from 12 o'clock
