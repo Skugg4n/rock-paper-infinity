@@ -5,6 +5,18 @@ Incremental idle game with rock-paper-scissors core mechanic. Single-page app (`
 - **Phase 1 (Industry)**: RPS mini-game with upgrade progression (`#phase-industry`)
 - **Phase 2 (City)**: Civilization-building with population and resources (`#phase-city`)
 
+## Source of truth for user requests
+
+`BACKLOG.yaml` at the project root is the AUTHORITATIVE list of pending user requests and feature work. Read it at the start of every session.
+
+**Rules:**
+- Every new user request MUST be appended to `BACKLOG.yaml` with a fresh `B###` ID, today's date, and the source.
+- Status `open` until shipped. Mark `done` only when verified in a commit, with `resolved_in` filled.
+- NEVER remove `open` items without explicit user permission.
+- NEVER mark `done` without an actual commit closing it.
+
+When the user asks "what's still pending" or "did you forget X", check `BACKLOG.yaml`.
+
 ## Version Management
 
 ### Version Bump Checklist

@@ -1,0 +1,153 @@
+# Rock, Paper, Infinity — Backlog
+#
+# This file is the AUTHORITATIVE LIST of pending user requests and feature
+# work. It exists because items get missed when scattered across
+# PROJECTPLAN.md, CHANGELOG.md, PDF feedback, and chat history.
+#
+# === RULES — must be respected without exception ===
+#
+# 1. Every user request gets a new item here with a fresh ID (B-prefix +
+#    next number).
+#
+# 2. Status `open` = not yet shipped. Status `done` = verified shipped
+#    AND `resolved_in` filled with the version that closed it.
+#
+# 3. NEVER mark `done` without a corresponding commit and version. Only
+#    mark `done` after you have actually shipped the change.
+#
+# 4. NEVER remove `open` items without explicit user permission.
+#
+# 5. When the user adds a new request, append it to the end of `items:`
+#    with the next sequential B-id, today's `added` date, and a clear
+#    `source` (PDF name, screenshot timestamp, or "chat 2026-04-27").
+#
+# 6. When closing an item, set `status: done`, fill `resolved_in: vX.Y.Z`,
+#    and leave the item in the file as a record. Do NOT delete it.
+#
+# Format — each item is a YAML mapping with required fields:
+#   id        - string, unique (e.g. "B001")
+#   added     - YYYY-MM-DD when the user first requested it
+#   source    - where it came from (PDF, screenshot, chat date)
+#   request   - the user's request, in their own words when possible
+#   status    - "open" or "done"
+#   resolved_in - version that closed it, or null if open
+#   notes     - optional, any context about deferral or design dependencies
+
+items:
+  - id: B001
+    added: 2026-04-27
+    source: "chat 2026-04-27 + screenshot at 10:10"
+    request: |
+      Phase 1 game animations after speed 10 are not fun. You can't see
+      if you win or lose. Redo them so they still "fladdrar skitfort"
+      but visually resemble the pre-speed-10 win/lose design (clearly
+      shows winner/enemy-winner per round).
+    status: open
+    resolved_in: null
+
+  - id: B002
+    added: 2026-04-26
+    source: 'PDF "Untitled 47.pdf" point #1'
+    request: |
+      Factory animations (both phases) are described as "hackiga, otydliga,
+      fula". Need new design direction.
+    status: open
+    resolved_in: null
+    notes: |
+      Phase 1 conveyor and Phase 2 rising-icons smoke. Blocked on design
+      direction — what does a good factory animation look like?
+
+  - id: B003
+    added: 2026-04-26
+    source: 'PDF "edit 2.pdf" point #1 (clarified later in chat)'
+    request: |
+      Enemy signature: red triangle behind enemy wins, echoed in Phase 3
+      WAR so players with memory recognize the connection.
+    status: open
+    resolved_in: null
+    notes: |
+      Shipped in v1.11.0, reverted in v1.11.2 because the triangle clashed
+      with the slate ring ("stökigt och fult"). Re-design needed — smaller,
+      subtler, possibly outside the wrapper rather than under the icon.
+
+  - id: B004
+    added: 2026-04-26
+    source: 'PDF "edit 2.pdf" point #8'
+    request: |
+      Sims-style pedestrian movement in Phase 2. Small circles representing
+      people moving between buildings. Possibly cars/trucks too at higher
+      population. Should give visual weight to the population growing.
+    status: open
+    resolved_in: null
+    notes: |
+      Substantial new feature. Canvas overlay or SVG animation likely.
+      Defer until v1.20+ at earliest.
+
+  - id: B005
+    added: 2026-04-26
+    source: 'PDF "Untitled 47.pdf" point #2 (bulk done v1.9.1)'
+    request: |
+      Color refinement. Bulk Claude-primary cleanup done in v1.9.1, but
+      fine-grained accent review and consistent icon tint pass still open.
+    status: open
+    resolved_in: null
+
+  - id: B006
+    added: 2026-03-01
+    source: "PROJECTPLAN Phase 18 (open item)"
+    request: |
+      "Code Processor" upgrade — unlockable upgrade that animates the
+      transition from icon-only UI to icon+text labels. Provides in-world
+      justification for Phase 2's text-heavy UI.
+    status: open
+    resolved_in: null
+
+  - id: B007
+    added: 2026-04-25
+    source: "PROJECTPLAN Phase 22 deferred"
+    request: |
+      Phase 1 upgrade tray UX on landscape phones. Gap reduction needed,
+      requires testing on actual landscape Android.
+    status: open
+    resolved_in: null
+
+  - id: B008
+    added: 2026-04-25
+    source: "PROJECTPLAN Phase 22 deferred"
+    request: |
+      Phase 2 upgrade button tooltip on touch. Hover-only currently. Touch
+      still shows no upgrade cost. Consider inline cost display on slot
+      tap, or a 250ms tooltip on touch-down.
+    status: open
+    resolved_in: null
+
+  - id: B009
+    added: 2026-03-01
+    source: "PROJECTPLAN Phase 20 future"
+    request: |
+      Phase 3: WAR — defined in gamePhase.js but not implemented. Includes
+      factory smoke → environmental impact mechanic (pollution meter,
+      climate consequences).
+    status: open
+    resolved_in: null
+    notes: "Major feature. Likely a separate project release."
+
+  - id: B010
+    added: 2026-03-01
+    source: "PROJECTPLAN Phase 20 future"
+    request: |
+      Phase 4: ESCAPE — defined in gamePhase.js but not implemented.
+      Environmental degradation forces the player to escape to space.
+    status: open
+    resolved_in: null
+    notes: "Major feature. Likely separate from Phase 3."
+
+  - id: B011
+    added: 2026-04-23
+    source: "v1.13.0 partial — accessibility"
+    request: |
+      Accessibility: keyboard navigation. ARIA labels and focus rings done
+      in v1.13.0, but full keyboard navigation for RPS choices and upgrade
+      buttons still open.
+    status: open
+    resolved_in: null
