@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.19.2 - 2026-04-27
+
+### Polish
+
+- **Upgrade dashes now actually sit OUTSIDE the button** — v1.19.1's math was wrong: with `inset: -3px` and `r0 = 25` viewbox units, dashes were drawn 1.5 px INSIDE the button edge, not outside. SVG container expanded back to `inset: -8px` (16 px wider canvas) and dash radii adjusted to `r0 = 23, r1 = 25` viewbox units (1 px / 1.067 ratio) so dashes start 0.5 px outside the button and extend 2 px outward. The bg-ring also recentred to `r = 22` so it reads as a clean outline at the button perimeter.
+- **Tooltip-to-button gap increased 8 → 14 px** — Hover lift (-2 px) + dash extent at top (~2 px outside button) was eating into the 8 px tooltip gap, causing visible cropping where the tooltip and dashes met. 14 px gives a comfortable buffer that survives both effects.
+
 ## v1.19.1 - 2026-04-27
 
 ### Polish

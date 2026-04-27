@@ -771,7 +771,7 @@ const uiState = {
             const rect = element.getBoundingClientRect();
             tooltip.style.display = 'block';
             tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
-            tooltip.style.top = `${rect.top - tooltip.offsetHeight - 8}px`;
+            tooltip.style.top = `${rect.top - tooltip.offsetHeight - 14}px`;
             tooltip.style.opacity = '1';
         }
 

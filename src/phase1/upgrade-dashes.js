@@ -15,19 +15,23 @@ export function setupDashes(buttonEl, maxLevel) {
     svg.setAttribute('class', 'upgrade-dashes');
     svg.setAttribute('viewBox', '-30 -30 60 60');
 
-    // Subtle background ring (the "andra linjen" — kept as a quiet button-edge cue)
+    // SVG is 64px square (button 48 + inset:-8 on each side). ViewBox 60×60
+    // → 1.067 px/unit. Button radius 24 px = 22.5 units. Dashes must sit
+    // OUTSIDE that, not on/inside it.
+
+    // Subtle background ring (the "andra linjen" — quiet button-edge cue)
     const bgRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     bgRing.setAttribute('class', 'upgrade-dash-bg');
     bgRing.setAttribute('cx', '0');
     bgRing.setAttribute('cy', '0');
-    bgRing.setAttribute('r', '23.5');
+    bgRing.setAttribute('r', '22');     // just inside button edge — reads as outline
     bgRing.setAttribute('fill', 'none');
     svg.appendChild(bgRing);
 
-    // Dashes — short outward radial ticks, almost dot-sized.
-    // Each dash extends from r0 (just outside button) to r1 (a sliver further).
-    const r0 = 25;   // 1px outside button edge
-    const r1 = 26.5; // ~1.5 units = ~1.6px long, "almost like dots" per spec
+    // Dashes — short outward radial ticks, almost dot-sized, OUTSIDE the
+    // button. r0 just past button edge, r1 a sliver further out.
+    const r0 = 23;   // 0.5 units = 0.5 px outside button edge
+    const r1 = 25;   // 2.5 units = 2.7 px outside button edge → ~1.6 px long
 
     for (let i = 0; i < maxLevel; i++) {
         const angle = (i / maxLevel) * Math.PI * 2 - Math.PI / 2; // start from 12 o'clock

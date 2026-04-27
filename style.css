@@ -92,9 +92,9 @@ input[type=range]:focus-visible {
    ring for multi-buy upgrades. As player buys, dashes fade out. */
 .upgrade-dashes {
     position: absolute;
-    inset: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    inset: -8px;
+    width: calc(100% + 16px);
+    height: calc(100% + 16px);
     pointer-events: none;
     overflow: visible;
 }
