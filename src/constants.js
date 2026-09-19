@@ -10,8 +10,8 @@ export const PHASE1_CONSTANTS = {
     MAX_QUANTUM_FOAM: 20000,
     FOAM_BONUS_SECONDS: 30,
     HYPER_SPEED_THRESHOLD: 10,
-    // Bank (→ chapter II) opens after the factory has run for a while.
-    BANK_GATE_STARS: 250000,
+    // Bank (→ chapter II) opens after the foam has been collapsed this many times.
+    BANK_GATE_COLLAPSES: 2,
     SAVE_KEY: 'rpi-save',
 };
 

@@ -351,7 +351,10 @@ export function renderUpgrades({
             if (upgrade.level !== undefined) {
                 upgrade.element.disabled =
                     (starBalance < currentCost) || (upgrade.level >= upgrade.maxLevel);
-                if (upgrade.level >= upgrade.maxLevel) upgrade.element.classList.add('purchased');
+                if (upgrade.level >= upgrade.maxLevel) {
+                    // Done means gone: a full grid has nothing left to say.
+                    upgrade.element.classList.add('purchased', 'invisible');
+                }
             } else if (upgrade.consumable) {
                 upgrade.element.disabled = starBalance < currentCost;
             } else {

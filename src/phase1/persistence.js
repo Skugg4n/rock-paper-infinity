@@ -44,6 +44,7 @@ export function serializeGameState(state, upgrades) {
         gameSpeed: state.gameSpeed,
         starMultiplier: state.starMultiplier,
         quantumFoam: state.quantumFoam,
+        foamCollapses: state.foamCollapses ?? 0,
         isMetaBoardActive: state.isMetaBoardActive,
         autoPlayWantsToRun: state.autoPlayWantsToRun,
         gameBoards: state.gameBoardsCount,

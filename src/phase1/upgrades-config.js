@@ -21,7 +21,9 @@
  * @param {function} actions.mergeToMetaBoard - Activates the meta board (mergeGameBoard)
  * @param {function} actions.setPhaseToCity  - Transitions to Phase 2 (bank)
  * @param {function} actions.getTotalStarsEarned - Lifetime stars (bank gate)
- * @param {number}   actions.bankGateStars   - Lifetime stars needed for the bank
+ * @param {function} actions.getFoamCollapses - Times the quantum foam has been collapsed
+ * @param {function} actions.getFoamFraction  - Current foam fill 0–1 (for the bank ring)
+ * @param {number}   actions.bankGateCollapses - Collapses needed for the bank
  * @returns {object} upgrades
  */
 export function createUpgrades(actions) {
@@ -32,10 +34,15 @@ export function createUpgrades(actions) {
         createGameBoard,
         mergeToMetaBoard,
         setPhaseToCity,
-        bankGateStars = 250000,
+        bankGateCollapses = 2,
     } = actions;
 
-    const geometric = (base, ratio, level) => Math.round(base * Math.pow(ratio, level));
+    // Two significant figures: 22 346 → 22 000, so Roman costs stay readable.
+    const geometric = (base, ratio, level) => {
+        const raw = base * Math.pow(ratio, level);
+        const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(raw)) - 1));
+        return Math.round(raw / mag) * mag;
+    };
 
     const upgrades = {
         autoPlay: {
@@ -138,13 +145,14 @@ export function createUpgrades(actions) {
             purchased: false,
             unlocksAt: 0,
             element: document.getElementById('bank'),
-            // Gate: factory must be purchased AND the player must have run it for
-            // a while (lifetime stars) so the factory is felt before chapter II.
-            // Greyed out with a progress ring as soon as the factory is bought.
+            // Gate: factory must be purchased AND the foam collapsed a couple of
+            // times, so the factory (and its boost) is felt before chapter II.
+            // Greyed out with a progress ring as soon as the factory is bought;
+            // the ring fills with the foam.
             unlockCondition: () =>
-                upgrades.mergeGameBoard.purchased && actions.getTotalStarsEarned() >= bankGateStars,
+                upgrades.mergeGameBoard.purchased && actions.getFoamCollapses() >= bankGateCollapses,
             teaseCondition: () => upgrades.mergeGameBoard.purchased,
-            progress: () => Math.min(1, actions.getTotalStarsEarned() / bankGateStars),
+            progress: () => Math.min(1, (actions.getFoamCollapses() + actions.getFoamFraction()) / bankGateCollapses),
             purchase: function() {
                 setPhaseToCity();
             }

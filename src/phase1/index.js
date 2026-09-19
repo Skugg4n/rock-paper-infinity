@@ -65,7 +65,7 @@ const resetBtn = document.getElementById('reset-btn');
         let totalWins = 0;
         let energy = PHASE1_CONSTANTS.MAX_ENERGY;
         let reserveEnergy = 0;
-        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_STARS, SAVE_KEY } = PHASE1_CONSTANTS;
+        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_COLLAPSES, SAVE_KEY } = PHASE1_CONSTANTS;
         let autoPlayInterval = null;
         let autoPlayWantsToRun = false;
         let gameSpeed = 1;
@@ -78,6 +78,7 @@ const resetBtn = document.getElementById('reset-btn');
         let isMetaBoardActive = false;
         let starMultiplier = 1;
         let quantumFoam = 0;
+        let foamCollapses = 0;
         let revealedUpgrades = new Set();
         let firstUpgradeUpdateDone = false;
         // Measured income (EMA of stars gained per second) — what the player
@@ -105,7 +106,9 @@ const resetBtn = document.getElementById('reset-btn');
             mergeToMetaBoard:  () => mergeToMetaBoard(),
             setPhaseToCity:    () => doSetPhaseToCity(),
             getTotalStarsEarned: () => totalStarsEarned,
-            bankGateStars: BANK_GATE_STARS,
+            getFoamCollapses: () => foamCollapses,
+            getFoamFraction: () => Math.min(1, quantumFoam / MAX_QUANTUM_FOAM),
+            bankGateCollapses: BANK_GATE_COLLAPSES,
         });
 
         const winRate = () => (upgrades.luck.purchased ? LUCK_WIN_RATE : BASE_WIN_RATE);
@@ -404,7 +407,7 @@ const uiState = {
             const rateChanged = sps !== uiState.sps || eps !== uiState.eps || egps !== uiState.egps || autoActive !== uiState.autoPlayActive || energyPaused !== uiState.energyPaused;
             const balanceChanged = starBalance !== uiState.starBalance;
             const foamChanged = isMetaBoardActive && (foamPercent !== uiState.foamPercent || foamReady !== uiState.foamReady);
-            const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive;
+            const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive || foamChanged;
 
             const tasks = [];
             if (gamesChanged) tasks.push(() => {
@@ -418,7 +421,7 @@ const uiState = {
             if (reserveChanged) tasks.push(() => renderReserveBar(reserveEnergyFillEl, reservePercent));
             if (emptyChanged) tasks.push(() => renderEnergyEmpty(energyFillEl, energyEmpty));
             if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
-            if (balanceChanged || totalStarsEarned !== uiState.totalStarsEarned) tasks.push(() => updateProgressCircles(starBalance));
+            if (balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || foamChanged) tasks.push(() => updateProgressCircles(starBalance));
             if (upgradesChanged) tasks.push(updateUpgrades);
             if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
 
@@ -455,7 +458,7 @@ const uiState = {
         function saveGame() {
             const state = {
                 starBalance, totalStarsEarned, totalGamesPlayed, totalWins,
-                energy, reserveEnergy, gameSpeed, starMultiplier, quantumFoam,
+                energy, reserveEnergy, gameSpeed, starMultiplier, quantumFoam, foamCollapses,
                 isMetaBoardActive, autoPlayWantsToRun,
                 gameBoardsCount: gameBoards.length
             };
@@ -474,6 +477,7 @@ const uiState = {
                 reserveEnergy = sanitizeNumber(data.reserveEnergy) ?? reserveEnergy;
                 starMultiplier = sanitizeNumber(data.starMultiplier) ?? starMultiplier;
                 quantumFoam = sanitizeNumber(data.quantumFoam) ?? quantumFoam;
+                foamCollapses = sanitizeNumber(data.foamCollapses) ?? foamCollapses;
                 isMetaBoardActive = data.isMetaBoardActive ?? isMetaBoardActive;
                 autoPlayWantsToRun = data.autoPlayWantsToRun ?? autoPlayWantsToRun;
                 measuredLastTotal = totalStarsEarned;
@@ -524,6 +528,7 @@ const uiState = {
             reserveEnergy = 0;
             starMultiplier = 1;
             quantumFoam = 0;
+            foamCollapses = 0;
             gameSpeed = 1;
             isMetaBoardActive = false;
             measuredSPS = 0;
@@ -724,6 +729,7 @@ const uiState = {
             const bonus = Math.floor(getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier, winRate()) * FOAM_BONUS_SECONDS);
             addStars(bonus);
             quantumFoam = 0;
+            foamCollapses++;
             
             const metaBoard = document.getElementById('meta-board');
             if(metaBoard) {

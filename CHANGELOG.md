@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.24.0 - 2026-09-18
+
+### Small things from Ola's second playtest
+
+- **Maxed upgrades disappear** — speed, generator and boards vanish when full (like luck), instead of sitting greyed out.
+- **Roman costs above 3 999 use a vinculum** — X̄ = 10 000, so the factory reads "×X̄" instead of ten M's. Geometric costs are rounded to two significant figures (22 346 → 22 000) so the numerals stay short.
+- **Bank opens after two foam collapses**, not a star count — the ring on the bank fills with the foam, so the boost is always used before chapter II.
+- **Market stall icon** is wheat, not a tent.
+- `scripts/sim-phase2.mjs` — first simulation of chapter II (for the cascade pass).
+
 ## v1.23.0 - 2026-09-18
 
 ### Chapter II: silo, hover minus, stop cue, something to do (Ola chose 1–4)

@@ -2,6 +2,7 @@
 // Phase 1 economy simulation: greedy player, 1 s steps. Mirrors src/phase1/rates.js + upgrades-config.js.
 // Usage: node scripts/sim-phase1.mjs old|new   (old = v1.19.2 balance, for comparison)
 const MODE = process.argv[2] || 'new';
+const sig2 = (raw) => { const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(raw)) - 1)); return Math.round(raw / mag) * mag; };
 
 const P = MODE === 'old' ? {
   speedMax: 55, speedCost: L => 10 + Math.floor(L * 2),
@@ -20,9 +21,9 @@ const P = MODE === 'old' ? {
     return (anim > interval ? 2 * interval : interval) / 1000;
   },
 } : {
-  speedMax: 40, speedCost: L => Math.round(10 * Math.pow(1.10, L)),
-  genMax: 50, genCost: L => Math.round(25 * Math.pow(1.07, L)), genRate: 10, genUnlock: { stars: 100 },
-  boardMax: 8, boardCost: L => Math.round(250 * Math.pow(1.9, L)), boardUnlock: 150,
+  speedMax: 40, speedCost: L => sig2(10 * Math.pow(1.10, L)),
+  genMax: 50, genCost: L => sig2(25 * Math.pow(1.07, L)), genRate: 10, genUnlock: { stars: 100 },
+  boardMax: 8, boardCost: L => sig2(250 * Math.pow(1.9, L)), boardUnlock: 150,
   luckCost: 50, luckUnlockGames: 100, luckWinRate: 2 / 3,
   battCost: 30, battAmount: 500, battUnlock: 40,
   rechargeAmount: 25, rechargeUnlock: 15,

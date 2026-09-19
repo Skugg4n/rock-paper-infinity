@@ -328,6 +328,16 @@ items:
     resolved_in: v1.22.0
     notes: "It was behind ?debug since v1.13. Now also a toggle in the ☰ menu."
 
+  - id: B029
+    added: 2026-09-18
+    source: "chat 2026-09-18 (second playtest)"
+    request: |
+      Duplicate/speed should disappear when maxed; factory price too
+      MMMMM-ish; the foam boost never fills before the bank opens; the
+      stall icon looks like a teepee.
+    status: done
+    resolved_in: v1.24.0
+
   - id: B028
     added: 2026-09-18
     source: "chat 2026-09-18"
