@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.22.0 - 2026-09-18
+
+### Chapter II: the competitor gets time to build; Reset reachable from the wall
+
+- **III·WAR no longer fires seconds after a District** — competitor island at 40k population, adds a warehouse at 100k and a radar mast at 175k, chapter turns at 250k. District growth 10 000 → 2 000 per second so the endgame is felt. Saves stuck between 50k and 250k resume.
+- **☰ menu above the chapter card** — Reset (and Debug) reachable from the WAR wall.
+- **Debug menu** — `?debug` or "Debug menu" in the ☰ menu (persisted). New +100k ★ and +50k population buttons.
+- **vision.md** — working notes on chapters III (slow opening, attack on an outer house), IV (THE DEEP: ocean floor, time as the resource, cryo, Year 0), V and VI.
+
 ## v1.21.0 - 2026-09-18
 
 ### Helpers, hills and teasers (Ola's playtest of v1.20.0)

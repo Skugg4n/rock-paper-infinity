@@ -127,6 +127,37 @@ Helpers are how a chapter gets texture without adding more line. When designing 
 mechanic, ask: is this the line, or a helper? If it is a helper, when does it arrive,
 what does it relieve, and what outgrows it?
 
+## Where the arc might go (working notes, Ola 2026-09-18)
+
+Not committed. Written down so the ideas are not lost, and so chapter II's endgame
+can point in the right direction. If any of this is adopted, the chapter table above,
+the four-chapter rule under "What we won't build", and `gamePhase.js` change together.
+
+**Chapter III · WAR opens slowly.** The competitor's island appears far beyond our
+land at 40k population and *builds*: a factory, then a warehouse, then a radar mast.
+The player watches it grow while still buying things in chapter II. Only then does the
+chapter turn, and the first beat of III should be the competitor *acting*: an attack
+on one of our outer houses. Conflict starts with them, not with a menu.
+
+**Chapter IV · THE DEEP (instead of ESCAPE-to-space).** After the war, humanity goes
+*down*, not up: a colony on the ocean floor. During the war the player has been
+filling a silo with material, tech and resources; that silo is the "ship" that
+launches downward, and the colony lives off it until it runs out. Then the player must
+mine the sea floor for minerals to keep developing. Modern equipment helps at first
+but is limited; the chapter is about starting over with few people.
+
+The new mechanic of IV is **time**. We arrive and declare *Year 0*. Time passes slowly
+at first (days, weeks, months), then years. When the silo runs dry and mining is slow,
+time itself becomes the resource: the player can speed it up, for example by freezing
+people in cryo chambers (fewer mouths, more years per minute), or with other means; a
+slider that sets how fast time runs for the player is one option. The feeling to chase
+is years flying past, astronomically, the same escalation as stars in chapter I but on
+the clock.
+
+**Chapters V and VI (sketch).** V: return to the surface. VI: leave Earth, or step
+sideways into another dimension. Titles still to find; they must stay single, all-caps,
+English words.
+
 ## What we won't build
 
 These are explicit non-goals for the project itself — features and surfaces we will not add, no matter how often the genre tempts us. (This is about what *we, the makers,* will not implement; it is not a statement about goals inside the game. The player has plenty of goals — usually unlocking the next thing — they are just not announced.)

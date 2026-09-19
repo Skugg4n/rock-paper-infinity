@@ -19,4 +19,15 @@ export const PHASE1_CONSTANTS = {
 export const PHASE2_CONSTANTS = {
     SAVE_KEY: 'rpi-stage2',
     STARS_TRANSFER_KEY: 'rpi-stars',
+    // The competitor appears far off, grows in stages, and only then the
+    // chapter turns. Population thresholds (see vision.md, chapter III).
+    COMPETITOR_POP: 40000,
+    COMPETITOR_STAGE2_POP: 100000,
+    COMPETITOR_STAGE3_POP: 175000,
+    WAR_POP: 250000,
+    // A district fills over ~50 s, not 10 s, so the endgame is felt.
+    DISTRICT_GROWTH_PER_SEC: 2000,
 };
+
+// Debug menus: ?debug in the URL, or the toggle in the ☰ menu (persisted).
+export const DEBUG_KEY = 'rpi-debug';

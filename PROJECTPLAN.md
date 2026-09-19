@@ -79,6 +79,18 @@ Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18
 - [x] Factory and bank teased greyed out with progress rings (B018)
 - [x] vision.md: "The power line and the helpers" (B019)
 
+### Shipped in v1.22.0 (chapter II fixes from the same playtest)
+- [x] Staged competitor + WAR wall at 250k, district growth 2 000/s (B025)
+- [x] ☰ menu above the chapter card; Reset reachable from the wall (B028)
+- [x] Debug menu toggle in ☰ menu + `?debug` (B027)
+- [x] vision.md working notes for chapters III–VI (B026)
+
+### Chapter II UX (decide with Ola first)
+- [ ] Supplies as silos (B021)
+- [ ] Plus/minus on buildings: hover minus, clearer affordability (B022)
+- [ ] Food ↔ housing-stop cue on the building ring (B023)
+- [ ] Something to do while waiting: hand harvest + cheap repeatable (B024)
+
 ### Next (needs Ola's playtest first)
 - [ ] Tune cost ratios / bank gate after playtest (B015)
 - [ ] Helper ideas: luck track, odds engine, space currency (B020)

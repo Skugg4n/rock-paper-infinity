@@ -243,3 +243,99 @@ items:
     status: open
     resolved_in: null
     notes: "Design dialogue first. See vision.md 'The power line and the helpers'."
+
+  - id: B021
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of chapter II) + screenshot"
+    request: |
+      The supplies row (−60/s Surplus +20/s +80/s) is unreadable. Consider
+      showing food as silos that fill and empty, so the player sees
+      starvation coming.
+    status: open
+    resolved_in: null
+    notes: |
+      Proposal A: one silo glyph with a fill level (stock) and a small
+      arrow up/down (net). Proposal B: row of small silos, each 1 000
+      supplies, filling left to right; last one blinking when draining.
+      Decide with Ola before building.
+
+  - id: B022
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of chapter II)"
+    request: |
+      Buying a highrise makes the whole city jump. Show upgrades through
+      the plus that appears; show minus only on hover (it takes space on
+      every building). Hard to tell when the plus is greyed for money vs
+      working, partly because minus always looks the same.
+    status: open
+    resolved_in: null
+
+  - id: B023
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of chapter II)"
+    request: |
+      Residents only move in when there is food, but it is unclear when
+      that stops. Add a faint cue that links food and the housing stop,
+      e.g. the ring around a house gets a reddish tint or a small red dot
+      at the front of the ring.
+    status: open
+    resolved_in: null
+
+  - id: B024
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of chapter II)"
+    request: |
+      Long stretches where the player cannot do anything in chapter II.
+      Other games have a manual toggle/click with diminishing effect, or a
+      cheap repeatable buy that matters less and less until an upgrade
+      multiplies it. Chapter II needs something like that.
+    status: open
+    resolved_in: null
+    notes: |
+      Proposal: a "hand harvest" click on the supplies (adds a shrinking
+      amount of food, diminishing per click within a window), and a cheap
+      repeatable "market stall" (+supplies/s, geometric cost) that a later
+      research multiplies. Fits the helper model in vision.md.
+
+  - id: B025
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of chapter II)"
+    request: |
+      III·WAR came seconds after buying a District; no time to see the
+      competitor. Move the trigger out, let the competitor build first,
+      and open chapter III with the competitor attacking an outer house.
+    status: done
+    resolved_in: v1.22.0
+    notes: |
+      Stopgap shipped: staged competitor (factory → warehouse → radar) and
+      wall at 250k. The attack itself is chapter III design, still open.
+
+  - id: B026
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Chapter IV as THE DEEP (ocean floor colony, time as the resource,
+      cryo, Year 0, time slider) instead of space; V return to surface,
+      VI leave Earth or parallel dimension. Capture in vision.md.
+    status: done
+    resolved_in: v1.22.0
+    notes: "Written as working notes; the four-chapter rule is not yet changed."
+
+  - id: B027
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Debug menu for jumping between chapters and adding resources is gone
+      (hidden top-left button). Bring it back.
+    status: done
+    resolved_in: v1.22.0
+    notes: "It was behind ?debug since v1.13. Now also a toggle in the ☰ menu."
+
+  - id: B028
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Cannot get back to the game after III·WAR appears; the reset button
+      is no longer visible.
+    status: done
+    resolved_in: v1.22.0

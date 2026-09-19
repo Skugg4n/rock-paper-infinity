@@ -80,6 +80,21 @@ Simulated greedy player: generator 4:01, bulk 5:07, luck 5:36, board 2 at 6:10,
 factory 11:54, bank 12:49. ★/s: 0.9 (4:30) → 3.7 → 25 → 77 → 133 → 191 → 219 → 2 460.
 Board 8 costs 22k at ~200 ★/s: a two-minute climb before the last burst.
 
+## v1.22.0: chapter II fixes from Ola's playtest (same day)
+
+- **III·WAR came 5 s after buying a District** (100k capacity filling at 10k/s; wall at
+  50k). Now: competitor at 40k grows in stages (warehouse at 100k, radar at 175k),
+  wall at 250k, district fills at 2 000/s. Not the designed opening of III (that is an
+  attack on an outer house, see vision.md), but the player gets to see it build.
+- **Stuck on the wall**: the ☰ menu sat under the chapter card, so Reset was
+  unreachable. Menu now above the card. Saves with 50k–250k population resume normally.
+- **Debug menu** back for Ola: `?debug` in the URL, or "Debug menu" in the ☰ menu
+  (persisted). Adds +100k ★ (I) and +50k population (II) buttons.
+
+Chapter II UX questions raised (supplies display, plus/minus, food-stop indicator,
+something to do while waiting) are in BACKLOG B021–B024 with proposals, pending Ola's
+choice.
+
 ## Open for Ola
 
 - Is 15–20 min the right length for chapter I? Knobs: cost ratios (1.08 / 1.03 / 1.6),

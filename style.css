@@ -377,8 +377,9 @@ input[type=range]:focus-visible {
     transition: height 0.3s ease-in-out;
 }
 
-/* Debug menus must sit above the chapter card overlay so the player can
-   reach Reset from the WAR wall (or any chapter card) when ?debug is on. */
+/* The ☰ menu (Reset, Debug) and the debug menus must sit above the chapter
+   card overlay so the player can always get out of the WAR wall. */
+#menu-wrapper,
 #debug-menu,
 #debug-trigger,
 #debug-toggle-btn,

@@ -50,7 +50,7 @@ export function init() {
               competitorSpawned: false,
           };
 
-          const { SAVE_KEY, STARS_TRANSFER_KEY } = PHASE2_CONSTANTS;
+          const { SAVE_KEY, STARS_TRANSFER_KEY, COMPETITOR_POP, COMPETITOR_STAGE2_POP, COMPETITOR_STAGE3_POP, WAR_POP, DISTRICT_GROWTH_PER_SEC } = PHASE2_CONSTANTS;
           const parsedSave = loadFromStorage(SAVE_KEY);
           if (parsedSave) {
               parsedSave.buildings = (parsedSave.buildings || []).map(b => b === null ? undefined : b);
@@ -110,6 +110,22 @@ export function init() {
               buildSeparator: document.getElementById('build-separator'),
           };
   
+          /**
+           * The competitor's island grows as the player's city does: factory,
+           * then a warehouse, then a radar mast. Stage 3 is the last thing the
+           * player sees before III·WAR.
+           */
+          function applyCompetitorStage(pop) {
+              const el = ui.competitorIsland;
+              if (!el) return;
+              const stage = pop >= COMPETITOR_STAGE3_POP ? 3 : pop >= COMPETITOR_STAGE2_POP ? 2 : 1;
+              const had2 = el.classList.contains('competitor-stage-2');
+              const had3 = el.classList.contains('competitor-stage-3');
+              el.classList.toggle('competitor-stage-2', stage >= 2);
+              el.classList.toggle('competitor-stage-3', stage >= 3);
+              if ((stage >= 2 && !had2) || (stage >= 3 && !had3)) scheduleIconRefresh();
+          }
+
           // --- DEBUG FUNCTIONS ---
           function debug_addResources(type, amount) { gameState[type] += amount; }
           function debug_addPopulation(amount) {
@@ -389,7 +405,7 @@ export function init() {
                   if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
                       if (!skipGrowth && gameState.supplies > 0 && b.population < b.capacity) {
                           let growthRate = 0;
-                          if (b.type === 'district') growthRate = 10000;
+                          if (b.type === 'district') growthRate = DISTRICT_GROWTH_PER_SEC;
                           else if (b.type === 'skyscraper') growthRate = 5;
                           else if (b.type === 'apartment') growthRate = 1;
                           else {
@@ -463,8 +479,8 @@ export function init() {
                   ui.allocationSliderContainer.classList.add('p2-visible');
               }
 
-              // Competitor spawn
-              if (gameState.population >= 40000 && !gameState.competitorSpawned) {
+              // Competitor spawn, then growth in stages before the chapter turns
+              if (gameState.population >= COMPETITOR_POP && !gameState.competitorSpawned) {
                   gameState.competitorSpawned = true;
                   gameState.competitorSpawnedAt = Date.now();
                   ui.competitorIsland.classList.remove('hidden');
@@ -475,11 +491,13 @@ export function init() {
                   });
               }
 
-              // III·WAR chapter card at 50k population
+              applyCompetitorStage(gameState.population);
+
+              // III·WAR chapter card once the competitor has grown (WAR_POP)
               // Requires competitor island to have been visible for at least 5 seconds
               const competitorVisibleLongEnough = gameState.competitorSpawned &&
                   (Date.now() - (gameState.competitorSpawnedAt || 0)) >= 5000;
-              if (gameState.population >= 50000 && !_warCardTriggered && competitorVisibleLongEnough) {
+              if (gameState.population >= WAR_POP && !_warCardTriggered && competitorVisibleLongEnough) {
                   _warCardTriggered = true;
                   saveGameState(); // persist 50k+ state before disabling saves
                   savingEnabled = false;
@@ -704,10 +722,11 @@ export function init() {
                 if (gameState.competitorSpawned) {
                     ui.competitorIsland.classList.remove('hidden');
                     ui.competitorIsland.classList.add('visible');
+                    applyCompetitorStage(gameState.population);
                     scheduleIconRefresh();
                 }
                 // Past-threshold load: player closed the tab on the WAR wall and came back.
-                if (gameState.population >= 50000) {
+                if (gameState.population >= WAR_POP) {
                     _warCardTriggered = true;
                     savingEnabled = false;
                     if (logicInterval) clearInterval(logicInterval);

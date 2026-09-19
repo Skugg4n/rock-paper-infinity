@@ -126,6 +126,7 @@
             <button data-add-stars="100" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+100 ★</button>
             <button data-add-stars="1000" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+1k ★</button>
             <button data-add-stars="10000" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+10k ★</button>
+            <button data-add-stars="100000" class="text-white text-xs font-bold bg-slate-600 hover:bg-slate-500 rounded px-2 py-1">+100k ★</button>
             <div class="text-white text-xs font-bold border-b border-slate-600 pb-1 my-1">Speed</div>
             <div class="flex items-center justify-between gap-2">
                  <button data-change-speed="-1" class="text-white text-lg font-bold bg-slate-600 hover:bg-slate-500 rounded w-6 h-6">-</button>
@@ -181,6 +182,7 @@
             <button class="debug-btn" onclick="debug_addResources('science', 100000)">+100k Science</button>
             <hr class="border-slate-500 my-2">
             <button class="debug-btn" onclick="debug_addPopulation(1000)">+1k Population</button>
+            <button class="debug-btn" onclick="debug_addPopulation(50000)">+50k Population</button>
             <hr class="border-slate-500 my-2">
             <button class="debug-btn" onclick="setPhase(phases.INDUSTRY)">Back to Stage 1</button>
         </div>
@@ -209,9 +211,15 @@
         <!-- LAND -->
         <div class="w-full h-full flex flex-col items-center justify-center p-4">
             <div id="land-grid" class="grid grid-cols-5 gap-1 sm:gap-4"></div>
-            <div id="competitor-island" class="hidden mt-8 flex justify-center">
+            <div id="competitor-island" class="hidden mt-12 flex justify-center items-end gap-3">
                 <div class="enemy-factory relative w-24 h-24 rounded-xl flex items-center justify-center">
                     <i data-lucide="factory" class="w-12 h-12 text-slate-500"></i>
+                </div>
+                <div class="enemy-tile enemy-stage-2 relative w-16 h-16 rounded-xl flex items-center justify-center">
+                    <i data-lucide="warehouse" class="w-8 h-8 text-slate-500"></i>
+                </div>
+                <div class="enemy-tile enemy-stage-3 relative w-16 h-16 rounded-xl flex items-center justify-center">
+                    <i data-lucide="radar" class="w-8 h-8 text-slate-500"></i>
                 </div>
             </div>
         </div>
@@ -281,11 +289,12 @@
             </button>
             <div id="menu-dropdown" class="hidden absolute bottom-14 left-0 bg-white rounded-lg shadow-lg">
                 <button id="reset-btn" class="block px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap">Reset everything</button>
+                <button id="debug-menu-toggle" class="block px-4 py-2 text-sm text-slate-400 hover:bg-slate-100 whitespace-nowrap">Debug menu</button>
             </div>
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.21.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.22.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">
