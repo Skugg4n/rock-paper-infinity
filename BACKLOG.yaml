@@ -452,6 +452,9 @@ items:
       tier cost 70 s × 1.3^k, silent island when bombed out, arrival bug
       fixed. Sim 16–19 min. Still open: cause-and-effect legibility, info
       panel top right, cheap repair, hatch visual, coastline band.
+      v1.38.0: bombed-out enemy regroups stronger (2 min, full defence, at
+      least our tier), leave only at doomsday ≥ 85 %, scorch cuts yield,
+      radar countdown badge. Sim 19–20 min.
 
   - id: B039
     added: 2026-09-19

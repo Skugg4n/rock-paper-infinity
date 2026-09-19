@@ -50,8 +50,12 @@ export const enemyDefenceCap = (waveCount) => 40 + waveCount * 0.8;
 export const ENEMY_REBUILD_S = 90;
 /** Salvage per razed enemy tile (× tier power of the strike). */
 export const SALVAGE_PER_TILE = 120;
-/** The enemy leaves when its island's scorch passes this. */
-export const ENEMY_LEAVES_AT_SCORCH = 1800;
+/** The enemy leaves when the doomsday clock (both islands' scorch) passes this percent. */
+export const DOOMSDAY_LEAVE = 85;
+/** Bombed out (nothing standing), the enemy digs in and returns all at once after this many seconds, rebuilt, with full defence and at least our tier. */
+export const ENEMY_REGROUP_S = 120;
+/** What scorch does to yield: stars and food per second are multiplied by this. */
+export const scorchYield = (doomPercent) => 1 - 0.6 * Math.max(0, Math.min(100, doomPercent)) / 100;
 /** Seconds of development between our tier purchases. */
 export const TIER_COOLDOWN_S = 45;
 /** The enemy never falls more than this many tiers behind us (checkpoint). */

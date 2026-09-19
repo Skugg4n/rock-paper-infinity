@@ -2,7 +2,7 @@
 // (src/phase3/war.js). Usage: node scripts/sim-phase3.mjs [seed] [--table]
 import {
   TIERS, UNIT_COST, ENEMY_DEFENCE_REGROW, enemyDefenceCap, armsPerSecond, UPKEEP_SHARE_PER_UNIT, FORT_HP, FORT_COST, ENEMY_TILE_HP, ENEMY_REBUILD_S,
-  SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, initialWarState, rng, doomsday, waveInterval, waveSize,
+  SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, initialWarState, rng, doomsday, waveInterval, waveSize,
   nextEnemyTierAt, pickTarget, resolveLanding, resolveOurStrike, canRazeTile, relativePower, plateMaxHp, tierScienceCost, enemyCatchUp, TIER_COOLDOWN_S,
 } from '../src/phase3/war.js';
 
@@ -13,7 +13,8 @@ const types = ['factory', 'bank', 'district', 'district', 'skyscraper', 'skyscra
   'skyscraper', 'skyscraper', 'superStore', 'superStore', 'superStore', 'superStore', 'store', 'store', 'apartment', 'home'];
 const plates = types.map((type, i) => ({ id: i + 1, type, row: Math.floor(i / 5), fort: 0, razed: false, hp: plateMaxHp(type), max: plateMaxHp(type), clearAt: 0 }));
 const popOf = { district: 100000, skyscraper: 500, apartment: 50, home: 10 };
-const income = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 1100 * 0.5;
+const income = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 1100 * 0.5 * scorchYield(doomsday(w.scorchOurs + w.scorchTheirs));
+let regroupAt = 0;
 const scienceRate = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 0.5;
 const w = initialWarState(0);
 w.scienceRate0 = plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 0.5; // potential
@@ -58,7 +59,18 @@ function playerPolicy() {
 }
 
 function enemyTurn() {
+  // Bombed out: they dig in, research twice as fast, and come back all at once, rebuilt and at least our tier.
+  const standing = enemyTiles.filter(e => e.razedUntil <= t).length;
+  if (standing === 0) {
+    if (!regroupAt) { regroupAt = t + ENEMY_REGROUP_S; enemyTiles.forEach(e => { e.razedUntil = regroupAt; }); events.push({ t, e: 'their island is silent (digging in)' }); }
+    w.lastWaveAt = t; w.nextTierAt -= 1;
+  } else if (regroupAt && t >= regroupAt) {
+    regroupAt = 0; w.enemyDefence = enemyDefenceCap(w.waveCount);
+    if (w.enemyTier < w.tier) { w.enemyTier = w.tier; w.nextTierAt = nextEnemyTierAt(t, rand, w.enemyTier); }
+    events.push({ t, e: `THEY ARE BACK, rebuilt, with ${TIERS[w.enemyTier].id}` });
+  }
   if (t >= w.nextTierAt && w.enemyTier < TIERS.length - 1) { w.enemyTier++; w.nextTierAt = nextEnemyTierAt(t, rand, w.enemyTier); events.push({ t, e: `ENEMY tier ${TIERS[w.enemyTier].numeral}` }); }
+  if (standing === 0) return;
   w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW, enemyDefenceCap(w.waveCount));
   if (t - w.lastWaveAt >= waveInterval(w.waveCount)) {
     w.lastWaveAt = t; w.waveCount++;
@@ -83,7 +95,7 @@ while (t < 3600 && !w.shipReady) {
   const lead = Math.sign(w.tier - w.enemyTier);
   if (lead !== 0 && lead !== lastLead) { leadChanges++; lastLead = lead; }
   if (lead < 0) behindS++; else if (lead > 0) aheadS++;
-  if (!w.enemyLeft && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH) { w.enemyLeft = true; events.push({ t, e: 'ENEMY LEAVES (spaceship)' }); }
+  if (!w.enemyLeft && doomsday(w.scorchOurs + w.scorchTheirs) >= DOOMSDAY_LEAVE) { w.enemyLeft = true; events.push({ t, e: `ENEMY LEAVES (spaceship) at doomsday ${Math.round(doomsday(w.scorchOurs + w.scorchTheirs))} %` }); }
   if (w.enemyLeft && w.salvage >= SHIP_SALVAGE) { w.shipReady = true; events.push({ t, e: 'SHIP READY → IV' }); }
   t++;
   if (t % 60 === 0) log.push({ t, tier: w.tier, etier: w.enemyTier, def: w.defence, force: w.force, standing: plates.filter(p => !p.razed).length, doom: Math.round(doomsday(w.scorchOurs + w.scorchTheirs)), ours: Math.round(w.scorchOurs), theirs: Math.round(w.scorchTheirs), salvage: Math.round(w.salvage), income: Math.round(income()) });

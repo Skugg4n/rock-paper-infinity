@@ -14,7 +14,7 @@ import { createAnts } from './ants.js';
 import { createIsland } from './islands.js';
 import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
-    SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
+    SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
     resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, MAX_ABSORB, plateMaxHp, tierScienceCost, armsPerSecond,
     TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S, RAID_S, raidCost,
@@ -157,6 +157,7 @@ export function init() {
               intelBtn: document.getElementById('intel-btn'),
               raidBtn: document.getElementById('raid-btn'),
               radarBtn: document.getElementById('radar-btn'),
+              radarBadge: document.getElementById('radar-badge'),
               warRoom: document.getElementById('war-room'),
               warEnemyDefence: document.getElementById('war-enemy-defence'),
               populationCapacity: document.getElementById('population-capacity'),
@@ -234,17 +235,27 @@ export function init() {
               w.t = (w.t || 0) + 1;
               w.arms += armsPerSecond(w.tier) * w.armsShare;
               // The enemy's strength follows what still stands on its island.
-              // Bombed out (nothing standing): no landings, no research, no
-              // regrowth until they have rebuilt. Razing their island buys time.
+              // Bombed out (nothing standing): no landings, but they dig in,
+              // research twice as fast, and come back all at once after
+              // ENEMY_REGROUP_S, rebuilt, with full defence and at least our
+              // tier. Razing their island buys two minutes, not the war.
               const standing = 5 - (w.enemyRazedUntil || []).filter(x => x > 0).length;
               const standingK = Math.max(0.3, standing / 5);
               const silent = standing === 0 && !w.enemyLeft;
               if (silent) {
-                  w.nextTierAt += 1; w.lastWaveAt = w.t;
-                  if (!w.saidSilent) { w.saidSilent = true; logWar('Interior: their island is silent. Nothing will come until they rebuild.'); }
-              } else w.saidSilent = false;
+                  if (!w.regroupAt) {
+                      w.regroupAt = w.t + ENEMY_REGROUP_S;
+                      w.enemyRazedUntil = (w.enemyRazedUntil || [0, 0, 0, 0, 0]).map(() => w.regroupAt);
+                      logWar('Interior: their island is silent. They are digging in. Expect them back, and stronger.', true);
+                  }
+                  w.nextTierAt -= 1; w.lastWaveAt = w.t;
+              } else if (w.regroupAt && w.t >= w.regroupAt) {
+                  w.regroupAt = 0; w.enemyDefence = enemyDefenceCap(w.waveCount);
+                  if (w.enemyTier < w.tier) { w.enemyTier = w.tier; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier); }
+                  logWar(`Status: they are back. Rebuilt, dug in, and they field ${TIERS[w.enemyTier].id}.`, true);
+              }
               // the enemy escalates on its own jittered clock
-              if (!silent && w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
+              if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
                   w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier);
                   logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
               }
@@ -290,11 +301,9 @@ export function init() {
               if (gameState.supplies <= 0 && gameState.population > 0 && (w.t - (w.lastFoodWarn || -999)) > 60) { w.lastFoodWarn = w.t; logWar('Status: food storages critical. People are starving.', true); }
               // rebuilt enemy tiles
               (w.enemyRazedUntil || []).forEach((until, i) => { if (until && w.t >= until) w.enemyRazedUntil[i] = 0; });
-              // The end: the enemy withdraws to a launch site, goes quiet, launches, leaves rubble.
-              const tilesVisible = enemyTileEls().filter(el => getComputedStyle(el).opacity !== '0').length;
-              const tilesRazed = (w.enemyRazedUntil || []).filter(x => x > 0).length;
-              const islandDead = tilesVisible > 0 && tilesRazed >= tilesVisible && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH * 0.4;
-              if (!w.enemyLeft && (w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH || islandDead)) {
+              // The end comes from the clock, not from their island: when the
+              // surface is nearly done (doomsday), they withdraw, launch, leave rubble.
+              if (!w.enemyLeft && doom >= DOOMSDAY_LEAVE) {
                   w.enemyLeft = true; w.leaveStage = 0; w.leaveAt = w.t;
                   logWar('Intel: the enemy is withdrawing all forces to a launch site.', true);
                   const rocket = ui.competitorIsland.querySelector('.enemy-rocket');
@@ -443,9 +452,27 @@ export function init() {
               ui.raidBtn.disabled = raidLeft > 0 || w.arms < raidCost(w.raids || 0);
               ui.raidBtn.classList.toggle('active-raid', raidLeft > 0);
               setTooltip(ui.raidBtn, raidLeft > 0 ? { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> ${raidLeft} s` } : { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> their <i data-lucide='shield' class='w-4 h-4'></i> → 0 for ${RAID_S} s`, armsCost: raidCost(w.raids || 0) });
-              ui.radarBtn.classList.toggle('hidden', !active || !!w.radar);
-              ui.radarBtn.disabled = w.arms < RADAR_COST;
-              setTooltip(ui.radarBtn, { effect: `<i data-lucide='radar' class='w-4 h-4'></i>`, armsCost: RADAR_COST });
+              // Radar: a purchase, then an instrument: the badge counts down to the next landing,
+              // the tooltip says how big it is and where it is heading once it is spotted.
+              ui.radarBtn.classList.toggle('hidden', !active || w.enemyLeft);
+              ui.radarBtn.classList.toggle('radar-on', !!w.radar);
+              if (w.radar) {
+                  const p = w.pendingWave;
+                  const silentNow = (w.enemyRazedUntil || []).filter(x => x > 0).length >= 5;
+                  const next = p ? Math.max(0, p.launchAt - w.t) : Math.max(0, Math.ceil(waveInterval(w.waveCount) - (w.t - w.lastWaveAt)));
+                  ui.radarBtn.disabled = false;
+                  ui.radarBadge.classList.toggle('hidden', silentNow);
+                  ui.radarBadge.textContent = `${next}s`;
+                  ui.radarBtn.classList.toggle('radar-spotted', !!p);
+                  const heading = p ? gameState.buildings.find(b => b && b.id === p.targetId)?.type : null;
+                  setTooltip(ui.radarBtn, silentNow ? { effect: `<i data-lucide='radar' class='w-4 h-4'></i> quiet` }
+                      : p ? { effect: `${p.size} ${TIERS[w.enemyTier].id} → ${heading || '?'} in ${next} s` }
+                      : { effect: `<i data-lucide='radar' class='w-4 h-4'></i> next landing in ${next} s` });
+              } else {
+                  ui.radarBadge.classList.add('hidden');
+                  ui.radarBtn.disabled = w.arms < RADAR_COST;
+                  setTooltip(ui.radarBtn, { effect: `<i data-lucide='radar' class='w-4 h-4'></i> when and where`, armsCost: RADAR_COST });
+              }
               // enemy tiles show damage like ours
               enemyTileEls().forEach((el, i) => { const hp = w.enemyTileHp?.[i]; el.style.setProperty('--hp', hp === undefined ? '1' : (hp / ENEMY_TILE_HP).toFixed(2)); });
               ui.autoBtn.disabled = !w.autoBought && w.arms < AUTO_COST;
@@ -474,7 +501,7 @@ export function init() {
               if (what === 'tier') w.tier = Math.min(TIERS.length - 1, w.tier + 1);
               if (what === 'etier') w.enemyTier = Math.min(TIERS.length - 1, w.enemyTier + 1);
               if (what === 'wave') w.lastWaveAt = -999;
-              if (what === 'leave') w.scorchTheirs = ENEMY_LEAVES_AT_SCORCH;
+              if (what === 'leave') w.scorchTheirs += 2500 * 2.5;
               if (what === 'salvage') w.salvage += 2000;
               if (what === 'stage') w.leaveAt = -999;
               updateAllUI();
@@ -814,7 +841,9 @@ export function init() {
               const popForStars = gameState.population * (1 - gameState.populationAllocation);
               const popForScience = gameState.population * gameState.populationAllocation;
 
-              let netStarChange = popForStars * baseStarPerPerson;
+              // Scorched land yields less: the war is felt in the numbers
+              const yieldK = gameState.war?.active ? scorchYield(doomsday(gameState.war.scorchOurs + gameState.war.scorchTheirs)) : 1;
+              let netStarChange = popForStars * baseStarPerPerson * yieldK;
               const netScienceChange = popForScience * 1;
 
               let supplyProduction = 0;
@@ -822,7 +851,7 @@ export function init() {
               const gmoMultiplier = Math.pow(2, gameState.gmoLevel);
               // Market stalls: the cheap repeatable helper; GMO multiplies them too.
               supplyProduction += (gameState.stalls || 0) * STALL_SUPPLY * gmoMultiplier;
-              if (gameState.war?.active) supplyProduction *= 1 - 0.6 * doomsday(gameState.war.scorchOurs + gameState.war.scorchTheirs) / 100;
+              if (gameState.war?.active) supplyProduction *= scorchYield(doomsday(gameState.war.scorchOurs + gameState.war.scorchTheirs));
               if (!skipGrowth) gameState.harvestEfficiency = recoverHarvestEfficiency(gameState.harvestEfficiency ?? 1);
 
               gameState.buildings.forEach((b) => {
@@ -987,7 +1016,11 @@ export function init() {
               ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('en-US')}/s`;
 
               const baseStarPerPerson = calculateBaseStarPerPerson();
-              ui.starsPerPerson.textContent = `${baseStarPerPerson.toFixed(1)} /person`;
+              const w2 = gameState.war;
+              const doomK = w2?.active ? scorchYield(doomsday(w2.scorchOurs + w2.scorchTheirs)) : 1;
+              ui.starsPerPerson.textContent = doomK < 0.995
+                  ? `${(baseStarPerPerson * doomK).toFixed(1)} /person · scorched −${Math.round((1 - doomK) * 100)} %`
+                  : `${baseStarPerPerson.toFixed(1)} /person`;
 
               const supplyProduction = gameState.cachedSupplyProduction || 0;
               const supplyConsumption = gameState.cachedSupplyConsumption || 0;

@@ -644,6 +644,10 @@ body.tilt #city-area {
 @keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 12% { transform: translateY(-14px); opacity: 1; } 78% { opacity: 1; } 100% { transform: translateY(-820px) scale(0.85); opacity: 0; } }
 @keyframes rocket-tremble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1px, -1px); } 50% { transform: translate(-1px, 1px); } 75% { transform: translate(1px, 1px); } }
 #war-ui input[type=range] { accent-color: #475569; }
+/* Radar after purchase: an instrument, not a buy; the badge counts down, it pulses once a wave is spotted */
+.btn.radar-on { cursor: default; }
+.btn.radar-on.radar-spotted { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.35); animation: radar-pulse 1s ease-in-out infinite; }
+@keyframes radar-pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.35); } 50% { box-shadow: 0 0 0 6px rgba(185, 28, 28, 0.12); } }
 /* War room feed, top right under people and food: every line stays readable, the newest is darkest */
 #war-room { text-align: left; border-top: 1px solid rgba(100, 116, 139, 0.25); padding-top: 6px; }
 #war-room div { opacity: 0.62; transition: opacity 600ms ease; white-space: normal; margin-bottom: 3px; }

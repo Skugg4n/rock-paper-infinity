@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.38.0 - 2026-09-19
+
+### The war ends when the earth is done, and a bombed-out enemy comes back stronger
+
+- **No more free suppression.** Bombed out (nothing standing), the enemy no longer waits to be bombed again: they dig in, research twice as fast, and come back all at once after two minutes, rebuilt, with full defence and at least our weapon tier. War room: "their island is silent. They are digging in. Expect them back, and stronger." then "they are back. Rebuilt, dug in, and they field missiles." Razing their island buys two minutes, not the war (Ola: zero engagement, they could do nothing, no reason for worse weapons).
+- **The end comes from the clock.** The enemy leaves when the doomsday ring passes 85 %, both islands' scorch counted, never because their island is empty. Only chemical, biological and nuclear scorch fast enough to get there, so the ladder matters to the end. Sim: 19–20 min, behind 27–43 % of the time, 2–4 lead changes.
+- **Scorch is felt in the numbers.** Stars and food per second fall with the doomsday clock (−60 % at 100 %), and the /person line says "scorched −23 %".
+- **Radar is an instrument.** After the purchase the button stays, with a badge counting down to the next landing; once a wave is spotted it pulses red and the tooltip says "34 artillery → skyscraper in 3 s". Before the purchase the tooltip says what it gives: "when and where".
+
 ## v1.37.0 - 2026-09-19
 
 ### The war room stays readable, the way down is dug, a raiding party
