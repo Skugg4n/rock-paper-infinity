@@ -232,6 +232,12 @@
         <!-- BUILD MENU -->
         <div class="absolute bottom-4 right-3 sm:bottom-8 sm:right-8 flex flex-col items-end gap-2 sm:gap-3 z-20">
             <div id="upgrades-container" class="flex flex-col items-end gap-3">
+                 <!-- III · WAR is chosen, like the bank in chapter I. Greyed from the
+                      moment the competitor appears, open once they have razed a house. -->
+                 <button class="btn hidden" id="war-btn" aria-label="Go to war — chapter III">
+                    <i data-lucide="swords" class="w-7 h-7"></i>
+                    <div class="tooltip"></div>
+                </button>
                  <button class="btn hidden" id="megastructure-research-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                     <div class="tooltip"></div>
@@ -304,7 +310,7 @@
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.26.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.27.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

@@ -30,6 +30,7 @@ export function createBuildingHTML(building, { urbanismResearched, megastructure
     let icon = '';
     let content = '';
     let classes = 'building';
+    if (building.razed) classes += ' razed';
     let actionButtons = '';
 
     if (building.type !== 'factory' && building.type !== 'bank') {

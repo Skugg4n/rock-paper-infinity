@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.27.0 - 2026-09-18
+
+### Ants, second pass (Ola's playtest)
+
+- **Slower** — people 15 px/s, cars 42, enemies 20.
+- **They go inside** — dots fade out as they enter a plate and fade in as they leave; nothing stands in the middle of a house.
+- **New plots settle in** one after another (500 ms, staggered) instead of popping.
+- **The enemy builds in time** — the island stands alone for 30 s before its dots come out, and its stages (warehouse, radar) can only advance after a minute. Stages are sticky: the warehouse no longer flickers away when population dips across the threshold (that was a bug).
+- **The attack is visible and razes** — the red dots march over and when five have arrived the house is razed: burnt plate, red ring, icon gone, population gone. Scorched earth is now written into vision.md as the core of chapter III.
+- **WAR is chosen, like the bank** — a swords button sits greyed in the build menu from the moment the competitor appears; after the razing it opens, the game keeps running with the ruin in place, and the chapter card comes when you press it. Reloading after the choice goes straight to the wall.
+
 ## v1.26.0 - 2026-09-18
 
 ### Ants (Ola's dream)

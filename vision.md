@@ -137,8 +137,14 @@ carried forward (see "What we won't build").
 **Chapter III · WAR opens slowly.** The competitor's island appears far beyond our
 land at 40k population and *builds*: a factory, then a warehouse, then a radar mast.
 The player watches it grow while still buying things in chapter II. Only then does the
-chapter turn, and the first beat of III should be the competitor *acting*: an attack
-on one of our outer houses. Conflict starts with them, not with a menu.
+chapter turn, and the first beat of III is the competitor *acting*: their red dots
+cross over and **raze** one of our outer houses (built in v1.26–1.27). Conflict starts
+with them, not with a menu.
+
+**Scorched earth.** Ola's call (2026-09-18): war means razing, not capturing. Both
+sides destroy. That is how the surface of the planet ends up uninhabitable, which is
+what sends humanity down into THE DEEP. Chapter III's mechanics should follow from
+this: what we build in II is what we lose in III, and what we do to them.
 
 **Chapter IV · THE DEEP (instead of ESCAPE-to-space).** After the war, humanity goes
 *down*, not up: a colony on the ocean floor. During the war the player has been

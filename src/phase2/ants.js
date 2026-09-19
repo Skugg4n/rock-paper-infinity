@@ -72,7 +72,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0 };
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemySince: 0 };
+    /** Seconds after the island appears before its dots come out. */
+    const ENEMY_DELAY_MS = 30000;
     let raf = null;
     let lastMeasure = 0;
     let lastT = 0;
@@ -80,15 +82,24 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     let dpr = 1;
 
     const COLORS = { person: '#1e3a8a', car: '#172554', enemy: '#b91c1c' };
-    const SPEED = { person: 22, car: 60, enemy: 26 };   // px per second
+    const SPEED = { person: 15, car: 42, enemy: 20 };   // px per second
     const RADIUS = { person: 2.2, car: 3.2, enemy: 2.4 };
 
+    let layoutKey = '';
     function measure() {
         const areaRect = area.getBoundingClientRect();
         const rel = (r) => ({ x: r.left - areaRect.left, y: r.top - areaRect.top, w: r.width, h: r.height });
         rects = getSlots()
             .filter(s => s.building)
             .map(s => ({ rect: rel(s.el.getBoundingClientRect()), building: s.building, el: s.el }));
+        // If the plates moved (new land, resize), drop every route so nobody
+        // keeps walking on a street that is no longer there.
+        const first = rects[0]?.rect;
+        const key = first ? `${Math.round(first.x)},${Math.round(first.y)},${rects.length}` : '';
+        if (key !== layoutKey) {
+            layoutKey = key;
+            for (const a of ants) { a.path = null; a.wait = Math.random() * 0.5; }
+        }
         enemyRects = getEnemyTiles().map(el => rel(el.getBoundingClientRect()));
         dpr = window.devicePixelRatio || 1;
         const w = Math.round(areaRect.width), h = Math.round(areaRect.height);
@@ -99,7 +110,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     }
 
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
-    const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0);
+    const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0 && !r.building.razed);
     const works = () => rects.filter(r => WORK.has(r.building.type));
 
     function newTrip(ant) {
@@ -139,8 +150,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         while (ants.length < want) { const a = spawnAnt(state.carUnlocked && Math.random() < 0.3 ? 'car' : 'person'); if (!a) break; ants.push(a); }
         if (ants.length > want) ants.length = want;
         if (state.carUnlocked) ants.forEach(a => { if (a.kind === 'person' && Math.random() < 0.02) a.kind = 'car'; });
-        // Enemies: a few per stage
-        const wantEnemies = state.enemyStage >= 1 ? 3 + state.enemyStage * 3 : 0;
+        // Enemies: none until the island has stood a while, then a few per stage
+        const enemiesOut = state.enemyStage >= 1 && Date.now() - (state.enemySince || 0) >= ENEMY_DELAY_MS;
+        const wantEnemies = enemiesOut ? 3 + state.enemyStage * 3 : 0;
         while (enemies.length < wantEnemies && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; e.t = Math.random(); enemies.push(e); }
         if (enemies.length > wantEnemies) enemies.length = wantEnemies;
     }
@@ -166,7 +178,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (now - lastMeasure > 1000) { measure(); reconcile(); lastMeasure = now; }
         for (const a of ants) stepDot(a, dt, SPEED[a.kind], (d) => { if (!newTrip(d)) d.wait = 1; });
         for (const e of enemies) {
-            if (attack) stepDot(e, dt, SPEED.enemy * 1.6, (d) => arriveAttack(d));
+            if (attack) stepDot(e, dt, SPEED.enemy * 2, (d) => arriveAttack(d));
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });
         }
         draw();
@@ -183,10 +195,17 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         for (const d of [...ants, ...enemies]) {
+            if (!d.path && !d.razing) continue;            // inside a building
             const p = pos(d); if (!p) continue;
+            // Walk out of a plate: fade in on the first segment; walk in: fade out on the last.
+            let edge = 1;
+            if (d.path) {
+                if (d.seg === 0) edge = Math.min(1, d.t * 2.2);
+                if (d.seg === d.path.length - 2) edge = Math.min(1, (1 - d.t) * 2.2);
+            }
             ctx.beginPath();
             ctx.fillStyle = COLORS[d.kind];
-            ctx.globalAlpha = d.kind === 'enemy' ? 0.85 : 0.75;
+            ctx.globalAlpha = (d.kind === 'enemy' ? 0.9 : 0.75) * edge;
             const r = RADIUS[d.kind];
             if (d.kind === 'car') ctx.roundRect(p.x - r, p.y - r * 0.7, r * 2, r * 1.4, 1);
             else ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -200,11 +219,15 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (!attack) return;
         if (e.at === attack.target) {
             if (!e.arrivedFlag) { e.arrivedFlag = true; attack.arrived++; }
-            e.wait = 99; // stay
+            e.wait = 99; e.razing = true; // stay, visibly, on the plate
             if (attack.arrived >= attack.needed && !attack.done) {
                 attack.done = true;
-                attack.target.el.querySelector('.building')?.classList.add('captured');
-                setTimeout(() => attack.onDone?.(), 1500);
+                // The house is razed: burnt plate, red ring, icon gone. Scorched
+                // earth is what chapter III is about (vision.md). Then a long
+                // beat before the chapter card so the player sees what happened.
+                attack.target.el.querySelector('.building')?.classList.add('razed');
+                const razed = attack.target.building;
+                setTimeout(() => attack.onDone?.(razed), 2500);
             }
             return;
         }
@@ -222,7 +245,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function startAttack(onDone) {
         measure();
         const targets = homes();
-        if (!targets.length || !enemyRects.length) { onDone?.(); return; }
+        if (!targets.length || !enemyRects.length) { onDone?.(null); return; }
         const target = targets.reduce((best, r) => (r.rect.y + r.rect.x > best.rect.y + best.rect.x ? r : best), targets[0]);
         while (enemies.length < 8 && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; enemies.push(e); }
         attack = { target, arrived: 0, needed: Math.min(5, enemies.length), onDone, done: false };

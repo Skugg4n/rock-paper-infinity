@@ -359,6 +359,18 @@ items:
       between the plates, on the gaps, like roads. Later mix in cars:
       slightly bigger, faster dots. Build after the cascade playtest.
 
+  - id: B032
+    added: 2026-09-18
+    source: "chat 2026-09-18 (ants playtest)"
+    request: |
+      Ants slower; fade into buildings instead of standing in the middle;
+      animate new plots in; enemy dots and buildings should come out over
+      time, not pop; the attack must be visible before the wall; war means
+      razing (scorched earth); and WAR must be CHOSEN with a button, like
+      the bank in chapter I.
+    status: done
+    resolved_in: v1.27.0
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

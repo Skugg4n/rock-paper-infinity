@@ -605,14 +605,26 @@ input[type=range]::-webkit-slider-thumb {
 #land-grid, #competitor-island { position: relative; z-index: 1; }
 .building-action-btn { z-index: 10; }
 
-/* A house taken by the competitor: the opening of III·WAR */
-.building.captured {
-    background-color: #e2e8f0;
-    box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.7), 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    transition: background-color 600ms ease, box-shadow 600ms ease;
+/* A house razed by the competitor: the opening of III·WAR (scorched earth) */
+.building.razed {
+    background-color: #334155;
+    box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.85), 0 4px 6px -1px rgb(0 0 0 / 0.2);
+    transition: background-color 1200ms ease, box-shadow 600ms ease;
 }
-.building.captured .progress-ring-fg { stroke: #b91c1c !important; opacity: 0.8; }
-.building.captured > [data-lucide], .building.captured > svg:not(.progress-ring) { opacity: 0.35; }
+.building.razed .progress-ring-base { stroke: #475569; }
+.building.razed .progress-ring-fg { stroke: #b91c1c !important; opacity: 0.9; }
+.building.razed > [data-lucide], .building.razed > svg:not(.progress-ring) {
+    opacity: 0;
+    transition: opacity 1200ms ease;
+}
+.building.razed .building-action-btn { display: none; }
+
+/* New plots settle in one after another */
+@keyframes slot-settle {
+    0%   { opacity: 0; transform: scale(0.6) translateY(8px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.building-slot.slot-new { animation: slot-settle 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
 /* Enemy competitor island */
 .enemy-factory {

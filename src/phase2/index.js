@@ -53,6 +53,9 @@ export function init() {
               landExpansion2: false,
               superconductorLevel: 0,
               competitorSpawned: false,
+              competitorStage: 0,
+              warReady: false,    // the competitor has razed a house; WAR can be chosen
+              warChosen: false,   // the player pressed the swords
               // Helpers beside the power line (v1.23.0)
               stalls: 0,
               harvestEfficiency: 1,
@@ -119,6 +122,7 @@ export function init() {
               superconductorBtn: document.getElementById('superconductor-btn'),
               superconductorRing: document.getElementById('superconductor-ring'),
               competitorIsland: document.getElementById('competitor-island'),
+              warBtn: document.getElementById('war-btn'),
               cityArea: document.getElementById('city-area'),
               antsCanvas: document.getElementById('ants-canvas'),
               scienceRow: document.getElementById('science-row'),
@@ -134,7 +138,13 @@ export function init() {
           function applyCompetitorStage(pop) {
               const el = ui.competitorIsland;
               if (!el) return;
-              const stage = pop >= COMPETITOR_STAGE3_POP ? 3 : pop >= COMPETITOR_STAGE2_POP ? 2 : 1;
+              // Stages are sticky (never go back when population dips) and the
+              // island stands alone for a minute before its dots build anything.
+              const age = Date.now() - (gameState.competitorSpawnedAt || 0);
+              const byPop = pop >= COMPETITOR_STAGE3_POP ? 3 : pop >= COMPETITOR_STAGE2_POP ? 2 : 1;
+              const allowed = age >= 60000 ? byPop : 1;
+              const stage = Math.max(gameState.competitorStage || 1, allowed);
+              gameState.competitorStage = stage;
               const had2 = el.classList.contains('competitor-stage-2');
               const had3 = el.classList.contains('competitor-stage-3');
               el.classList.toggle('competitor-stage-2', stage >= 2);
@@ -337,6 +347,13 @@ export function init() {
                   if(shouldShow && !(isPurchased && !isMultiLevel)) anyUpgradeVisible = true;
               });
               ui.buildSeparator.classList.toggle('hidden', !anyUpgradeVisible);
+
+              // III · WAR: teased when the competitor appears, open once they razed a house
+              ui.warBtn.classList.toggle('hidden', !gameState.competitorSpawned);
+              ui.warBtn.disabled = !gameState.warReady;
+              setTooltip(ui.warBtn, gameState.warReady
+                  ? { effect: `III · WAR` }
+                  : { unlockReq: `<i data-lucide='factory' class='w-4 h-4'></i> …` });
   
   
               // Disabled state for basic buildings
@@ -439,7 +456,7 @@ export function init() {
                       supplyProduction += b.supply * gmoMultiplier;
                       netStarChange -= b.upkeep;
                   }
-                  if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
+                  if ((b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && !b.razed) {
                       if (!skipGrowth && gameState.supplies > 0 && b.population < b.capacity) {
                           let growthRate = 0;
                           if (b.type === 'district') growthRate = DISTRICT_GROWTH_PER_SEC;
@@ -531,32 +548,25 @@ export function init() {
               _ants?.setState({
                   population: gameState.population,
                   carUnlocked: !!gameState.carUnlocked,
-                  enemyStage: !gameState.competitorSpawned ? 0
-                      : gameState.population >= COMPETITOR_STAGE3_POP ? 3
-                      : gameState.population >= COMPETITOR_STAGE2_POP ? 2 : 1,
+                  enemyStage: gameState.competitorSpawned ? (gameState.competitorStage || 1) : 0,
+                  enemySince: gameState.competitorSpawnedAt || 0,
               });
 
               // III·WAR chapter card once the competitor has grown (WAR_POP)
               // Requires competitor island to have been visible for at least 5 seconds
               const competitorVisibleLongEnough = gameState.competitorSpawned &&
                   (Date.now() - (gameState.competitorSpawnedAt || 0)) >= 5000;
-              if (gameState.population >= WAR_POP && !_warCardTriggered && competitorVisibleLongEnough) {
+              if (gameState.population >= WAR_POP && !_warCardTriggered && !gameState.warReady && competitorVisibleLongEnough) {
                   _warCardTriggered = true;
-                  saveGameState(); // persist the state before disabling saves
-                  savingEnabled = false;
-                  if (logicInterval) clearInterval(logicInterval);
-                  // The opening of III·WAR: the red dots cross over and take one of
-                  // our outer houses. Only then the chapter card.
-                  const card = () => {
-                      if (fastUiInterval) clearInterval(fastUiInterval);
-                      playChapterCard({
-                          roman: 'III',
-                          title: 'WAR',
-                          mode: 'to-come',
-                          onMidpoint: () => { /* saving already disabled above */ },
-                      });
+                  // The opening of III·WAR: the red dots cross over and raze one of
+                  // our outer houses. The game goes on; the swords button opens.
+                  const onRazed = (building) => {
+                      if (building) { building.razed = true; building.population = 0; }
+                      gameState.warReady = true;
+                      saveGameState();
+                      updateAllUI();
                   };
-                  if (_ants) _ants.startAttack(card); else card();
+                  if (_ants) _ants.startAttack(onRazed); else onRazed(null);
               }
 
               updateAllUI();
@@ -644,6 +654,15 @@ export function init() {
               }
           }, { signal });
 
+          ui.warBtn.addEventListener('click', () => {
+              if (!gameState.warReady || gameState.warChosen) return;
+              gameState.warChosen = true;
+              saveGameState();
+              savingEnabled = false;
+              if (logicInterval) clearInterval(logicInterval);
+              if (fastUiInterval) clearInterval(fastUiInterval);
+              playChapterCard({ roman: 'III', title: 'WAR', mode: 'to-come', onMidpoint: () => {} });
+          }, { signal });
           ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'), { signal });
           ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'), { signal });
           ui.buildStallBtn.addEventListener('click', () => {
@@ -713,13 +732,7 @@ export function init() {
                 if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
                     gameState.stars -= buildingData.landExpansion.cost;
                     gameState.landExpanded = true;
-                    const grid = ui.landGrid;
-                    for (let i = 0; i < 5; i++) {
-                        gameState.buildings.push(undefined);
-                        const slot = document.createElement('div');
-                        slot.className = 'building-slot empty';
-                        grid.appendChild(slot);
-                    }
+                    addLandSlots(5);
                     updateAllUI();
                 }
             }, { signal });
@@ -728,16 +741,22 @@ export function init() {
               if (gameState.stars >= buildingData.landExpansion2.cost && !gameState.landExpansion2 && gameState.landExpanded) {
                   gameState.stars -= buildingData.landExpansion2.cost;
                   gameState.landExpansion2 = true;
-                  const grid = ui.landGrid;
-                  for (let i = 0; i < 5; i++) {
-                      gameState.buildings.push(undefined);
-                      const slot = document.createElement('div');
-                      slot.className = 'building-slot empty';
-                      grid.appendChild(slot);
-                  }
+                  addLandSlots(5);
                   updateAllUI();
               }
           }, { signal });
+
+          /** New plots settle in one after another instead of popping. */
+          function addLandSlots(n) {
+              for (let i = 0; i < n; i++) {
+                  gameState.buildings.push(undefined);
+                  const slot = document.createElement('div');
+                  slot.className = 'building-slot empty slot-new';
+                  slot.style.animationDelay = `${i * 120}ms`;
+                  slot.addEventListener('animationend', () => slot.classList.remove('slot-new'), { once: true });
+                  ui.landGrid.appendChild(slot);
+              }
+          }
 
             ui.allocationSlider.addEventListener('input', (e) => {
                 gameState.populationAllocation = e.target.value / 100;
@@ -785,8 +804,9 @@ export function init() {
                     applyCompetitorStage(gameState.population);
                     scheduleIconRefresh();
                 }
-                // Past-threshold load: player closed the tab on the WAR wall and came back.
-                if (gameState.population >= WAR_POP) {
+                // Came back after choosing WAR: straight to the wall.
+                if (gameState.warReady) _warCardTriggered = true;
+                if (gameState.warChosen) {
                     _warCardTriggered = true;
                     savingEnabled = false;
                     if (logicInterval) clearInterval(logicInterval);
