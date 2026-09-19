@@ -91,8 +91,12 @@ Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18
 - [x] Starved ring + red dot, silo same colour (B023)
 - [x] Hand harvest + market stalls (B024)
 
+### Shipped in v1.25.0
+- [x] Cascades: per-person income, multiplier hills, prices for bursts, districts 500/s (B030)
+
 ### Chapter II next
-- [ ] Downhill feeling mid-chapter (Ola's question 5): windfall after a tier purchase, milestone cascades, periodic shipment. Decide, then build.
+- [ ] Ants: people dots between buildings; red enemy dots attack an outer house = start of WAR (B031)
+- [ ] Playtest the cascade pass; tune with `scripts/sim-phase2.mjs`
 
 ### Next (needs Ola's playtest first)
 - [ ] Tune cost ratios / bank gate after playtest (B015)

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.25.0 - 2026-09-18
+
+### Chapter II cascades (Ola chose cascades over windfalls: "rimmar bäst med projektet")
+
+- **Income is per person, not per factory** — base 2 → 10 stars per person per second; the carried-over factory gives 200/s (was 1 680) as a starter engine. Now the multipliers (tool case ×2, car ×5, computer ×11, superconductor ×2) are felt.
+- **Prices set for cascades** — right after each multiplier several things become affordable at once: homes 6 000, apartments 25 000, skyscrapers 150 000, stores 20 000, super stores 120 000, districts 8M; tool case 100k, urbanism 150k, car 600k, computer 4M, megastructure 800k, land 500k / 5M, superconductor 20M ×5 per level.
+- **Districts fill at 500/s** (was 2 000) so the end of the chapter is a climb of a few minutes, not a dump.
+- Simulated (greedy, 60k stars from chapter I): tool case 7:40, car 13:30, computer 15:20, districts 17:35, war 18:46; eight cascade windows, longest climb 3:20. `scripts/sim-phase2.mjs` reads `buildings-config.js`, so sim and game cannot drift.
+
 ## v1.24.0 - 2026-09-18
 
 ### Small things from Ola's second playtest

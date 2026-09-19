@@ -43,6 +43,7 @@ All must be updated together on every release:
 npm test                          # Run Jest tests
 npm run lint                      # Run ESLint
 node scripts/sim-phase1.mjs new   # Simulate the Phase 1 economy (old|new) before touching balance
+node scripts/sim-phase2.mjs new   # Simulate the Phase 2 economy (reads buildings-config.js); shows cascades and climbs
 ```
 
 ## Balance rule

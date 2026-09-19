@@ -25,8 +25,8 @@ export const PHASE2_CONSTANTS = {
     COMPETITOR_STAGE2_POP: 100000,
     COMPETITOR_STAGE3_POP: 175000,
     WAR_POP: 250000,
-    // A district fills over ~50 s, not 10 s, so the endgame is felt.
-    DISTRICT_GROWTH_PER_SEC: 2000,
+    // A district fills over ~200 s, so the endgame is a climb, not a dump.
+    DISTRICT_GROWTH_PER_SEC: 500,
 };
 
 // Debug menus: ?debug in the URL, or the toggle in the ☰ menu (persisted).

@@ -328,6 +328,36 @@ items:
     resolved_in: v1.22.0
     notes: "It was behind ?debug since v1.13. Now also a toggle in the ☰ menu."
 
+  - id: B030
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Downhill feeling mid-chapter: cascades (several buys right after a
+      multiplier), not windfalls ("varför skulle det i verkligheten bli mer
+      flow först efter ett köp och sen sämre?").
+    status: done
+    resolved_in: v1.25.0
+    notes: "Balance only, no new mechanic. Verify feel in playtest."
+
+  - id: B031
+    added: 2026-09-18
+    source: "chat 2026-09-18 (Ola's dream)"
+    request: |
+      People as small dark-blue dots moving between houses, store and
+      factory, like ants. The enemy island gets red dots moving in its own
+      world; suddenly they move towards US and take over/destroy one of our
+      houses or districts. That is the start of WAR.
+    status: open
+    resolved_in: null
+    notes: |
+      Merges B004 (pedestrians) and B025 (war opening). Proposed build: a
+      canvas overlay on the land grid, up to ~40 dots, each walking between
+      building centres (home → store/factory → home); enemy island spawns
+      red dots at stage 2; at WAR_POP the red dots cross to our outermost
+      house, its ring turns red, the house darkens, then the chapter card.
+      Contained inside the plates per vision.md. Build after the cascade
+      playtest.
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

@@ -184,7 +184,7 @@ export function init() {
           const refreshAllBuildingActions = () => renderer.refreshAllBuildingActions(gameState.buildings, gameState, initialLoadDone);
 
           function calculateBaseStarPerPerson() {
-              let baseStarPerPerson = 2;
+              let baseStarPerPerson = buildingData.person.income;
               if (gameState.toolCaseUnlocked) baseStarPerPerson *= 2;
               if (gameState.carUnlocked) baseStarPerPerson *= 5;
               if (gameState.computerUnlocked) baseStarPerPerson *= 11;
@@ -417,7 +417,7 @@ export function init() {
 
               gameState.buildings.forEach((b) => {
                   if (!b) return;
-                  if (b.type === 'factory') netStarChange += 1680;
+                  if (b.type === 'factory') netStarChange += buildingData.factoryIncome.income;
                   if (b.type === 'bank') netStarChange -= 30;
                   if (b.type === 'store' || b.type === 'superStore') {
                       supplyProduction += b.supply * gmoMultiplier;

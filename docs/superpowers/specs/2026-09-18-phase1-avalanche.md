@@ -103,6 +103,20 @@ efficiency per click, +10 %/s rest); market stalls (2 000 × 1.25ⁿ, +5/s, ×GM
 helpers in `src/phase2/economy.js` with tests. No balance simulation for chapter II
 yet; that is the next pass.
 
+## v1.25.0: chapter II cascades
+
+Ola wanted the downhill feeling mid-chapter and chose cascades (explainable: a
+multiplier makes you rich relative to everything that was waiting) over windfalls
+(not explainable). Simulation `scripts/sim-phase2.mjs` showed the old chapter II was
+flat for 20 minutes (income was the flat 1 680/s factory, so ×2/×5/×11 on 2 per person
+meant nothing) and then dumped 64 buys in the last 30 s.
+
+Changes: per-person 10, factory 200; cheaper buildings; multipliers priced as hills;
+districts fill at 500/s. Result: opening cascade, climb to tool case (7:40), cascade,
+climb, car (13:30) cascade, computer (15:20) cascade, districts (17:35), war (18:46).
+Eight cascade windows, longest climb 3:20. Superconductor is now end-of-chapter candy
+(20M ×5) that only the district phase can pay for.
+
 ## Open for Ola
 
 - Is 15–20 min the right length for chapter I? Knobs: cost ratios (1.08 / 1.03 / 1.6),
