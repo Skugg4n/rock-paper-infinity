@@ -24,7 +24,7 @@ describe('war rules', () => {
     test('waves come faster and bigger', () => {
         expect(waveInterval(0)).toBe(40);
         expect(waveInterval(100)).toBe(15);
-        expect(waveSize(0)).toBe(8);
+        expect(waveSize(0)).toBe(10);
         expect(waveSize(10)).toBeGreaterThan(waveSize(0));
     });
 
@@ -56,7 +56,7 @@ describe('war rules', () => {
     test('resolveHit: defence absorbs, the rest hits the plate', () => {
         const stopped = resolveHit({ power: 10, defence: 20, defencePower: 1, hp: 10 });
         expect(stopped.razed).toBe(false);
-        expect(stopped.hpLeft).toBe(10);
+        expect(stopped.hpLeft).toBe(7);          // 30 % always reaches the plate
         expect(stopped.defenceLost).toBeGreaterThan(0);
         const through = resolveHit({ power: 30, defence: 5, defencePower: 1, hp: 10 });
         expect(through.razed).toBe(true);
@@ -64,6 +64,8 @@ describe('war rules', () => {
         const scratch = resolveHit({ power: 12, defence: 5, defencePower: 1, hp: 10 });
         expect(scratch.razed).toBe(false);
         expect(scratch.hpLeft).toBe(3);
+        const capped = resolveHit({ power: 100, defence: 1000, defencePower: 10, hp: 50 });
+        expect(capped.hpLeft).toBe(20);
     });
 
     test('resolveStrike razes a tile when force beats their defence and HP', () => {

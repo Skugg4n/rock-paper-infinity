@@ -13,11 +13,11 @@ import {
 import { createAnts } from './ants.js';
 import { createIsland } from './islands.js';
 import {
-    TIERS, UNIT_COST, FORT_HP, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
+    TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
     SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
     resolveHit, resolveStrike, plateMaxHp, tierScienceCost, armsPerSecond,
-    enemyTileHp, TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES,
+    enemyTileHp, TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -154,6 +154,7 @@ export function init() {
               tierBadge: document.getElementById('tier-badge'),
               shipBtn: document.getElementById('ship-btn'),
               autoBtn: document.getElementById('auto-btn'),
+              intelBtn: document.getElementById('intel-btn'),
               radarBtn: document.getElementById('radar-btn'),
               warRoom: document.getElementById('war-room'),
               warEnemyDefence: document.getElementById('war-enemy-defence'),
@@ -178,6 +179,7 @@ export function init() {
           /** War room: short lines from the advisor. Kept in the save (last 8). */
           function logWar(text, grim = false) {
               const w = gameState.war; if (!w) return;
+              if (text.startsWith('Intel:') && !w.intel) return;   // you have to buy the eyes
               w.log = (w.log || []).slice(-7).concat([{ text, grim, t: w.t || 0 }]);
               renderWarRoom();
           }
@@ -204,17 +206,17 @@ export function init() {
               w.enemyRazedUntil = [0, 0, 0, 0, 0];
               gameState.war = w;
               gameState.warChosen = true;
-              applyWarPresentation();
+              applyWarPresentation({ tilt: false });        // the camera lowers after the card
               logWar('War room: the factory can make arms. Fists first.');
               logWar('Intel: enemy shipyard active. Expect landings from the south.');
               saveGameState();
               updateAllUI();
           }
-          function applyWarPresentation() {
+          function applyWarPresentation({ tilt = true } = {}) {
               const w = gameState.war;
               if (!w?.active) return;
               ui.phaseCity.classList.add('war');
-              document.body.classList.add('tilt');          // the camera lowers (6 s transition)
+              if (tilt) document.body.classList.add('tilt'); // the camera lowers (6 s transition)
               ui.warUi.classList.remove('hidden');
               ui.doomsday.classList.remove('hidden');
               ui.armsSlider.value = Math.round((w.armsShare || 0.3) * 100);
@@ -239,20 +241,29 @@ export function init() {
               const standingK = Math.max(0.3, standing / 5);
               w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
               // waves, as long as the enemy is still here; every fifth is a push
-              if (!w.enemyLeft && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
+              if (!w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
                   w.lastWaveAt = w.t; w.waveCount++;
                   const target = pickTarget(warPlates(), warRand);
                   if (target) {
-                      const enemy = TIERS[w.enemyTier];
                       const push = w.waveCount % 5 === 0;
                       const size = Math.round(waveSize(w.waveCount) * standingK * (push ? 2 : 1));
-                      const power = size * enemy.power;
+                      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push };
                       const ti = gameState.buildings.findIndex(b => b && b.id === target.id);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       if (w.radar && targetEl) targetEl.classList.add('targeted');
-                      if (w.radar && push) logWar('Intel: a large force is forming at their shipyard.', true);
-                      const impact = (fraction = 1) => { targetEl?.classList.remove('targeted'); resolveWave(target.id, power * fraction, enemy, size, fraction); };
-                      if (_ants) _ants.launchWave({ targetBuildingId: target.id, count: size, mode: enemy.mode, onImpact: impact });
+                      if (w.radar) logWar(push ? `Intel: a large force is heading for ${target.type}.` : `Radar: landing party heading for ${target.type}.`, push);
+                  }
+              }
+              if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
+                  const { targetId, size } = w.pendingWave; w.pendingWave = null;
+                  const b = gameState.buildings.find(x => x && x.id === targetId);
+                  if (b && !b.razed) {
+                      const enemy = TIERS[w.enemyTier];
+                      const power = size * enemy.power;
+                      const ti = gameState.buildings.findIndex(x => x && x.id === targetId);
+                      const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
+                      const impact = (fraction = 1) => { targetEl?.classList.remove('targeted'); resolveWave(targetId, power * fraction, enemy, size, fraction); };
+                      if (_ants) _ants.launchWave({ targetBuildingId: targetId, count: size, mode: enemy.mode, onImpact: impact });
                       else impact(1);
                   }
               }
@@ -265,7 +276,10 @@ export function init() {
               // rebuilt enemy tiles
               (w.enemyRazedUntil || []).forEach((until, i) => { if (until && w.t >= until) w.enemyRazedUntil[i] = 0; });
               // The end: the enemy withdraws to a launch site, goes quiet, launches, leaves rubble.
-              if (!w.enemyLeft && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH) {
+              const tilesVisible = enemyTileEls().filter(el => getComputedStyle(el).opacity !== '0').length;
+              const tilesRazed = (w.enemyRazedUntil || []).filter(x => x > 0).length;
+              const islandDead = tilesVisible > 0 && tilesRazed >= tilesVisible && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH * 0.4;
+              if (!w.enemyLeft && (w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH || islandDead)) {
                   w.enemyLeft = true; w.leaveStage = 0; w.leaveAt = w.t;
                   logWar('Intel: the enemy is withdrawing all forces to a launch site.', true);
                   const rocket = ui.competitorIsland.querySelector('.enemy-rocket');
@@ -304,18 +318,23 @@ export function init() {
                   w.scorchOurs += enemy.scorch * 4;
                   renderGridSlot(i);
                   logWar(`Status: ${b.type} razed by enemy ${enemy.id}.`, true);
-              } else if (r.absorbed >= power) {
-                  logWar(`Interior: our defence held at ${b.type}.`);
+              } else if ((b.fort || 0) > 0) {
+                  logWar(`Interior: fortification at ${b.type} held. HP ${Math.round(b.hp)}/${plateMaxHp(b.type, b.fort)}.`);
               } else {
-                  logWar(`Status: ${b.type} damaged by enemy ${enemy.id}.`);
+                  logWar(`Status: ${b.type} damaged by enemy ${enemy.id} (HP ${Math.round(b.hp)}/${plateMaxHp(b.type, 0)}).`);
               }
               updateAllUI();
           }
 
+          const strikeTargets = () => {
+              const w = gameState.war; if (!w?.active) return [];
+              return enemyTileEls().map((el, i) => ({ el, i })).filter(({ el, i }) => getComputedStyle(el).opacity !== '0' && !(w.enemyRazedUntil?.[i] > 0));
+          };
           function tryStrike() {
               const w = gameState.war; if (!w?.active || w.enemyLeft || w.force <= 0) return false;
-              const visible = enemyTileEls().map((el, i) => ({ el, i })).filter(({ el, i }) => getComputedStyle(el).opacity !== '0' && !(w.enemyRazedUntil?.[i] > 0));
-              if (!visible.length) return false;
+              const visible = strikeTargets();
+              if (!visible.length) { if (!w.saidNothingToStrike) { w.saidNothingToStrike = true; logWar('Interior: nothing left standing over there to strike. They are rebuilding.'); } return false; }
+              w.saidNothingToStrike = false;
               const pickIdx = visible[Math.floor(Math.random() * visible.length)].i;
               const force = w.force, tier = TIERS[w.tier], enemy = TIERS[w.enemyTier];
               w.force = 0; // released
@@ -350,7 +369,7 @@ export function init() {
               const w = gameState.war;
               const active = !!w?.active;
               [ui.buyDefenceBtn, ui.buyForceBtn, ui.strikeBtn, ui.tierBtn].forEach(btn => btn.classList.toggle('hidden', !active));
-              if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); }
+              if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); }
               ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
               if (!active) return;
               const tier = TIERS[w.tier];
@@ -358,8 +377,11 @@ export function init() {
               ui.warForce.textContent = Math.round(w.force).toLocaleString('en-US');
               ui.warArms.textContent = Math.floor(w.arms).toLocaleString('en-US');
               ui.warArmsRate.textContent = `+${(armsPerSecond(w.tier) * w.armsShare).toFixed(0)}/s`;
-              ui.warTier.textContent = tier.numeral;
-              ui.warEnemyTier.textContent = TIERS[w.enemyTier].numeral;
+              ui.warTier.textContent = `${tier.numeral} ${tier.id}`;
+              ui.warEnemyTier.textContent = w.intel ? `${TIERS[w.enemyTier].numeral} ${TIERS[w.enemyTier].id}` : '?';
+              ui.intelBtn.classList.toggle('hidden', !active || !!w.intel);
+              ui.intelBtn.disabled = w.arms < INTEL_COST;
+              setTooltip(ui.intelBtn, { effect: `<i data-lucide='eye' class='w-4 h-4'></i> intel`, armsCost: INTEL_COST });
               ui.tierBadge.textContent = w.tier < TIERS.length - 1 ? TIERS[w.tier + 1].numeral : tier.numeral;
               const doom = doomsday(w.scorchOurs + w.scorchTheirs);
               ui.doomsdayRing.style.strokeDashoffset = 113 - (doom / 100) * 113;
@@ -367,7 +389,8 @@ export function init() {
               ui.salvage.textContent = w.salvage > 0 ? `${Math.round(w.salvage).toLocaleString('en-US')} ▾` : '';
               ui.buyDefenceBtn.disabled = w.arms < UNIT_COST;
               ui.buyForceBtn.disabled = w.arms < UNIT_COST;
-              ui.strikeBtn.disabled = w.force <= 0 || w.enemyLeft;
+              const targets = strikeTargets();
+              ui.strikeBtn.disabled = w.force <= 0 || w.enemyLeft || !targets.length;
               const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0) : null;
               const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
               ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
@@ -395,11 +418,14 @@ export function init() {
               // Predicted strike: ✓ if force × power beats their defence and a tile
               const canRaze = w.force * tier.power > w.enemyDefence * TIERS[w.enemyTier].power + enemyTileHp(w.enemyTier);
               ui.strikeBtn.classList.toggle('will-raze', canRaze && w.force > 0);
-              ui.warEnemyDefence.textContent = Math.round(w.enemyDefence).toLocaleString('en-US');
+              ui.warEnemyDefence.textContent = w.intel ? Math.round(w.enemyDefence).toLocaleString('en-US') : '?';
               ui.shipBtn.disabled = !w.shipReady;
-              setTooltip(ui.buyDefenceBtn, { effect: `+1 <i data-lucide='shield' class='w-4 h-4'></i> (${tier.power})`, armsCost: UNIT_COST });
-              setTooltip(ui.buyForceBtn, { effect: `+1 <i data-lucide='swords' class='w-4 h-4'></i> (${tier.power})`, armsCost: UNIT_COST });
-              setTooltip(ui.strikeBtn, { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> → ${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ${canRaze && w.force > 0 ? '✓' : '×'}` });
+              const batch = batchSize(w.arms);
+              setTooltip(ui.buyDefenceBtn, { effect: `+${batch} <i data-lucide='shield' class='w-4 h-4'></i> (×${tier.power})`, armsCost: batch * UNIT_COST });
+              setTooltip(ui.buyForceBtn, { effect: `+${batch} <i data-lucide='swords' class='w-4 h-4'></i> (×${tier.power})`, armsCost: batch * UNIT_COST });
+              setTooltip(ui.strikeBtn, !targets.length && !w.enemyLeft
+                  ? { unlockReq: `<i data-lucide='factory' class='w-4 h-4'></i> rebuilding…` }
+                  : { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> → ${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ${canRaze && w.force > 0 ? '✓' : '×'}` });
               setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : (cooling ? { unlockReq: `${TIERS[w.tier + 1].numeral} · ${Math.max(0, TIER_COOLDOWN_S - ((w.t || 0) - (w.lastTierAt ?? 0)))} s` } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost }));
               setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
               // enemy tiles: razed ones dim until rebuilt
@@ -986,7 +1012,7 @@ export function init() {
                   const i = gameState.buildings.findIndex(b => b && b.id === id); const b = gameState.buildings[i];
                   if (w?.active && b && !b.razed) {
                       const cost = FORT_COST(b.fort || 0);
-                      if (w.arms >= cost) { w.arms -= cost; b.fort = (b.fort || 0) + 1; b.hp = (b.hp ?? plateMaxHp(b.type, b.fort - 1)) + FORT_HP; renderGridSlot(i); updateAllUI(); }
+                      if (w.arms >= cost) { w.arms -= cost; b.fort = (b.fort || 0) + 1; b.hp = plateMaxHp(b.type, b.fort); renderGridSlot(i); logWar(`Interior: ${b.type} fortified and repaired. HP ${b.hp}.`); updateAllUI(); }
                   }
                   return;
               }
@@ -1013,10 +1039,17 @@ export function init() {
               gameState.warChosen = true;
               saveGameState();
               // The chapter turns, but the game goes on: the war is played on this map.
-              playChapterCard({ roman: 'III', title: 'WAR', dark: true, hold: 4000, onMidpoint: () => startWar() });
+              playChapterCard({ roman: 'III', title: 'WAR', dark: true, hold: 4000, onMidpoint: () => startWar() })
+                  .then(() => document.body.classList.add('tilt'));
           }, { signal });
-          ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (w?.active && w.arms >= UNIT_COST) { w.arms -= UNIT_COST; w.defence++; updateAllUI(); } }, { signal });
-          ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (w?.active && w.arms >= UNIT_COST) { w.arms -= UNIT_COST; w.force++; updateAllUI(); } }, { signal });
+          /** One click buys a tenth of your arms' worth of units (at least one). */
+          const batchSize = (arms) => Math.max(1, Math.floor(arms * 0.1 / UNIT_COST));
+          ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.defence += n; updateAllUI(); }, { signal });
+          ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.force += n; updateAllUI(); }, { signal });
+          ui.intelBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || w.intel) return;
+              if (w.arms >= INTEL_COST) { w.arms -= INTEL_COST; w.intel = true; logWar(`Intel: office opened. The enemy fields ${TIERS[w.enemyTier].id}.`); updateAllUI(); }
+          }, { signal });
           ui.strikeBtn.addEventListener('click', () => { tryStrike(); }, { signal });
           ui.tierBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.tier >= TIERS.length - 1) return;

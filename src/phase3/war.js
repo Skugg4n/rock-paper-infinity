@@ -60,6 +60,10 @@ export const TIER_COOLDOWN_S = 45;
 export const ENEMY_MAX_LAG = 1;
 /** One-time price (arms) of the auto quartermaster: buys units and strikes for you. */
 export const AUTO_COST = 400;
+/** Intel office: shows the enemy's tier and the Intel lines in the war room. */
+export const INTEL_COST = 150;
+/** Seconds between a wave being spotted (radar) and its departure. */
+export const WAVE_WARNING_S = 4;
 /** Salvage needed to open the ship down. */
 export const SHIP_SALVAGE = 1500;
 
@@ -106,7 +110,7 @@ export function waveInterval(waveCount) {
 
 /** Units in the next wave: grows for thirty waves, then holds. */
 export function waveSize(waveCount) {
-    return 8 + Math.min(waveCount, 30) * 2;
+    return 10 + Math.min(waveCount, 30) * 3;
 }
 
 /**
@@ -158,8 +162,10 @@ export function pickTarget(plates, rand) {
  * @param {number} args.hp - plate HP left (including fortification)
  * @returns {{ razed: boolean, hpLeft: number, defenceLost: number, absorbed: number }}
  */
+/** Defence can absorb at most this share of a wave; the rest always reaches the plate. */
+export const MAX_ABSORB = 0.7;
 export function resolveHit({ power, defence, defencePower, hp }) {
-    const absorbed = Math.min(power, defence * defencePower);
+    const absorbed = Math.min(power * MAX_ABSORB, defence * defencePower);
     const rest = power - absorbed;
     // defenders take losses proportional to what they absorbed
     const defenceLost = Math.min(defence, Math.ceil((absorbed / Math.max(1, defencePower)) * 0.1));

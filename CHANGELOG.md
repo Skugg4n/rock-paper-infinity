@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.35.0 - 2026-09-19
+
+### Understand it, or control it (Ola's third war playtest)
+
+- **The camera lowers after the WAR card**, not behind it.
+- **Intel is a purchase** (eye, 150 arms): without it the enemy's tier and defence read "?" and the Intel lines stay silent. Status and Interior are free.
+- **Radar warns for real** — a wave is spotted four seconds before it departs; the target plate gets a pulsing red ring and the war room names it.
+- **Buy in batches** — one click buys a tenth of your arms' worth of units (at least one); the tooltip says +N. Build a balanced defence, then send a big force.
+- **Defence caps at 70 %** of a wave; the rest always reaches the plate, so fortification and repairs matter. Fortifying repairs the plate to full and raises its ceiling; the ◆ tooltip shows HP now/max → next; the war room reports "fortification at district held. HP 34/58".
+- **The HUD names the weapons** ("VII chemical · I fists").
+- **Nothing to strike** — when every enemy tile is razed the crosshair is disabled with "rebuilding…", and once the island is dead (all tiles down, scorch high enough) the enemy gives up and launches. No more silent clicks.
+- **War room wraps** long lines. Waves are bigger (10 + 3 per wave).
+
 ## v1.34.1 - 2026-09-19
 
 ### Hotfix: dead page after deploy (again)

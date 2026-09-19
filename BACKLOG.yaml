@@ -486,6 +486,17 @@ items:
     resolved_in: v1.34.0
     notes: "All built. Open: player should feel one step behind (tuned: enemy leads; verify in playtest)."
 
+  - id: B042
+    added: 2026-09-19
+    source: "chat 2026-09-19 (third war playtest)"
+    request: |
+      Tilt before entering; intel as a purchase; war room text clipped;
+      radar "marked before" not visible; more control over attack/defence;
+      fortification not understood; which weapons we use; strike does
+      nothing (all tiles razed).
+    status: done
+    resolved_in: v1.35.0
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

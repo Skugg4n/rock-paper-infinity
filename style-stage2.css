@@ -643,11 +643,13 @@ body.tilt #city-area {
 @keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-260px); opacity: 0; } }
 #war-ui input[type=range] { accent-color: #475569; }
 /* War room feed: newest line darkest */
-#war-room div { opacity: 0.35; transition: opacity 600ms ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#war-room div { opacity: 0.35; transition: opacity 600ms ease; white-space: normal; }
 #war-room div:last-child { opacity: 1; color: #334155; }
 #war-room div:nth-last-child(2) { opacity: 0.7; }
 #war-room div.grim { color: #b45309; }
-/* Radar: the plate the next wave is heading for */
+/* Radar: the plate the next wave is heading for — a pulsing ring and a dot */
+.building.targeted { animation: target-ring 900ms ease-in-out infinite; }
+@keyframes target-ring { 0%, 100% { box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.25); } 50% { box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.7); } }
 .building.targeted::before {
     content: '';
     position: absolute;

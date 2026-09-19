@@ -12,7 +12,7 @@
  */
 
 import { buildingData } from './buildings-config.js';
-import { FORT_COST } from '../phase3/war.js';
+import { FORT_COST, plateMaxHp } from '../phase3/war.js';
 
 /**
  * Generates the inner HTML string for a building slot.
@@ -47,8 +47,10 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     if (war && !building.razed && building.type !== 'factory' && building.type !== 'bank') {
         const level = building.fort || 0;
         const cost = FORT_COST(level);
+        const maxHp = plateMaxHp(building.type, level);
+        const hpNow = Math.round(building.hp ?? maxHp);
         actionButtons += `<button class="building-action-btn fort-btn" data-building-id="${building.id}" ${war.arms >= cost ? '' : 'disabled'}>${level > 0 ? level : '◆'}
-            <div class="tooltip"><div class="effect">+HP <i data-lucide='shield' class='w-4 h-4'></i></div><div class="cost">${cost} <i data-lucide='hammer' class='w-4 h-4 text-slate-300'></i></div></div>
+            <div class="tooltip"><div class="effect">${hpNow}/${maxHp} <i data-lucide='shield' class='w-4 h-4'></i> → ${plateMaxHp(building.type, level + 1)}</div><div class="cost">${cost} <i data-lucide='hammer' class='w-4 h-4 text-slate-300'></i></div></div>
         </button>`;
     }
 
