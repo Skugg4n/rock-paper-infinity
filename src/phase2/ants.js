@@ -94,7 +94,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0 };
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0 };
+    let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
     const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
     let gather = null;       // { rect, onDone } — everyone walks to one plate (THE DEEP)
@@ -238,6 +239,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
 
     /** Advances the simulation by dt seconds and draws. */
     function step(dt, now = performance.now()) {
+        clock += dt;
         if (now - lastMeasure > 1000) { measure(); reconcile(); lastMeasure = now; }
         for (const a of ants) stepDot(a, dt, speedOf(a.kind), (d) => {
             if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetPath(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
@@ -467,17 +469,15 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, false); }
             }
         }
-        // their wave on our island: our people fight it
+        // their wave on our island: the guards at the coast fight it (our people are civilians)
         if (combat) {
             const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead));
-            for (const a of ants) {
-                const p = pos(a); if (!p) continue;
-                for (const d of hostiles) { fight(p, d, state.ourTier, COLORS.person, false); }
-            }
-            // and they fire back at whoever is near (visual only; our people are civilians)
+            const guards = guardPositions();
+            for (const g of guards) for (const d of hostiles) fight(g, d, state.ourTier, COLORS.person, false);
+            // and they fire back at the guards
             for (const d of hostiles) {
                 const p = pos(d); if (!p) continue;
-                for (const a of ants) { if (Math.random() < 0.3) fight(p, a, state.enemyTier, COLORS.enemy, false); }
+                for (const g of guards) { if (Math.random() < 0.3) fight(p, { at: { x: g.x - 1, y: g.y - 1, w: 2, h: 2 } }, state.enemyTier, COLORS.enemy, false); }
             }
         }
         // withdraw: everyone home to the rocket; gather: everyone into the hatch
@@ -485,7 +485,19 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (gather && ants.every(a => a.at === gather.rect && !a.path)) { const cb = gather.onDone; gather = null; peopleGone = true; ants.length = 0; cb?.(); }
     }
 
+    /** Our defence, made visible: one guard per five units along the south coast, facing the water. */
+    function guardPositions() {
+        const n = Math.min(40, Math.round((state.defence || 0) / 5));
+        if (!n || !rects.length) return [];
+        const box = gridBox(), gap = getGap();
+        const y = box.y + box.h + gap * 0.9, margin = box.w * 0.06;
+        return Array.from({ length: n }, (_, i) => ({ x: box.x + margin + (box.w - 2 * margin) * (n === 1 ? 0.5 : i / (n - 1)), y: y + Math.sin(clock * 2.2 + i * 1.3) * 0.7, i }));
+    }
     function drawWar() {
+        for (const g of guardPositions()) {
+            ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.globalAlpha = 0.95;
+            ctx.arc(g.x, g.y, RADIUS.person + 0.3, 0, Math.PI * 2); ctx.fill();
+        }
         for (const w of waves) for (const d of w.dots) {
             if (d.dead) continue;
             const p = pos(d); if (!p) continue;

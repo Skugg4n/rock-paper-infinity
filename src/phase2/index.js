@@ -17,7 +17,7 @@ import {
     SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
     resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, MAX_ABSORB, plateMaxHp, tierScienceCost, armsPerSecond,
-    TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S,
+    TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S, RAID_S, raidCost,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -155,6 +155,7 @@ export function init() {
               shipBtn: document.getElementById('ship-btn'),
               autoBtn: document.getElementById('auto-btn'),
               intelBtn: document.getElementById('intel-btn'),
+              raidBtn: document.getElementById('raid-btn'),
               radarBtn: document.getElementById('radar-btn'),
               warRoom: document.getElementById('war-room'),
               warEnemyDefence: document.getElementById('war-enemy-defence'),
@@ -187,7 +188,7 @@ export function init() {
               const w = gameState.war;
               ui.warRoom.classList.toggle('hidden', !w?.active && !gameState.shipChosen);
               if (!w?.log) return;
-              ui.warRoom.innerHTML = w.log.slice(-5).map(l => `<div class="${l.grim ? 'grim' : ''}">${l.text}</div>`).join('');
+              ui.warRoom.innerHTML = w.log.slice(-8).map(l => `<div class="${l.grim ? 'grim' : ''}">${l.text}</div>`).join('');
           }
 
           // ---------------- CHAPTER III · WAR ----------------
@@ -247,7 +248,10 @@ export function init() {
                   w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier);
                   logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
               }
-              if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
+              const raided = (w.raidUntil || 0) > w.t;          // our raiding party holds their defence down
+              if (raided) w.enemyDefence = 0;
+              else if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
+              if (!raided && w.raidUntil && !w.saidRaidOver) { w.saidRaidOver = true; logWar('Interior: the raiding party is back. Their defence is regrouping.'); }
               // waves, as long as the enemy is still here; every fifth is a push
               if (!silent && !w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
                   w.lastWaveAt = w.t; w.waveCount++;
@@ -394,7 +398,7 @@ export function init() {
               const w = gameState.war;
               const active = !!w?.active;
               [ui.buyDefenceBtn, ui.buyForceBtn, ui.strikeBtn, ui.tierBtn].forEach(btn => btn.classList.toggle('hidden', !active));
-              if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); }
+              if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); ui.raidBtn.classList.add('hidden'); }
               ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
               if (!active) return;
               const tier = TIERS[w.tier];
@@ -433,6 +437,12 @@ export function init() {
                       scheduleIconRefresh();
                   }
               }
+              // Raiding party: a helper you send in; while it is there their defence is nothing
+              const raidLeft = Math.max(0, Math.ceil((w.raidUntil || 0) - w.t));
+              ui.raidBtn.classList.toggle('hidden', !active || w.enemyLeft);
+              ui.raidBtn.disabled = raidLeft > 0 || w.arms < raidCost(w.raids || 0);
+              ui.raidBtn.classList.toggle('active-raid', raidLeft > 0);
+              setTooltip(ui.raidBtn, raidLeft > 0 ? { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> ${raidLeft} s` } : { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> their <i data-lucide='shield' class='w-4 h-4'></i> → 0 for ${RAID_S} s`, armsCost: raidCost(w.raids || 0) });
               ui.radarBtn.classList.toggle('hidden', !active || !!w.radar);
               ui.radarBtn.disabled = w.arms < RADAR_COST;
               setTooltip(ui.radarBtn, { effect: `<i data-lucide='radar' class='w-4 h-4'></i>`, armsCost: RADAR_COST });
@@ -929,6 +939,7 @@ export function init() {
                   enemyTicks: gameState.competitorTicks || 0,
                   ourTier: gameState.war?.tier || 0,
                   enemyTier: gameState.war?.enemyTier || 0,
+                  defence: gameState.war?.defence || 0,
               });
 
               // Raids. The competitor waits until our city is complete (everything
@@ -1075,6 +1086,15 @@ export function init() {
           ui.intelBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.intel) return;
               if (w.arms >= INTEL_COST) { w.arms -= INTEL_COST; w.intel = true; logWar(`Intel: office opened. The enemy fields ${TIERS[w.enemyTier].id}.`); updateAllUI(); }
+          }, { signal });
+          ui.raidBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || w.enemyLeft || (w.raidUntil || 0) > w.t) return;
+              const cost = raidCost(w.raids || 0);
+              if (w.arms < cost) return;
+              w.arms -= cost; w.raids = (w.raids || 0) + 1; w.raidUntil = w.t + RAID_S; w.saidRaidOver = false;
+              w.enemyDefence = 0;
+              logWar(`Interior: a raiding party slipped onto their island. Their defence is down for ${RAID_S} s. Strike now.`);
+              updateAllUI();
           }, { signal });
           ui.strikeBtn.addEventListener('click', () => { tryStrike(); }, { signal });
           ui.tierBtn.addEventListener('click', () => {

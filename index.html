@@ -233,6 +233,8 @@
                 <span id="harvest-pop" class="harvest-pop" aria-hidden="true"></span>
                 <i data-lucide="shopping-basket" class="w-5 h-5 text-slate-400"></i>
             </div>
+            <!-- War room: the advisor's feed. Lines stay until pushed out; nothing fades before it is read. -->
+            <div id="war-room" class="hidden w-[300px] sm:w-[340px] font-mono text-[11px] leading-snug text-slate-500 select-none pointer-events-none"></div>
         </div>
 
         <!-- Doomsday clock: how finished the surface is -->
@@ -279,8 +281,8 @@
                  <!-- III · WAR is chosen, like the bank in chapter I. Greyed from the
                       moment the competitor appears, open once they have razed a house. -->
                  <!-- Chapter III controls -->
-                 <button class="btn hidden" id="ship-btn" aria-label="Go down — chapter IV">
-                    <i data-lucide="anchor" class="w-7 h-7"></i>
+                 <button class="btn hidden" id="ship-btn" aria-label="Dig down — chapter IV">
+                    <i data-lucide="shovel" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
                 </button>
                  <button class="btn hidden" id="tier-btn" aria-label="Research next weapon tier">
@@ -294,6 +296,10 @@
                 </button>
                  <button class="btn hidden" id="radar-btn" aria-label="Radar: see where the next wave lands">
                     <i data-lucide="radar" class="w-7 h-7"></i>
+                    <div class="tooltip"></div>
+                </button>
+                 <button class="btn hidden" id="raid-btn" aria-label="Raiding party: knock out their defence for a while">
+                    <i data-lucide="venetian-mask" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
                 </button>
                  <button class="btn hidden" id="auto-btn" aria-label="Auto quartermaster">
@@ -405,8 +411,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="war-room" class="hidden fixed left-4 bottom-20 max-w-[440px] font-mono text-[11px] leading-snug text-slate-500 select-none pointer-events-none z-30"></div>
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.36.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.37.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

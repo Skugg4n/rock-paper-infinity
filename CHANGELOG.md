@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.37.0 - 2026-09-19
+
+### The war room stays readable, the way down is dug, a raiding party
+
+- **War room top right**, under people and food: the last eight lines stay until pushed out, older lines are dimmer but readable, nothing fades before it is read (Ola: the text sat loose and faded before you had read it).
+- **Chapter IV is dug, not sailed.** The plate everyone walks into is a hole (dark centre, lit rim), and the button is a shovel instead of an anchor. Tooltip "IV · THE DEEP ▾".
+- **Raiding party** (helper, mask button): 250 arms, ×1.5 per raid. Their defence drops to nothing for 20 s and does not regrow while the party is there; the war room says "Strike now." and, when it is over, "Their defence is regrouping." A strike during a raid goes straight to the tile.
+- **Shields stand at the coast** (Ola): one guard dot per five defence units lines the south shore facing the water. They are the ones who fight a landing (tracers, clinches); the townspeople are civilians and stay out of it. Buy shields, see the line grow; lose defenders, see it thin.
+- Old duplicate rocket animation rule removed.
+
 ## v1.36.0 - 2026-09-19
 
 ### Weapons are relative (the sim said the war was broken)

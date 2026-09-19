@@ -519,3 +519,52 @@ items:
       is no longer visible.
     status: done
     resolved_in: v1.22.0
+
+  - id: B043
+    added: 2026-09-19
+    source: "chat 2026-09-19 (fifth war playtest)"
+    request: |
+      Helper: raiding party / infiltration that knocks out the enemy's defence
+      for a short while so a strike goes through.
+    status: done
+    resolved_in: v1.37.0
+    notes: "Mask button, 250 arms × 1.5 per raid, their defence 0 for 20 s, war-room lines."
+
+  - id: B044
+    added: 2026-09-19
+    source: "chat 2026-09-19 (fifth war playtest)"
+    request: |
+      Repair a damaged plate without fortifying: a cheap repair for stars so
+      the city's money has a job in III. ◆ repairs today but costs arms and a level.
+    status: open
+    resolved_in: null
+
+  - id: B045
+    added: 2026-09-19
+    source: "chat 2026-09-19 (fifth war playtest)"
+    request: |
+      Ola: "för vissa hus kan man inte försvara". Only factory and bank lack ◆
+      (and cannot be targeted). Ask which plates he meant; maybe the hover-only
+      buttons are the problem on some plates.
+    status: open
+    resolved_in: null
+
+  - id: B046
+    added: 2026-09-19
+    source: "chat 2026-09-19 (fifth war playtest)"
+    request: |
+      "Det saknas feeling. Som att någon stampat i ett myrbo. Man förstår inte
+      cause and effect." v1.36.0 scripts losses from the rules and narrates
+      every landing and strike; verify in the next playtest, then decide on
+      more (a hit counter on the plate, a pause/beat when a plate falls).
+    status: open
+    resolved_in: null
+
+  - id: B047
+    added: 2026-09-19
+    source: "chat 2026-09-19 (fifth war playtest)"
+    request: |
+      Chapter IV is dug, not sailed: the way down is a hole in the plate and
+      the button a shovel (v1.37.0). Design IV (THE DEEP) around digging down.
+    status: open
+    resolved_in: null

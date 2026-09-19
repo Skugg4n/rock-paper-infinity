@@ -638,16 +638,16 @@ body.tilt #city-area {
 /* Enemy tiles razed by us, and the island when they have left */
 .enemy-tile.enemy-razed, .enemy-factory.enemy-razed { opacity: 0.25 !important; filter: grayscale(1) brightness(0.6); transform: none !important; }
 #competitor-island .enemy-rocket { display: none; }
-#competitor-island.enemy-left .enemy-rocket { display: flex; opacity: 1; transform: none; animation: rocket-leave 4000ms ease-in 800ms both; }
+#competitor-island.enemy-left .enemy-rocket { display: flex; opacity: 1; transform: none; }
 #competitor-island.enemy-left .enemy-factory, #competitor-island.enemy-left .enemy-tile:not(.enemy-rocket) { opacity: 0.45 !important; }
 /* Board first (quiet), then ignition (the glow builds, a tremble), then a long climb; it fades only near the top. */
 @keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 12% { transform: translateY(-14px); opacity: 1; } 78% { opacity: 1; } 100% { transform: translateY(-820px) scale(0.85); opacity: 0; } }
 @keyframes rocket-tremble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1px, -1px); } 50% { transform: translate(-1px, 1px); } 75% { transform: translate(1px, 1px); } }
 #war-ui input[type=range] { accent-color: #475569; }
-/* War room feed: newest line darkest */
-#war-room div { opacity: 0.35; transition: opacity 600ms ease; white-space: normal; }
+/* War room feed, top right under people and food: every line stays readable, the newest is darkest */
+#war-room { text-align: left; border-top: 1px solid rgba(100, 116, 139, 0.25); padding-top: 6px; }
+#war-room div { opacity: 0.62; transition: opacity 600ms ease; white-space: normal; margin-bottom: 3px; }
 #war-room div:last-child { opacity: 1; color: #334155; }
-#war-room div:nth-last-child(2) { opacity: 0.7; }
 #war-room div.grim { color: #b45309; }
 /* Radar: the plate the next wave is heading for — a pulsing ring and a dot */
 .building.targeted { animation: target-ring 900ms ease-in-out infinite; }
@@ -671,8 +671,8 @@ body.tilt #city-area {
 #competitor-island.enemy-left .enemy-rocket { box-shadow: 0 26px 48px -2px rgba(180, 83, 9, 0.95), 0 0 40px 10px rgba(251, 146, 60, 0.45); animation: rocket-leave 10000ms cubic-bezier(0.6, 0, 0.9, 0.4) 200ms both; }
 #competitor-island.enemy-rubble .enemy-factory, #competitor-island.enemy-rubble .enemy-tile:not(.enemy-rocket) { opacity: 0.35 !important; background: #64748b !important; filter: none; transform: none !important; }
 #competitor-island.enemy-rubble .enemy-rocket { display: none; }
-/* The hatch down: the plate everyone walks into */
-.building-slot.deep-hatch { background: #0f172a; transition: background 1500ms ease; }
+/* The way down: a hole dug in the plate, everyone walks into it */
+.building-slot.deep-hatch { background: radial-gradient(circle at 50% 50%, #020617 0 26%, #1e293b 34%, #475569 48%, #94a3b8 62%); transition: background 1500ms ease; box-shadow: inset 0 6px 14px rgba(2, 6, 23, 0.55); }
 .building-slot.deep-hatch .building { opacity: 0; transition: opacity 1500ms ease; }
 #phase-city .btn.toggled { background-color: #e2e8f0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); }
 /* Strike button: a filled ring when the strike would raze a tile */

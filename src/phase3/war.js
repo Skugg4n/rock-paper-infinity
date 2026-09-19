@@ -60,6 +60,9 @@ export const ENEMY_MAX_LAG = 1;
 export const AUTO_COST = 400;
 /** Intel office: shows the enemy's tier and the Intel lines in the war room. */
 export const INTEL_COST = 150;
+/** Raiding party (helper): knocks their defence to zero for RAID_S seconds; the price climbs per raid. */
+export const RAID_S = 20;
+export const raidCost = (raids = 0) => Math.round(250 * Math.pow(1.5, raids));
 /** Seconds between a wave being spotted (radar) and its departure. */
 export const WAVE_WARNING_S = 4;
 /** Salvage needed to open the ship down. */
