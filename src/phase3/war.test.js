@@ -24,7 +24,7 @@ describe('war rules', () => {
     test('waves come faster and bigger', () => {
         expect(waveInterval(0)).toBe(40);
         expect(waveInterval(100)).toBe(15);
-        expect(waveSize(0)).toBe(6);
+        expect(waveSize(0)).toBe(8);
         expect(waveSize(10)).toBeGreaterThan(waveSize(0));
     });
 
@@ -32,8 +32,8 @@ describe('war rules', () => {
         const rand = rng(1);
         for (let i = 0; i < 20; i++) {
             const t = nextEnemyTierAt(1000, rand, 0);
-            expect(t).toBeGreaterThanOrEqual(1000 + 72);
-            expect(t).toBeLessThanOrEqual(1000 + 168);
+            expect(t).toBeGreaterThanOrEqual(1000 + 66);
+            expect(t).toBeLessThanOrEqual(1000 + 124);
             expect(nextEnemyTierAt(0, () => 0.5, 4)).toBeGreaterThan(nextEnemyTierAt(0, () => 0.5, 0));
         }
     });
@@ -86,6 +86,8 @@ describe('war rules', () => {
         expect(autoBuy(55, 0, 0, 10)).toEqual({ defence: 3, force: 2 });
         expect(autoBuy(9, 0, 0, 10)).toEqual({ defence: 0, force: 0 });
         expect(autoBuy(30, 0, 10, 10)).toEqual({ defence: 3, force: 0 });
+        expect(autoBuy(30, 0, 0, 10, 'defend')).toEqual({ defence: 3, force: 0 });
+        expect(autoBuy(30, 0, 0, 10, 'attack')).toEqual({ defence: 0, force: 3 });
     });
 
     test('tier cost ignores the current slider and grows per tier', () => {

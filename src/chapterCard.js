@@ -24,9 +24,11 @@ function delay(ms) {
  * @param {string} opts.title - Chapter title (uppercased automatically)
  * @param {'normal' | 'to-come'} [opts.mode='normal'] - Transition mode; 'to-come' ends on a permanent black wall
  * @param {Function} [opts.onMidpoint] - Callback fired during the hold phase (e.g. to trigger phase switch)
+ * @param {boolean} [opts.dark=false] - Black veil with white title (WAR)
+ * @param {number} [opts.hold] - Hold time in ms (default PHASE_DURATIONS.hold); a click ends the hold early
  * @returns {Promise<void>} Resolves after the card exits (normal mode only; never resolves for to-come)
  */
-export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = {}) {
+export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold } = {}) {
     if (_cardActive) return Promise.resolve();
 
     const card = el('#chapter-card');
@@ -46,6 +48,7 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = 
     romanEl.textContent = roman;
     titleEl.textContent = String(title).toUpperCase();
     if (mode === 'to-come') card.classList.add('is-to-come');
+    card.classList.toggle('is-dark', !!dark);
     card.classList.add('is-active');
     card.setAttribute('aria-hidden', 'false');
 
@@ -59,11 +62,17 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = 
             content.style.opacity = '1';
             await delay(PHASE_DURATIONS.titleIn);
 
-            // Phase 3: hold (midpoint callback fires here)
+            // Phase 3: hold (midpoint callback fires here). A long hold can be
+            // ended early with a click anywhere on the card.
             if (typeof onMidpoint === 'function') {
                 try { onMidpoint(); } catch (e) { console.error('chapterCard onMidpoint:', e); }
             }
-            await delay(PHASE_DURATIONS.hold);
+            const holdMs = REDUCED_MOTION ? PHASE_DURATIONS.hold : (hold ?? PHASE_DURATIONS.hold);
+            await new Promise((resolve) => {
+                const t = setTimeout(done, holdMs);
+                function done() { clearTimeout(t); card.removeEventListener('click', done); resolve(); }
+                if (holdMs > 1500) card.addEventListener('click', done, { once: true });
+            });
 
             if (mode === 'to-come') {
                 // Replace phase 4+5: keep title visible, fade veil to black,
@@ -85,7 +94,7 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint } = 
             await delay(PHASE_DURATIONS.veilOut);
 
             // Cleanup
-            card.classList.remove('is-active');
+            card.classList.remove('is-active', 'is-dark');
             card.setAttribute('aria-hidden', 'true');
             content.style.opacity = '0';
             _cardActive = false;

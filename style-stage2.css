@@ -642,6 +642,36 @@ body.tilt #city-area {
 #competitor-island.enemy-left .enemy-factory, #competitor-island.enemy-left .enemy-tile:not(.enemy-rocket) { opacity: 0.2 !important; }
 @keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-260px); opacity: 0; } }
 #war-ui input[type=range] { accent-color: #475569; }
+/* War room feed: newest line darkest */
+#war-room div { opacity: 0.35; transition: opacity 600ms ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#war-room div:last-child { opacity: 1; color: #334155; }
+#war-room div:nth-last-child(2) { opacity: 0.7; }
+#war-room div.grim { color: #b45309; }
+/* Radar: the plate the next wave is heading for */
+.building.targeted::before {
+    content: '';
+    position: absolute;
+    top: -5px; right: -5px;
+    width: 9px; height: 9px;
+    border-radius: 9999px;
+    background: #b91c1c;
+    animation: radar-pulse 900ms ease-in-out infinite;
+    z-index: 12;
+}
+@keyframes radar-pulse { 0%, 100% { transform: scale(0.7); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } }
+/* Enemy tiles show damage like ours */
+.enemy-factory, .enemy-tile { background-color: color-mix(in srgb, #f8fafc calc(var(--hp, 1) * 100%), #94a3b8); }
+/* The launch: a glow under the rocket, then it climbs, then rubble */
+#competitor-island.enemy-launch .enemy-rocket { display: flex; opacity: 1; transform: none; box-shadow: 0 18px 30px -6px rgba(180, 83, 9, 0.7), 0 0 0 0 rgba(0,0,0,0); }
+#competitor-island.enemy-left .enemy-rocket { animation: rocket-leave 8000ms ease-in 300ms both; }
+#competitor-island.enemy-rubble .enemy-factory, #competitor-island.enemy-rubble .enemy-tile:not(.enemy-rocket) { opacity: 0.35 !important; background: #64748b !important; filter: none; transform: none !important; }
+#competitor-island.enemy-rubble .enemy-rocket { display: none; }
+/* The hatch down: the plate everyone walks into */
+.building-slot.deep-hatch { background: #0f172a; transition: background 1500ms ease; }
+.building-slot.deep-hatch .building { opacity: 0; transition: opacity 1500ms ease; }
+#phase-city .btn.toggled { background-color: #e2e8f0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); }
+/* Strike button: a filled ring when the strike would raze a tile */
+#strike-btn.will-raze { box-shadow: 0 0 0 2px #475569, 0 4px 6px -1px rgb(0 0 0 / 0.1); }
 
 /* Ants canvas: above the plates, below the +/- buttons, never catches clicks */
 #ants-canvas {

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.34.0 - 2026-09-19
+
+### The war becomes readable and dangerous (Ola's second war playtest)
+
+- **War room** — an advisor's feed bottom-left, the one place in the game with words: what both sides develop ("Intel: enemy has developed gunpowder"), what lands and what holds, when the ground and the food suffer, and the end ("Our scientists have declared the surface uninhabitable… The enemy has left for space." / "There is a secret plan. Go deep.").
+- **The enemy leads by default** — faster tier clock, more defence from the start, bigger waves; you fight to catch up. Every fifth wave is a push. The enemy's strength follows what still stands on its island.
+- **Radar** (300 arms): the plate the next wave is heading for pulses red before it lands; pushes are announced.
+- **Fighting by tier** — fists and swords clinch (bursts where they meet), gunpowder and up shoot from further away. Our fire kills wave dots for real: fewer land, the impact is weaker, and the war room says so. The enemy fights back when we land, and their tiles show damage like ours.
+- **Quartermaster with a stance** — one button after purchase (400 arms, shown with the hammer, not a star): shield buys only defence, scale both, sword only force and strikes when it can win. The strike button shows ✓ when a strike would raze a tile.
+- **Scorch hurts** — food production drops with the doomsday clock; chemical and heavier strikes hit our stores.
+- **The launch** — the enemy withdraws every dot to the rocket, goes quiet, a glow, the rocket climbs for eight seconds, and the island is rubble. No respawns after.
+- **The descent** — the anchor turns the bottom-right plate into a hatch; everyone walks in; then `IV · THE DEEP`.
+- **WAR card** is black, holds four seconds, a click continues.
+- **Smooth layout** — new rows and the island appearing slide into place over 700 ms; dots slide with the plates.
+- Also: science never greys out; GMO and superconductor vanish when maxed; chapter II research hides during the war; you can sell buildings during the war; the swords appear only after the first raid; our coastline shows from the first land expansion; the endless "going home" loop of the raiders is fixed.
+
 ## v1.33.0 - 2026-09-19
 
 ### Test menu, and a critical review

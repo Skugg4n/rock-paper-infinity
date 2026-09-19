@@ -470,6 +470,22 @@ items:
     status: open
     resolved_in: null
 
+  - id: B041
+    added: 2026-09-19
+    source: "chat 2026-09-19 (second war playtest)"
+    request: |
+      Science greys when GMO maxed; GMO button should vanish; layout
+      stutters on new rows/enemy; swords greyed before any attack; our
+      island earlier; WAR card black, longer, clickable; can't sell in war;
+      fighting before weapons exist; no visible damage on either side; auto
+      can't choose defence/attack; slider confusion; enemy tiles greyed
+      forever; crosshair does nothing with auto; enemy must feel dangerous;
+      rocket sequence (withdraw, silence, launch, rubble); war room text;
+      food must collapse; THE DEEP hatch; raiders hang between islands.
+    status: done
+    resolved_in: v1.34.0
+    notes: "All built. Open: player should feel one step behind (tuned: enemy leads; verify in playtest)."
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

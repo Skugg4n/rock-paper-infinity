@@ -94,7 +94,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0 };
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0 };
+    /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
+    const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
+    let gather = null;       // { rect, onDone } — everyone walks to one plate (THE DEEP)
+    let withdrawing = null;  // { rect, onDone } — the enemy pulls back to its rocket
+    let enemiesGone = false; // after the launch nobody comes back
+    let peopleGone = false;  // after the descent nobody comes back
     /** Seconds of PLAY after the island appears before its dots come out. */
     const ENEMY_DELAY_S = 30;
     let raf = null;
@@ -141,6 +147,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             // Same layout: keep `at`/`from` pointing at fresh rect entries
             const byId = new Map(rects.map(r => [r.building.id, r]));
             for (const a of ants) {
+                if (a.at?.building?.id === 'hatch') continue;   // walking into THE DEEP
                 if (a.at) a.at = byId.get(a.at.building.id) || null;
                 if (a.from) a.from = byId.get(a.from.building.id) || null;
                 if (!a.at) { a.path = null; }
@@ -198,8 +205,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     }
 
     function reconcile() {
+        if (gather || withdrawing) return;
+        if (peopleGone) { ants.length = 0; }
+        if (enemiesGone) { enemies.length = 0; return; }
         // People: match count to population; cars once researched (30 %)
-        const want = state.population > 0 && homes().length ? antCount(state.population) : 0;
+        const want = !peopleGone && state.population > 0 && homes().length ? antCount(state.population) : 0;
         while (ants.length < want) { const a = spawnAnt(state.carUnlocked && Math.random() < 0.3 ? 'car' : 'person'); if (!a) break; ants.push(a); }
         if (ants.length > want) ants.length = want;
         if (state.carUnlocked) ants.forEach(a => { if (a.kind === 'person' && Math.random() < 0.02) a.kind = 'car'; });
@@ -229,12 +239,18 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     /** Advances the simulation by dt seconds and draws. */
     function step(dt, now = performance.now()) {
         if (now - lastMeasure > 1000) { measure(); reconcile(); lastMeasure = now; }
-        for (const a of ants) stepDot(a, dt, speedOf(a.kind), (d) => { if (!newTrip(d)) d.wait = 1; });
+        for (const a of ants) stepDot(a, dt, speedOf(a.kind), (d) => {
+            if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetPath(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
+            if (!newTrip(d)) d.wait = 1;
+        });
         for (const e of enemies) {
-            if (attack) stepDot(e, dt, SPEED.enemy * 2, (d) => arriveAttack(d));
+            if (withdrawing) stepDot(e, dt, SPEED.enemy * 1.5, (d) => {
+                if (d.at !== withdrawing.rect) { const from = d.at?.rect ?? d.at ?? withdrawing.rect; d.path = (from.x !== undefined && from.w !== undefined) ? streetPath(from, withdrawing.rect, Math.max(6, getGap() / 2)) : null; d.seg = 0; d.t = 0; d.at = withdrawing.rect; d.wait = Math.random() * 0.5; d.razing = false; d.homeBound = false; }
+            });
+            else if (attack) stepDot(e, dt, SPEED.enemy * 2, (d) => arriveAttack(d));
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });
         }
-        if (attack?.done && enemies.every(e => !e.homeBound && !e.razing)) attack = null;
+        if (attack?.done && enemies.every(e => e.settled)) { attack = null; enemies.forEach(e => { e.settled = false; }); }
         stepWar(dt);
         draw();
         drawWar();
@@ -274,8 +290,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function arriveAttack(e) {
         if (!attack) return;
         if (attack.done) {
-            // Raid over: walk home to the island, then wander there again.
-            if (e.homeBound) { e.homeBound = false; e.razing = false; e.at = pick(enemyRects); e.path = null; e.wait = 0.5; return; }
+            // Raid over: walk home to the island once, then wander there again.
+            if (e.settled) { if (!newEnemyTrip(e)) e.wait = 1; return; }
+            if (e.homeBound) { e.homeBound = false; e.razing = false; e.settled = true; e.at = pick(enemyRects); e.path = null; e.wait = 0.5; return; }
             const from = e.at?.rect ?? e.at ?? attack.target.rect;
             const home = pick(enemyRects);
             e.path = reverse(crossPath(home, from, getGap(), gridBox()));
@@ -317,10 +334,27 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const target = targets.reduce((best, r) => (r.rect.y + r.rect.x > best.rect.y + best.rect.x ? r : best), targets[0]);
         while (enemies.length < 8 && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; enemies.push(e); }
         attack = { target, arrived: 0, needed: Math.min(5, enemies.length), onDone, done: false };
-        enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.2; e.arrivedFlag = false; e.homeBound = false; e.razing = false; });
+        enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.2; e.arrivedFlag = false; e.homeBound = false; e.razing = false; e.settled = false; });
         return true;
     }
     const raiding = () => !!attack;
+    /** The enemy pulls every dot back to `tileEl` (its rocket). onDone when all are there. */
+    function withdraw(tileEl, onDone) {
+        measure();
+        attack = null;
+        const rect = layoutRect(tileEl, area);
+        withdrawing = { rect, onDone };
+        enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.5; e.razing = false; e.homeBound = false; });
+        if (!enemies.length) { withdrawing = null; onDone?.(); }
+    }
+    /** Everyone walks into one plate (the hatch down). onDone when all are in. */
+    function gatherAt(slotEl, onDone) {
+        measure();
+        const rect = { rect: layoutRect(slotEl, area), building: { id: 'hatch' } };
+        gather = { rect, onDone };
+        ants.forEach(a => { a.path = null; a.wait = Math.random() * 1.2; });
+        if (!ants.length) { gather = null; onDone?.(); }
+    }
 
     /**
      * A wave against one of our plates. Melee: red dots march from the island
@@ -383,7 +417,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 stepDot(d, dt, d.strike ? SPEED.enemy * 2.2 : SPEED.enemy * 2, (x) => { x.dead = true; x.wait = 0; });
                 if (d.dead) { flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); }
             }
-            if (!w.done && arrived >= Math.ceil(w.dots.length / 2)) { w.done = true; w.onImpact?.(); flash(c(w.target.rect), 30, w.kind === 'ours' ? COLORS.person : COLORS.enemy); }
+            const alive = w.dots.filter(d => !d.killed).length;
+            if (!w.done && alive === 0) { w.done = true; w.onImpact?.(0); }
+            if (!w.done && arrived >= Math.ceil(alive / 2)) { w.done = true; w.onImpact?.(alive / w.dots.length); flash(c(w.target.rect), 30, w.kind === 'ours' ? COLORS.person : COLORS.enemy); }
         }
         for (let i = waves.length - 1; i >= 0; i--) if (waves[i].dots.every(d => d.dead)) waves.splice(i, 1);
         combat = waves.some(w => w.kind === 'enemy');
@@ -393,30 +429,47 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             if (e.type === 'arc' && !e.hit && e.t >= e.dur) { e.hit = true; e.onImpact?.(); }
         }
         for (let i = effects.length - 1; i >= 0; i--) { const e = effects[i]; if (e.t >= e.dur + (e.type === 'arc' ? 0 : 0)) effects.splice(i, 1); }
-        // our landing party on their island: their dots shoot at ours, and back
-        const ourLanding = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.seg >= 1).map(pos).filter(Boolean));
-        if (ourLanding.length) {
+        // Fighting. Reach depends on the tier: fists and swords clinch (a small
+        // burst where they meet), gunpowder and up shoot lines from further away.
+        // Our fire kills wave dots for real: fewer dots land, weaker impact.
+        const fight = (shooterPos, targetDot, shooterTier, color, canKill) => {
+            const h = pos(targetDot); if (!h) return;
+            const r = reach(shooterTier);
+            const d2 = (shooterPos.x - h.x) ** 2 + (shooterPos.y - h.y) ** 2;
+            if (r === 0) {
+                if (d2 < 26 * 26 && Math.random() < 0.15) {
+                    flash({ x: (shooterPos.x + h.x) / 2, y: (shooterPos.y + h.y) / 2 }, 7, color);
+                    if (canKill && Math.random() < 0.12) { targetDot.killed = true; targetDot.dead = true; }
+                }
+            } else if (d2 < r * r && Math.random() < 0.06) {
+                effects.push({ type: 'tracer', from: shooterPos, to: h, t: 0, dur: 0.12, color });
+                if (canKill && Math.random() < 0.25) { targetDot.killed = true; targetDot.dead = true; flash(h, 8, color); }
+            }
+        };
+        // our landing party on their island: their dots fight ours
+        const ourDots = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.seg >= 1));
+        if (ourDots.length) {
             for (const e of enemies) {
                 const p = pos(e); if (!p) continue;
-                for (const h of ourLanding) {
-                    const d2 = (p.x - h.x) ** 2 + (p.y - h.y) ** 2;
-                    if (d2 < 90 * 90 && Math.random() < 0.08) effects.push({ type: 'tracer', from: p, to: h, t: 0, dur: 0.12, color: COLORS.enemy });
-                    if (d2 < 90 * 90 && Math.random() < 0.05) effects.push({ type: 'tracer', from: h, to: p, t: 0, dur: 0.12, color: COLORS.person });
-                }
+                for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, true); }
             }
         }
-        // tracers: our dots near an enemy wave dot shoot at it, and back
+        // their wave on our island: our people fight it
         if (combat) {
-            const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead).map(pos).filter(Boolean));
+            const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead));
             for (const a of ants) {
                 const p = pos(a); if (!p) continue;
-                for (const h of hostiles) {
-                    const d2 = (p.x - h.x) ** 2 + (p.y - h.y) ** 2;
-                    if (d2 < 70 * 70 && Math.random() < 0.06) effects.push({ type: 'tracer', from: p, to: h, t: 0, dur: 0.12, color: COLORS.person });
-                    if (d2 < 70 * 70 && Math.random() < 0.04) effects.push({ type: 'tracer', from: h, to: p, t: 0, dur: 0.12, color: COLORS.enemy });
-                }
+                for (const d of hostiles) { fight(p, d, state.ourTier, COLORS.person, true); }
+            }
+            // and they fire back at whoever is near (visual only; our people are civilians)
+            for (const d of hostiles) {
+                const p = pos(d); if (!p) continue;
+                for (const a of ants) { if (Math.random() < 0.3) fight(p, a, state.enemyTier, COLORS.enemy, false); }
             }
         }
+        // withdraw: everyone home to the rocket; gather: everyone into the hatch
+        if (withdrawing && enemies.every(e => e.at === withdrawing.rect && !e.path)) { const cb = withdrawing.onDone; withdrawing = null; enemiesGone = true; enemies.length = 0; cb?.(); }
+        if (gather && ants.every(a => a.at === gather.rect && !a.path)) { const cb = gather.onDone; gather = null; peopleGone = true; ants.length = 0; cb?.(); }
     }
 
     function drawWar() {
@@ -458,5 +511,5 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack }) };
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length }) };
 }

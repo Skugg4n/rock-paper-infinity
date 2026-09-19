@@ -17,7 +17,7 @@ import {
     SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
     resolveHit, resolveStrike, plateMaxHp, tierScienceCost, armsPerSecond,
-    enemyTileHp, TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST,
+    enemyTileHp, TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -154,6 +154,8 @@ export function init() {
               tierBadge: document.getElementById('tier-badge'),
               shipBtn: document.getElementById('ship-btn'),
               autoBtn: document.getElementById('auto-btn'),
+              radarBtn: document.getElementById('radar-btn'),
+              warRoom: document.getElementById('war-room'),
               warEnemyDefence: document.getElementById('war-enemy-defence'),
               populationCapacity: document.getElementById('population-capacity'),
               cityArea: document.getElementById('city-area'),
@@ -171,6 +173,20 @@ export function init() {
            * player sees before III·WAR.
            */
           const RAID_INTERVAL_MS = 90000;
+          const RADAR_COST = 300;
+
+          /** War room: short lines from the advisor. Kept in the save (last 8). */
+          function logWar(text, grim = false) {
+              const w = gameState.war; if (!w) return;
+              w.log = (w.log || []).slice(-7).concat([{ text, grim, t: w.t || 0 }]);
+              renderWarRoom();
+          }
+          function renderWarRoom() {
+              const w = gameState.war;
+              ui.warRoom.classList.toggle('hidden', !w?.active && !gameState.shipChosen);
+              if (!w?.log) return;
+              ui.warRoom.innerHTML = w.log.slice(-5).map(l => `<div class="${l.grim ? 'grim' : ''}">${l.text}</div>`).join('');
+          }
 
           // ---------------- CHAPTER III · WAR ----------------
           // Rules live in src/phase3/war.js; this is the glue to the map.
@@ -189,6 +205,8 @@ export function init() {
               gameState.war = w;
               gameState.warChosen = true;
               applyWarPresentation();
+              logWar('War room: the factory can make arms. Fists first.');
+              logWar('Intel: enemy shipyard active. Expect landings from the south.');
               saveGameState();
               updateAllUI();
           }
@@ -200,7 +218,9 @@ export function init() {
               ui.warUi.classList.remove('hidden');
               ui.doomsday.classList.remove('hidden');
               ui.armsSlider.value = Math.round((w.armsShare || 0.3) * 100);
-              ui.competitorIsland.classList.toggle('enemy-left', !!w.enemyLeft);
+              ui.competitorIsland.classList.toggle('enemy-left', w.leaveStage >= 2);
+              ui.competitorIsland.classList.toggle('enemy-rubble', w.leaveStage >= 3);
+              renderWarRoom();
               gameState.buildings.forEach((b, i) => { if (b) renderGridSlot(i); });
           }
 
@@ -210,46 +230,84 @@ export function init() {
               w.t = (w.t || 0) + 1;
               w.arms += armsPerSecond(w.tier) * w.armsShare;
               // the enemy escalates on its own jittered clock
-              if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1) { w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier); }
-              w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW, enemyDefenceCap(w.waveCount));
-              // waves, as long as the enemy is still here
+              if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
+                  w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier);
+                  logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
+              }
+              // The enemy's strength follows what still stands on its island
+              const standing = 5 - (w.enemyRazedUntil || []).filter(x => x > 0).length;
+              const standingK = Math.max(0.3, standing / 5);
+              w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
+              // waves, as long as the enemy is still here; every fifth is a push
               if (!w.enemyLeft && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
                   w.lastWaveAt = w.t; w.waveCount++;
                   const target = pickTarget(warPlates(), warRand);
                   if (target) {
                       const enemy = TIERS[w.enemyTier];
-                      const power = waveSize(w.waveCount) * enemy.power;
-                      const impact = () => resolveWave(target.id, power, enemy);
-                      if (_ants) _ants.launchWave({ targetBuildingId: target.id, count: waveSize(w.waveCount), mode: enemy.mode, onImpact: impact });
-                      else impact();
+                      const push = w.waveCount % 5 === 0;
+                      const size = Math.round(waveSize(w.waveCount) * standingK * (push ? 2 : 1));
+                      const power = size * enemy.power;
+                      const ti = gameState.buildings.findIndex(b => b && b.id === target.id);
+                      const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
+                      if (w.radar && targetEl) targetEl.classList.add('targeted');
+                      if (w.radar && push) logWar('Intel: a large force is forming at their shipyard.', true);
+                      const impact = (fraction = 1) => { targetEl?.classList.remove('targeted'); resolveWave(target.id, power * fraction, enemy, size, fraction); };
+                      if (_ants) _ants.launchWave({ targetBuildingId: target.id, count: size, mode: enemy.mode, onImpact: impact });
+                      else impact(1);
                   }
               }
+              // food and land suffer: scorch cuts production, and the war room says so once
+              const doom = doomsday(w.scorchOurs + w.scorchTheirs);
+              for (const [th, text] of [[15, 'Status: artillery is scarring the fields.'], [35, 'Status: wheat fields obliterated. Food is short.'], [55, 'Status: chemical weapons have struck our larders.'], [80, 'Status: the ground is poisoned. Little grows.']]) {
+                  if (doom >= th && !(w.saidDoom || []).includes(th)) { w.saidDoom = (w.saidDoom || []).concat([th]); logWar(text, true); }
+              }
+              if (gameState.supplies <= 0 && gameState.population > 0 && (w.t - (w.lastFoodWarn || -999)) > 60) { w.lastFoodWarn = w.t; logWar('Status: food storages critical. People are starving.', true); }
               // rebuilt enemy tiles
               (w.enemyRazedUntil || []).forEach((until, i) => { if (until && w.t >= until) w.enemyRazedUntil[i] = 0; });
-              // the enemy leaves when its island is finished
-              if (!w.enemyLeft && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH) { w.enemyLeft = true; ui.competitorIsland.classList.add('enemy-left'); }
-              if (w.enemyLeft && w.salvage >= SHIP_SALVAGE) w.shipReady = true;
+              // The end: the enemy withdraws to a launch site, goes quiet, launches, leaves rubble.
+              if (!w.enemyLeft && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH) {
+                  w.enemyLeft = true; w.leaveStage = 0; w.leaveAt = w.t;
+                  logWar('Intel: the enemy is withdrawing all forces to a launch site.', true);
+                  const rocket = ui.competitorIsland.querySelector('.enemy-rocket');
+                  ui.competitorIsland.classList.add('enemy-launch');
+                  if (_ants && rocket) _ants.withdraw(rocket, () => { w.leaveStage = Math.max(w.leaveStage, 1); w.leaveAt = w.t; });
+                  else { w.leaveStage = 1; }
+              }
+              if (w.enemyLeft) {
+                  if (w.leaveStage === 0 && w.t - w.leaveAt > 25) { w.leaveStage = 1; w.leaveAt = w.t; }
+                  if (w.leaveStage === 1 && w.t - w.leaveAt >= 4) { w.leaveStage = 2; w.leaveAt = w.t; ui.competitorIsland.classList.add('enemy-left'); logWar('Our scientists have declared the surface uninhabitable for life. The enemy has left for space.', true); }
+                  if (w.leaveStage === 2 && w.t - w.leaveAt >= 9) { w.leaveStage = 3; ui.competitorIsland.classList.remove('enemy-launch'); ui.competitorIsland.classList.add('enemy-rubble'); logWar('We have not had the resources to do the same. But there is a secret plan. Go deep.'); }
+                  if (w.leaveStage >= 3 && w.salvage >= SHIP_SALVAGE && !w.shipReady) { w.shipReady = true; }
+              }
               if (w.auto) {
-                  const buy = autoBuy(w.arms, w.defence, w.force, UNIT_COST);
+                  const stance = w.stance || 'balanced';
+                  const buy = autoBuy(w.arms, w.defence, w.force, UNIT_COST, stance);
                   w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
                   const enemy = TIERS[w.enemyTier];
-                  if (w.force * TIERS[w.tier].power > w.enemyDefence * enemy.power + enemyTileHp(w.enemyTier)) tryStrike();
+                  if (stance !== 'defend' && w.force * TIERS[w.tier].power > w.enemyDefence * enemy.power + enemyTileHp(w.enemyTier)) tryStrike();
               }
           }
 
-          function resolveWave(targetId, power, enemy) {
+          function resolveWave(targetId, power, enemy, size = 1, fraction = 1) {
               const w = gameState.war; if (!w?.active) return;
               const i = gameState.buildings.findIndex(b => b && b.id === targetId);
               const b = gameState.buildings[i]; if (!b || b.razed) return;
+              if (power <= 0) { logWar(`Interior: a landing at ${b.type} was cut down before it reached the door.`); return; }
               const hp = b.hp ?? plateMaxHp(b.type, b.fort || 0);
               const r = resolveHit({ power, defence: w.defence, defencePower: TIERS[w.tier].power, hp });
               w.defence = Math.max(0, w.defence - r.defenceLost);
               b.hp = r.hpLeft;
-              w.scorchOurs += enemy.scorch * waveSize(w.waveCount) * 0.3;
+              w.scorchOurs += enemy.scorch * size * fraction * 0.3;
+              if (enemy.mode === 'area') { gameState.supplies = Math.max(0, gameState.supplies * 0.8); logWar('Status: their strike hit our stores. Food lost.', true); }
               if (r.razed) {
                   b.razed = true; b.population = 0; b.fort = 0; b.hp = 0;
                   w.scorchOurs += enemy.scorch * 4;
                   renderGridSlot(i);
+                  logWar(`Status: ${b.type} razed by enemy ${enemy.id}.`, true);
+              } else if (r.absorbed >= power) {
+                  logWar(`Interior: our defence held at ${b.type}.`);
+              } else {
+                  logWar(`Status: ${b.type} damaged by enemy ${enemy.id}.`);
               }
               updateAllUI();
           }
@@ -269,11 +327,17 @@ export function init() {
                   ww.enemyTileHp = ww.enemyTileHp || [0, 0, 0, 0, 0].map(() => enemyTileHp(ww.enemyTier));
                   ww.enemyTileHp[pickIdx] = r.tileHpLeft;
                   ww.scorchTheirs += tier.scorch * 3;
+                  const names = ['factory', 'warehouse', 'radar', 'tower', 'shipyard'];
                   if (r.razed) {
                       ww.enemyRazedUntil[pickIdx] = ww.t + ENEMY_REBUILD_S;
                       ww.enemyTileHp[pickIdx] = enemyTileHp(ww.enemyTier);
                       ww.salvage += SALVAGE_PER_TILE * tier.power;
                       ww.scorchTheirs += tier.scorch * 10;
+                      logWar(`Interior: our ${tier.id} razed their ${names[pickIdx]}. Salvage recovered.`);
+                  } else if (r.tileHpLeft < hp) {
+                      logWar(`Interior: their ${names[pickIdx]} damaged.`);
+                  } else {
+                      logWar(`Interior: our strike broke on their defence.`);
                   }
                   updateAllUI();
               };
@@ -286,7 +350,7 @@ export function init() {
               const w = gameState.war;
               const active = !!w?.active;
               [ui.buyDefenceBtn, ui.buyForceBtn, ui.strikeBtn, ui.tierBtn].forEach(btn => btn.classList.toggle('hidden', !active));
-              if (!active) ui.autoBtn.classList.add('hidden');
+              if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); }
               ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
               if (!active) return;
               const tier = TIERS[w.tier];
@@ -307,14 +371,35 @@ export function init() {
               const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0) : null;
               const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
               ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
-              ui.autoBtn.classList.toggle('hidden', !active || !!w.auto);
-              ui.autoBtn.disabled = w.arms < AUTO_COST;
-              setTooltip(ui.autoBtn, { effect: `<i data-lucide='repeat' class='w-4 h-4'></i> auto`, cost: AUTO_COST });
+              ui.autoBtn.classList.toggle('hidden', !active);
+              ui.autoBtn.classList.toggle('toggled', !!w.autoBought);
+              // The quartermaster's stance: shield = only defence, scale = both, sword = only force + strikes
+              {
+                  const stance = w.stance || 'balanced';
+                  const stanceIcon = { defend: 'shield-check', balanced: 'scale', attack: 'sword' }[stance];
+                  const wantIcon = w.autoBought ? stanceIcon : 'repeat';
+                  if (ui.autoBtn.dataset.icon !== wantIcon) {
+                      ui.autoBtn.dataset.icon = wantIcon;
+                      const i = document.createElement('i'); i.className = 'w-7 h-7'; i.setAttribute('data-lucide', wantIcon);
+                      ui.autoBtn.querySelector('svg, i')?.replaceWith(i);
+                      scheduleIconRefresh();
+                  }
+              }
+              ui.radarBtn.classList.toggle('hidden', !active || !!w.radar);
+              ui.radarBtn.disabled = w.arms < RADAR_COST;
+              setTooltip(ui.radarBtn, { effect: `<i data-lucide='radar' class='w-4 h-4'></i>`, armsCost: RADAR_COST });
+              // enemy tiles show damage like ours
+              enemyTileEls().forEach((el, i) => { const hp = w.enemyTileHp?.[i]; el.style.setProperty('--hp', hp === undefined ? '1' : (hp / enemyTileHp(w.enemyTier)).toFixed(2)); });
+              ui.autoBtn.disabled = !w.autoBought && w.arms < AUTO_COST;
+              setTooltip(ui.autoBtn, w.autoBought ? { effect: `${w.stance || 'balanced'}` } : { effect: `<i data-lucide='repeat' class='w-4 h-4'></i> quartermaster`, armsCost: AUTO_COST });
+              // Predicted strike: ✓ if force × power beats their defence and a tile
+              const canRaze = w.force * tier.power > w.enemyDefence * TIERS[w.enemyTier].power + enemyTileHp(w.enemyTier);
+              ui.strikeBtn.classList.toggle('will-raze', canRaze && w.force > 0);
               ui.warEnemyDefence.textContent = Math.round(w.enemyDefence).toLocaleString('en-US');
               ui.shipBtn.disabled = !w.shipReady;
-              setTooltip(ui.buyDefenceBtn, { effect: `+1 <i data-lucide='shield' class='w-4 h-4'></i> (${tier.power})`, cost: UNIT_COST });
-              setTooltip(ui.buyForceBtn, { effect: `+1 <i data-lucide='swords' class='w-4 h-4'></i> (${tier.power})`, cost: UNIT_COST });
-              setTooltip(ui.strikeBtn, { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> → ${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i>` });
+              setTooltip(ui.buyDefenceBtn, { effect: `+1 <i data-lucide='shield' class='w-4 h-4'></i> (${tier.power})`, armsCost: UNIT_COST });
+              setTooltip(ui.buyForceBtn, { effect: `+1 <i data-lucide='swords' class='w-4 h-4'></i> (${tier.power})`, armsCost: UNIT_COST });
+              setTooltip(ui.strikeBtn, { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> → ${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ${canRaze && w.force > 0 ? '✓' : '×'}` });
               setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : (cooling ? { unlockReq: `${TIERS[w.tier + 1].numeral} · ${Math.max(0, TIER_COOLDOWN_S - ((w.t || 0) - (w.lastTierAt ?? 0)))} s` } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost }));
               setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
               // enemy tiles: razed ones dim until rebuilt
@@ -329,6 +414,8 @@ export function init() {
               if (what === 'etier') w.enemyTier = Math.min(TIERS.length - 1, w.enemyTier + 1);
               if (what === 'wave') w.lastWaveAt = -999;
               if (what === 'leave') w.scorchTheirs = ENEMY_LEAVES_AT_SCORCH;
+              if (what === 'salvage') w.salvage += 2000;
+              if (what === 'stage') w.leaveAt = -999;
               updateAllUI();
           };
           /** Everything chapter II sells has been bought. */
@@ -414,7 +501,7 @@ export function init() {
           };
           _islands.enemy.path.classList.add('enemy');
           function updateIslands() {
-              const full = gameState.landExpansion2 && gameState.buildings.every(b => b !== undefined && b !== null);
+              const full = gameState.landExpanded || gameState.competitorSpawned;
               const oursVisible = full || gameState.islandRevealed;
               if (full) gameState.islandRevealed = true;
               const enemyVisible = !!gameState.competitorSpawned && ui.competitorIsland.classList.contains('visible');
@@ -524,7 +611,7 @@ export function init() {
           // --- TOOLTIP & UI UPDATE LOGIC ---
           const tooltipListenersAttached = new WeakSet();
 
-          function setTooltip(el, { effect, cost, scienceCost, unlockReq }) {
+          function setTooltip(el, { effect, cost, scienceCost, armsCost, unlockReq }) {
               const tooltipEl = el.querySelector('.tooltip');
               if (!tooltipEl) return;
               let html = '';
@@ -533,6 +620,7 @@ export function init() {
               } else {
                   if (effect) html += `<div class="effect">${effect}</div>`;
                   if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('en-US')}</span><i data-lucide="star" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (armsCost) html += `<div class="cost"><span class="font-mono">${armsCost.toLocaleString('en-US')}</span><i data-lucide="hammer" class="w-4 h-4 text-slate-300"></i></div>`;
                   if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-slate-300"></i></div>`;
               }
               tooltipEl.innerHTML = html;
@@ -570,13 +658,15 @@ export function init() {
                   const prereqMet = prereq ? gameState[prereq] : true;
                   const shouldShow = (pop >= showAt || isPurchased) && prereqMet;
 
-                  btn.classList.toggle('hidden', !shouldShow || (isPurchased && !isMultiLevel));
-                  if(shouldShow && !(isPurchased && !isMultiLevel)) anyUpgradeVisible = true;
+                  // Done means gone, multi-level too; and chapter II research hides during the war
+                  const warOn = !!gameState.war?.active;
+                  btn.classList.toggle('hidden', !shouldShow || isPurchased || warOn);
+                  if (shouldShow && !isPurchased && !warOn) anyUpgradeVisible = true;
               });
               ui.buildSeparator.classList.toggle('hidden', !anyUpgradeVisible);
 
               // III · WAR: teased when the competitor appears, open once they razed a house
-              ui.warBtn.classList.toggle('hidden', !gameState.competitorSpawned || gameState.warChosen);
+              ui.warBtn.classList.toggle('hidden', !gameState.warReady || gameState.warChosen);
               updateWarUI();
               ui.warBtn.disabled = !gameState.warReady;
               setTooltip(ui.warBtn, gameState.warReady
@@ -643,18 +733,11 @@ export function init() {
                   && gameState.carUnlocked
                   && gameState.computerUnlocked
                   && gameState.megastructureResearched;
+              // Science never greys out: the war needs it (Ola 2026-09-19).
+              void allScienceDone;
               if (_scienceRevealed) {
-                  if (allScienceDone && !gameState.competitorSpawned) {
-                      ui.scienceRow.style.opacity = '0.15';
-                      ui.allocationSliderContainer.style.opacity = '0.15';
-                      if (gameState.populationAllocation > 0) {
-                          gameState.populationAllocation = 0;
-                          ui.allocationSlider.value = 0;
-                      }
-                  } else {
-                      ui.scienceRow.style.opacity = '1';
-                      ui.allocationSliderContainer.style.opacity = '1';
-                  }
+                  ui.scienceRow.style.opacity = '1';
+                  ui.allocationSliderContainer.style.opacity = '1';
               }
 
               scheduleIconRefresh();
@@ -678,6 +761,7 @@ export function init() {
               const gmoMultiplier = Math.pow(2, gameState.gmoLevel);
               // Market stalls: the cheap repeatable helper; GMO multiplies them too.
               supplyProduction += (gameState.stalls || 0) * STALL_SUPPLY * gmoMultiplier;
+              if (gameState.war?.active) supplyProduction *= 1 - 0.6 * doomsday(gameState.war.scorchOurs + gameState.war.scorchTheirs) / 100;
               if (!skipGrowth) gameState.harvestEfficiency = recoverHarvestEfficiency(gameState.harvestEfficiency ?? 1);
 
               gameState.buildings.forEach((b) => {
@@ -776,7 +860,7 @@ export function init() {
               if (gameState.population >= COMPETITOR_POP && !gameState.competitorSpawned) {
                   gameState.competitorSpawned = true;
                   gameState.competitorSpawnedAt = Date.now();
-                  ui.competitorIsland.classList.remove('hidden');
+                  smoothLayoutShift(() => ui.competitorIsland.classList.remove('hidden'));
                   // Trigger fade-in on next frame
                   requestAnimationFrame(() => {
                       ui.competitorIsland.classList.add('visible');
@@ -792,6 +876,8 @@ export function init() {
                   carUnlocked: !!gameState.carUnlocked,
                   enemyStage: gameState.competitorSpawned ? (gameState.competitorStage || 1) : 0,
                   enemyTicks: gameState.competitorTicks || 0,
+                  ourTier: gameState.war?.tier || 0,
+                  enemyTier: gameState.war?.enemyTier || 0,
               });
 
               // Raids. The competitor waits until our city is complete (everything
@@ -927,7 +1013,7 @@ export function init() {
               gameState.warChosen = true;
               saveGameState();
               // The chapter turns, but the game goes on: the war is played on this map.
-              playChapterCard({ roman: 'III', title: 'WAR', onMidpoint: () => startWar() });
+              playChapterCard({ roman: 'III', title: 'WAR', dark: true, hold: 4000, onMidpoint: () => startWar() });
           }, { signal });
           ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (w?.active && w.arms >= UNIT_COST) { w.arms -= UNIT_COST; w.defence++; updateAllUI(); } }, { signal });
           ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (w?.active && w.arms >= UNIT_COST) { w.arms -= UNIT_COST; w.force++; updateAllUI(); } }, { signal });
@@ -938,24 +1024,44 @@ export function init() {
               if ((w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S) return;
               if (gameState.science >= cost) {
                   gameState.science -= cost; w.tier++; w.lastTierAt = w.t || 0;
+                  logWar(`Interior: ${TIERS[w.tier].id} developed. Units are stronger.`);
                   const pulled = enemyCatchUp(w.tier, w.enemyTier);
-                  if (pulled > w.enemyTier) { w.enemyTier = pulled; w.nextTierAt = (w.t || 0) + 120; }
+                  if (pulled > w.enemyTier) { w.enemyTier = pulled; w.nextTierAt = (w.t || 0) + 120; logWar(`Intel: enemy has stolen blueprints for ${TIERS[w.enemyTier].id}.`, true); }
                   updateAllUI();
               }
           }, { signal });
+          ui.radarBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || w.radar) return;
+              if (w.arms >= RADAR_COST) { w.arms -= RADAR_COST; w.radar = true; logWar('Interior: radar online. Landings are marked before they arrive.'); updateAllUI(); }
+          }, { signal });
           ui.autoBtn.addEventListener('click', () => {
-              const w = gameState.war; if (!w?.active || w.auto) return;
-              if (w.arms >= AUTO_COST) { w.arms -= AUTO_COST; w.auto = true; updateAllUI(); }
+              const w = gameState.war; if (!w?.active) return;
+              if (!w.autoBought) {
+                  if (w.arms >= AUTO_COST) { w.arms -= AUTO_COST; w.autoBought = true; w.auto = true; w.stance = 'balanced'; logWar('Interior: a quartermaster now buys units for us. Set the stance.'); }
+              } else {
+                  const i = STANCES.indexOf(w.stance || 'balanced');
+                  w.stance = STANCES[(i + 1) % STANCES.length];
+                  w.auto = true;
+              }
+              updateAllUI();
           }, { signal });
           ui.armsSlider.addEventListener('input', (e) => { if (gameState.war?.active) gameState.war.armsShare = e.target.value / 100; updateAllUI(); }, { signal });
           ui.shipBtn.addEventListener('click', () => {
-              const w = gameState.war; if (!w?.shipReady) return;
+              const w = gameState.war; if (!w?.shipReady || gameState.shipChosen) return;
               gameState.shipChosen = true;
+              logWar('Go deep.');
               saveGameState();
               savingEnabled = false;
               if (logicInterval) clearInterval(logicInterval);
-              if (fastUiInterval) clearInterval(fastUiInterval);
-              playChapterCard({ roman: 'IV', title: 'THE DEEP', mode: 'to-come', onMidpoint: () => {} });
+              // The hatch: the bottom-right plate goes dark and everyone walks in.
+              const slots = ui.landGrid.children;
+              const hatch = slots[slots.length - 1];
+              hatch?.classList.add('deep-hatch');
+              const card = () => {
+                  if (fastUiInterval) clearInterval(fastUiInterval);
+                  playChapterCard({ roman: 'IV', title: 'THE DEEP', mode: 'to-come', onMidpoint: () => {} });
+              };
+              if (_ants && hatch) { _ants.gatherAt(hatch, () => setTimeout(card, 1200)); setTimeout(card, 20000); } else card();
           }, { signal });
           ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'), { signal });
           ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'), { signal });
@@ -1030,7 +1136,7 @@ export function init() {
                 if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
                     gameState.stars -= buildingData.landExpansion.cost;
                     gameState.landExpanded = true;
-                    addLandSlots(5);
+                    smoothLayoutShift(() => addLandSlots(5));
                     updateAllUI();
                 }
             }, { signal });
@@ -1039,10 +1145,28 @@ export function init() {
               if (gameState.stars >= buildingData.landExpansion2.cost && !gameState.landExpansion2 && gameState.landExpanded) {
                   gameState.stars -= buildingData.landExpansion2.cost;
                   gameState.landExpansion2 = true;
-                  addLandSlots(5);
+                  smoothLayoutShift(() => addLandSlots(5));
                   updateAllUI();
               }
           }, { signal });
+
+          /**
+           * Layout changes (new rows, the island appearing) move the whole city.
+           * FLIP: measure, mutate, then slide grid, island and the dot canvas from
+           * the old place to the new over 700 ms. Dots measure in layout space,
+           * so they slide with the plates instead of jumping.
+           */
+          function smoothLayoutShift(mutate) {
+              const before = ui.landGrid.offsetTop;
+              mutate();
+              const dy = before - ui.landGrid.offsetTop;
+              if (!dy) return;
+              const els = [ui.landGrid, ui.competitorIsland, ui.antsCanvas, ui.islandsSvg];
+              els.forEach(el => { el.style.transition = 'none'; el.style.transform = `translateY(${dy}px)`; });
+              void ui.landGrid.offsetHeight; // reflow
+              els.forEach(el => { el.style.transition = 'transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1)'; el.style.transform = ''; });
+              setTimeout(() => els.forEach(el => { el.style.transition = ''; }), 800);
+          }
 
           /** New plots settle in one after another instead of popping. */
           function addLandSlots(n) {

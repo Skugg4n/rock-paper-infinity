@@ -44,14 +44,14 @@ export const FORT_COST = (level) => Math.round(40 * Math.pow(1.6, level));
 /** Enemy tiles: HP per tile, defence units the enemy fields, rebuild time. */
 export const ENEMY_TILE_HP = 120;
 /** Enemy defence: starting units, regrowth per second, cap per wave. */
-export const ENEMY_DEFENCE_START = 30;
+export const ENEMY_DEFENCE_START = 45;
 export const ENEMY_DEFENCE_REGROW = 0.3;
 export const enemyDefenceCap = (waveCount) => 40 + waveCount * 0.8;
 export const ENEMY_REBUILD_S = 90;
 /** Salvage per razed enemy tile (× tier power of the strike). */
 export const SALVAGE_PER_TILE = 120;
 /** The enemy leaves when its island's scorch passes this. */
-export const ENEMY_LEAVES_AT_SCORCH = 2500;
+export const ENEMY_LEAVES_AT_SCORCH = 1800;
 /** Enemy tiles get sturdier with their tier. */
 export const enemyTileHp = (enemyTier) => ENEMY_TILE_HP * (1 + enemyTier);
 /** Seconds of development between our tier purchases. */
@@ -69,7 +69,7 @@ export function initialWarState(now = 0) {
         active: true, startedAt: now,
         arms: 0, armsShare: 0.3,
         defence: 0, force: 0, tier: 0,
-        enemyTier: 0, enemyDefence: ENEMY_DEFENCE_START, waveCount: 0, lastWaveAt: now, nextTierAt: now + 120,
+        enemyTier: 0, enemyDefence: ENEMY_DEFENCE_START, waveCount: 0, lastWaveAt: now, nextTierAt: now + 75,
         scorchOurs: 0, scorchTheirs: 0, salvage: 0,
         enemyLeft: false, shipReady: false,
         autoStrike: false,
@@ -106,7 +106,7 @@ export function waveInterval(waveCount) {
 
 /** Units in the next wave: grows for thirty waves, then holds. */
 export function waveSize(waveCount) {
-    return 6 + Math.min(waveCount, 30) * 2;
+    return 8 + Math.min(waveCount, 30) * 2;
 }
 
 /**
@@ -117,7 +117,7 @@ export function waveSize(waveCount) {
  * @param {number} [tierReached=0] - the tier they just reached
  */
 export function nextEnemyTierAt(now, rand, tierReached = 0) {
-    return now + 120 * Math.pow(1.15, tierReached) * (0.6 + rand() * 0.8);
+    return now + 95 * Math.pow(1.15, tierReached) * (0.7 + rand() * 0.6);
 }
 
 /**
@@ -220,14 +220,18 @@ export function enemyCatchUp(ourTier, enemyTier) {
  * @param {number} force
  * @param {number} unitCost
  */
-export function autoBuy(arms, defence, force, unitCost) {
+export function autoBuy(arms, defence, force, unitCost, stance = 'balanced') {
     let d = 0, f = 0, left = arms;
     while (left >= unitCost) {
-        if (defence + d <= force + f) d++; else f++;
+        if (stance === 'defend') d++;
+        else if (stance === 'attack') f++;
+        else if (defence + d <= force + f) d++; else f++;
         left -= unitCost;
     }
     return { defence: d, force: f };
 }
+/** The quartermaster's three stances, cycled with one button. */
+export const STANCES = ['defend', 'balanced', 'attack'];
 
 /** Base HP for a plate of `type` plus fortification. */
 export function plateMaxHp(type, fort = 0) {

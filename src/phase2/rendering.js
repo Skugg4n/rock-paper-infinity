@@ -52,7 +52,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
         </button>`;
     }
 
-    if (building.type !== 'factory' && building.type !== 'bank' && !war) {
+    if (building.type !== 'factory' && building.type !== 'bank') {
         const refund = (buildingData[building.type]?.cost || 0) * 0.7;
         actionButtons += `<button class="building-action-btn sell-btn" data-building-id="${building.id}">-
             <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>

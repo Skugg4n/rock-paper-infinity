@@ -455,9 +455,12 @@ input[type=range]:focus-visible {
     letter-spacing: 0.12em;
 }
 
-.chapter-card.is-to-come .chapter-card__veil {
+.chapter-card.is-to-come .chapter-card__veil,
+.chapter-card.is-dark .chapter-card__veil {
     background: #000000;
 }
+.chapter-card.is-dark .chapter-card__content { color: #ffffff; cursor: pointer; }
+.chapter-card.is-dark { cursor: pointer; }
 
 .chapter-card.is-to-come .chapter-card__content {
     color: #ffffff;
