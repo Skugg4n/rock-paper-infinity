@@ -59,7 +59,28 @@ Core game loop, upgrade system, Phase 2 city builder, UI polish, bug fixes. 49 m
 
 ---
 
-## Phase 25: v1.18.0 (current)
+## Phase 26: v1.20.0 — Phase 1 avalanche pass (current)
+
+Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18-phase1-avalanche.md`.
+
+### Shipped in v1.20.0
+- [x] Measured ★/s (EMA) instead of formula; rate formatting
+- [x] Game loop: per-board scheduling, monotonic `roundTiming`, no skipped rounds
+- [x] Hands free of energy (soft-lock removed); energy UI tied to auto-play
+- [x] Result visuals: winner bold + ring, loser fades; bulk mode shows real outcomes (B001)
+- [x] Luck applies in bulk mode
+- [x] Balance rework with geometric costs, new unlock order, self-powered factory, bank at 250k
+- [x] Upgrade tray crop fix
+- [x] `scripts/sim-phase1.mjs` economy simulation; tests 84 → 98
+
+### Next (needs Ola's playtest first)
+- [ ] Tune cost ratios / bank gate after playtest (B015)
+- [ ] Celebrate the speed-10 jump visually?
+- [ ] Phase 2 pass with the same method (measure, simulate, geometric costs)
+
+---
+
+## Phase 25: v1.18.0
 
 ### Shipped in v1.18.0
 - [x] **P1: game-logic.js extracted** — `showResult` + `iconMap` moved to `createGameLogic` factory. index.js: 802 → 769 lines.

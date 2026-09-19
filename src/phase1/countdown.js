@@ -1,17 +1,15 @@
-export async function runCountdownAnimation(board, gameSpeed) {
-    // Per-frame duration scales with speed, but never below ~120ms so the
-    // frame is actually perceivable. Without this floor, at high speeds the
-    // countdown flashes invisibly and the player sees only "white → result".
-    const rawDuration = (1.2 / gameSpeed / 3) * 1000;
-    const duration = Math.max(120, rawDuration);
-    let countdownIcons = [];
+import { roundTiming } from './rates.js';
 
-    if (gameSpeed <= 5) countdownIcons = ["III", "II", "I"];
-    else if (gameSpeed <= 6) countdownIcons = ["III", "II"];
-    else if (gameSpeed <= 7) countdownIcons = ["III"];
-    else countdownIcons = ["I"];  // always show at least one frame, even past
-                                   // HYPER_SPEED_THRESHOLD — gives the player a
-                                   // visual round divider
+/**
+ * Plays the 3/2/1 countdown on a board. Frame count and duration come from
+ * roundTiming() so the game loop, the visuals and the rate model agree.
+ *
+ * @param {{ computerEl: HTMLElement, playerEl: HTMLElement }} board
+ * @param {number} gameSpeed
+ */
+export async function runCountdownAnimation(board, gameSpeed) {
+    const { frames, frameMs: duration } = roundTiming(gameSpeed);
+    const countdownIcons = ["III", "II", "I"].slice(3 - frames);
 
     const svgMap = {
         "III": `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="lucide-lg countdown-pop text-slate-400"><line x1="16" y1="14" x2="16" y2="42"></line><line x1="28" y1="14" x2="28" y2="42"></line><line x1="40" y1="14" x2="40" y2="42"></line></svg>`,

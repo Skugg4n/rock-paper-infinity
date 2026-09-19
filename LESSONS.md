@@ -86,6 +86,24 @@
 **Lesson:** A "permanent" UI state must also stop the underlying simulation, not just hide it.
 **Rule:** "When triggering a wall/end state, clear all intervals and timers explicitly."
 
+### #15 — A shared tick interval plus per-item animations creates dead zones
+**Problem:** The auto-play loop fired every `1.2/speed + 0.45` s and skipped boards still animating. At speed 4–5 the animation (760 ms) outlasted the interval (690–750 ms), so every other tick was skipped and buying speed *halved* the rate.
+**Cause:** Two independent clocks (tick interval, animation length) with no relation to each other.
+**Lesson:** Derive loop cadence from the animation length, not the other way round. One source of truth (`roundTiming`) for both.
+**Rule:** "If a loop skips busy items, the loop's interval must be derived from the busy time, and a test must assert monotonicity."
+
+### #16 — Displayed rates must be measured, not derived
+**Problem:** ★/s showed a formula that ignored energy pauses and loop bugs. Ola saw 0.2 on screen and 0.05 in reality.
+**Cause:** The display trusted the model; the model was wrong (#15) and incomplete (energy).
+**Lesson:** Show what the player actually gets. An EMA of real gains is cheap and self-correcting.
+**Rule:** "Any 'per second' number shown to the player is measured from actual state changes."
+
+### #17 — A resource that gates the only income source can soft-lock
+**Problem:** Hand play cost energy. 0 energy + 0 stars = nothing can ever happen.
+**Cause:** No free fallback action.
+**Lesson:** The base action of an incremental game must always be available (Paperclips: you can always click "Make Paperclip").
+**Rule:** "There is always one free action that produces the primary currency."
+
 ## Rules Checklist
 - [ ] Never bump version without updating all files in the checklist
 - [ ] Keep modules focused — one concern per file
@@ -101,3 +119,6 @@
 - [ ] Cross-phase localStorage writes happen synchronously at the trigger, not at chapter card midpoints
 - [ ] Sanity-check numeric trigger conditions against actual game values before shipping
 - [ ] Clear all intervals/timers when triggering wall/end states
+- [ ] Loop cadence is derived from animation length; assert monotonicity in a test
+- [ ] Displayed per-second rates are measured from real state changes
+- [ ] One free action always produces the primary currency

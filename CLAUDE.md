@@ -40,9 +40,15 @@ All must be updated together on every release:
 
 ## Commands
 ```bash
-npm test          # Run Jest tests
-npm run lint      # Run ESLint
+npm test                          # Run Jest tests
+npm run lint                      # Run ESLint
+node scripts/sim-phase1.mjs new   # Simulate the Phase 1 economy (old|new) before touching balance
 ```
+
+## Balance rule
+Never change a cost, unlock threshold or rate without running `scripts/sim-phase1.mjs`
+and updating the spec in `docs/superpowers/specs/` with the new milestone times.
+The on-screen ★/s is MEASURED (EMA), never a formula.
 
 ## File Structure
 ```

@@ -1,0 +1,18 @@
+{
+  "atlasVersion": 1,
+  "id": "rock-paper-infinity",
+  "name": "Rock Paper Infinity",
+  "summary": "Inkrementellt sten-sax-påse-spel i fyra kapitel (I TRIVIAL, II CAPITAL klara; III WAR, IV ESCAPE ej byggda). Vanilla JS, Jest, GitHub Pages. Lokal kod i ~/Projects, repo Skugg4n/rock-paper-infinity.",
+  "aliases": ["rock-paper-infinity", "rock paper infinity", "sten sax pase", "rpi", "rock scissor infinity"],
+  "tags": ["game", "web-app", "idle", "github-pages"],
+  "stack": ["javascript", "tailwind", "jest"],
+  "status": "active",
+  "entrypoints": {
+    "docs": ["README.md", "vision.md", "BACKLOG.yaml", "PROJECTPLAN.md", "CLAUDE.md"],
+    "run": ["python3 -m http.server 8000", "npm test", "npm run lint"],
+    "urls": ["https://skugg4n.github.io/rock-paper-infinity/", "https://github.com/Skugg4n/rock-paper-infinity"]
+  },
+  "path": "/Users/olabelin/Projects/rock-paper-infinity",
+  "secrets": {},
+  "nexusProjectId": "rock-paper-infinity"
+}

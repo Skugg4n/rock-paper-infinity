@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.20.0 - 2026-09-18
+
+### Phase 1 avalanche pass (Ola's playtest 2026-09-18; spec: docs/superpowers/specs/2026-09-18-phase1-avalanche.md)
+
+- **★/s is now measured, not a formula** — exponential moving average of real stars gained per second, so energy pauses and the true round cadence show. Rates format with one decimal below 100, compact above.
+- **Game loop fixed** — per-board scheduling with a fixed breathing gap; round length (`roundTiming`) is monotonic in speed. The old shared interval skipped every other round at speed 4–5, halving the rate right after a purchase.
+- **Hands are free** — hand-played rounds cost no energy; only the auto-player does. Removes the 0-energy/0-stars soft-lock. Energy bars appear when auto-play is bought.
+- **Result visuals** — winner's icon bold with a thin dark ring, loser recedes to 28 %, draw both at 60 %. Same rules in bulk mode, which now renders one representative round per 100 ms tick from the real outcome distribution (closes B001: you can see wins at speed ≥ 10).
+- **Luck works in bulk mode** — `pickOutcome` gives a 2/3 win rate everywhere; previously bulk hard-coded 1/3.
+- **Balance rework** — geometric costs (speed 10·1.08^L max 40, generator 20·1.03^L unlocking at 30★, boards 150·1.6^L unlocking at 150★), factory 5 000★ gated on speed + boards + luck (not generator) and running on its own reactor, foam 20 000 games / 30 s bonus, bank at 250k lifetime stars. Simulated: bulk ~5 min, factory ~8 min, bank ~9.5 min for a perfect player; 2 recharge clicks instead of 683.
+- **Upgrade tray no longer crops the dash ring** — 12 px padding with a matching negative margin inside the scroll box.
+- **Old saves** — speed levels above the new max are clamped on load.
+- Tests: 84 → 98. New `scripts/sim-phase1.mjs` for balance passes (`old|new`).
+
 ## v1.19.2 - 2026-04-27
 
 ### Polish

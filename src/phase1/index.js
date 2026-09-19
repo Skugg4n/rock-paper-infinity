@@ -2,7 +2,10 @@ import { getIcon } from "../icons.js";
 import { phases, setPhase } from "../gamePhase.js";
 import { playChapterCard } from "../chapterCard.js";
 import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
-import { getSPS, getEPS } from "./rates.js";
+import {
+    getSPS, getEPS, getGamesPerSecond, roundTiming, updateMeasuredRate, pickOutcome,
+    BASE_WIN_RATE, LUCK_WIN_RATE,
+} from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
@@ -62,7 +65,7 @@ const resetBtn = document.getElementById('reset-btn');
         let totalWins = 0;
         let energy = PHASE1_CONSTANTS.MAX_ENERGY;
         let reserveEnergy = 0;
-        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, HYPER_SPEED_THRESHOLD, SAVE_KEY } = PHASE1_CONSTANTS;
+        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_STARS, SAVE_KEY } = PHASE1_CONSTANTS;
         let autoPlayInterval = null;
         let autoPlayWantsToRun = false;
         let gameSpeed = 1;
@@ -77,6 +80,10 @@ const resetBtn = document.getElementById('reset-btn');
         let quantumFoam = 0;
         let revealedUpgrades = new Set();
         let firstUpgradeUpdateDone = false;
+        // Measured income (EMA of stars gained per second) — what the player
+        // actually gets, energy pauses and all. This is what the ★/s shows.
+        let measuredSPS = 0;
+        let measuredLastTotal = 0;
         
         function doSetPhaseToCity() {
             localStorage.setItem(PHASE2_CONSTANTS.STARS_TRANSFER_KEY, String(starBalance));
@@ -91,14 +98,17 @@ const resetBtn = document.getElementById('reset-btn');
         }
 
         const upgrades = createUpgrades({
-            rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 10); },
+            rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); },
             addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 700); },
             incrementSpeed:    () => { gameSpeed += 1; },
             createGameBoard:   () => createGameBoard(),
             mergeToMetaBoard:  () => mergeToMetaBoard(),
             setPhaseToCity:    () => doSetPhaseToCity(),
             getTotalStarsEarned: () => totalStarsEarned,
+            bankGateStars: BANK_GATE_STARS,
         });
+
+        const winRate = () => (upgrades.luck.purchased ? LUCK_WIN_RATE : BASE_WIN_RATE);
 
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
@@ -162,6 +172,7 @@ function scheduleUIUpdate() {
                 id: boardId,
                 element: board,
                 isAnimating: false,
+                freeAt: 0,
                 computerEl: board.querySelector('.computer-result-icon'),
                 playerEl: board.querySelector('.player-result-icon')
             });
@@ -271,6 +282,8 @@ function scheduleUIUpdate() {
                     }
                 }
                 manageAutoPlay();
+                measuredSPS = updateMeasuredRate(measuredSPS, totalStarsEarned - measuredLastTotal);
+                measuredLastTotal = totalStarsEarned;
                 saveGame();
             });
             scheduleUIUpdate();
@@ -290,10 +303,10 @@ function scheduleUIUpdate() {
         }
 
         function updateAnimationSpeed() {
-            const animationDuration = 1.2 / gameSpeed;
+            const { frameMs } = roundTiming(gameSpeed);
             dynamicStyles.innerHTML = `
-                .countdown-pop { animation-duration: ${animationDuration / 3}s; }
-                .reveal-item { animation-duration: ${0.4 / gameSpeed}s; }
+                .countdown-pop { animation-duration: ${frameMs}ms; }
+                .reveal-item { animation-duration: ${Math.max(120, 400 / gameSpeed)}ms; }
             `;
             debugSpeedEl.textContent = `⚡︎ ${gameSpeed}x`;
             if (autoPlayInterval) restartAutoPlay();
@@ -362,11 +375,13 @@ const uiState = {
 
         function updateUI() {
             const games = Math.floor(totalGamesPlayed);
-            const showResources = totalStarsEarned >= 10;
+            // Energy only matters once machines play; hands are free. The
+            // factory has its own reactor, so its bars go away (foam stays).
+            const showResources = upgrades.autoPlay.purchased;
             const energyPercent = (energy / MAX_ENERGY) * 100;
             const reservePercent = (reserveEnergy / MAX_RESERVE_ENERGY) * 100;
             const energyEmpty = energy <= 0;
-            const sps = getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier);
+            const sps = measuredSPS;
             const eps = getEPS(gameSpeed, isMetaBoardActive, gameBoards.length);
             const egps = upgrades.energyGenerator.level * 5;
             const autoActive = !!autoPlayInterval;
@@ -390,7 +405,9 @@ const uiState = {
                 debugGamesPlayedEl.textContent = games;
                 renderGameCounters({ gameCounters, gamesValueEl, winsValueEl }, games, wins);
             });
-            if (resourcesChanged) tasks.push(() => renderResourceBarsVisibility(resourceBars, showResources));
+            if (resourcesChanged || isMetaBoardActive !== uiState.isMetaBoardActive) {
+                tasks.push(() => renderResourceBarsVisibility(resourceBars, showResources, !isMetaBoardActive));
+            }
             if (energyChanged) tasks.push(() => renderEnergyBar(energyFillEl, energyPercent));
             if (reserveChanged) tasks.push(() => renderReserveBar(reserveEnergyFillEl, reservePercent));
             if (emptyChanged) tasks.push(() => renderEnergyEmpty(energyFillEl, energyEmpty));
@@ -453,11 +470,16 @@ const uiState = {
                 quantumFoam = sanitizeNumber(data.quantumFoam) ?? quantumFoam;
                 isMetaBoardActive = data.isMetaBoardActive ?? isMetaBoardActive;
                 autoPlayWantsToRun = data.autoPlayWantsToRun ?? autoPlayWantsToRun;
+                measuredLastTotal = totalStarsEarned;
                 if (data.upgrades) {
                     for (const key in data.upgrades) {
                         if (upgrades[key]) {
                             const info = data.upgrades[key];
-                            if (info.level !== undefined) upgrades[key].level = info.level;
+                            if (info.level !== undefined) {
+                                // Clamp: balance passes may lower maxLevel on old saves.
+                                const max = upgrades[key].maxLevel ?? Infinity;
+                                upgrades[key].level = Math.min(sanitizeNumber(info.level) ?? 0, max);
+                            }
                             if (info.purchased !== undefined) upgrades[key].purchased = info.purchased;
                         }
                     }
@@ -498,6 +520,8 @@ const uiState = {
             quantumFoam = 0;
             gameSpeed = 1;
             isMetaBoardActive = false;
+            measuredSPS = 0;
+            measuredLastTotal = 0;
             // Invalidate uiState cache so the next updateUI() does a full re-render.
             // Without this, dirty cached values from before the reset cause some UI
             // renders to be skipped on the first post-reset update.
@@ -526,59 +550,72 @@ const uiState = {
             resetCounterIconState();
             createGameBoard();
             choiceButtons.forEach(btn => btn.disabled = false);
+            gameBoards.forEach(b => { b.freeAt = 0; });
             menuDropdown.classList.add('hidden');
             updateAnimationSpeed();
             manageAutoPlay();
             scheduleUIUpdate();
         }
 
-        async function playGame(playerChoice, board = gameBoards[0]) {
-            if (isMetaBoardActive || board.isAnimating || !hasEnergy()) return;
+        /**
+         * Plays one animated round on a board. Hand-played rounds (auto=false)
+         * are free; only the auto-player consumes energy. That keeps the game
+         * from soft-locking at 0 energy / 0 stars.
+         */
+        async function playGame(playerChoice, board = gameBoards[0], auto = false) {
+            if (isMetaBoardActive || board.isAnimating) return;
+            if (auto && !hasEnergy()) return;
             board.isAnimating = true;
-            consumeEnergy();
+            if (auto) consumeEnergy();
             totalGamesPlayed++;
-            
+
             choiceButtons.forEach(btn => btn.disabled = true);
 
-            if (gameSpeed >= HYPER_SPEED_THRESHOLD && autoPlayInterval) {
-                showResult(playerChoice, board, true);
-            } else {
-                await runCountdownAnimation(board, gameSpeed);
-                showResult(playerChoice, board, false);
-            }
+            await runCountdownAnimation(board, gameSpeed);
+            showResult(playerChoice, board, false);
         }
 
-        function showResult(playerChoice, board, instant = false) {
-            let computerChoice;
-            if (upgrades.luck.purchased && Math.random() < 0.5) {
-                // 50% chance: pick the move that loses to the player's choice
-                const losingForComputer = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
-                computerChoice = losingForComputer[playerChoice];
-            } else {
-                computerChoice = choices[Math.floor(Math.random() * choices.length)];
-            }
-            let result;
+        const losingFor = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+        const winningFor = { rock: 'paper', paper: 'scissors', scissors: 'rock' };
 
-            if (playerChoice === computerChoice) result = 'draw';
-            else if (
-                (playerChoice === 'rock' && computerChoice === 'scissors') ||
-                (playerChoice === 'scissors' && computerChoice === 'paper') ||
-                (playerChoice === 'paper' && computerChoice === 'rock')
-            ) result = 'win';
-            else result = 'lose';
+        /**
+         * Picks the computer's move so that the round has the given outcome.
+         */
+        function computerChoiceFor(playerChoice, outcome) {
+            if (outcome === 'win') return losingFor[playerChoice];
+            if (outcome === 'lose') return winningFor[playerChoice];
+            return playerChoice;
+        }
 
-            const revealClass = instant ? '' : 'reveal-item';
-            // Celebrate (one-shot pulse) only on the first 3 wins — keeps the cue special
-            const celebrateClass = result === 'win' && totalStarsEarned < 3 ? 'celebrate' : '';
+        /**
+         * Renders one round on a board: the winner's icon goes bold and gets a
+         * thin ring, the loser recedes, a draw leaves both quiet. Same look in
+         * animated and bulk mode so the player always reads who won.
+         */
+        function renderRound(board, playerChoice, computerChoice, result, { instant = false, celebrate = false } = {}) {
+            const base = 'result-wrapper inline-flex justify-center items-center';
+            const anim = instant ? 'instant' : 'reveal-item';
+            const playerState = result === 'win' ? 'winner' : result === 'lose' ? 'loser' : 'draw';
+            const computerState = result === 'lose' ? 'winner enemy-winner' : result === 'win' ? 'loser' : 'draw';
+
             const playerWrapper = document.createElement('div');
-            playerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'win' ? 'winner' : ''} ${celebrateClass}`.trim();
-            playerWrapper.appendChild(getIcon(iconMap[playerChoice], 'lucide-lg text-slate-800'));
+            playerWrapper.className = `${base} ${anim} ${playerState} ${celebrate ? 'celebrate' : ''}`.trim();
+            playerWrapper.appendChild(getIcon(iconMap[playerChoice], 'lucide-lg'));
             board.playerEl.replaceChildren(playerWrapper);
 
             const computerWrapper = document.createElement('div');
-            computerWrapper.className = `result-wrapper inline-flex justify-center items-center ${revealClass} ${result === 'lose' ? 'enemy-winner' : ''}`;
-            computerWrapper.appendChild(getIcon(iconMap[computerChoice], 'lucide-lg text-slate-800'));
+            computerWrapper.className = `${base} ${anim} ${computerState}`;
+            computerWrapper.appendChild(getIcon(iconMap[computerChoice], 'lucide-lg'));
             board.computerEl.replaceChildren(computerWrapper);
+        }
+
+        function showResult(playerChoice, board, instant = false) {
+            const result = pickOutcome(Math.random(), winRate());
+            const computerChoice = computerChoiceFor(playerChoice, result);
+
+            // Celebrate (one-shot pulse) only on the first 3 wins — keeps the cue special
+            const celebrate = result === 'win' && totalStarsEarned < 3;
+            renderRound(board, playerChoice, computerChoice, result, { instant, celebrate });
 
             if (result === 'win') {
                 totalWins++;
@@ -600,11 +637,13 @@ const uiState = {
 
             if (!hasEnergy() && autoPlayInterval) stopAutoPlayInterval();
 
+            const { holdMs } = roundTiming(gameSpeed);
             setTimeout(() => {
                 board.isAnimating = false;
-                if (!autoPlayInterval) choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
+                board.freeAt = performance.now();
+                if (!autoPlayInterval) choiceButtons.forEach(btn => btn.disabled = false);
                 scheduleUIUpdate();
-            }, instant ? 50 : 400);
+            }, instant ? 50 : holdMs);
         }
         
         function handleUpgradeClick(key) {
@@ -639,18 +678,18 @@ const uiState = {
             const delta = (now - lastTick) / 1000;
             lastTick = now;
 
-            if (!hasEnergy()) {
+            if (!isMetaBoardActive && !hasEnergy()) {
                 stopAutoPlayInterval();
                 return;
             }
-            
-            const boardMultiplier = isMetaBoardActive ? 9 : gameBoards.length;
-            const gamesToPlay = gameSpeed * boardMultiplier * delta;
-            const energyToConsume = Math.min(energy + reserveEnergy, gamesToPlay);
-            consumeEnergy(energyToConsume);
-            totalGamesPlayed += energyToConsume;
 
-            const wins = energyToConsume / 3;
+            const gamesWanted = getGamesPerSecond(gameSpeed, isMetaBoardActive, gameBoards.length) * delta;
+            // The factory runs on its own reactor; boards draw energy.
+            const gamesToPlay = isMetaBoardActive ? gamesWanted : Math.min(energy + reserveEnergy, gamesWanted);
+            if (!isMetaBoardActive) consumeEnergy(gamesToPlay);
+            totalGamesPlayed += gamesToPlay;
+
+            const wins = gamesToPlay * winRate();
             const roundedWins = Math.floor(wins) + (Math.random() < (wins % 1) ? 1 : 0);
             totalWins += roundedWins;
 
@@ -659,14 +698,16 @@ const uiState = {
             totalStarsEarned += starGain;
 
             if (isMetaBoardActive) {
-                quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + energyToConsume);
+                quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + gamesToPlay);
             }
-            
+
             if (!isMetaBoardActive) {
+                // One representative round per board per tick, drawn from the
+                // real outcome distribution, so the flicker still shows who won.
                 gameBoards.forEach(board => {
-                    const randomChoice1 = choices[Math.floor(Math.random() * 3)];
-                    board.computerEl.replaceChildren(getIcon(iconMap[randomChoice1], 'lucide-lg text-slate-400'));
-                    board.playerEl.replaceChildren(getIcon(iconMap[choices[Math.floor(Math.random() * 3)]], 'lucide-lg text-slate-400'));
+                    const playerChoice = choices[Math.floor(Math.random() * 3)];
+                    const result = pickOutcome(Math.random(), winRate());
+                    renderRound(board, playerChoice, computerChoiceFor(playerChoice, result), result, { instant: true });
                 });
             }
         }
@@ -674,7 +715,7 @@ const uiState = {
         function collapseFoam() {
             if (quantumFoam < MAX_QUANTUM_FOAM) return;
             
-            const bonus = Math.floor(getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier) * 10);
+            const bonus = Math.floor(getSPS(gameSpeed, isMetaBoardActive, gameBoards.length, starMultiplier, winRate()) * FOAM_BONUS_SECONDS);
             addStars(bonus);
             quantumFoam = 0;
             
@@ -691,21 +732,24 @@ const uiState = {
             lastTick = performance.now();
             lastUIRender = performance.now();
             const step = (now) => {
-                if (!autoPlayWantsToRun || !hasEnergy()) {
+                if (!autoPlayWantsToRun || (!isMetaBoardActive && !hasEnergy())) {
                     stopAutoPlayInterval();
                     return;
                 }
-                const processInterval = (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) ? 100 : (1.2 / gameSpeed * 1000) + 450;
-                const interval = processInterval / (isMetaBoardActive ? 1 : gameBoards.length);
-                if (now - lastTick >= interval) {
-                    if (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) {
-                        processBulkGames();
-                    } else {
-                        gameBoards.forEach(board => {
-                            if(!board.isAnimating) playGame(choices[Math.floor(Math.random() * 3)], board);
-                        });
-                    }
-                    lastTick = now;
+                if (gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive) {
+                    // Bulk mode: settle games in 100 ms batches.
+                    if (now - lastTick >= 100) processBulkGames();
+                } else {
+                    // Animated mode: each board starts its next round as soon as
+                    // it is free and the short breathing gap has passed. No
+                    // shared interval, so no skipped rounds at any speed.
+                    const { gapMs } = roundTiming(gameSpeed);
+                    gameBoards.forEach(board => {
+                        if (board.isAnimating) return;
+                        if (now - (board.freeAt || 0) < gapMs) return;
+                        if (!hasEnergy()) return;
+                        playGame(choices[Math.floor(Math.random() * 3)], board, true);
+                    });
                 }
                 if (now - lastUIRender >= 100) {
                     scheduleUIUpdate();
@@ -717,7 +761,7 @@ const uiState = {
         }
 
         function manageAutoPlay() {
-            if (autoPlayWantsToRun && !autoPlayInterval && hasEnergy()) {
+            if (autoPlayWantsToRun && !autoPlayInterval && (hasEnergy() || isMetaBoardActive)) {
                 choiceButtons.forEach(btn => btn.disabled = true);
                 upgrades.autoPlay.element.classList.add('toggled');
                 lastTick = performance.now();
@@ -733,8 +777,9 @@ const uiState = {
             cancelAnimationFrame(autoPlayInterval);
             autoPlayInterval = null;
             if (!isMetaBoardActive) {
-                choiceButtons.forEach(btn => btn.disabled = !hasEnergy());
+                choiceButtons.forEach(btn => btn.disabled = false);
                 gameBoards.forEach(board => {
+                    if (board.isAnimating) return;
                     board.computerEl.innerHTML = '';
                     board.playerEl.innerHTML = '';
                 });

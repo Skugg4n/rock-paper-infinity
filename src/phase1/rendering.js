@@ -9,7 +9,7 @@
  */
 
 import { getIcon } from "../icons.js";
-import { getSPS, getVisibleDots, formatCount, fillFraction } from "./rates.js";
+import { getSPS, getVisibleDots, formatCount, formatRate, fillFraction } from "./rates.js";
 
 // --- Icon templates (built once, cloned per use) ---
 const crownTemplate = getIcon('crown', 'lucide-crown-xl text-slate-800');
@@ -108,24 +108,26 @@ export function renderWinTracker(refs, starBalance, totalStarsEarned) {
 export function renderRateDisplays(els, sps, eps, egps, autoActive, energyPaused) {
     const { spsContainer, spsValue, epsContainer, epsValue, egpsContainer, egpsValue } = els;
 
-    if (sps > 0.1) {
+    // sps is the MEASURED income (EMA), so it reflects energy pauses and the
+    // real round cadence. Shown once there is any income at all.
+    if (sps >= 0.05) {
         spsContainer.classList.remove('hidden');
-        spsValue.textContent = sps.toFixed(1);
+        spsValue.textContent = formatRate(sps);
         spsContainer.classList.toggle('rate-paused', energyPaused);
     } else {
         spsContainer.classList.add('hidden');
     }
 
-    if (autoActive) {
+    if (autoActive && eps > 0) {
         epsContainer.classList.remove('hidden');
-        epsValue.textContent = eps.toFixed(1);
+        epsValue.textContent = formatRate(eps);
     } else {
         epsContainer.classList.add('hidden');
     }
 
-    if (egps > 0) {
+    if (egps > 0 && eps > 0) {
         egpsContainer.classList.remove('hidden');
-        egpsValue.textContent = egps.toFixed(1);
+        egpsValue.textContent = formatRate(egps);
     } else {
         egpsContainer.classList.add('hidden');
     }
@@ -168,13 +170,17 @@ export function renderCollapseFoam(els, percent, ready) {
 // ---- Resource bars ------------------------------------------------------
 
 /**
- * Toggles the resource bars container.
+ * Toggles the resource bars container, and the energy bars inside it
+ * (the factory needs no energy, but the foam button lives in the same box).
  *
  * @param {HTMLElement} resourceBars
  * @param {boolean} show
+ * @param {boolean} [showEnergyBars=true]
  */
-export function renderResourceBarsVisibility(resourceBars, show) {
+export function renderResourceBarsVisibility(resourceBars, show, showEnergyBars = true) {
     resourceBars.classList.toggle('hidden', !show);
+    const bars = resourceBars.querySelector('#energy-bars');
+    if (bars) bars.classList.toggle('hidden', !showEnergyBars);
 }
 
 /**

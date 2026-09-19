@@ -42,8 +42,8 @@ items:
       if you win or lose. Redo them so they still "fladdrar skitfort"
       but visually resemble the pre-speed-10 win/lose design (clearly
       shows winner/enemy-winner per round).
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.20.0
 
   - id: B002
     added: 2026-04-26
@@ -151,3 +151,46 @@ items:
       buttons still open.
     status: open
     resolved_in: null
+
+  - id: B012
+    added: 2026-09-18
+    source: "chat 2026-09-18 (Ola's playtest)"
+    request: |
+      "Man vill ha ett snitt i vinster per sekund" — the ★/s said 0.2 but
+      reality was one win per ~20 s. Show a real average, not a formula.
+    status: done
+    resolved_in: v1.20.0
+
+  - id: B013
+    added: 2026-09-18
+    source: "chat 2026-09-18 + screenshot (cropped speed button)"
+    request: |
+      Upgrade button's dash ring is cropped on the right edge.
+    status: done
+    resolved_in: v1.20.0
+    notes: "#upgrade-tray overflow-y:auto clipped horizontally; padded the scroll box."
+
+  - id: B014
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Win graphics unclear. Should be clean but obvious. No colour party.
+    status: done
+    resolved_in: v1.20.0
+    notes: "Winner bold + thin ring, loser fades. Same in bulk mode."
+
+  - id: B015
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Full pass on balance, graphics and ordering so it feels like an
+      endlessly escalating avalanche (Spaceplan, Universal Paperclips).
+      Things should arrive in a sensible order and build on each other.
+    status: open
+    resolved_in: null
+    notes: |
+      First pass shipped in v1.20.0 (see spec 2026-09-18-phase1-avalanche.md):
+      geometric costs, fixed unlock order, energy no longer a click tax,
+      factory self-powered, simulated curve 0.2 → 0.9 → 7 → 46 → 164 → 2460 ★/s.
+      Stays open until Ola has playtested and the numbers are tuned; Phase 2
+      not touched yet.
