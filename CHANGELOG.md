@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.21.0 - 2026-09-18
+
+### Helpers, hills and teasers (Ola's playtest of v1.20.0)
+
+- **Battery is a step again** — recharge (15★, click) → battery (40★ earned, 30★ for 500 energy) → generator (100★ earned, +10/s per level, max 50). Each energy helper is the right answer for a while, then outgrown.
+- **Slower, hillier mid-game** — boards 250·1.9^L, speed 10·1.10^L, generator 25·1.07^L, factory 10 000★. Simulated factory at ~12 min instead of ~8 for a perfect player.
+- **Factory needs everything** — gated on speed, boards, generator and luck all complete (as Ola expected), not just speed + boards.
+- **Goal teasers** — the factory shows greyed out from 150★ with a ring that fills as upgrades complete; the bank shows greyed out from the factory purchase with a ring that fills toward 250k. The chapter never looks finished before it is.
+- **vision.md** — new section "The power line and the helpers" capturing Ola's design philosophy.
+- Tests: 98 → 101 (`upgrade-dashes.test.js`).
+
 ## v1.20.0 - 2026-09-18
 
 ### Phase 1 avalanche pass (Ola's playtest 2026-09-18; spec: docs/superpowers/specs/2026-09-18-phase1-avalanche.md)

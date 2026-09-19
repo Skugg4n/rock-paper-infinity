@@ -59,6 +59,27 @@ generator 30 → battery 60 → luck (100 games) → boards 150 → factory (gri
 Milestones: bulk 4:56, luck 5:18, factory 8:18, bank 9:23. Two recharge clicks total.
 A human is roughly 1.5–2× slower, so chapter I should take 15–20 minutes.
 
+## v1.21.0 follow-up (Ola's playtest of v1.20.0, same day)
+
+Feedback: battery had no role once the generator came at 30★; after luck it went too
+fast ("kan köpa sig till allt på 4 minuter"); the factory appearing hid the other
+upgrades (he expected the factory after ALL upgrades); nothing hinted that a bank was
+coming, so the factory looked like the end.
+
+| Area | v1.20.0 | v1.21.0 |
+|---|---|---|
+| Recharge | 15★, +25 for 1★ | same |
+| Battery | 60★, 100★ → 700 | 40★, 30★ → 500 (the helper between clicking and the generator) |
+| Generator | 30★, +5/s, max 100, 20·1.03^L | 100★ earned, +10/s, max 50, 25·1.07^L |
+| Speed | 10·1.08^L | 10·1.10^L |
+| Boards | 150·1.6^L | 250·1.9^L (the chapter's uphill) |
+| Factory | 5 000★, speed + boards + luck | 10 000★, everything maxed; teased greyed out with a progress ring from 150★ |
+| Bank | appears at 250k | teased greyed out with a progress ring from factory purchase |
+
+Simulated greedy player: generator 4:01, bulk 5:07, luck 5:36, board 2 at 6:10,
+factory 11:54, bank 12:49. ★/s: 0.9 (4:30) → 3.7 → 25 → 77 → 133 → 191 → 219 → 2 460.
+Board 8 costs 22k at ~200 ★/s: a two-minute climb before the last burst.
+
 ## Open for Ola
 
 - Is 15–20 min the right length for chapter I? Knobs: cost ratios (1.08 / 1.03 / 1.6),

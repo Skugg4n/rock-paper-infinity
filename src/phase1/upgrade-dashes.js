@@ -52,6 +52,24 @@ export function setupDashes(buttonEl, maxLevel) {
     buttonEl.appendChild(svg);
 }
 
+/** Dash count for goal rings (factory, bank) that fill up instead of spending. */
+export const PROGRESS_DASHES = 24;
+
+/**
+ * Goal ring: dashes appear clockwise as `fraction` (0–1) grows.
+ * Inverse of updateDashes, which hides dashes as levels are spent.
+ *
+ * @param {HTMLElement} buttonEl
+ * @param {number} fraction
+ */
+export function updateProgressDashes(buttonEl, fraction) {
+    const dashes = buttonEl.querySelectorAll('.upgrade-dash');
+    const visible = Math.floor(Math.max(0, Math.min(1, fraction || 0)) * dashes.length);
+    dashes.forEach((dash, i) => {
+        dash.classList.toggle('is-spent', i >= visible);
+    });
+}
+
 /**
  * Update which dashes are visible based on current level.
  * Dashes for already-bought levels become `.is-spent` (faded out).

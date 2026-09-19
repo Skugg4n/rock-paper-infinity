@@ -93,6 +93,10 @@ input[type=range]:focus-visible {
 .gem-dot { width: 16px; height: 16px; background-color: #cbd5e1; border-radius: 9999px; }
 
 
+/* Locked goal buttons (factory, bank) keep their progress ring readable */
+.upgrade-btn.is-locked { opacity: 0.55; filter: grayscale(1); }
+.upgrade-btn.is-locked .upgrade-dash { stroke: #94a3b8; }
+
 /* Outward dashes — one per remaining purchase. Replaces the level/maxLevel
    ring for multi-buy upgrades. As player buys, dashes fade out. */
 .upgrade-dashes {

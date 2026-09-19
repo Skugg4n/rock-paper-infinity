@@ -73,8 +73,15 @@ Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18
 - [x] Upgrade tray crop fix
 - [x] `scripts/sim-phase1.mjs` economy simulation; tests 84 → 98
 
+### Shipped in v1.21.0 (same day, after Ola's first playtest)
+- [x] Battery as the helper between recharge clicks and the generator (B016)
+- [x] Hillier mid-game: boards 250·1.9^L, factory 10k gated on everything (B017, B018)
+- [x] Factory and bank teased greyed out with progress rings (B018)
+- [x] vision.md: "The power line and the helpers" (B019)
+
 ### Next (needs Ola's playtest first)
 - [ ] Tune cost ratios / bank gate after playtest (B015)
+- [ ] Helper ideas: luck track, odds engine, space currency (B020)
 - [ ] Celebrate the speed-10 jump visually?
 - [ ] Phase 2 pass with the same method (measure, simulate, geometric costs)
 

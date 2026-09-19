@@ -315,6 +315,19 @@ export function renderUpgrades({
             isUnlocked = isUnlocked && upgrade.unlockCondition();
         }
 
+        // Teaser: a goal that isn't reachable yet is shown greyed out (with its
+        // progress ring) so the player sees that the chapter continues.
+        const teased = !isUnlocked && !upgrade.purchased &&
+            typeof upgrade.teaseCondition === 'function' && upgrade.teaseCondition();
+        if (teased) {
+            upgrade.element.classList.remove('invisible');
+            upgrade.element.classList.add('is-locked');
+            upgrade.element.disabled = true;
+            revealedUpgrades.add(key);
+            continue;
+        }
+        upgrade.element.classList.remove('is-locked');
+
         if (isUnlocked) {
             if (isMetaBoardActive && (key === 'addGameBoard' || key === 'mergeGameBoard')) {
                 upgrade.element.classList.add('invisible');

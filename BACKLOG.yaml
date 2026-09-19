@@ -193,4 +193,53 @@ items:
       geometric costs, fixed unlock order, energy no longer a click tax,
       factory self-powered, simulated curve 0.2 → 0.9 → 7 → 46 → 164 → 2460 ★/s.
       Stays open until Ola has playtested and the numbers are tuned; Phase 2
-      not touched yet.
+      not touched yet. Second pass v1.21.0 (battery step, hillier mid-game).
+
+  - id: B016
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of v1.20.0)"
+    request: |
+      Battery should be the helper when clicking the energy button gets
+      tedious, then be outgrown and replaced by the generator.
+    status: done
+    resolved_in: v1.21.0
+
+  - id: B017
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of v1.20.0)"
+    request: |
+      After luck it goes too fast; buying everything in 4 minutes loses the
+      challenge. Want uphill stretches and downhill stretches.
+    status: done
+    resolved_in: v1.21.0
+    notes: "Boards 250·1.9^L as the uphill; verify feel in playtest."
+
+  - id: B018
+    added: 2026-09-18
+    source: "chat 2026-09-18 (playtest of v1.20.0)"
+    request: |
+      Factory appeared before ALL upgrades were bought and hid the rest.
+      Bank came with no warning, so the factory looked like the end. Show
+      the bank (and factory) early, greyed out.
+    status: done
+    resolved_in: v1.21.0
+
+  - id: B019
+    added: 2026-09-18
+    source: "chat 2026-09-18"
+    request: |
+      Write the "power line + helpers" design philosophy into vision.md,
+      clearer than the chat version.
+    status: done
+    resolved_in: v1.21.0
+
+  - id: B020
+    added: 2026-09-18
+    source: "chat 2026-09-18 (ideas, not yet requested)"
+    request: |
+      Helper ideas for later: luck as a small track instead of one-off,
+      an odds engine to gamble stars (Paperclips), space as a currency
+      beyond chapter II.
+    status: open
+    resolved_in: null
+    notes: "Design dialogue first. See vision.md 'The power line and the helpers'."

@@ -91,6 +91,42 @@ Within a chapter, unlocks should arrive **one at a time**. Two or three things u
 
 Teasers must be **consistent**: an upgrade that will unlock at threshold X should appear, greyed out, at some lower threshold. The grey state and its tooltip are how the player learns the requirement. An upgrade that pops fully formed at its unlock threshold without prior teasing breaks the rhythm.
 
+## The power line and the helpers
+
+*(Ola, 2026-09-18, after playtesting v1.20.0.)*
+
+Underneath every chapter runs one **power line**: the production of stars, from a
+handful per minute to astronomical amounts per second. That line is the game. It only
+goes up, and because we set the limits, it can go as far as we like: walking → cycling
+→ a Tesla → a rocket. Each step on the line is a *huge* increase in power, not a
+percentage. The player should regularly think "oj, vad fort det går".
+
+The line is not smooth. The player drags themselves one metre for one upgrade and a
+hundred metres for the next; some stretches are uphill and heavy, and then a purchase
+tips the road downhill for a while and everything comes cheap and fast. Both are
+needed. A chapter that is only uphill is a grind; a chapter you can buy through in
+four minutes has no challenge. Geometric costs with a big ratio on the *multiplying*
+upgrades (boards in chapter I) produce exactly this: long climb, burst, long climb.
+
+Beside the line run **helpers**: mechanics that come, do their job, and are outgrown.
+
+- **Energy in chapter I.** First you click the recharge button. When that gets tedious,
+  the battery arrives: a pack that lasts minutes. The line keeps climbing, the pack is
+  eaten in seconds, and then the generator arrives as the next relief. Each helper is
+  the right answer for a while and then too small. That is the dynamic, not a bug.
+- **One-offs.** Luck is a single purchase that doubles the win rate. A helper can be a
+  one-off or a small track of its own; the point is that it is *beside* the line, not
+  the line.
+- **Other currencies.** Chapter II introduces space: a limited amount of land to build
+  on, spent and freed. Later chapters may add others. A second currency is a helper
+  with its own economy, and it can be spent on the line.
+- **Play.** Universal Paperclips has an odds engine you can bet on. Something like it,
+  a place to gamble stars against the line, is welcome as long as it stays a helper.
+
+Helpers are how a chapter gets texture without adding more line. When designing a new
+mechanic, ask: is this the line, or a helper? If it is a helper, when does it arrive,
+what does it relieve, and what outgrows it?
+
 ## What we won't build
 
 These are explicit non-goals for the project itself — features and surfaces we will not add, no matter how often the genre tempts us. (This is about what *we, the makers,* will not implement; it is not a statement about goals inside the game. The player has plenty of goals — usually unlocking the next thing — they are just not announced.)

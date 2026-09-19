@@ -6,10 +6,12 @@
  * via the `actions` parameter so this module stays free of direct closures
  * over index.js variables.
  *
- * Balance (v1.20.0, simulated in docs/superpowers/specs/2026-09-18-phase1-avalanche.md):
+ * Balance (v1.21.0, simulated in docs/superpowers/specs/2026-09-18-phase1-avalanche.md):
  * costs grow geometrically so every purchase feels heavier than the last,
- * and unlocks arrive in a fixed order: hands → auto → speed → recharge →
- * generator → battery → luck → boards → factory → bank.
+ * and unlocks arrive in a fixed order: hands → auto → speed → recharge (15★)
+ * → battery (40★) → luck (100 games) → generator (100★) → boards (150★)
+ * → factory (everything maxed) → bank (250k lifetime). Energy helpers come and
+ * go: clicking → battery packs → generator, each outgrown by the power line.
  *
  * @param {object} actions - Callbacks for purchase side-effects
  * @param {function} actions.rechargeEnergy  - Adds energy (manualRecharge)
@@ -48,7 +50,7 @@ export function createUpgrades(actions) {
         },
         speed: {
             level: 0, maxLevel: 40,
-            cost: () => geometric(10, 1.08, upgrades.speed.level),
+            cost: () => geometric(10, 1.10, upgrades.speed.level),
             unlocks: [],
             element: document.getElementById('speed'),
             purchase: function() {
@@ -59,15 +61,18 @@ export function createUpgrades(actions) {
             }
         },
         energyGenerator: {
-            level: 0, maxLevel: 100,
-            cost: () => geometric(20, 1.03, upgrades.energyGenerator.level),
-            unlocksAt: 30, unlocks: [],
+            level: 0, maxLevel: 50,
+            cost: () => geometric(25, 1.07, upgrades.energyGenerator.level),
+            // Arrives when batteries stop keeping up (around the speed-10 jump).
+            unlocksAt: 100, unlocks: [],
             element: document.getElementById('energyGenerator'),
             purchase: function() { this.level++; }
         },
         buyBattery: {
-            cost: 100, consumable: true,
-            unlocksAt: 60, unlocks: [],
+            // Helper step between clicking recharge and the generator: a pack of
+            // 500 energy lasts minutes in the animated phase, seconds in bulk.
+            cost: 30, consumable: true,
+            unlocksAt: 40, unlocks: [],
             element: document.getElementById('buyBattery'),
             purchase: function() {
                 addReserve();
@@ -86,7 +91,9 @@ export function createUpgrades(actions) {
         },
         addGameBoard: {
             level: 0, maxLevel: 8,
-            cost: () => geometric(150, 1.6, upgrades.addGameBoard.level),
+            // The big uphill of chapter I: each board is a long climb, then a
+            // burst of speed/generator buys downhill.
+            cost: () => geometric(250, 1.9, upgrades.addGameBoard.level),
             unlocksAt: 150, unlocks: [],
             element: document.getElementById('addGameBoard'),
             purchase: function() {
@@ -96,17 +103,26 @@ export function createUpgrades(actions) {
             }
         },
         mergeGameBoard: {
-            cost: 5000, purchased: false,
+            cost: 10000, purchased: false,
             unlocksAt: 0,
             element: document.getElementById('mergeGameBoard'),
-            // Factory: the two visible "grids" (speed + boards) must be full and
-            // luck bought. The generator is support, not a gate, and the factory
-            // has its own reactor so it never starves.
+            // Factory: every upgrade of chapter I must be complete. Shown greyed
+            // out (with a progress ring) from the moment boards unlock, so the
+            // player knows where the chapter is heading.
             unlockCondition: () =>
                 upgrades.autoPlay.purchased &&
                 upgrades.luck.purchased &&
                 upgrades.speed.level >= upgrades.speed.maxLevel &&
+                upgrades.energyGenerator.level >= upgrades.energyGenerator.maxLevel &&
                 upgrades.addGameBoard.level >= upgrades.addGameBoard.maxLevel,
+            teaseCondition: () => actions.getTotalStarsEarned() >= upgrades.addGameBoard.unlocksAt,
+            progress: () => {
+                const done = upgrades.speed.level + upgrades.energyGenerator.level +
+                    upgrades.addGameBoard.level + (upgrades.luck.purchased ? 1 : 0);
+                const total = upgrades.speed.maxLevel + upgrades.energyGenerator.maxLevel +
+                    upgrades.addGameBoard.maxLevel + 1;
+                return done / total;
+            },
             purchase: function() {
                 this.purchased = true;
                 mergeToMetaBoard();
@@ -124,8 +140,11 @@ export function createUpgrades(actions) {
             element: document.getElementById('bank'),
             // Gate: factory must be purchased AND the player must have run it for
             // a while (lifetime stars) so the factory is felt before chapter II.
+            // Greyed out with a progress ring as soon as the factory is bought.
             unlockCondition: () =>
                 upgrades.mergeGameBoard.purchased && actions.getTotalStarsEarned() >= bankGateStars,
+            teaseCondition: () => upgrades.mergeGameBoard.purchased,
+            progress: () => Math.min(1, actions.getTotalStarsEarned() / bankGateStars),
             purchase: function() {
                 setPhaseToCity();
             }

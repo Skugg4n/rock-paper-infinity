@@ -11,7 +11,7 @@ import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
-import { setupDashes, updateDashes } from "./upgrade-dashes.js";
+import { setupDashes, updateDashes, updateProgressDashes, PROGRESS_DASHES } from "./upgrade-dashes.js";
 import { mountSaveButtons } from "../save-export.js";
 import {
     renderWinTracker,
@@ -99,7 +99,7 @@ const resetBtn = document.getElementById('reset-btn');
 
         const upgrades = createUpgrades({
             rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); },
-            addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 700); },
+            addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 500); },
             incrementSpeed:    () => { gameSpeed += 1; },
             createGameBoard:   () => createGameBoard(),
             mergeToMetaBoard:  () => mergeToMetaBoard(),
@@ -109,6 +109,7 @@ const resetBtn = document.getElementById('reset-btn');
         });
 
         const winRate = () => (upgrades.luck.purchased ? LUCK_WIN_RATE : BASE_WIN_RATE);
+        const ENERGY_PER_GENERATOR_LEVEL = 10;
 
 const choices = ['rock', 'paper', 'scissors'];
 const iconMap = { rock: 'gem', paper: 'file-text', scissors: 'scissors' };
@@ -253,6 +254,8 @@ function scheduleUIUpdate() {
             setupDashes(upgrades.speed.element, upgrades.speed.maxLevel);
             setupDashes(upgrades.energyGenerator.element, upgrades.energyGenerator.maxLevel);
             setupDashes(upgrades.addGameBoard.element, upgrades.addGameBoard.maxLevel);
+            setupDashes(upgrades.mergeGameBoard.element, PROGRESS_DASHES);
+            setupDashes(upgrades.bank.element, PROGRESS_DASHES);
             setupButtons();
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
@@ -270,7 +273,7 @@ function scheduleUIUpdate() {
 
         function passiveTick() {
             timed('p1:logicTick', () => {
-                const energyGen = upgrades.energyGenerator.level * 5;
+                const energyGen = upgrades.energyGenerator.level * ENERGY_PER_GENERATOR_LEVEL;
                 if (energyGen > 0) {
                     const newEnergy = energy + energyGen;
                     if (newEnergy <= MAX_ENERGY) {
@@ -330,6 +333,9 @@ function scheduleUIUpdate() {
             updateDashes(upgrades.speed.element, upgrades.speed.level);
             updateDashes(upgrades.energyGenerator.element, upgrades.energyGenerator.level);
             updateDashes(upgrades.addGameBoard.element, upgrades.addGameBoard.level);
+            // Goal rings: fill up as the chapter's goals approach.
+            updateProgressDashes(upgrades.mergeGameBoard.element, upgrades.mergeGameBoard.purchased ? 1 : upgrades.mergeGameBoard.progress());
+            updateProgressDashes(upgrades.bank.element, upgrades.bank.progress());
         }
 
         function updateCollapseFoam(percent, ready) {
@@ -383,7 +389,7 @@ const uiState = {
             const energyEmpty = energy <= 0;
             const sps = measuredSPS;
             const eps = getEPS(gameSpeed, isMetaBoardActive, gameBoards.length);
-            const egps = upgrades.energyGenerator.level * 5;
+            const egps = upgrades.energyGenerator.level * ENERGY_PER_GENERATOR_LEVEL;
             const autoActive = !!autoPlayInterval;
             const energyPaused = autoPlayWantsToRun && energyEmpty;
             const foamPercent = (quantumFoam / MAX_QUANTUM_FOAM) * 100;
@@ -412,7 +418,7 @@ const uiState = {
             if (reserveChanged) tasks.push(() => renderReserveBar(reserveEnergyFillEl, reservePercent));
             if (emptyChanged) tasks.push(() => renderEnergyEmpty(energyFillEl, energyEmpty));
             if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
-            if (balanceChanged) tasks.push(() => updateProgressCircles(starBalance));
+            if (balanceChanged || totalStarsEarned !== uiState.totalStarsEarned) tasks.push(() => updateProgressCircles(starBalance));
             if (upgradesChanged) tasks.push(updateUpgrades);
             if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
 

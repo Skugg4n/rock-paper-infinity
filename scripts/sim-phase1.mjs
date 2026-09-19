@@ -20,13 +20,13 @@ const P = MODE === 'old' ? {
     return (anim > interval ? 2 * interval : interval) / 1000;
   },
 } : {
-  speedMax: 40, speedCost: L => Math.round(10 * Math.pow(1.08, L)),
-  genMax: 100, genCost: L => Math.round(20 * Math.pow(1.03, L)), genRate: 5, genUnlock: { stars: 30 },
-  boardMax: 8, boardCost: L => Math.round(150 * Math.pow(1.6, L)), boardUnlock: 150,
+  speedMax: 40, speedCost: L => Math.round(10 * Math.pow(1.10, L)),
+  genMax: 50, genCost: L => Math.round(25 * Math.pow(1.07, L)), genRate: 10, genUnlock: { stars: 100 },
+  boardMax: 8, boardCost: L => Math.round(250 * Math.pow(1.9, L)), boardUnlock: 150,
   luckCost: 50, luckUnlockGames: 100, luckWinRate: 2 / 3,
-  battCost: 100, battAmount: 700, battUnlock: 60,
+  battCost: 30, battAmount: 500, battUnlock: 40,
   rechargeAmount: 25, rechargeUnlock: 15,
-  factoryCost: 5000, factoryNeedsGenMax: false, factoryEnergyFree: true,
+  factoryCost: 10000, factoryNeedsGenMax: true, factoryEnergyFree: true,
   bankGate: 250000, foamMax: 20000, foamBonusSec: 30,
   roundTime: s => {
     const frames = s <= 5 ? 3 : s <= 6 ? 2 : 1;
@@ -69,7 +69,8 @@ function shop() {
     // energy balance: generation vs consumption (factory free in new)
     const cons = (st.factory && P.factoryEnergyFree) ? 0 : gamesPerSec();
     const genUnlocked = P.genUnlock.sps ? sps() >= P.genUnlock.sps : st.earned >= P.genUnlock.stars;
-    const genNeeded = genUnlocked && st.gen < P.genMax && st.gen * P.genRate < cons;
+    const restMaxed = st.speed >= P.speedMax && st.boards >= P.boardMax && st.luck;
+    const genNeeded = genUnlocked && st.gen < P.genMax && (st.gen * P.genRate < cons || (P.factoryNeedsGenMax && restMaxed));
     if (genNeeded && buy(P.genCost(st.gen))) { st.gen++; mark('generator'); bought = true; continue; }
     if (genNeeded && MODE !== 'old') { /* save up for generator */
       if (st.energy + st.reserve < cons * 2 && st.earned >= P.rechargeUnlock && st.bal >= 1 && st.energy < 100) { st.bal -= 1; st.energy = Math.min(100, st.energy + P.rechargeAmount); st.clicks++; bought = true; continue; }
@@ -83,7 +84,14 @@ function shop() {
     const canSpeed = st.auto && st.speed < P.speedMax;
     const canBoard = st.earned >= P.boardUnlock && st.boards < P.boardMax;
     const s = gameSpeed();
-    const gainSpeed = canSpeed ? ((s + 1 >= 10 ? (s + 1) * st.boards : st.boards / P.realRoundTime(s + 1)) - gamesPerSec()) / P.speedCost(st.speed) : -1;
+    let gainSpeed = -1;
+    if (canSpeed) {
+      if (s + 1 >= 10) gainSpeed = ((s + 1) * st.boards - gamesPerSec()) / P.speedCost(st.speed);
+      else { // look ahead to the bulk jump at 10 and amortize over the remaining levels
+        let cost = 0; for (let L = st.speed; L < 9; L++) cost += P.speedCost(L);
+        gainSpeed = (10 * st.boards - gamesPerSec()) / cost;
+      }
+    }
     const gainBoard = canBoard ? (gamesPerSec() / st.boards) / P.boardCost(st.boards - 1) : -1;
     if (gainSpeed >= gainBoard && canSpeed && buy(P.speedCost(st.speed))) { st.speed++; if (gameSpeed() === 10) mark('bulk'); bought = true; continue; }
     if (canBoard && gainBoard > 0 && buy(P.boardCost(st.boards - 1))) { st.boards++; if (st.boards === 2) mark('board2'); bought = true; continue; }
