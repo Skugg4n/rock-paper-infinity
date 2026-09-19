@@ -137,6 +137,16 @@ player never has fewer than ~40 % of plates standing; the enemy leaves between m
 4. Tiers I–VI with the jittered enemy clock, scorch, doomsday clock, salvage.
 5. The enemy's spaceship, the ship button, hand-over to IV.
 
+## Prototype v1.31.0 (2026-09-19)
+
+Built as sketched, minus radar and auto-strike. Rules in `src/phase3/war.js`
+(TIERS, one rule `resolveHit`, `resolveStrike`, `pickTarget` weighted random,
+doomsday = 100·(1−e^(−scorch/700)), enemy tier clock 120 s ×1.15^k ±40 %, science cost
+per tier = 90 s × science rate at war start × 1.3^(k−1), units 10 arms each, arms
+20/s × (1 + 0.25·tier) × slider). Sim: ~14 min for a perfect player, lead changes 1–3,
+plates rarely fall against a perfect defender; humans will lose more. Tune after the
+playtest (B038).
+
 ## Open questions for Ola
 
 1. Islands and water now, as the next build? (Yes from me.)

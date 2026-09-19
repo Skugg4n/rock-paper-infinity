@@ -12,6 +12,7 @@
  */
 
 import { buildingData } from './buildings-config.js';
+import { FORT_COST } from '../phase3/war.js';
 
 /**
  * Generates the inner HTML string for a building slot.
@@ -28,14 +29,30 @@ import { buildingData } from './buildings-config.js';
  * @param {boolean} context.initialLoadDone - Whether the first load cycle has completed
  * @returns {string} HTML string to insert into the slot element
  */
-export function createBuildingHTML(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched, stars, population, notifiedUpgrades, initialLoadDone }) {
+export function createBuildingHTML(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched, stars, population, notifiedUpgrades, initialLoadDone, war = null }) {
     let icon = '';
     let content = '';
     let classes = 'building';
     if (building.razed) classes += ' razed';
     let actionButtons = '';
 
-    if (building.type !== 'factory' && building.type !== 'bank') {
+    // Chapter III: fortify a standing plate (arms), clear a ruin (stars)
+    if (war && building.razed) {
+        const clearCost = Math.round((buildingData[building.type]?.cost || 0) * 0.3);
+        actionButtons += `<button class="building-action-btn clear-btn" data-building-id="${building.id}" ${stars >= clearCost ? '' : 'disabled'}>×
+            <div class="tooltip"><div class="cost">${clearCost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
+        </button>`;
+        return `<div class="${classes}">${actionButtons}</div>`;
+    }
+    if (war && !building.razed && building.type !== 'factory' && building.type !== 'bank') {
+        const level = building.fort || 0;
+        const cost = FORT_COST(level);
+        actionButtons += `<button class="building-action-btn fort-btn" data-building-id="${building.id}" ${war.arms >= cost ? '' : 'disabled'}>${level > 0 ? level : '◆'}
+            <div class="tooltip"><div class="effect">+HP <i data-lucide='shield' class='w-4 h-4'></i></div><div class="cost">${cost} <i data-lucide='hammer' class='w-4 h-4 text-slate-300'></i></div></div>
+        </button>`;
+    }
+
+    if (building.type !== 'factory' && building.type !== 'bank' && !war) {
         const refund = (buildingData[building.type]?.cost || 0) * 0.7;
         actionButtons += `<button class="building-action-btn sell-btn" data-building-id="${building.id}">-
             <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
@@ -146,6 +163,7 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
                 population: gameState.population,
                 notifiedUpgrades,
                 initialLoadDone,
+                war: gameState.war?.active ? { arms: gameState.war.arms } : null,
             });
             slot.classList.remove('empty');
             const typeLabel = building.type.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/^./, c => c.toUpperCase());
@@ -191,6 +209,10 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
             else innerDiv.classList.remove('upgradeable');
 
             // Keep upgrade button disabled state current
+            const fortBtn = innerDiv.querySelector('.fort-btn');
+            if (fortBtn && gameState.war?.active) fortBtn.disabled = gameState.war.arms < FORT_COST(building.fort || 0);
+            const clearBtn = innerDiv.querySelector('.clear-btn');
+            if (clearBtn) clearBtn.disabled = gameState.stars < Math.round((buildingData[building.type]?.cost || 0) * 0.3);
             const upgradeBtn = innerDiv.querySelector('.upgrade-btn');
             if (upgradeBtn) {
                 upgradeBtn.disabled = !canAfford;

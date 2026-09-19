@@ -82,6 +82,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     let lastT = 0;
     let attack = null;       // { target, arrived, needed, onDone }
     let dpr = 1;
+    // War visuals: waves (red dots marching), strikes (blue dots marching),
+    // arcs (shells/missiles through the air) and short-lived effects.
+    const waves = [];        // { dots: [...], target, onImpact, done, kind: 'enemy'|'ours', tileRect }
+    const effects = [];      // { type: 'arc'|'flash'|'tracer', ... }
+    let combat = false;      // tracers on when a melee wave is on our island
 
     const COLORS = { person: '#1e3a8a', car: '#172554', enemy: '#b91c1c' };
     // px per second. A village of 2–4 dots must feel alive, a full city calm:
@@ -203,7 +208,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });
         }
         if (attack?.done && enemies.every(e => !e.homeBound && !e.razing)) attack = null;
+        stepWar(dt);
         draw();
+        drawWar();
     }
 
     function frame(now) {
@@ -288,9 +295,129 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     }
     const raiding = () => !!attack;
 
+    /**
+     * A wave against one of our plates. Melee: red dots march from the island
+     * and hit the plate; ranged/area: one arc through the air per few units.
+     * `onImpact()` fires once, when the first dots land or the arc lands.
+     */
+    function launchWave({ targetBuildingId, count, mode, onImpact }) {
+        measure();
+        const target = rects.find(r => r.building.id === targetBuildingId);
+        if (!target) { onImpact?.(); return; }
+        const from = enemyRects.length ? pick(enemyRects) : { x: canvas.width / dpr / 2, y: canvas.height / dpr, w: 0, h: 0 };
+        if (mode === 'melee') {
+            const dots = [];
+            for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
+                const d = { kind: 'enemy', at: target, from: { rect: from }, path: streetPath(from, target.rect, getGap()), seg: 0, t: 0, wait: Math.random() * 1.5, wave: true };
+                dots.push(d);
+            }
+            waves.push({ dots, target, onImpact, done: false, kind: 'enemy' });
+            combat = true;
+        } else {
+            const shells = mode === 'area' ? 3 : 1;
+            for (let i = 0; i < shells; i++) {
+                effects.push({ type: 'arc', from: c(from), to: jitter(c(target.rect), 10), t: -i * 0.35, dur: 1.4, color: COLORS.enemy, size: mode === 'area' ? 4 : 2.5,
+                    onImpact: i === 0 ? () => { flash(c(target.rect), mode === 'area' ? 44 : 26, COLORS.enemy); onImpact?.(); } : () => flash(jitter(c(target.rect), 12), 22, COLORS.enemy) });
+            }
+        }
+    }
+
+    /** Our strike on an enemy tile (by index in enemyRects). Same shapes, blue. */
+    function launchStrike({ tileIndex, count, mode, onImpact }) {
+        measure();
+        const tile = enemyRects[tileIndex] ?? enemyRects[0];
+        if (!tile) { onImpact?.(); return; }
+        const coast = rects.filter(r => !r.building.razed).sort((a, b) => b.rect.y - a.rect.y)[0]?.rect ?? { x: 0, y: 0, w: 0, h: 0 };
+        if (mode === 'melee') {
+            const dots = [];
+            for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
+                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: streetPath(coast, tile, getGap()), seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true });
+            }
+            waves.push({ dots, target: { rect: tile }, onImpact, done: false, kind: 'ours' });
+        } else {
+            const shells = mode === 'area' ? 3 : 1;
+            for (let i = 0; i < shells; i++) {
+                effects.push({ type: 'arc', from: c(coast), to: jitter(c(tile), 8), t: -i * 0.35, dur: 1.4, color: COLORS.person, size: mode === 'area' ? 4 : 2.5,
+                    onImpact: i === 0 ? () => { flash(c(tile), mode === 'area' ? 40 : 24, COLORS.person); onImpact?.(); } : () => flash(jitter(c(tile), 10), 20, COLORS.person) });
+            }
+        }
+    }
+
+    const c = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+    const jitter = (p, a) => ({ x: p.x + (Math.random() * 2 - 1) * a, y: p.y + (Math.random() * 2 - 1) * a });
+    function flash(p, size, color) { effects.push({ type: 'flash', x: p.x, y: p.y, t: 0, dur: 0.5, size, color }); }
+
+    function stepWar(dt) {
+        // waves and strikes: dots march; first arrivals trigger the impact
+        for (const w of waves) {
+            let arrived = 0;
+            for (const d of w.dots) {
+                if (d.dead) { arrived++; continue; }
+                stepDot(d, dt, d.strike ? SPEED.enemy * 2.2 : SPEED.enemy * 2, (x) => { x.dead = true; x.wait = 0; });
+                if (d.dead) { flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); }
+            }
+            if (!w.done && arrived >= Math.ceil(w.dots.length / 2)) { w.done = true; w.onImpact?.(); flash(c(w.target.rect), 30, w.kind === 'ours' ? COLORS.person : COLORS.enemy); }
+        }
+        for (let i = waves.length - 1; i >= 0; i--) if (waves[i].dots.every(d => d.dead)) waves.splice(i, 1);
+        combat = waves.some(w => w.kind === 'enemy');
+        // arcs and flashes
+        for (const e of effects) {
+            e.t += dt;
+            if (e.type === 'arc' && !e.hit && e.t >= e.dur) { e.hit = true; e.onImpact?.(); }
+        }
+        for (let i = effects.length - 1; i >= 0; i--) { const e = effects[i]; if (e.t >= e.dur + (e.type === 'arc' ? 0 : 0)) effects.splice(i, 1); }
+        // tracers: our dots near an enemy wave dot shoot at it, and back
+        if (combat) {
+            const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead).map(pos).filter(Boolean));
+            for (const a of ants) {
+                const p = pos(a); if (!p) continue;
+                for (const h of hostiles) {
+                    const d2 = (p.x - h.x) ** 2 + (p.y - h.y) ** 2;
+                    if (d2 < 70 * 70 && Math.random() < 0.06) effects.push({ type: 'tracer', from: p, to: h, t: 0, dur: 0.12, color: COLORS.person });
+                    if (d2 < 70 * 70 && Math.random() < 0.04) effects.push({ type: 'tracer', from: h, to: p, t: 0, dur: 0.12, color: COLORS.enemy });
+                }
+            }
+        }
+    }
+
+    function drawWar() {
+        for (const w of waves) for (const d of w.dots) {
+            if (d.dead) continue;
+            const p = pos(d); if (!p) continue;
+            ctx.beginPath(); ctx.fillStyle = d.strike ? COLORS.person : COLORS.enemy; ctx.globalAlpha = 0.9;
+            ctx.arc(p.x, p.y, RADIUS.enemy, 0, Math.PI * 2); ctx.fill();
+        }
+        for (const e of effects) {
+            if (e.t < 0) continue;
+            if (e.type === 'tracer') {
+                ctx.beginPath(); ctx.strokeStyle = e.color; ctx.globalAlpha = 0.8 * (1 - e.t / e.dur); ctx.lineWidth = 1;
+                ctx.moveTo(e.from.x, e.from.y); ctx.lineTo(e.to.x, e.to.y); ctx.stroke();
+            } else if (e.type === 'flash') {
+                const k = e.t / e.dur;
+                ctx.beginPath(); ctx.strokeStyle = e.color; ctx.globalAlpha = 0.7 * (1 - k); ctx.lineWidth = 2;
+                ctx.arc(e.x, e.y, e.size * (0.3 + 0.7 * k), 0, Math.PI * 2); ctx.stroke();
+            } else if (e.type === 'arc') {
+                // a shell through the air: a parabola between from and to
+                const k = Math.min(1, e.t / e.dur);
+                const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y;
+                const dist = Math.hypot(dx, dy);
+                const h = dist * 0.35;
+                const x = e.from.x + dx * k, y = e.from.y + dy * k - h * 4 * k * (1 - k);
+                ctx.beginPath(); ctx.fillStyle = e.color; ctx.globalAlpha = 0.95;
+                ctx.arc(x, y, e.size, 0, Math.PI * 2); ctx.fill();
+                // short trail
+                const k2 = Math.max(0, k - 0.06);
+                const x2 = e.from.x + dx * k2, y2 = e.from.y + dy * k2 - h * 4 * k2 * (1 - k2);
+                ctx.beginPath(); ctx.strokeStyle = e.color; ctx.globalAlpha = 0.35; ctx.lineWidth = e.size * 0.8;
+                ctx.moveTo(x2, y2); ctx.lineTo(x, y); ctx.stroke();
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+
     function start() { if (reduced || raf) return; lastT = 0; raf = requestAnimationFrame(frame); }
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, raiding, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack }) };
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack }) };
 }

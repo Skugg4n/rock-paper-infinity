@@ -429,9 +429,20 @@ items:
       fortify (fortification bar at the coast/border), manual strike with an
       auto option later, visceral graphics (dots shooting lines at the
       nearest enemy), doomsday clock slow at first, no dead ends.
+    status: done
+    resolved_in: v1.31.0
+    notes: "Prototype shipped. Tuning after Ola's playtest (B038)."
+
+  - id: B038
+    added: 2026-09-19
+    source: "prototype v1.31.0"
+    request: |
+      Tune the war after Ola's first playtest: pace (sim says ~14 min for a
+      perfect player), how often plates fall, the feel of waves and strikes,
+      HUD placement, auto-strike option, radar (see next wave), coastline
+      fortification band instead of per-plate ◆ if it reads better.
     status: open
     resolved_in: null
-    notes: "Spec v2 + this. Build: src/phase3/war.js pure rules + sim-phase3 + war mode on the chapter II map."
 
   - id: B029
     added: 2026-09-18

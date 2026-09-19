@@ -100,9 +100,14 @@ Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18
 ### Shipped in v1.27.0
 - [x] Ants second pass: fades, delays, sticky stages, razing, WAR as a chosen button (B032)
 
-### Chapter II next
+### Shipped in v1.30.0–v1.31.0
+- [x] Islands, water, shipyard, ?tilt (B036)
+- [x] Chapter III prototype: arms, ladder I–IX, waves, strikes, fortify/clear, doomsday, enemy leaves, ship to IV (B037)
+
+### Next
+- [ ] Playtest the war; tune with `scripts/sim-phase3.mjs` (B038)
 - [ ] Playtest the cascade pass; tune with `scripts/sim-phase2.mjs`
-- [ ] Chapter III design: scorched earth (what we lose, what we do to them)
+- [ ] Chapter IV: THE DEEP (time as the resource) — design first
 
 ### Next (needs Ola's playtest first)
 - [ ] Tune cost ratios / bank gate after playtest (B015)

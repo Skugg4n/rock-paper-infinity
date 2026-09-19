@@ -614,13 +614,34 @@ input[type=range]::-webkit-slider-thumb {
 #islands-svg .island.is-visible { opacity: 1; }
 #islands-svg .island.enemy { fill: #e6ebf1; }
 
-/* 2.5D experiment (?tilt): the whole city area leans back like a model on a
-   table; the dots and islands are children, so they lean with it. */
+/* 2.5D: the whole city area leans back like a model on a table; dots, arcs
+   and islands are children, so they lean with it. Turned on with ?tilt, or
+   slowly (the camera lowers over 6 s) when WAR begins. */
+#city-area {
+    transform-origin: 50% 58%;
+    transition: transform 6000ms cubic-bezier(0.4, 0, 0.2, 1), filter 2000ms ease;
+}
 body.tilt #city-area {
     transform: perspective(1400px) rotateX(22deg) scale(1.04);
-    transform-origin: 50% 58%;
 }
-body.tilt #ants-canvas { filter: none; }
+/* Scorch: the land and water darken as the doomsday clock fills */
+#phase-city.war #city-area { filter: brightness(calc(1 - var(--scorch, 0) * 0.45)) saturate(calc(1 - var(--scorch, 0) * 0.5)); }
+/* Plate HP: damaged plates grey toward slate as they lose HP */
+#phase-city.war .building-slot .building:not(.razed):not(.factory) {
+    background-color: color-mix(in srgb, #ffffff calc(var(--hp, 1) * 100%), #94a3b8);
+}
+/* Fortify (◆ + level) bottom-left, clear ruin (×) centre */
+.fort-btn { bottom: -8px; left: -8px; top: auto; background-color: #475569; color: #fff; font-size: 10px; }
+.fort-btn:disabled { background-color: #fff !important; color: #94a3b8; box-shadow: inset 0 0 0 1.5px #cbd5e1; }
+.clear-btn { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 28px; height: 28px; background-color: #f1f5f9; color: #334155; font-size: 16px; }
+.clear-btn:disabled { opacity: 0.4; }
+/* Enemy tiles razed by us, and the island when they have left */
+.enemy-tile.enemy-razed, .enemy-factory.enemy-razed { opacity: 0.25 !important; filter: grayscale(1) brightness(0.6); transform: none !important; }
+#competitor-island .enemy-rocket { display: none; }
+#competitor-island.enemy-left .enemy-rocket { display: flex; opacity: 1; transform: none; animation: rocket-leave 4000ms ease-in 800ms both; }
+#competitor-island.enemy-left .enemy-factory, #competitor-island.enemy-left .enemy-tile:not(.enemy-rocket) { opacity: 0.2 !important; }
+@keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-260px); opacity: 0; } }
+#war-ui input[type=range] { accent-color: #475569; }
 
 /* Ants canvas: above the plates, below the +/- buttons, never catches clicks */
 #ants-canvas {
@@ -646,7 +667,7 @@ body.tilt #ants-canvas { filter: none; }
     opacity: 0;
     transition: opacity 1200ms ease;
 }
-.building.razed .building-action-btn { display: none; }
+.building.razed .building-action-btn:not(.clear-btn) { display: none; }
 
 /* New plots settle in one after another */
 @keyframes slot-settle {

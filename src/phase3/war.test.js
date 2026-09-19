@@ -1,0 +1,83 @@
+/* eslint-env jest */
+import {
+    TIERS, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, rng,
+} from './war.js';
+
+describe('war rules', () => {
+    test('the ladder climbs: every tier stronger and dearer than the last', () => {
+        for (let i = 1; i < TIERS.length; i++) {
+            expect(TIERS[i].power).toBeGreaterThan(TIERS[i - 1].power);
+            expect(TIERS[i].scorch).toBeGreaterThanOrEqual(TIERS[i - 1].scorch);
+        }
+        expect(TIERS[0].id).toBe('fists');
+        expect(TIERS[TIERS.length - 1].id).toBe('nuclear');
+    });
+
+    test('doomsday is slow at first and saturates at 100', () => {
+        expect(doomsday(0)).toBe(0);
+        expect(doomsday(10)).toBeLessThan(5);
+        expect(doomsday(700)).toBeCloseTo(63.2, 0);
+        expect(doomsday(1e6)).toBeCloseTo(100, 5);
+    });
+
+    test('waves come faster and bigger', () => {
+        expect(waveInterval(0)).toBe(40);
+        expect(waveInterval(100)).toBe(15);
+        expect(waveSize(0)).toBe(6);
+        expect(waveSize(10)).toBeGreaterThan(waveSize(0));
+    });
+
+    test('enemy tier timing has jitter but stays in range', () => {
+        const rand = rng(1);
+        for (let i = 0; i < 20; i++) {
+            const t = nextEnemyTierAt(1000, rand, 0);
+            expect(t).toBeGreaterThanOrEqual(1000 + 72);
+            expect(t).toBeLessThanOrEqual(1000 + 168);
+            expect(nextEnemyTierAt(0, () => 0.5, 4)).toBeGreaterThan(nextEnemyTierAt(0, () => 0.5, 0));
+        }
+    });
+
+    test('pickTarget prefers weak, valuable, coastal plates but stays random', () => {
+        const plates = [
+            { id: 1, type: 'district', fort: 0, row: 3, razed: false },
+            { id: 2, type: 'home', fort: 5, row: 0, razed: false },
+            { id: 3, type: 'factory', fort: 0, row: 0, razed: false },
+            { id: 4, type: 'home', fort: 0, row: 3, razed: true },
+        ];
+        const rand = rng(7);
+        const counts = { 1: 0, 2: 0 };
+        for (let i = 0; i < 500; i++) counts[pickTarget(plates, rand).id]++;
+        expect(counts[1]).toBeGreaterThan(counts[2] * 3);
+        expect(counts[2]).toBeGreaterThan(0);          // never fully predictable
+        expect(pickTarget([], rand)).toBeNull();
+    });
+
+    test('resolveHit: defence absorbs, the rest hits the plate', () => {
+        const stopped = resolveHit({ power: 10, defence: 20, defencePower: 1, hp: 10 });
+        expect(stopped.razed).toBe(false);
+        expect(stopped.hpLeft).toBe(10);
+        expect(stopped.defenceLost).toBeGreaterThan(0);
+        const through = resolveHit({ power: 30, defence: 5, defencePower: 1, hp: 10 });
+        expect(through.razed).toBe(true);
+        expect(through.hpLeft).toBe(0);
+        const scratch = resolveHit({ power: 12, defence: 5, defencePower: 1, hp: 10 });
+        expect(scratch.razed).toBe(false);
+        expect(scratch.hpLeft).toBe(3);
+    });
+
+    test('resolveStrike razes a tile when force beats their defence and HP', () => {
+        const r = resolveStrike({ force: 40, power: 4, enemyDefence: 10, enemyPower: 2, tileHp: 60 });
+        expect(r.razed).toBe(true);
+        expect(r.forceLeft).toBe(20);
+        expect(r.enemyDefenceLeft).toBeLessThan(10);
+        const weak = resolveStrike({ force: 5, power: 1, enemyDefence: 10, enemyPower: 2, tileHp: 60 });
+        expect(weak.razed).toBe(false);
+        expect(weak.tileHpLeft).toBe(60);
+    });
+
+    test('plateMaxHp adds fortification', () => {
+        expect(plateMaxHp('home')).toBe(10);
+        expect(plateMaxHp('home', 2)).toBe(34);
+        expect(plateMaxHp('unknown')).toBe(10);
+    });
+});

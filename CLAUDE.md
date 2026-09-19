@@ -44,6 +44,7 @@ npm test                          # Run Jest tests
 npm run lint                      # Run ESLint
 node scripts/sim-phase1.mjs new   # Simulate the Phase 1 economy (old|new) before touching balance
 node scripts/sim-phase2.mjs new   # Simulate the Phase 2 economy (reads buildings-config.js); shows cascades and climbs
+node scripts/sim-phase3.mjs 1     # Simulate the chapter III war (reads src/phase3/war.js); seed as argument
 ```
 
 ## Balance rule

@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.31.0 - 2026-09-19
+
+### Chapter III · WAR — first playable prototype
+
+- **The war is played on the chapter II map.** Pressing the swords plays the card and the camera lowers (the ?tilt look, now a 6 s transition). The game keeps running.
+- **Arms** — the factory gets a slider goods ↔ arms; arms buy defence and force at 10 each, and a better weapons tier means a better arms factory (+25 %/tier). Arms production and upkeep come off star income; troops eat.
+- **The ladder** — fists, swords, gunpowder, repeaters, artillery, missiles, chemical, biological, nuclear (Roman I–IX). Research costs science scaled to what the city made when the war began; the enemy climbs on its own jittered clock so the lead changes.
+- **Waves** — the enemy targets a plate weighted toward weak, valuable and coastal; melee tiers march as red dots (our dots shoot tracer lines at them), ranged tiers fly as shells in arcs through the air, area tiers as three. One rule: defence absorbs, the rest hits the plate's HP; plates grey as they lose HP; at zero they are razed.
+- **Fortify** (◆ on each plate, arms) raises a plate's HP; **clear** (× on a ruin, 30 % of the building price) gives the plot back to build on.
+- **Strike** — release your force at a random standing enemy tile; razed tiles dim for 90 s and drop salvage (▾ under the clock).
+- **Doomsday clock** (skull, top centre) fills with total scorch: slow with small arms, fast with chemical and up. Land and water darken with it.
+- **The end** — when their island's scorch passes the threshold the enemy launches a rocket and leaves; the anchor opens when salvage is enough and plays `IV · THE DEEP`. No dead ends.
+- Debug: Start WAR, +1000 arms, tiers, Wave now, Enemy leaves. `scripts/sim-phase3.mjs` simulates it (greedy: ~14 min; humans longer). `src/phase3/war.js` pure rules, 121 tests.
+- Islands sit further apart.
+
 ## v1.30.0 - 2026-09-19
 
 ### Islands (the bridge to chapter III)
