@@ -388,7 +388,13 @@ items:
       while keeping income and expenses in balance. Sketch the system.
     status: open
     resolved_in: null
-    notes: "Sketch: docs/superpowers/specs/2026-09-19-chapter-iii-war-design.md (RPS triangle as weapon kinds, tiers, draft slider, salvage silo). Decide, simulate, then build."
+    notes: |
+      Sketch v2 (2026-09-19, after Ola dropped the RPS triangle): numbers
+      game. Arms as a currency from the factory slider, Defence and Force
+      as two numbers, one rule (P vs HP), tiers I–VI up to nuclear, ruins
+      cleared and rebuilt (dyrt), scorch + doomsday clock, no dead ends,
+      the enemy leaves in a spaceship, salvage down to IV. Next build:
+      islands + water + shipyard in chapter II. Simulate before the rest.
 
   - id: B035
     added: 2026-09-19
@@ -400,6 +406,18 @@ items:
       is complete. Ruins as plain dark plates, no red line.
     status: done
     resolved_in: v1.29.0
+
+  - id: B036
+    added: 2026-09-19
+    source: "chat 2026-09-19"
+    request: |
+      Islands: our plates get a real island with a wobbly coastline when
+      all land is used; the enemy island appears to the south with a fixed
+      area it colonises; water as a light grey-blue tone; the enemy's last
+      building is a shipyard that lets them cross = the starting shot.
+    status: open
+    resolved_in: null
+    notes: "Bridge to chapter III. Visual change to II: discuss look with Ola, then build."
 
   - id: B029
     added: 2026-09-18
