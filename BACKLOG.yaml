@@ -448,6 +448,10 @@ items:
       sturdier tiles, 2500 scorch to leave), auto quartermaster, enemy
       fights back, cross-water routes, capacity display. Still open: radar
       (next wave), coastline fortification band, tuning after next playtest.
+      v1.36.0: weapons relative (relativePower), waves 10+2n, doomsday 2500,
+      tier cost 70 s × 1.3^k, silent island when bombed out, arrival bug
+      fixed. Sim 16–19 min. Still open: cause-and-effect legibility, info
+      panel top right, cheap repair, hatch visual, coastline band.
 
   - id: B039
     added: 2026-09-19

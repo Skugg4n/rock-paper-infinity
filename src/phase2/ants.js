@@ -171,7 +171,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     };
     const reverse = (path) => [...path].reverse();
     const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0 && !r.building.razed);
-    const works = () => rects.filter(r => WORK.has(r.building.type));
+    const works = () => rects.filter(r => WORK.has(r.building.type) && !r.building.razed);
 
     function newTrip(ant) {
         const from = ant.at || pick(homes());
@@ -361,7 +361,12 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
      * and hit the plate; ranged/area: one arc through the air per few units.
      * `onImpact()` fires once, when the first dots land or the arc lands.
      */
-    function launchWave({ targetBuildingId, count, mode, onImpact }) {
+    /** Marks `losses` (0–1) of the dots to fall on the last stretch of the way: what the defence absorbs, made visible. */
+    function scriptLosses(dots, losses) {
+        const fall = Math.round(dots.length * Math.max(0, Math.min(1, losses || 0)));
+        dots.forEach((d, i) => { if (i < fall) d.fallAt = 0.55 + Math.random() * 0.4; });
+    }
+    function launchWave({ targetBuildingId, count, mode, losses = 0, onImpact }) {
         measure();
         const target = rects.find(r => r.building.id === targetBuildingId);
         if (!target) { onImpact?.(); return; }
@@ -372,6 +377,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 const d = { kind: 'enemy', at: target, from: { rect: from }, path: crossPath(from, target.rect, getGap(), gridBox()), seg: 0, t: 0, wait: Math.random() * 1.5, wave: true };
                 dots.push(d);
             }
+            scriptLosses(dots, losses);
             waves.push({ dots, target, onImpact, done: false, kind: 'enemy' });
             combat = true;
         } else {
@@ -384,7 +390,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     }
 
     /** Our strike on an enemy tile (by index in enemyRects). Same shapes, blue. */
-    function launchStrike({ tileIndex, count, mode, onImpact }) {
+    function launchStrike({ tileIndex, count, mode, losses = 0, onImpact }) {
         measure();
         const tile = enemyRects[tileIndex] ?? enemyRects[0];
         if (!tile) { onImpact?.(); return; }
@@ -394,6 +400,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
                 dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: reverse(crossPath(tile, coast, getGap(), gridBox())), seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true });
             }
+            scriptLosses(dots, losses);
             waves.push({ dots, target: { rect: tile }, onImpact, done: false, kind: 'ours' });
         } else {
             const shells = mode === 'area' ? 3 : 1;
@@ -413,9 +420,14 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         for (const w of waves) {
             let arrived = 0;
             for (const d of w.dots) {
-                if (d.dead) { arrived++; continue; }
+                if (d.dead) { if (!d.killed) arrived++; continue; }   // the fallen never arrive
                 stepDot(d, dt, d.strike ? SPEED.enemy * 2.2 : SPEED.enemy * 2, (x) => { x.dead = true; x.wait = 0; });
-                if (d.dead) { flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); }
+                if (d.dead) { flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); continue; }
+                // scripted losses: this one falls here, to the other side's fire
+                if (d.fallAt !== undefined && d.path && (d.seg + d.t) / Math.max(1, d.path.length - 1) >= d.fallAt) {
+                    const p = pos(d); d.killed = true; d.dead = true;
+                    if (p) { flash(p, 9, d.strike ? COLORS.enemy : COLORS.person); effects.push({ type: 'tracer', from: jitter(p, 30), to: p, t: 0, dur: 0.15, color: d.strike ? COLORS.enemy : COLORS.person }); }
+                }
             }
             const alive = w.dots.filter(d => !d.killed).length;
             if (!w.done && alive === 0) { w.done = true; w.onImpact?.(0); }
@@ -429,9 +441,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             if (e.type === 'arc' && !e.hit && e.t >= e.dur) { e.hit = true; e.onImpact?.(); }
         }
         for (let i = effects.length - 1; i >= 0; i--) { const e = effects[i]; if (e.t >= e.dur + (e.type === 'arc' ? 0 : 0)) effects.splice(i, 1); }
-        // Fighting. Reach depends on the tier: fists and swords clinch (a small
-        // burst where they meet), gunpowder and up shoot lines from further away.
-        // Our fire kills wave dots for real: fewer dots land, weaker impact.
+        // Fighting, visual only. Reach depends on the tier: fists and swords
+        // clinch (a small burst where they meet), gunpowder and up shoot lines
+        // from further away. Who falls is scripted from the rules (scriptLosses),
+        // so what you see is what the numbers do.
         const fight = (shooterPos, targetDot, shooterTier, color, canKill) => {
             const h = pos(targetDot); if (!h) return;
             const r = reach(shooterTier);
@@ -451,7 +464,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (ourDots.length) {
             for (const e of enemies) {
                 const p = pos(e); if (!p) continue;
-                for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, true); }
+                for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, false); }
             }
         }
         // their wave on our island: our people fight it
@@ -459,7 +472,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead));
             for (const a of ants) {
                 const p = pos(a); if (!p) continue;
-                for (const d of hostiles) { fight(p, d, state.ourTier, COLORS.person, true); }
+                for (const d of hostiles) { fight(p, d, state.ourTier, COLORS.person, false); }
             }
             // and they fire back at whoever is near (visual only; our people are civilians)
             for (const d of hostiles) {
@@ -511,5 +524,5 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length }) };
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

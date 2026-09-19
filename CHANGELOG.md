@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.36.0 - 2026-09-19
+
+### Weapons are relative (the sim said the war was broken)
+
+- **The war was not in order.** The simulation showed that from minute 8 every landing razed a plate whatever the defence (tier power grows 1 → 800, plate HP stayed at 10–90), the doomsday clock stood at 100 % by minute 15, and then 30 minutes of stalemate until a huge force ended it at 40 minutes.
+- **Weapons are now relative** (`relativePower`): a unit measured against an equal enemy is 1, one tier ahead about 2, one behind about 0.5. Plate HP, fortification, defence units and enemy tiles are all counted in those units, so the ladder never outruns the plates. What decides a landing is who is ahead, and by how much. Same tier with a decent defence: a skyscraper stands. Two tiers behind: it falls.
+- **Waves grow slower** (10 + 2 per wave, max 50), scorch per landing no longer scales with wave size, doomsday scale 700 → 2500, tier research 90 s × 1.35^k → 70 s × 1.3^k. Sim (perfect player, six seeds): 16–19 min, 1–4 lead changes, behind 0–27 % of the time, 7–25 plates lost, doomsday 58–86 % at the end. A human researches slower and lands further behind.
+- **Bombing out their island matters**: with nothing standing there are no landings, their research clock pauses and their defence does not regrow until they rebuild. The war room says "their island is silent".
+- **Bug: damage without arrivals.** Fallen wave dots counted as arrived, so a landing could resolve with nobody at the door. Now only survivors arrive, and the war room says how many landed ("12 swords landed at skyscraper. It stands, HP 28/40. Our defence lost 2.").
+- **Bug: people kept walking to razed stores.** Razed work plates are no longer destinations.
+- **The plate under attack is marked** (red ring) as soon as the wave sets out, radar or not; the radar still gives the four-second warning and the war-room line.
+- **WAR card slow and dark**: fade to black, III, then WAR, click or five seconds, a beat, then the camera lowers. The war room opens with "We are at war. The generals are ready for your command."
+- Ship tooltip reads "IV · THE DEEP ▾". Strike tooltip shows the relative strength only with intel.
+- **What you see is the rule.** The share of wave dots that fall on the way is exactly what our defence absorbs (and the same for our strikes against theirs); the fights are visual only. Before this, sixty civilians with fists cut down every landing before the door, whatever the shields said.
+- **Rocket sequence** (Ola): they board in silence, then ignition (the glow builds, a tremble), then a long climb; it fades only near the top. Their island dims less.
+
 ## v1.35.0 - 2026-09-19
 
 ### Understand it, or control it (Ola's third war playtest)

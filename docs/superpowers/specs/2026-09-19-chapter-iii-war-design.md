@@ -156,3 +156,25 @@ playtest (B038).
 4. Should the enemy's units still be drawn with the old three icons (gem, file,
    scissors) as pure flavour, or drop that layer completely?
 5. Doomsday clock as a ring at the top, or the chapter II silo turned into it?
+
+## Prototype v1.36.0 (2026-09-19): weapons are relative
+
+The sim exposed the flaw in "the one rule" as first built: tier power is
+exponential (1 → 800) while plate HP is flat (10–90), so from tier V every
+landing razed its plate regardless of defence, and doomsday saturated by
+minute 15. Fix: `relativePower(tier, against)` = power ratio. Landings and
+strikes are resolved in units of an equal enemy (`resolveLanding`,
+`resolveOurStrike`, `canRazeTile`); plate HP, FORT_HP, defence units and
+ENEMY_TILE_HP (flat 120) all live in those units. Consequences the player can
+read: same tier + defence = plates stand; one tier behind = plates fall on the
+second landing unless repaired (◆); two behind = every landing razes. Waves
+10 + 2n (max 50); scorch per landing = tier scorch (×4 on a raze); doomsday
+scale 2500; tier cost 70 s × 1.3^(k−1) of full research. A bombed-out enemy
+island (nothing standing) sends nothing and researches nothing until rebuilt.
+
+Sim (perfect player, seeds 1–6): 16–19 min, lead changes 1–4, behind 0–27 %
+of the time, plates lost 7–25 (with repairs), doomsday 58–86 % at the end.
+Humans research slower and will sit behind longer, which is the feel Ola asked
+for ("steget efter"). Open: legibility of cause and effect (Ola: "som att
+någon stampat i ett myrbo"), an info panel top right (Spaceplan), repair as a
+separate cheap action, the hatch visual.

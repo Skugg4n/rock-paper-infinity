@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import {
     TIERS, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, rng,
-    enemyCatchUp, autoBuy, tierScienceCost,
+    enemyCatchUp, autoBuy, tierScienceCost, DOOMSDAY_SCALE, relativePower, resolveLanding, resolveOurStrike, canRazeTile, ENEMY_TILE_HP,
 } from './war.js';
 
 describe('war rules', () => {
@@ -17,7 +17,7 @@ describe('war rules', () => {
     test('doomsday is slow at first and saturates at 100', () => {
         expect(doomsday(0)).toBe(0);
         expect(doomsday(10)).toBeLessThan(5);
-        expect(doomsday(700)).toBeCloseTo(63.2, 0);
+        expect(doomsday(DOOMSDAY_SCALE)).toBeCloseTo(63.2, 0);
         expect(doomsday(1e6)).toBeCloseTo(100, 5);
     });
 
@@ -93,9 +93,30 @@ describe('war rules', () => {
     });
 
     test('tier cost ignores the current slider and grows per tier', () => {
-        expect(tierScienceCost(1, 1000)).toBe(90000);
+        expect(tierScienceCost(1, 1000)).toBe(70000);
         expect(tierScienceCost(2, 1000)).toBeGreaterThan(tierScienceCost(1, 1000));
-        expect(tierScienceCost(1, 0)).toBe(45000);
+        expect(tierScienceCost(1, 0)).toBe(35000);
+    });
+
+    test('weapons are relative: equal tiers fight at 1, a tier ahead roughly doubles', () => {
+        expect(relativePower(3, 3)).toBe(1);
+        expect(relativePower(4, 3)).toBeGreaterThan(1.5);
+        expect(relativePower(3, 4)).toBeLessThan(0.7);
+        // same tier, decent defence: a skyscraper takes a wave and stands
+        const equal = resolveLanding({ size: 40, enemyTier: 2, ourTier: 2, defence: 40, hp: 40 });
+        expect(equal.razed).toBe(false);
+        expect(equal.hpLeft).toBe(28);
+        // two tiers ahead: the same wave razes it whatever the defence
+        const ahead = resolveLanding({ size: 40, enemyTier: 4, ourTier: 2, defence: 400, hp: 40 });
+        expect(ahead.razed).toBe(true);
+        // our strike: equal tiers need defence + tile in units
+        expect(canRazeTile(160, 2, 2, 45, ENEMY_TILE_HP)).toBe(false);
+        expect(canRazeTile(170, 2, 2, 45, ENEMY_TILE_HP)).toBe(true);
+        expect(canRazeTile(170, 2, 3, 45, ENEMY_TILE_HP)).toBe(false);   // a tier behind: not enough
+        expect(canRazeTile(0, 5, 0, 0, 1)).toBe(false);
+        const r = resolveOurStrike({ force: 170, ourTier: 2, enemyTier: 2, enemyDefence: 45, tileHp: ENEMY_TILE_HP });
+        expect(r.razed).toBe(true);
+        expect(r.forceLeft).toBe(85);
     });
 
     test('plateMaxHp adds fortification', () => {

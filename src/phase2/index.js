@@ -16,8 +16,8 @@ import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
     SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
-    resolveHit, resolveStrike, plateMaxHp, tierScienceCost, armsPerSecond,
-    enemyTileHp, TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S,
+    resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, MAX_ABSORB, plateMaxHp, tierScienceCost, armsPerSecond,
+    TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -207,6 +207,7 @@ export function init() {
               gameState.war = w;
               gameState.warChosen = true;
               applyWarPresentation({ tilt: false });        // the camera lowers after the card
+              logWar('We are at war. The generals are ready for your command.');
               logWar('War room: the factory can make arms. Fists first.');
               logWar('Intel: enemy shipyard active. Expect landings from the south.');
               saveGameState();
@@ -231,17 +232,24 @@ export function init() {
               if (!w?.active) return;
               w.t = (w.t || 0) + 1;
               w.arms += armsPerSecond(w.tier) * w.armsShare;
+              // The enemy's strength follows what still stands on its island.
+              // Bombed out (nothing standing): no landings, no research, no
+              // regrowth until they have rebuilt. Razing their island buys time.
+              const standing = 5 - (w.enemyRazedUntil || []).filter(x => x > 0).length;
+              const standingK = Math.max(0.3, standing / 5);
+              const silent = standing === 0 && !w.enemyLeft;
+              if (silent) {
+                  w.nextTierAt += 1; w.lastWaveAt = w.t;
+                  if (!w.saidSilent) { w.saidSilent = true; logWar('Interior: their island is silent. Nothing will come until they rebuild.'); }
+              } else w.saidSilent = false;
               // the enemy escalates on its own jittered clock
-              if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
+              if (!silent && w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
                   w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier);
                   logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
               }
-              // The enemy's strength follows what still stands on its island
-              const standing = 5 - (w.enemyRazedUntil || []).filter(x => x > 0).length;
-              const standingK = Math.max(0.3, standing / 5);
-              w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
+              if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
               // waves, as long as the enemy is still here; every fifth is a push
-              if (!w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
+              if (!silent && !w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
                   w.lastWaveAt = w.t; w.waveCount++;
                   const target = pickTarget(warPlates(), warRand);
                   if (target) {
@@ -259,12 +267,15 @@ export function init() {
                   const b = gameState.buildings.find(x => x && x.id === targetId);
                   if (b && !b.razed) {
                       const enemy = TIERS[w.enemyTier];
-                      const power = size * enemy.power;
                       const ti = gameState.buildings.findIndex(x => x && x.id === targetId);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
-                      const impact = (fraction = 1) => { targetEl?.classList.remove('targeted'); resolveWave(targetId, power * fraction, enemy, size, fraction); };
-                      if (_ants) _ants.launchWave({ targetBuildingId: targetId, count: size, mode: enemy.mode, onImpact: impact });
-                      else impact(1);
+                      targetEl?.classList.add('targeted');   // the plate under attack is marked as soon as they set out
+                      // What you see is the rule: the share of dots that fall on the way is what our defence absorbs.
+                      const ratio = relativePower(w.enemyTier, w.tier);
+                      const losses = Math.min(1, Math.min(size * ratio * MAX_ABSORB, w.defence) / (size * ratio));
+                      const impact = () => { targetEl?.classList.remove('targeted'); resolveWave(targetId, size, enemy); };
+                      if (_ants) _ants.launchWave({ targetBuildingId: targetId, count: size, mode: enemy.mode, losses, onImpact: impact });
+                      else impact();
                   }
               }
               // food and land suffer: scorch cuts production, and the war room says so once
@@ -288,40 +299,49 @@ export function init() {
                   else { w.leaveStage = 1; }
               }
               if (w.enemyLeft) {
+                  // 0 boarding (quiet) → 1 all aboard: ignition, 5 s → 2 lift-off, 11 s → 3 rubble
                   if (w.leaveStage === 0 && w.t - w.leaveAt > 25) { w.leaveStage = 1; w.leaveAt = w.t; }
-                  if (w.leaveStage === 1 && w.t - w.leaveAt >= 4) { w.leaveStage = 2; w.leaveAt = w.t; ui.competitorIsland.classList.add('enemy-left'); logWar('Our scientists have declared the surface uninhabitable for life. The enemy has left for space.', true); }
-                  if (w.leaveStage === 2 && w.t - w.leaveAt >= 9) { w.leaveStage = 3; ui.competitorIsland.classList.remove('enemy-launch'); ui.competitorIsland.classList.add('enemy-rubble'); logWar('We have not had the resources to do the same. But there is a secret plan. Go deep.'); }
+                  if (w.leaveStage >= 1 && w.leaveStage < 3) ui.competitorIsland.classList.add('enemy-ignite');
+                  if (w.leaveStage === 1 && w.t - w.leaveAt >= 5) { w.leaveStage = 2; w.leaveAt = w.t; ui.competitorIsland.classList.add('enemy-left'); logWar('Our scientists have declared the surface uninhabitable for life. The enemy has left for space.', true); }
+                  if (w.leaveStage === 2 && w.t - w.leaveAt >= 11) { w.leaveStage = 3; ui.competitorIsland.classList.remove('enemy-launch', 'enemy-ignite'); ui.competitorIsland.classList.add('enemy-rubble'); logWar('We have not had the resources to do the same. But there is a secret plan. Go deep.'); }
                   if (w.leaveStage >= 3 && w.salvage >= SHIP_SALVAGE && !w.shipReady) { w.shipReady = true; }
               }
               if (w.auto) {
                   const stance = w.stance || 'balanced';
                   const buy = autoBuy(w.arms, w.defence, w.force, UNIT_COST, stance);
                   w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
-                  const enemy = TIERS[w.enemyTier];
-                  if (stance !== 'defend' && w.force * TIERS[w.tier].power > w.enemyDefence * enemy.power + enemyTileHp(w.enemyTier)) tryStrike();
+                  if (stance !== 'defend' && canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence)) tryStrike();
               }
           }
 
-          function resolveWave(targetId, power, enemy, size = 1, fraction = 1) {
+          /**
+           * A landing resolves when the survivors reach the plate. `size` is the
+           * wave as launched; the dots that fell on the way are the units our
+           * defence absorbed (the visuals were scripted from the same rule).
+           * Weapons are relative (war.js): what decides it is who is ahead.
+           */
+          function resolveWave(targetId, size, enemy) {
               const w = gameState.war; if (!w?.active) return;
               const i = gameState.buildings.findIndex(b => b && b.id === targetId);
               const b = gameState.buildings[i]; if (!b || b.razed) return;
-              if (power <= 0) { logWar(`Interior: a landing at ${b.type} was cut down before it reached the door.`); return; }
               const hp = b.hp ?? plateMaxHp(b.type, b.fort || 0);
-              const r = resolveHit({ power, defence: w.defence, defencePower: TIERS[w.tier].power, hp });
+              const ratio = relativePower(w.enemyTier, w.tier);
+              const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, hp });
+              const fallen = Math.min(size, Math.round(r.absorbed / ratio));
+              const reached = size - fallen;
               w.defence = Math.max(0, w.defence - r.defenceLost);
               b.hp = r.hpLeft;
-              w.scorchOurs += enemy.scorch * size * fraction * 0.3;
+              w.scorchOurs += enemy.scorch;
               if (enemy.mode === 'area') { gameState.supplies = Math.max(0, gameState.supplies * 0.8); logWar('Status: their strike hit our stores. Food lost.', true); }
+              const story = `${size} ${enemy.id} landed; ${fallen} fell to our defence, ${reached} reached ${b.type}`;
+              const cost = r.defenceLost > 0 ? ` We lost ${r.defenceLost} defenders.` : '';
               if (r.razed) {
                   b.razed = true; b.population = 0; b.fort = 0; b.hp = 0;
                   w.scorchOurs += enemy.scorch * 4;
                   renderGridSlot(i);
-                  logWar(`Status: ${b.type} razed by enemy ${enemy.id}.`, true);
-              } else if ((b.fort || 0) > 0) {
-                  logWar(`Interior: fortification at ${b.type} held. HP ${Math.round(b.hp)}/${plateMaxHp(b.type, b.fort)}.`);
+                  logWar(`Status: ${story} and razed it.${cost}`, true);
               } else {
-                  logWar(`Status: ${b.type} damaged by enemy ${enemy.id} (HP ${Math.round(b.hp)}/${plateMaxHp(b.type, 0)}).`);
+                  logWar(`Status: ${story}. It stands, HP ${Math.round(b.hp)}/${plateMaxHp(b.type, b.fort || 0)}.${cost}`);
               }
               updateAllUI();
           }
@@ -336,31 +356,36 @@ export function init() {
               if (!visible.length) { if (!w.saidNothingToStrike) { w.saidNothingToStrike = true; logWar('Interior: nothing left standing over there to strike. They are rebuilding.'); } return false; }
               w.saidNothingToStrike = false;
               const pickIdx = visible[Math.floor(Math.random() * visible.length)].i;
-              const force = w.force, tier = TIERS[w.tier], enemy = TIERS[w.enemyTier];
+              const force = w.force, ourTier = w.tier, tier = TIERS[w.tier];
+              const strikeRatio = relativePower(w.tier, w.enemyTier), enemyDefence0 = w.enemyDefence;
+              const losses = Math.min(1, Math.min(force * strikeRatio, enemyDefence0) / (force * strikeRatio));
               w.force = 0; // released
               const impact = () => {
                   const ww = gameState.war; if (!ww?.active) return;
-                  const hp = ww.enemyTileHp?.[pickIdx] ?? enemyTileHp(ww.enemyTier);
-                  const r = resolveStrike({ force, power: tier.power, enemyDefence: ww.enemyDefence, enemyPower: enemy.power, tileHp: hp });
+                  const hp = ww.enemyTileHp?.[pickIdx] ?? ENEMY_TILE_HP;
+                  const enemyDefenceAtImpact = ww.enemyDefence;
+                  const r = resolveOurStrike({ force, ourTier, enemyTier: ww.enemyTier, enemyDefence: ww.enemyDefence, tileHp: hp });
                   ww.force += r.forceLeft; ww.enemyDefence = r.enemyDefenceLeft;
-                  ww.enemyTileHp = ww.enemyTileHp || [0, 0, 0, 0, 0].map(() => enemyTileHp(ww.enemyTier));
+                  ww.enemyTileHp = ww.enemyTileHp || [0, 0, 0, 0, 0].map(() => ENEMY_TILE_HP);
                   ww.enemyTileHp[pickIdx] = r.tileHpLeft;
                   ww.scorchTheirs += tier.scorch * 3;
                   const names = ['factory', 'warehouse', 'radar', 'tower', 'shipyard'];
+                  const fell = Math.min(force, Math.round(Math.min(force * strikeRatio, enemyDefenceAtImpact) / strikeRatio));
+                  const story = `${force} ${tier.id} struck; ${fell} fell to their defence`;
                   if (r.razed) {
                       ww.enemyRazedUntil[pickIdx] = ww.t + ENEMY_REBUILD_S;
-                      ww.enemyTileHp[pickIdx] = enemyTileHp(ww.enemyTier);
+                      ww.enemyTileHp[pickIdx] = ENEMY_TILE_HP;
                       ww.salvage += SALVAGE_PER_TILE * tier.power;
                       ww.scorchTheirs += tier.scorch * 10;
-                      logWar(`Interior: our ${tier.id} razed their ${names[pickIdx]}. Salvage recovered.`);
+                      logWar(`Interior: ${story}, the rest razed their ${names[pickIdx]}. Salvage recovered.`);
                   } else if (r.tileHpLeft < hp) {
-                      logWar(`Interior: their ${names[pickIdx]} damaged.`);
+                      logWar(`Interior: ${story}, the rest damaged their ${names[pickIdx]} (HP ${Math.round(r.tileHpLeft)}/${ENEMY_TILE_HP}).`);
                   } else {
-                      logWar(`Interior: our strike broke on their defence.`);
+                      logWar(`Interior: ${story}. Nothing reached their ${names[pickIdx]}.`);
                   }
                   updateAllUI();
               };
-              if (_ants) _ants.launchStrike({ tileIndex: pickIdx, count: force, mode: tier.mode, onImpact: impact }); else impact();
+              if (_ants) _ants.launchStrike({ tileIndex: pickIdx, count: force, mode: tier.mode, losses, onImpact: impact }); else impact();
               updateAllUI();
               return true;
           }
@@ -412,22 +437,22 @@ export function init() {
               ui.radarBtn.disabled = w.arms < RADAR_COST;
               setTooltip(ui.radarBtn, { effect: `<i data-lucide='radar' class='w-4 h-4'></i>`, armsCost: RADAR_COST });
               // enemy tiles show damage like ours
-              enemyTileEls().forEach((el, i) => { const hp = w.enemyTileHp?.[i]; el.style.setProperty('--hp', hp === undefined ? '1' : (hp / enemyTileHp(w.enemyTier)).toFixed(2)); });
+              enemyTileEls().forEach((el, i) => { const hp = w.enemyTileHp?.[i]; el.style.setProperty('--hp', hp === undefined ? '1' : (hp / ENEMY_TILE_HP).toFixed(2)); });
               ui.autoBtn.disabled = !w.autoBought && w.arms < AUTO_COST;
               setTooltip(ui.autoBtn, w.autoBought ? { effect: `${w.stance || 'balanced'}` } : { effect: `<i data-lucide='repeat' class='w-4 h-4'></i> quartermaster`, armsCost: AUTO_COST });
               // Predicted strike: ✓ if force × power beats their defence and a tile
-              const canRaze = w.force * tier.power > w.enemyDefence * TIERS[w.enemyTier].power + enemyTileHp(w.enemyTier);
+              const canRaze = canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence);
               ui.strikeBtn.classList.toggle('will-raze', canRaze && w.force > 0);
               ui.warEnemyDefence.textContent = w.intel ? Math.round(w.enemyDefence).toLocaleString('en-US') : '?';
               ui.shipBtn.disabled = !w.shipReady;
               const batch = batchSize(w.arms);
-              setTooltip(ui.buyDefenceBtn, { effect: `+${batch} <i data-lucide='shield' class='w-4 h-4'></i> (×${tier.power})`, armsCost: batch * UNIT_COST });
-              setTooltip(ui.buyForceBtn, { effect: `+${batch} <i data-lucide='swords' class='w-4 h-4'></i> (×${tier.power})`, armsCost: batch * UNIT_COST });
+              setTooltip(ui.buyDefenceBtn, { effect: `+${batch} <i data-lucide='shield' class='w-4 h-4'></i>`, armsCost: batch * UNIT_COST });
+              setTooltip(ui.buyForceBtn, { effect: `+${batch} <i data-lucide='swords' class='w-4 h-4'></i>`, armsCost: batch * UNIT_COST });
               setTooltip(ui.strikeBtn, !targets.length && !w.enemyLeft
                   ? { unlockReq: `<i data-lucide='factory' class='w-4 h-4'></i> rebuilding…` }
-                  : { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> → ${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ${canRaze && w.force > 0 ? '✓' : '×'}` });
+                  : { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> ${w.intel ? `→ ${Math.round(w.force * relativePower(w.tier, w.enemyTier)).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ` : ''}${canRaze ? '✓' : '×'}` });
               setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : (cooling ? { unlockReq: `${TIERS[w.tier + 1].numeral} · ${Math.max(0, TIER_COOLDOWN_S - ((w.t || 0) - (w.lastTierAt ?? 0)))} s` } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost }));
-              setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
+              setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV · THE DEEP ▾` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
               // enemy tiles: razed ones dim until rebuilt
               enemyTileEls().forEach((el, i) => el.classList.toggle('enemy-razed', (w.enemyRazedUntil?.[i] || 0) > 0));
           }
@@ -1039,8 +1064,9 @@ export function init() {
               gameState.warChosen = true;
               saveGameState();
               // The chapter turns, but the game goes on: the war is played on this map.
-              playChapterCard({ roman: 'III', title: 'WAR', dark: true, hold: 4000, onMidpoint: () => startWar() })
-                  .then(() => document.body.classList.add('tilt'));
+              // Slow and dark: black, then III, then WAR; a click or 5 s ends it; a beat; the camera lowers.
+              playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, hold: 5000, onMidpoint: () => startWar() })
+                  .then(() => setTimeout(() => document.body.classList.add('tilt'), 1500));
           }, { signal });
           /** One click buys a tenth of your arms' worth of units (at least one). */
           const batchSize = (arms) => Math.max(1, Math.floor(arms * 0.1 / UNIT_COST));

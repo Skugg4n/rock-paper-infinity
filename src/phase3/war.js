@@ -41,7 +41,7 @@ export const FOOD_PER_UNIT = 1;
 export const PLATE_HP = { home: 10, apartment: 20, skyscraper: 40, district: 90, store: 15, superStore: 30, factory: 60, bank: 30 };
 export const FORT_HP = 12;
 export const FORT_COST = (level) => Math.round(40 * Math.pow(1.6, level));
-/** Enemy tiles: HP per tile, defence units the enemy fields, rebuild time. */
+/** Enemy tiles: HP per tile (in units of an equal strike), rebuild time. */
 export const ENEMY_TILE_HP = 120;
 /** Enemy defence: starting units, regrowth per second, cap per wave. */
 export const ENEMY_DEFENCE_START = 45;
@@ -52,8 +52,6 @@ export const ENEMY_REBUILD_S = 90;
 export const SALVAGE_PER_TILE = 120;
 /** The enemy leaves when its island's scorch passes this. */
 export const ENEMY_LEAVES_AT_SCORCH = 1800;
-/** Enemy tiles get sturdier with their tier. */
-export const enemyTileHp = (enemyTier) => ENEMY_TILE_HP * (1 + enemyTier);
 /** Seconds of development between our tier purchases. */
 export const TIER_COOLDOWN_S = 45;
 /** The enemy never falls more than this many tiers behind us (checkpoint). */
@@ -95,9 +93,11 @@ export function rng(seed) {
     };
 }
 
+/** Scorch at which the doomsday clock stands at 63 %; ~90 % at 2.3×. */
+export const DOOMSDAY_SCALE = 2500;
 /** Doomsday 0–100 from total scorch: slow at first, steep later. */
 export function doomsday(scorchTotal) {
-    return 100 * (1 - Math.exp(-Math.max(0, scorchTotal) / 700));
+    return 100 * (1 - Math.exp(-Math.max(0, scorchTotal) / DOOMSDAY_SCALE));
 }
 
 /**
@@ -108,9 +108,9 @@ export function waveInterval(waveCount) {
     return Math.max(15, 40 - waveCount * 1.5);
 }
 
-/** Units in the next wave: grows for thirty waves, then holds. */
+/** Units in the next wave: grows for twenty waves, then holds at 50. */
 export function waveSize(waveCount) {
-    return 10 + Math.min(waveCount, 30) * 3;
+    return 10 + Math.min(waveCount, 20) * 2;
 }
 
 /**
@@ -195,6 +195,32 @@ export function resolveStrike({ force, power, enemyDefence, enemyPower, tileHp }
 }
 
 /**
+ * Weapons are relative. A unit of `tier` measured against a side at
+ * `against`: equal tiers = 1, one tier ahead ≈ 2, one behind ≈ 0.5. Plate HP,
+ * fortification and defence units are all counted in units of the equal
+ * enemy, so the ladder never outruns the plates: what decides a landing is
+ * who is ahead, and by how much.
+ * @param {number} tier - tier index of the acting side
+ * @param {number} against - tier index of the other side
+ */
+export const relativePower = (tier, against) => TIERS[tier].power / TIERS[against].power;
+
+/** A landing: `size` enemy units at their tier against our defence and a plate. */
+export function resolveLanding({ size, enemyTier, ourTier, defence, hp }) {
+    return resolveHit({ power: size * relativePower(enemyTier, ourTier), defence, defencePower: 1, hp });
+}
+
+/** Our strike: `force` units at our tier against their defence and a tile. */
+export function resolveOurStrike({ force, ourTier, enemyTier, enemyDefence, tileHp }) {
+    return resolveStrike({ force, power: relativePower(ourTier, enemyTier), enemyDefence, enemyPower: 1, tileHp });
+}
+
+/** Would a strike with `force` raze a tile of `tileHp` behind `enemyDefence`? */
+export function canRazeTile(force, ourTier, enemyTier, enemyDefence, tileHp = ENEMY_TILE_HP) {
+    return force > 0 && force * relativePower(ourTier, enemyTier) > enemyDefence + tileHp;
+}
+
+/**
  * Science cost of tier k, scaled to the science the city COULD make per second
  * (population × 0.5, i.e. everyone researching) when the war began, so a small
  * city and a huge one both take ~90 s of full research for tier II and more
@@ -204,8 +230,8 @@ export function resolveStrike({ force, power, enemyDefence, enemyPower, tileHp }
  * @param {number} sciencePotential0 - population × 0.5 at war start
  */
 export function tierScienceCost(k, sciencePotential0) {
-    const base = Math.max(500, sciencePotential0) * 90;
-    return Math.round(base * Math.pow(1.35, k - 1));
+    const base = Math.max(500, sciencePotential0) * 70;
+    return Math.round(base * Math.pow(1.3, k - 1));
 }
 
 /**

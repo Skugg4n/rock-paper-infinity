@@ -26,9 +26,10 @@ function delay(ms) {
  * @param {Function} [opts.onMidpoint] - Callback fired during the hold phase (e.g. to trigger phase switch)
  * @param {boolean} [opts.dark=false] - Black veil with white title (WAR)
  * @param {number} [opts.hold] - Hold time in ms (default PHASE_DURATIONS.hold); a click ends the hold early
+ * @param {boolean} [opts.slow=false] - Ominous pacing: long fades, the numeral before the title
  * @returns {Promise<void>} Resolves after the card exits (normal mode only; never resolves for to-come)
  */
-export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold } = {}) {
+export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false } = {}) {
     if (_cardActive) return Promise.resolve();
 
     const card = el('#chapter-card');
@@ -52,15 +53,24 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dar
     card.classList.add('is-active');
     card.setAttribute('aria-hidden', 'false');
 
+    const isSlow = slow && !REDUCED_MOTION;
+    const D = isSlow ? { ...PHASE_DURATIONS, veilIn: 1800, titleIn: 1400, titleOut: 1200, veilOut: 1600 } : PHASE_DURATIONS;
+    const fadeMs = isSlow ? '1400ms' : '';
+    veil.style.transitionDuration = fadeMs;
+    content.style.transitionDuration = fadeMs;
+    titleEl.style.transition = isSlow ? 'opacity 1200ms ease' : '';
+    titleEl.style.opacity = isSlow ? '0' : '';
+
     return (async () => {
         try {
-            // Phase 1: fade to white
+            // Phase 1: fade to white (or black)
             veil.style.opacity = '1';
-            await delay(PHASE_DURATIONS.veilIn);
+            await delay(D.veilIn);
 
-            // Phase 2: title in
+            // Phase 2: title in (slow: the numeral first, then the title)
             content.style.opacity = '1';
-            await delay(PHASE_DURATIONS.titleIn);
+            await delay(D.titleIn);
+            if (isSlow) { titleEl.style.opacity = '1'; await delay(1200); }
 
             // Phase 3: hold (midpoint callback fires here). A long hold can be
             // ended early with a click anywhere on the card.
@@ -87,16 +97,18 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dar
 
             // Phase 4: title out
             content.style.opacity = '0';
-            await delay(PHASE_DURATIONS.titleOut);
+            await delay(D.titleOut);
 
             // Phase 5 (normal): veil out
             veil.style.opacity = '0';
-            await delay(PHASE_DURATIONS.veilOut);
+            await delay(D.veilOut);
 
             // Cleanup
             card.classList.remove('is-active', 'is-dark');
             card.setAttribute('aria-hidden', 'true');
             content.style.opacity = '0';
+            veil.style.transitionDuration = ''; content.style.transitionDuration = '';
+            titleEl.style.transition = ''; titleEl.style.opacity = '';
             _cardActive = false;
         } catch (e) {
             _cardActive = false;
