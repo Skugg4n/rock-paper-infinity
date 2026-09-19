@@ -77,8 +77,8 @@ items:
       Sims-style pedestrian movement in Phase 2. Small circles representing
       people moving between buildings. Possibly cars/trucks too at higher
       population. Should give visual weight to the population growing.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.26.0
     notes: |
       Substantial new feature. Canvas overlay or SVG animation likely.
       Defer until v1.20+ at earliest.
@@ -347,8 +347,8 @@ items:
       factory, like ants. The enemy island gets red dots moving in its own
       world; suddenly they move towards US and take over/destroy one of our
       houses or districts. That is the start of WAR.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.26.0
     notes: |
       Merges B004 (pedestrians) and B025 (war opening). Proposed build: a
       canvas overlay on the land grid, up to ~40 dots, each walking between

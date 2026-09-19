@@ -94,8 +94,10 @@ Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18
 ### Shipped in v1.25.0
 - [x] Cascades: per-person income, multiplier hills, prices for bursts, districts 500/s (B030)
 
+### Shipped in v1.26.0
+- [x] Ants: people/cars on the streets, enemy dots, the attack that opens III·WAR (B004, B031)
+
 ### Chapter II next
-- [ ] Ants: people dots between buildings; red enemy dots attack an outer house = start of WAR (B031)
 - [ ] Playtest the cascade pass; tune with `scripts/sim-phase2.mjs`
 
 ### Next (needs Ola's playtest first)

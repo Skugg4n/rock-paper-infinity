@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.26.0 - 2026-09-18
+
+### Ants (Ola's dream)
+
+- **People as dots** — small dark-blue dots walk the streets between the plates: home → store or factory → home, on Manhattan routes through the gaps. Count grows with √population, capped at 60.
+- **Cars** — once the car is researched, some dots become slightly bigger, faster rectangles.
+- **The enemy** — red dots on the competitor's island from the moment it appears, more with each stage.
+- **The opening of III·WAR** — at the threshold the red dots march across to our outermost house; when enough have arrived the house is captured (red ring, dimmed icon), and only then the chapter card. Saves are written before the attack starts.
+- Canvas overlay, no clicks intercepted, off under prefers-reduced-motion. `src/phase2/ants.js`, pure `streetPath`/`antCount` with tests (106 → 110).
+- vision.md: the one exception to "contained animations" written down.
+
 ## v1.25.1 - 2026-09-18
 
 ### Hotfix: reload loop after deploy

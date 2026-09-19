@@ -212,7 +212,9 @@
         </div>
 
         <!-- LAND -->
-        <div class="w-full h-full flex flex-col items-center justify-center p-4">
+        <div id="city-area" class="relative w-full h-full flex flex-col items-center justify-center p-4">
+            <!-- Ants: people (and cars, and the enemy) walking the streets between the plates -->
+            <canvas id="ants-canvas" aria-hidden="true"></canvas>
             <div id="land-grid" class="grid grid-cols-5 gap-1 sm:gap-4"></div>
             <div id="competitor-island" class="hidden mt-12 flex justify-center items-end gap-3">
                 <div class="enemy-factory relative w-24 h-24 rounded-xl flex items-center justify-center">
@@ -302,7 +304,7 @@
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.25.1</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.26.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

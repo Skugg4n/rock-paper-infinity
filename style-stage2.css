@@ -593,6 +593,27 @@ input[type=range]::-webkit-slider-thumb {
     transition: none;
 }
 
+/* Ants canvas: above the plates, below the +/- buttons, never catches clicks */
+#ants-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+#land-grid, #competitor-island { position: relative; z-index: 1; }
+.building-action-btn { z-index: 10; }
+
+/* A house taken by the competitor: the opening of III·WAR */
+.building.captured {
+    background-color: #e2e8f0;
+    box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.7), 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    transition: background-color 600ms ease, box-shadow 600ms ease;
+}
+.building.captured .progress-ring-fg { stroke: #b91c1c !important; opacity: 0.8; }
+.building.captured > [data-lucide], .building.captured > svg:not(.progress-ring) { opacity: 0.35; }
+
 /* Enemy competitor island */
 .enemy-factory {
     background: linear-gradient(135deg, #e2e8f0, #cbd5e1);

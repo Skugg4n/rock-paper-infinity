@@ -78,7 +78,7 @@ These are the rules every visual and interaction decision must answer to. They a
 - **Progressive disclosure.** Complexity arrives in waves. The player never sees the full system at once. New elements appear as old ones are mastered.
 - **Exponential satisfaction.** Numbers grow slowly, then quickly, then absurdly. The player feels the curve.
 - **Roman numerals for costs ≥ 10.** Costs are intentionally cryptic past a certain point. Roman numerals enforce the puzzle texture.
-- **Contained animations.** Animations stay inside their parent. No icons fly loose across the screen. Everything feels attached, weighted, present.
+- **Contained animations.** Animations stay inside their parent. No icons fly loose across the screen. Everything feels attached, weighted, present. *One deliberate exception (2026-09-18): the people of chapter II are dots that walk the gaps between the plates, so the gaps become streets. They are on the ground, between the buildings, which is the opposite of loose.*
 - **Discreet, not distracting.** Animations are calm. State changes get a one-shot pop, fade, or colour transition; UI elements never blink or pulse on a loop. The visual tone is quiet.
 - **Directional clarity.** Anything representing a process has a direction. Input on one side, output on the other. The factory is a conveyor belt, not a swirl.
 - **Tone plates, not lines.** Structure is communicated through background colour and subtle shadow. Visible borders are forbidden. Containers float; they are not framed.

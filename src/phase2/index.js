@@ -10,6 +10,7 @@ import { timed, counter } from '../perf.js';
 import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY,
 } from './economy.js';
+import { createAnts } from './ants.js';
 
 let logicInterval;
 let fastUiInterval;
@@ -17,6 +18,7 @@ let savingEnabled = true;
 let beforeUnloadHandler;
 let abortController;
 let _warCardTriggered = false;
+let _ants = null;
 
 // Smooth counter rolling — lerp displayed values toward actual values each fastUiTick
 let _displayedStars = 0;
@@ -117,6 +119,8 @@ export function init() {
               superconductorBtn: document.getElementById('superconductor-btn'),
               superconductorRing: document.getElementById('superconductor-ring'),
               competitorIsland: document.getElementById('competitor-island'),
+              cityArea: document.getElementById('city-area'),
+              antsCanvas: document.getElementById('ants-canvas'),
               scienceRow: document.getElementById('science-row'),
               allocationSliderContainer: document.getElementById('allocation-slider-container'),
               buildSeparator: document.getElementById('build-separator'),
@@ -182,6 +186,18 @@ export function init() {
           const renderer = createRenderer({ landGrid: ui.landGrid, scheduleIconRefresh, notifiedUpgrades });
           const renderGridSlot = (index) => renderer.renderGridSlot(index, gameState.buildings, gameState, initialLoadDone);
           const refreshAllBuildingActions = () => renderer.refreshAllBuildingActions(gameState.buildings, gameState, initialLoadDone);
+
+          // Ants: people and cars on the streets, the enemy on its island
+          // Debug hook: rpiAnts.step(0.05) advances by 50 ms when the loop is idle
+          window.rpiAnts = _ants = createAnts({
+              canvas: ui.antsCanvas,
+              area: ui.cityArea,
+              getSlots: () => gameState.buildings.map((b, i) => ({ el: ui.landGrid.children[i], building: b })).filter(s => s.el),
+              getEnemyTiles: () => ui.competitorIsland.classList.contains('visible')
+                  ? [...ui.competitorIsland.querySelectorAll('.enemy-factory, .enemy-tile')].filter(el => getComputedStyle(el).opacity !== '0')
+                  : [],
+              getGap: () => parseFloat(getComputedStyle(ui.landGrid).columnGap) || 8,
+          });
 
           function calculateBaseStarPerPerson() {
               let baseStarPerPerson = buildingData.person.income;
@@ -512,6 +528,13 @@ export function init() {
               }
 
               applyCompetitorStage(gameState.population);
+              _ants?.setState({
+                  population: gameState.population,
+                  carUnlocked: !!gameState.carUnlocked,
+                  enemyStage: !gameState.competitorSpawned ? 0
+                      : gameState.population >= COMPETITOR_STAGE3_POP ? 3
+                      : gameState.population >= COMPETITOR_STAGE2_POP ? 2 : 1,
+              });
 
               // III·WAR chapter card once the competitor has grown (WAR_POP)
               // Requires competitor island to have been visible for at least 5 seconds
@@ -519,16 +542,21 @@ export function init() {
                   (Date.now() - (gameState.competitorSpawnedAt || 0)) >= 5000;
               if (gameState.population >= WAR_POP && !_warCardTriggered && competitorVisibleLongEnough) {
                   _warCardTriggered = true;
-                  saveGameState(); // persist 50k+ state before disabling saves
+                  saveGameState(); // persist the state before disabling saves
                   savingEnabled = false;
                   if (logicInterval) clearInterval(logicInterval);
-                  if (fastUiInterval) clearInterval(fastUiInterval);
-                  playChapterCard({
-                      roman: 'III',
-                      title: 'WAR',
-                      mode: 'to-come',
-                      onMidpoint: () => { /* saving already disabled above */ },
-                  });
+                  // The opening of III·WAR: the red dots cross over and take one of
+                  // our outer houses. Only then the chapter card.
+                  const card = () => {
+                      if (fastUiInterval) clearInterval(fastUiInterval);
+                      playChapterCard({
+                          roman: 'III',
+                          title: 'WAR',
+                          mode: 'to-come',
+                          onMidpoint: () => { /* saving already disabled above */ },
+                      });
+                  };
+                  if (_ants) _ants.startAttack(card); else card();
               }
 
               updateAllUI();
@@ -797,12 +825,14 @@ export function init() {
   if (savingEnabled) {
       logicInterval = setInterval(logicTick, 1000);
       fastUiInterval = setInterval(fastUiTick, 50);
+      _ants?.start();
   }
   window.addEventListener('beforeunload', beforeUnloadHandler);
   mountSaveButtons(ui.debugMenu);
   }
 
 export function teardown() {
+  if (_ants) { _ants.stop(); _ants = null; delete window.rpiAnts; }
   if (abortController) abortController.abort();
   clearInterval(logicInterval);
   clearInterval(fastUiInterval);
