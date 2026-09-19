@@ -213,6 +213,8 @@
 
         <!-- LAND -->
         <div id="city-area" class="relative w-full h-full flex flex-col items-center justify-center p-4">
+            <!-- Islands: wobbly coastlines on the water, behind the plates -->
+            <svg id="islands-svg" aria-hidden="true"></svg>
             <!-- Ants: people (and cars, and the enemy) walking the streets between the plates -->
             <canvas id="ants-canvas" aria-hidden="true"></canvas>
             <div id="land-grid" class="grid grid-cols-5 gap-1 sm:gap-4"></div>
@@ -230,7 +232,7 @@
                     <i data-lucide="building-2" class="w-8 h-8 text-slate-500"></i>
                 </div>
                 <div class="enemy-tile enemy-stage-5 relative w-20 h-20 rounded-xl flex items-center justify-center">
-                    <i data-lucide="castle" class="w-9 h-9 text-slate-500"></i>
+                    <i data-lucide="ship" class="w-9 h-9 text-slate-500"></i>
                 </div>
             </div>
         </div>
@@ -324,7 +326,7 @@
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.29.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.30.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

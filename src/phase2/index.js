@@ -11,6 +11,7 @@ import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY,
 } from './economy.js';
 import { createAnts } from './ants.js';
+import { createIsland } from './islands.js';
 
 let logicInterval;
 let fastUiInterval;
@@ -19,6 +20,7 @@ let beforeUnloadHandler;
 let abortController;
 let _warCardTriggered = false;
 let _ants = null;
+let _islands = null;
 
 // Smooth counter rolling — lerp displayed values toward actual values each fastUiTick
 let _displayedStars = 0;
@@ -128,6 +130,8 @@ export function init() {
               competitorIsland: document.getElementById('competitor-island'),
               warBtn: document.getElementById('war-btn'),
               cityArea: document.getElementById('city-area'),
+              islandsSvg: document.getElementById('islands-svg'),
+              phaseCity: document.getElementById('phase-city'),
               antsCanvas: document.getElementById('ants-canvas'),
               scienceRow: document.getElementById('science-row'),
               allocationSliderContainer: document.getElementById('allocation-slider-container'),
@@ -215,6 +219,22 @@ export function init() {
           const refreshAllBuildingActions = () => renderer.refreshAllBuildingActions(gameState.buildings, gameState, initialLoadDone);
 
           // Ants: people and cars on the streets, the enemy on its island
+          // Islands: our coast appears when the land is full, theirs with the competitor
+          _islands = {
+              ours: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.landGrid, id: 'island-ours', shape: { pad: 34, points: 22, wobble: 0.3, seed: 11 } }),
+              enemy: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.competitorIsland, id: 'island-enemy', shape: { pad: 30, points: 16, wobble: 0.35, seed: 5 } }),
+          };
+          _islands.enemy.path.classList.add('enemy');
+          function updateIslands() {
+              const full = gameState.landExpansion2 && gameState.buildings.every(b => b !== undefined && b !== null);
+              const oursVisible = full || gameState.islandRevealed;
+              if (full) gameState.islandRevealed = true;
+              const enemyVisible = !!gameState.competitorSpawned && ui.competitorIsland.classList.contains('visible');
+              ui.phaseCity.classList.toggle('has-water', oursVisible || enemyVisible);
+              _islands.ours.update(oursVisible);
+              _islands.enemy.update(enemyVisible);
+          }
+
           // Debug hook: rpiAnts.step(0.05) advances by 50 ms when the loop is idle
           window.rpiAnts = _ants = createAnts({
               canvas: ui.antsCanvas,
@@ -568,6 +588,7 @@ export function init() {
               }
 
               applyCompetitorStage(gameState.population);
+              updateIslands();
               _ants?.setState({
                   population: gameState.population,
                   carUnlocked: !!gameState.carUnlocked,
@@ -874,6 +895,8 @@ export function init() {
       fastUiInterval = setInterval(fastUiTick, 50);
       _ants?.start();
   }
+  updateIslands();
+  window.addEventListener('resize', () => { _islands?.ours.update(gameState.islandRevealed); }, { signal: abortController.signal });
   window.addEventListener('beforeunload', beforeUnloadHandler);
   mountSaveButtons(ui.debugMenu);
   }

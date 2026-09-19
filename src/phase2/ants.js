@@ -14,6 +14,8 @@
  * 2026-09-18).
  */
 
+import { layoutRect } from './layout.js';
+
 const HOUSING = new Set(['home', 'apartment', 'skyscraper', 'district']);
 const WORK = new Set(['store', 'superStore', 'factory', 'bank']);
 
@@ -91,11 +93,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
 
     let layoutKey = '';
     function measure() {
-        const areaRect = area.getBoundingClientRect();
-        const rel = (r) => ({ x: r.left - areaRect.left, y: r.top - areaRect.top, w: r.width, h: r.height });
         rects = getSlots()
             .filter(s => s.building)
-            .map(s => ({ rect: rel(s.el.getBoundingClientRect()), building: s.building, el: s.el }));
+            .map(s => ({ rect: layoutRect(s.el, area), building: s.building, el: s.el }));
         // If the plates moved (new land, the island appearing, resize), rebuild
         // every route between the SAME two buildings at the same progress, so
         // nobody vanishes or jumps: they just continue on the new street.
@@ -121,9 +121,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 if (!a.at) { a.path = null; }
             }
         }
-        enemyRects = getEnemyTiles().map(el => rel(el.getBoundingClientRect()));
+        enemyRects = getEnemyTiles().map(el => layoutRect(el, area));
         dpr = window.devicePixelRatio || 1;
-        const w = Math.round(areaRect.width), h = Math.round(areaRect.height);
+        const w = area.offsetWidth, h = area.offsetHeight;
         if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
             canvas.width = w * dpr; canvas.height = h * dpr;
             canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;

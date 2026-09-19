@@ -33,6 +33,8 @@ function setDebugVisible(on) {
   if (item) item.textContent = on ? 'Debug menu: on' : 'Debug menu';
 }
 let debugOn = window.location.search.includes('debug') || readDebugFlag();
+// 2.5D experiment: ?tilt leans the city like a model (Ola, 2026-09-19)
+if (window.location.search.includes('tilt')) document.body.classList.add('tilt');
 setDebugVisible(debugOn);
 document.getElementById('debug-menu-toggle')?.addEventListener('click', () => {
   debugOn = !debugOn;

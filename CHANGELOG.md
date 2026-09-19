@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.30.0 - 2026-09-19
+
+### Islands (the bridge to chapter III)
+
+- **Water and coastlines** — the sea is a light grey-blue tone; our island is a wobbly coast around the plates that appears when all twenty plots are used (the island is full), the enemy's island appears with the competitor. No strokes, only tones (`src/phase2/islands.js`, seeded coast, tested).
+- **Shipyard** — the competitor's fifth and last building is a shipyard (was a castle): with it they can cross the water, and the raids follow.
+- **2.5D experiment** — add `?tilt` to the URL to lean the whole city like a model on a table (dots and islands lean with it). An experiment for Ola's isometric/tilt-shift idea.
+- Tests 110 → 113.
+
 ## v1.29.0 - 2026-09-19
 
 ### The competitor lives its own life (Ola's playtest)

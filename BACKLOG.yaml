@@ -415,9 +415,23 @@ items:
       all land is used; the enemy island appears to the south with a fixed
       area it colonises; water as a light grey-blue tone; the enemy's last
       building is a shipyard that lets them cross = the starting shot.
+    status: done
+    resolved_in: v1.30.0
+    notes: "Bridge to chapter III. Visual change to II: discuss look with Ola, then build."
+
+  - id: B037
+    added: 2026-09-19
+    source: "chat 2026-09-19"
+    request: |
+      War prototype soon: weapons ladder from close combat (fists → swords →
+      gunpowder → blunderbuss → repeaters → ... → nuclear, Civilization in
+      micro), waves weighted-random toward smart, player chooses where to
+      fortify (fortification bar at the coast/border), manual strike with an
+      auto option later, visceral graphics (dots shooting lines at the
+      nearest enemy), doomsday clock slow at first, no dead ends.
     status: open
     resolved_in: null
-    notes: "Bridge to chapter III. Visual change to II: discuss look with Ola, then build."
+    notes: "Spec v2 + this. Build: src/phase3/war.js pure rules + sim-phase3 + war mode on the chapter II map."
 
   - id: B029
     added: 2026-09-18
