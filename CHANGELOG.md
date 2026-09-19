@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.32.0 - 2026-09-19
+
+### War, second pass (Ola's first war playtest)
+
+- **No more buying the whole ladder at once** — tier cost is based on the city's research potential (population × 0.5) at war start, not the slider at that moment; 45 s of development between tiers. The enemy never falls more than one tier behind (checkpoint) and their tiles get sturdier with their tier; they leave only when their island is thoroughly burnt (2 500 scorch). Sim: ~22 min for a perfect player.
+- **The enemy fights back visibly** when our dots land, and their defence shows in the HUD (red shield number).
+- **Auto quartermaster** (repeat icon, 400 arms, one-time): buys units keeping defence ≥ force and strikes when it can raze a tile.
+- **Clearer buttons** — strike is a crosshair, tier research a flame, and the strike tooltip reads "12 swords → 144 power".
+- **Routes across the water** — raids, waves and strikes go down into the water, up the street beside the target's column and in, never through plates.
+- **Play-time clocks** — the competitor's building and its first raid run on seconds played, so a reload does not deliver five buildings at once; the first raid waits 30 s after the city is complete.
+- **Chapter II** — population shows its housing capacity underneath; the science block no longer greys out once the competitor exists (the war needs it); enemy tiles are light like ours; the tilt has stronger perspective so both islands read as one leaning plane.
+
 ## v1.31.0 - 2026-09-19
 
 ### Chapter III · WAR — first playable prototype

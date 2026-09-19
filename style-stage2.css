@@ -612,7 +612,7 @@ input[type=range]::-webkit-slider-thumb {
     transition: opacity 2000ms ease;
 }
 #islands-svg .island.is-visible { opacity: 1; }
-#islands-svg .island.enemy { fill: #e6ebf1; }
+#islands-svg .island.enemy { fill: #e4eaf1; }
 
 /* 2.5D: the whole city area leans back like a model on a table; dots, arcs
    and islands are children, so they lean with it. Turned on with ?tilt, or
@@ -622,7 +622,7 @@ input[type=range]::-webkit-slider-thumb {
     transition: transform 6000ms cubic-bezier(0.4, 0, 0.2, 1), filter 2000ms ease;
 }
 body.tilt #city-area {
-    transform: perspective(1400px) rotateX(22deg) scale(1.04);
+    transform: perspective(900px) rotateX(26deg) scale(1.02);
 }
 /* Scorch: the land and water darken as the doomsday clock fills */
 #phase-city.war #city-area { filter: brightness(calc(1 - var(--scorch, 0) * 0.45)) saturate(calc(1 - var(--scorch, 0) * 0.5)); }
@@ -676,10 +676,11 @@ body.tilt #city-area {
 }
 .building-slot.slot-new { animation: slot-settle 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
-/* Enemy competitor island */
+/* Enemy competitor island: light tiles like ours, a cooler tint, so they read
+   against the island blob and the water */
 .enemy-factory {
-    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-    box-shadow: 0 0 20px rgba(15, 23, 42, 0.20);
+    background: #f8fafc;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
 }
 
 #competitor-island {
@@ -693,8 +694,8 @@ body.tilt #city-area {
 
 /* The competitor builds up in stages before III·WAR */
 .enemy-tile {
-    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-    box-shadow: 0 0 14px rgba(15, 23, 42, 0.16);
+    background: #f8fafc;
+    box-shadow: 0 4px 8px rgba(15, 23, 42, 0.10);
     opacity: 0;
     transform: translateY(6px);
     transition: opacity 1.5s ease-in, transform 1.5s ease-out;

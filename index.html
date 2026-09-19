@@ -183,7 +183,7 @@
                     <input type="range" min="0" max="100" value="30" class="w-24 sm:w-32" id="arms-slider" aria-label="Factory output: goods vs arms">
                     <i data-lucide="hammer" class="w-3 h-3 text-slate-400"></i>
                 </div>
-                <div class="flex items-center gap-2"><span id="war-tier" class="font-mono text-xs text-slate-500">I</span><span class="text-slate-300 text-xs">·</span><span id="war-enemy-tier" class="font-mono text-xs text-red-800/70">I</span></div>
+                <div class="flex items-center gap-2"><span id="war-tier" class="font-mono text-xs text-slate-500">I</span><span class="text-slate-300 text-xs">·</span><span id="war-enemy-tier" class="font-mono text-xs text-red-800/70">I</span><span class="text-slate-300 text-xs">·</span><i data-lucide="shield" class="w-3 h-3 text-red-800/60"></i><span id="war-enemy-defence" class="font-mono text-xs text-red-800/70">0</span></div>
             </div>
         </div>
 
@@ -208,7 +208,10 @@
 
         <div class="absolute top-4 right-3 sm:top-8 sm:right-4 md:right-8 flex flex-col items-end gap-3 sm:gap-6 z-20">
             <div id="population-ui" class="info-ui flex items-center gap-2 sm:gap-3">
-                 <span id="population-count-total" class="font-mono font-bold text-lg sm:text-2xl text-slate-600">0</span>
+                 <div class="flex flex-col items-end leading-tight">
+                     <span id="population-count-total" class="font-mono font-bold text-lg sm:text-2xl text-slate-600">0</span>
+                     <span id="population-capacity" class="font-mono text-[10px] sm:text-xs text-slate-400 tabular-nums"></span>
+                 </div>
                  <i data-lucide="users" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-500"></i>
             </div>
             <div id="supplies-ui" class="info-ui flex items-center gap-2 sm:gap-3">
@@ -279,12 +282,16 @@
                     <div class="tooltip"></div>
                 </button>
                  <button class="btn hidden" id="tier-btn" aria-label="Research next weapon tier">
-                    <i data-lucide="target" class="w-7 h-7"></i>
+                    <i data-lucide="flame" class="w-7 h-7"></i>
                     <span id="tier-badge" class="btn-badge">I</span>
                     <div class="tooltip"></div>
                 </button>
+                 <button class="btn hidden" id="auto-btn" aria-label="Auto quartermaster">
+                    <i data-lucide="repeat" class="w-7 h-7"></i>
+                    <div class="tooltip"></div>
+                </button>
                  <button class="btn hidden" id="strike-btn" aria-label="Strike the enemy">
-                    <i data-lucide="send" class="w-7 h-7"></i>
+                    <i data-lucide="crosshair" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
                 </button>
                  <button class="btn hidden" id="buy-force-btn" aria-label="Buy force">
@@ -379,7 +386,7 @@
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.31.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.32.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

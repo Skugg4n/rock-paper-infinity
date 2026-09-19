@@ -58,6 +58,26 @@ export function streetPath(src, dst, gap) {
 }
 
 /**
+ * A route between the islands: from a tile, straight across the water to the
+ * street left of the target's column just below the whole grid, up that street
+ * to the street under the target's row, then in. Never through a plate.
+ *
+ * @param {{x,y,w,h}} from - tile on the other island
+ * @param {{x,y,w,h}} dst - target plate
+ * @param {number} gap
+ * @param {{x,y,w,h}} grid - bounding box of all plates
+ */
+export function crossPath(from, dst, gap, grid) {
+    const g = Math.max(2, gap);
+    const a = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
+    const b = { x: dst.x + dst.w / 2, y: dst.y + dst.h / 2 };
+    const vx = dst.x - g / 2;
+    const yBottom = grid.y + grid.h + g / 2;
+    const yRow = dst.y + dst.h + g / 2;
+    return [a, { x: vx, y: yBottom }, { x: vx, y: yRow }, { x: b.x, y: yRow }, b];
+}
+
+/**
  * Creates the ant layer.
  *
  * @param {object} opts
@@ -74,9 +94,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemySince: 0 };
-    /** Seconds after the island appears before its dots come out. */
-    const ENEMY_DELAY_MS = 30000;
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0 };
+    /** Seconds of PLAY after the island appears before its dots come out. */
+    const ENEMY_DELAY_S = 30;
     let raf = null;
     let lastMeasure = 0;
     let lastT = 0;
@@ -136,6 +156,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     }
 
     const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    const gridBox = () => {
+        if (!rects.length) return { x: 0, y: 0, w: 0, h: 0 };
+        const xs = rects.map(r => r.rect.x), ys = rects.map(r => r.rect.y);
+        const x2 = Math.max(...rects.map(r => r.rect.x + r.rect.w)), y2 = Math.max(...rects.map(r => r.rect.y + r.rect.h));
+        return { x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) };
+    };
+    const reverse = (path) => [...path].reverse();
     const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0 && !r.building.razed);
     const works = () => rects.filter(r => WORK.has(r.building.type));
 
@@ -177,7 +204,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (ants.length > want) ants.length = want;
         if (state.carUnlocked) ants.forEach(a => { if (a.kind === 'person' && Math.random() < 0.02) a.kind = 'car'; });
         // Enemies: none until the island has stood a while, then a few per stage
-        const enemiesOut = state.enemyStage >= 1 && Date.now() - (state.enemySince || 0) >= ENEMY_DELAY_MS;
+        const enemiesOut = state.enemyStage >= 1 && (state.enemyTicks || 0) >= ENEMY_DELAY_S;
         const wantEnemies = enemiesOut ? 3 + state.enemyStage * 3 : 0;
         while (enemies.length < wantEnemies && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; e.t = Math.random(); enemies.push(e); }
         if (enemies.length > wantEnemies) enemies.length = wantEnemies;
@@ -251,7 +278,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             if (e.homeBound) { e.homeBound = false; e.razing = false; e.at = pick(enemyRects); e.path = null; e.wait = 0.5; return; }
             const from = e.at?.rect ?? e.at ?? attack.target.rect;
             const home = pick(enemyRects);
-            e.path = streetPath(from, home, getGap());
+            e.path = reverse(crossPath(home, from, getGap(), gridBox()));
             e.seg = 0; e.t = 0; e.at = home; e.homeBound = true; e.razing = false; e.wait = 0.2 + Math.random();
             return;
         }
@@ -271,9 +298,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             }
             return;
         }
-        // route from wherever the enemy is (its island tile) to the target
-        const from = e.at ?? pick(enemyRects);
-        e.path = streetPath(from, attack.target.rect, getGap());
+        // route from wherever the enemy is (its island tile) across the water to the target
+        const from = e.at?.rect ?? e.at ?? pick(enemyRects);
+        e.path = crossPath(from, attack.target.rect, getGap(), gridBox());
         e.seg = 0; e.t = 0; e.at = attack.target; e.wait = 0.2 + Math.random() * 1.5;
     }
 
@@ -308,7 +335,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (mode === 'melee') {
             const dots = [];
             for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
-                const d = { kind: 'enemy', at: target, from: { rect: from }, path: streetPath(from, target.rect, getGap()), seg: 0, t: 0, wait: Math.random() * 1.5, wave: true };
+                const d = { kind: 'enemy', at: target, from: { rect: from }, path: crossPath(from, target.rect, getGap(), gridBox()), seg: 0, t: 0, wait: Math.random() * 1.5, wave: true };
                 dots.push(d);
             }
             waves.push({ dots, target, onImpact, done: false, kind: 'enemy' });
@@ -331,7 +358,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         if (mode === 'melee') {
             const dots = [];
             for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
-                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: streetPath(coast, tile, getGap()), seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true });
+                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: reverse(crossPath(tile, coast, getGap(), gridBox())), seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true });
             }
             waves.push({ dots, target: { rect: tile }, onImpact, done: false, kind: 'ours' });
         } else {
@@ -366,6 +393,18 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             if (e.type === 'arc' && !e.hit && e.t >= e.dur) { e.hit = true; e.onImpact?.(); }
         }
         for (let i = effects.length - 1; i >= 0; i--) { const e = effects[i]; if (e.t >= e.dur + (e.type === 'arc' ? 0 : 0)) effects.splice(i, 1); }
+        // our landing party on their island: their dots shoot at ours, and back
+        const ourLanding = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.seg >= 1).map(pos).filter(Boolean));
+        if (ourLanding.length) {
+            for (const e of enemies) {
+                const p = pos(e); if (!p) continue;
+                for (const h of ourLanding) {
+                    const d2 = (p.x - h.x) ** 2 + (p.y - h.y) ** 2;
+                    if (d2 < 90 * 90 && Math.random() < 0.08) effects.push({ type: 'tracer', from: p, to: h, t: 0, dur: 0.12, color: COLORS.enemy });
+                    if (d2 < 90 * 90 && Math.random() < 0.05) effects.push({ type: 'tracer', from: h, to: p, t: 0, dur: 0.12, color: COLORS.person });
+                }
+            }
+        }
         // tracers: our dots near an enemy wave dot shoot at it, and back
         if (combat) {
             const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead).map(pos).filter(Boolean));

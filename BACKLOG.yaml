@@ -443,6 +443,11 @@ items:
       fortification band instead of per-plate ◆ if it reads better.
     status: open
     resolved_in: null
+    notes: |
+      v1.32.0: pacing fixed (potential-based tier cost, cooldown, catch-up,
+      sturdier tiles, 2500 scorch to leave), auto quartermaster, enemy
+      fights back, cross-water routes, capacity display. Still open: radar
+      (next wave), coastline fortification band, tuning after next playtest.
 
   - id: B029
     added: 2026-09-18

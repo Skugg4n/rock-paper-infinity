@@ -51,7 +51,15 @@ export const ENEMY_REBUILD_S = 90;
 /** Salvage per razed enemy tile (× tier power of the strike). */
 export const SALVAGE_PER_TILE = 120;
 /** The enemy leaves when its island's scorch passes this. */
-export const ENEMY_LEAVES_AT_SCORCH = 900;
+export const ENEMY_LEAVES_AT_SCORCH = 2500;
+/** Enemy tiles get sturdier with their tier. */
+export const enemyTileHp = (enemyTier) => ENEMY_TILE_HP * (1 + enemyTier);
+/** Seconds of development between our tier purchases. */
+export const TIER_COOLDOWN_S = 45;
+/** The enemy never falls more than this many tiers behind us (checkpoint). */
+export const ENEMY_MAX_LAG = 1;
+/** One-time price (arms) of the auto quartermaster: buys units and strikes for you. */
+export const AUTO_COST = 400;
 /** Salvage needed to open the ship down. */
 export const SHIP_SALVAGE = 1500;
 
@@ -181,15 +189,44 @@ export function resolveStrike({ force, power, enemyDefence, enemyPower, tileHp }
 }
 
 /**
- * Science cost of tier k, scaled to the science income the city had when the
- * war began, so a small city and a huge one both take ~2–3 minutes per tier
- * when they commit. The enemy's clock is ~150 s per tier.
+ * Science cost of tier k, scaled to the science the city COULD make per second
+ * (population × 0.5, i.e. everyone researching) when the war began, so a small
+ * city and a huge one both take ~90 s of full research for tier II and more
+ * for each after. Using potential, not the current slider, means a banked
+ * science pile from chapter II cannot buy the whole ladder at once.
  * @param {number} k - tier index (1..)
- * @param {number} scienceRate0 - science per second at war start
+ * @param {number} sciencePotential0 - population × 0.5 at war start
  */
-export function tierScienceCost(k, scienceRate0) {
-    const base = Math.max(50, scienceRate0) * 90;
-    return Math.round(base * Math.pow(1.3, k - 1));
+export function tierScienceCost(k, sciencePotential0) {
+    const base = Math.max(500, sciencePotential0) * 90;
+    return Math.round(base * Math.pow(1.35, k - 1));
+}
+
+/**
+ * Checkpoint: after we research, the enemy is pulled up to at most ENEMY_MAX_LAG
+ * tiers behind us (their clock restarts). Keeps the war a race, not a rout.
+ * @param {number} ourTier
+ * @param {number} enemyTier
+ */
+export function enemyCatchUp(ourTier, enemyTier) {
+    return Math.max(enemyTier, ourTier - ENEMY_MAX_LAG);
+}
+
+/**
+ * Auto quartermaster: how to spend `arms` this second. Keeps defence at least
+ * equal to force, then alternates. Returns { defence, force } units to buy.
+ * @param {number} arms
+ * @param {number} defence
+ * @param {number} force
+ * @param {number} unitCost
+ */
+export function autoBuy(arms, defence, force, unitCost) {
+    let d = 0, f = 0, left = arms;
+    while (left >= unitCost) {
+        if (defence + d <= force + f) d++; else f++;
+        left -= unitCost;
+    }
+    return { defence: d, force: f };
 }
 
 /** Base HP for a plate of `type` plus fortification. */

@@ -1,6 +1,7 @@
 /* eslint-env jest */
 import {
     TIERS, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, rng,
+    enemyCatchUp, autoBuy, tierScienceCost,
 } from './war.js';
 
 describe('war rules', () => {
@@ -73,6 +74,24 @@ describe('war rules', () => {
         const weak = resolveStrike({ force: 5, power: 1, enemyDefence: 10, enemyPower: 2, tileHp: 60 });
         expect(weak.razed).toBe(false);
         expect(weak.tileHpLeft).toBe(60);
+    });
+
+    test('enemyCatchUp keeps the enemy within one tier', () => {
+        expect(enemyCatchUp(5, 2)).toBe(4);
+        expect(enemyCatchUp(2, 5)).toBe(5);
+        expect(enemyCatchUp(0, 0)).toBe(0);
+    });
+
+    test('autoBuy alternates and never overspends', () => {
+        expect(autoBuy(55, 0, 0, 10)).toEqual({ defence: 3, force: 2 });
+        expect(autoBuy(9, 0, 0, 10)).toEqual({ defence: 0, force: 0 });
+        expect(autoBuy(30, 0, 10, 10)).toEqual({ defence: 3, force: 0 });
+    });
+
+    test('tier cost ignores the current slider and grows per tier', () => {
+        expect(tierScienceCost(1, 1000)).toBe(90000);
+        expect(tierScienceCost(2, 1000)).toBeGreaterThan(tierScienceCost(1, 1000));
+        expect(tierScienceCost(1, 0)).toBe(45000);
     });
 
     test('plateMaxHp adds fortification', () => {

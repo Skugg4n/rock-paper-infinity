@@ -13,10 +13,11 @@ import {
 import { createAnts } from './ants.js';
 import { createIsland } from './islands.js';
 import {
-    TIERS, UNIT_COST, FORT_HP, FORT_COST, ENEMY_TILE_HP, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
+    TIERS, UNIT_COST, FORT_HP, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
     SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
     resolveHit, resolveStrike, plateMaxHp, tierScienceCost, armsPerSecond,
+    enemyTileHp, TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -152,6 +153,9 @@ export function init() {
               tierBtn: document.getElementById('tier-btn'),
               tierBadge: document.getElementById('tier-badge'),
               shipBtn: document.getElementById('ship-btn'),
+              autoBtn: document.getElementById('auto-btn'),
+              warEnemyDefence: document.getElementById('war-enemy-defence'),
+              populationCapacity: document.getElementById('population-capacity'),
               cityArea: document.getElementById('city-area'),
               islandsSvg: document.getElementById('islands-svg'),
               phaseCity: document.getElementById('phase-city'),
@@ -173,13 +177,14 @@ export function init() {
           const warRand = warRng(Date.now() % 100000);
           const enemyTileEls = () => [...ui.competitorIsland.querySelectorAll('.enemy-factory, .enemy-tile:not(.enemy-rocket)')];
           const warPlates = () => gameState.buildings.map((b, i) => b ? { id: b.id, type: b.type, fort: b.fort || 0, row: Math.floor(i / 5), razed: !!b.razed, b, i } : null).filter(Boolean);
-          const scienceRateNow = () => gameState.population * gameState.populationAllocation;
 
           function startWar() {
               if (gameState.war?.active) return;
               const w = initialWarState(0);
               w.t = 0;
-              w.scienceRate0 = Math.max(50, scienceRateNow());
+              w.scienceRate0 = Math.max(500, gameState.population * 0.5); // research potential, not the slider
+              w.lastTierAt = -999;
+              w.auto = false;
               w.enemyRazedUntil = [0, 0, 0, 0, 0];
               gameState.war = w;
               gameState.warChosen = true;
@@ -224,7 +229,12 @@ export function init() {
               // the enemy leaves when its island is finished
               if (!w.enemyLeft && w.scorchTheirs >= ENEMY_LEAVES_AT_SCORCH) { w.enemyLeft = true; ui.competitorIsland.classList.add('enemy-left'); }
               if (w.enemyLeft && w.salvage >= SHIP_SALVAGE) w.shipReady = true;
-              if (w.autoStrike) tryStrike();
+              if (w.auto) {
+                  const buy = autoBuy(w.arms, w.defence, w.force, UNIT_COST);
+                  w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
+                  const enemy = TIERS[w.enemyTier];
+                  if (w.force * TIERS[w.tier].power > w.enemyDefence * enemy.power + enemyTileHp(w.enemyTier)) tryStrike();
+              }
           }
 
           function resolveWave(targetId, power, enemy) {
@@ -253,15 +263,15 @@ export function init() {
               w.force = 0; // released
               const impact = () => {
                   const ww = gameState.war; if (!ww?.active) return;
-                  const hp = ww.enemyTileHp?.[pickIdx] ?? ENEMY_TILE_HP;
+                  const hp = ww.enemyTileHp?.[pickIdx] ?? enemyTileHp(ww.enemyTier);
                   const r = resolveStrike({ force, power: tier.power, enemyDefence: ww.enemyDefence, enemyPower: enemy.power, tileHp: hp });
                   ww.force += r.forceLeft; ww.enemyDefence = r.enemyDefenceLeft;
-                  ww.enemyTileHp = ww.enemyTileHp || [ENEMY_TILE_HP, ENEMY_TILE_HP, ENEMY_TILE_HP, ENEMY_TILE_HP, ENEMY_TILE_HP];
+                  ww.enemyTileHp = ww.enemyTileHp || [0, 0, 0, 0, 0].map(() => enemyTileHp(ww.enemyTier));
                   ww.enemyTileHp[pickIdx] = r.tileHpLeft;
                   ww.scorchTheirs += tier.scorch * 3;
                   if (r.razed) {
                       ww.enemyRazedUntil[pickIdx] = ww.t + ENEMY_REBUILD_S;
-                      ww.enemyTileHp[pickIdx] = ENEMY_TILE_HP;
+                      ww.enemyTileHp[pickIdx] = enemyTileHp(ww.enemyTier);
                       ww.salvage += SALVAGE_PER_TILE * tier.power;
                       ww.scorchTheirs += tier.scorch * 10;
                   }
@@ -276,6 +286,7 @@ export function init() {
               const w = gameState.war;
               const active = !!w?.active;
               [ui.buyDefenceBtn, ui.buyForceBtn, ui.strikeBtn, ui.tierBtn].forEach(btn => btn.classList.toggle('hidden', !active));
+              if (!active) ui.autoBtn.classList.add('hidden');
               ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
               if (!active) return;
               const tier = TIERS[w.tier];
@@ -294,12 +305,17 @@ export function init() {
               ui.buyForceBtn.disabled = w.arms < UNIT_COST;
               ui.strikeBtn.disabled = w.force <= 0 || w.enemyLeft;
               const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0) : null;
-              ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost;
+              const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
+              ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
+              ui.autoBtn.classList.toggle('hidden', !active || !!w.auto);
+              ui.autoBtn.disabled = w.arms < AUTO_COST;
+              setTooltip(ui.autoBtn, { effect: `<i data-lucide='repeat' class='w-4 h-4'></i> auto`, cost: AUTO_COST });
+              ui.warEnemyDefence.textContent = Math.round(w.enemyDefence).toLocaleString('en-US');
               ui.shipBtn.disabled = !w.shipReady;
               setTooltip(ui.buyDefenceBtn, { effect: `+1 <i data-lucide='shield' class='w-4 h-4'></i> (${tier.power})`, cost: UNIT_COST });
               setTooltip(ui.buyForceBtn, { effect: `+1 <i data-lucide='swords' class='w-4 h-4'></i> (${tier.power})`, cost: UNIT_COST });
-              setTooltip(ui.strikeBtn, { effect: `${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='send' class='w-4 h-4'></i>` });
-              setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost });
+              setTooltip(ui.strikeBtn, { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> → ${Math.round(w.force * tier.power).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i>` });
+              setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : (cooling ? { unlockReq: `${TIERS[w.tier + 1].numeral} · ${Math.max(0, TIER_COOLDOWN_S - ((w.t || 0) - (w.lastTierAt ?? 0)))} s` } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost }));
               setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
               // enemy tiles: razed ones dim until rebuilt
               enemyTileEls().forEach((el, i) => el.classList.toggle('enemy-razed', (w.enemyRazedUntil?.[i] || 0) > 0));
@@ -327,10 +343,11 @@ export function init() {
           function applyCompetitorStage(pop) {
               const el = ui.competitorIsland;
               if (!el) return;
-              // The competitor builds its capital on its own clock, one tile a
-              // minute, five tiles in all. Stages are sticky.
+              // The competitor builds its capital on its own clock of PLAY time
+              // (a reload does not build five tiles at once), one tile a minute,
+              // five tiles in all. Stages are sticky.
               void pop;
-              const age = Date.now() - (gameState.competitorSpawnedAt || 0);
+              const age = (gameState.competitorTicks || 0) * 1000;
               const byTime = Math.min(5, 1 + Math.floor(age / 60000));
               const stage = Math.max(gameState.competitorStage || 1, byTime);
               gameState.competitorStage = stage;
@@ -627,7 +644,7 @@ export function init() {
                   && gameState.computerUnlocked
                   && gameState.megastructureResearched;
               if (_scienceRevealed) {
-                  if (allScienceDone) {
+                  if (allScienceDone && !gameState.competitorSpawned) {
                       ui.scienceRow.style.opacity = '0.15';
                       ui.allocationSliderContainer.style.opacity = '0.15';
                       if (gameState.populationAllocation > 0) {
@@ -767,13 +784,14 @@ export function init() {
                   });
               }
 
+              if (gameState.competitorSpawned && !skipGrowth) gameState.competitorTicks = (gameState.competitorTicks || 0) + 1;
               applyCompetitorStage(gameState.population);
               updateIslands();
               _ants?.setState({
                   population: gameState.population,
                   carUnlocked: !!gameState.carUnlocked,
                   enemyStage: gameState.competitorSpawned ? (gameState.competitorStage || 1) : 0,
-                  enemySince: gameState.competitorSpawnedAt || 0,
+                  enemyTicks: gameState.competitorTicks || 0,
               });
 
               // Raids. The competitor waits until our city is complete (everything
@@ -781,7 +799,9 @@ export function init() {
               // house, walks home, and comes back every RAID_INTERVAL until the
               // player chooses WAR. (WAR_POP is only a safety net.)
               const capitalReady = gameState.competitorSpawned && (gameState.competitorStage || 1) >= 3;
-              const ready = capitalReady && !gameState.warChosen && !gameState.war?.active && (cityComplete() || gameState.population >= WAR_POP * 4);
+              const complete = cityComplete() || gameState.population >= WAR_POP * 4;
+              if (complete && !skipGrowth) gameState.completeTicks = (gameState.completeTicks || 0) + 1;
+              const ready = capitalReady && !gameState.warChosen && !gameState.war?.active && complete && (gameState.completeTicks || 0) >= 30;
               const sinceRaid = Date.now() - (gameState.lastRaidAt || 0);
               if (ready && _ants && !_ants.raiding() && sinceRaid >= RAID_INTERVAL_MS) {
                   const onRazed = (building) => {
@@ -811,6 +831,8 @@ export function init() {
               ui.starCount.textContent = Math.round(_displayedStars).toLocaleString('en-US');
               ui.scienceCount.textContent = Math.round(_displayedScience).toLocaleString('en-US');
               ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
+              const capacity = gameState.buildings.reduce((a, b) => a + ((b && !b.razed && b.capacity) ? b.capacity : 0), 0);
+              ui.populationCapacity.textContent = capacity > 0 ? `${capacity.toLocaleString('en-US')} ◻` : '';
 
               ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('en-US')}/s`;
               ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#64748b' : '#94a3b8';
@@ -913,7 +935,17 @@ export function init() {
           ui.tierBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.tier >= TIERS.length - 1) return;
               const cost = tierScienceCost(w.tier + 1, w.scienceRate0);
-              if (gameState.science >= cost) { gameState.science -= cost; w.tier++; updateAllUI(); }
+              if ((w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S) return;
+              if (gameState.science >= cost) {
+                  gameState.science -= cost; w.tier++; w.lastTierAt = w.t || 0;
+                  const pulled = enemyCatchUp(w.tier, w.enemyTier);
+                  if (pulled > w.enemyTier) { w.enemyTier = pulled; w.nextTierAt = (w.t || 0) + 120; }
+                  updateAllUI();
+              }
+          }, { signal });
+          ui.autoBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || w.auto) return;
+              if (w.arms >= AUTO_COST) { w.arms -= AUTO_COST; w.auto = true; updateAllUI(); }
           }, { signal });
           ui.armsSlider.addEventListener('input', (e) => { if (gameState.war?.active) gameState.war.armsShare = e.target.value / 100; updateAllUI(); }, { signal });
           ui.shipBtn.addEventListener('click', () => {

@@ -3,7 +3,7 @@
 import {
   TIERS, UNIT_COST, ENEMY_DEFENCE_REGROW, enemyDefenceCap, armsPerSecond, UPKEEP_SHARE_PER_UNIT, FORT_HP, FORT_COST, ENEMY_TILE_HP, ENEMY_REBUILD_S,
   SALVAGE_PER_TILE, ENEMY_LEAVES_AT_SCORCH, SHIP_SALVAGE, initialWarState, rng, doomsday, waveInterval, waveSize,
-  nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, tierScienceCost,
+  nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, tierScienceCost, enemyCatchUp, enemyTileHp, TIER_COOLDOWN_S,
 } from '../src/phase3/war.js';
 
 const seed = Number(process.argv[2] || 1);
@@ -16,8 +16,9 @@ const popOf = { district: 100000, skyscraper: 500, apartment: 50, home: 10 };
 const income = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 1100 * 0.5;
 const scienceRate = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 0.5;
 const w = initialWarState(0);
-w.scienceRate0 = scienceRate();
+w.scienceRate0 = plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0) * 0.5; // potential
 w.armsShare = 0.5;
+w.lastTierAt = -999;
 let stars = 0, science = 0, t = 0;
 const enemyTiles = Array.from({ length: 5 }, (_, i) => ({ i, hp: ENEMY_TILE_HP, razedUntil: 0 }));
 const log = []; const events = [];
@@ -26,9 +27,13 @@ let leadChanges = 0, lastLead = 0;
 function playerPolicy() {
   const tier = TIERS[w.tier], enemy = TIERS[w.enemyTier];
   // research the next tier when science allows
-  if (w.tier < TIERS.length - 1) {
+  if (w.tier < TIERS.length - 1 && t - w.lastTierAt >= TIER_COOLDOWN_S) {
     const cost = tierScienceCost(w.tier + 1, w.scienceRate0);
-    if (science >= cost) { science -= cost; w.tier++; events.push({ t, e: `OUR tier ${TIERS[w.tier].numeral} ${TIERS[w.tier].id}` }); }
+    if (science >= cost) {
+      science -= cost; w.tier++; w.lastTierAt = t; events.push({ t, e: `OUR tier ${TIERS[w.tier].numeral} ${TIERS[w.tier].id}` });
+      const pulled = enemyCatchUp(w.tier, w.enemyTier);
+      if (pulled > w.enemyTier) { w.enemyTier = pulled; w.nextTierAt = nextEnemyTierAt(t, rand, w.enemyTier); events.push({ t, e: `ENEMY catches up to ${TIERS[w.enemyTier].numeral}` }); }
+    }
   }
   // keep defence power around 1.2× the expected wave
   const expected = waveSize(w.waveCount) * enemy.power;
@@ -44,7 +49,7 @@ function playerPolicy() {
     const r = resolveStrike({ force: w.force, power: tier.power, enemyDefence: w.enemyDefence, enemyPower: enemy.power, tileHp: target.hp });
     w.force = r.forceLeft; w.enemyDefence = r.enemyDefenceLeft; target.hp = r.tileHpLeft;
     w.scorchTheirs += tier.scorch * 3;
-    if (r.razed) { target.razedUntil = t + ENEMY_REBUILD_S; target.hp = ENEMY_TILE_HP; w.salvage += SALVAGE_PER_TILE * tier.power; w.scorchTheirs += tier.scorch * 10; events.push({ t, e: `we razed tile ${target.i}` }); }
+    if (r.razed) { target.razedUntil = t + ENEMY_REBUILD_S; target.hp = enemyTileHp(w.enemyTier); w.salvage += SALVAGE_PER_TILE * tier.power; w.scorchTheirs += tier.scorch * 10; events.push({ t, e: `we razed tile ${target.i}` }); }
   }
   // clear + rebuild ruins (30 % of a price we approximate with 2M stars)
   for (const p of plates) if (p.razed && stars >= 2e6 && t >= p.clearAt) { stars -= 2e6; p.razed = false; p.hp = p.max; }
