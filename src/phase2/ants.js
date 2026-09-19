@@ -82,7 +82,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     let dpr = 1;
 
     const COLORS = { person: '#1e3a8a', car: '#172554', enemy: '#b91c1c' };
-    const SPEED = { person: 15, car: 42, enemy: 20 };   // px per second
+    // px per second. A village of 2–4 dots must feel alive, a full city calm:
+    // people run at 32 with few dots and settle toward 18 with many.
+    const SPEED = { person: 18, car: 46, enemy: 20 };
+    const personSpeed = () => 18 + 14 * (1 - Math.min(1, ants.length / 30));
+    const speedOf = (kind) => (kind === 'person' ? personSpeed() : SPEED[kind]);
     const RADIUS = { person: 2.2, car: 3.2, enemy: 2.4 };
 
     let layoutKey = '';
@@ -176,7 +180,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     /** Advances the simulation by dt seconds and draws. */
     function step(dt, now = performance.now()) {
         if (now - lastMeasure > 1000) { measure(); reconcile(); lastMeasure = now; }
-        for (const a of ants) stepDot(a, dt, SPEED[a.kind], (d) => { if (!newTrip(d)) d.wait = 1; });
+        for (const a of ants) stepDot(a, dt, speedOf(a.kind), (d) => { if (!newTrip(d)) d.wait = 1; });
         for (const e of enemies) {
             if (attack) stepDot(e, dt, SPEED.enemy * 2, (d) => arriveAttack(d));
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });

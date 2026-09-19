@@ -29,6 +29,9 @@ export const buildingData = {
     district:             { cost: 8000000,  capacity: 100000 },
     superStore:           { cost: 120000,   upkeep: 50,  supply: 60 },
     gmoUpgrade:           { baseCost: 10000,   scienceCost: 1000 },
+    // Housing research: you buy the right to level houses before you can (Ola 2026-09-18)
+    apartmentResearch:    { cost: 30000,    scienceCost: 500 },
+    storeResearch:        { cost: 60000,    scienceCost: 1500 },
     toolCaseUpgrade:      { cost: 100000,   scienceCost: 3000 },
     urbanismResearch:     { cost: 150000,   scienceCost: 25000 },
     carUpgrade:           { cost: 600000,   scienceCost: 30000 },

@@ -18,6 +18,8 @@ import { buildingData } from './buildings-config.js';
  *
  * @param {object} building - The building object from gameState.buildings
  * @param {object} context
+ * @param {boolean} context.apartmentResearched - Whether housing research (home → apartment) is done
+ * @param {boolean} context.storeResearched - Whether store research (store → super store) is done
  * @param {boolean} context.urbanismResearched - Whether urbanism research is done
  * @param {boolean} context.megastructureResearched - Whether megastructure research is done
  * @param {number} context.stars - Current star balance (for affordability check)
@@ -26,7 +28,7 @@ import { buildingData } from './buildings-config.js';
  * @param {boolean} context.initialLoadDone - Whether the first load cycle has completed
  * @returns {string} HTML string to insert into the slot element
  */
-export function createBuildingHTML(building, { urbanismResearched, megastructureResearched, stars, population, notifiedUpgrades, initialLoadDone }) {
+export function createBuildingHTML(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched, stars, population, notifiedUpgrades, initialLoadDone }) {
     let icon = '';
     let content = '';
     let classes = 'building';
@@ -41,8 +43,8 @@ export function createBuildingHTML(building, { urbanismResearched, megastructure
     }
 
     let upgradeTarget = null;
-    if (building.type === 'home') { upgradeTarget = 'apartment'; }
-    else if (building.type === 'store') { upgradeTarget = 'superStore'; }
+    if (building.type === 'home' && apartmentResearched) { upgradeTarget = 'apartment'; }
+    else if (building.type === 'store' && storeResearched) { upgradeTarget = 'superStore'; }
     else if (building.type === 'apartment' && urbanismResearched) { upgradeTarget = 'skyscraper'; }
     else if (building.type === 'skyscraper' && megastructureResearched) { upgradeTarget = 'district'; }
 
@@ -136,6 +138,8 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
 
         if (building) {
             slot.innerHTML = createBuildingHTML(building, {
+                apartmentResearched: gameState.apartmentResearched,
+                storeResearched: gameState.storeResearched,
                 urbanismResearched: gameState.urbanismResearched,
                 megastructureResearched: gameState.megastructureResearched,
                 stars: gameState.stars,
@@ -171,8 +175,8 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
         if (!innerDiv) return;
 
         let upgradeTarget = null;
-        if (building.type === 'home') upgradeTarget = 'apartment';
-        else if (building.type === 'store') upgradeTarget = 'superStore';
+        if (building.type === 'home' && gameState.apartmentResearched) upgradeTarget = 'apartment';
+        else if (building.type === 'store' && gameState.storeResearched) upgradeTarget = 'superStore';
         else if (building.type === 'apartment' && gameState.urbanismResearched) upgradeTarget = 'skyscraper';
         else if (building.type === 'skyscraper' && gameState.megastructureResearched) upgradeTarget = 'district';
 

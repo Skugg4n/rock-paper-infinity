@@ -371,6 +371,25 @@ items:
     status: done
     resolved_in: v1.27.0
 
+  - id: B033
+    added: 2026-09-19
+    source: "chat 2026-09-19"
+    request: |
+      Levelling houses and stores should require buying the research first
+      (like urbanism/megastructure). People dots crawl early on; boost them.
+    status: done
+    resolved_in: v1.28.0
+
+  - id: B034
+    added: 2026-09-19
+    source: "chat 2026-09-19"
+    request: |
+      Chapter III: an escalation of weapons and defence of different kinds
+      while keeping income and expenses in balance. Sketch the system.
+    status: open
+    resolved_in: null
+    notes: "Sketch: docs/superpowers/specs/2026-09-19-chapter-iii-war-design.md (RPS triangle as weapon kinds, tiers, draft slider, salvage silo). Decide, simulate, then build."
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

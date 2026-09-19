@@ -47,6 +47,8 @@ export function init() {
               toolCaseUnlocked: false,
               carUnlocked: false,
               computerUnlocked: false,
+              apartmentResearched: false,
+              storeResearched: false,
               urbanismResearched: false,
               megastructureResearched: false,
               landExpanded: false,
@@ -113,6 +115,8 @@ export function init() {
               gmoUpgradeBtn: document.getElementById('gmo-upgrade-btn'),
               gmoRing: document.getElementById('gmo-ring'),
               toolCaseUpgradeBtn: document.getElementById('tool-case-upgrade-btn'),
+              apartmentResearchBtn: document.getElementById('apartment-research-btn'),
+              storeResearchBtn: document.getElementById('store-research-btn'),
               urbanismResearchBtn: document.getElementById('urbanism-research-btn'),
               megastructureResearchBtn: document.getElementById('megastructure-research-btn'),
               carUpgradeBtn: document.getElementById('car-upgrade-btn'),
@@ -328,6 +332,8 @@ export function init() {
               const upgrades = [
                   { btn: ui.toolCaseUpgradeBtn, showAt: 25, popReq: 50, flag: 'toolCaseUnlocked' },
                   { btn: ui.gmoUpgradeBtn, showAt: 40, popReq: 75, flag: 'gmoLevel', isMultiLevel: true, maxLevel: gameState.gmoMaxLevel },
+                  { btn: ui.apartmentResearchBtn, showAt: 15, popReq: 30, flag: 'apartmentResearched' },
+                  { btn: ui.storeResearchBtn, showAt: 40, popReq: 50, flag: 'storeResearched' },
                   { btn: ui.urbanismResearchBtn, showAt: 100, popReq: 200, flag: 'urbanismResearched' },
                   { btn: ui.expandLandBtn, showAt: 750, popReq: 1000, flag: 'landExpanded' },
                   { btn: ui.carUpgradeBtn, showAt: 250, popReq: 500, flag: 'carUnlocked' },
@@ -362,6 +368,8 @@ export function init() {
   
               // Disabled state for global upgrades
               ui.toolCaseUpgradeBtn.disabled = !canAfford(buildingData.toolCaseUpgrade) || pop < 50 || gameState.toolCaseUnlocked;
+              ui.apartmentResearchBtn.disabled = !canAfford(buildingData.apartmentResearch) || pop < 30 || gameState.apartmentResearched;
+              ui.storeResearchBtn.disabled = !canAfford(buildingData.storeResearch) || pop < 50 || gameState.storeResearched;
               ui.urbanismResearchBtn.disabled = !canAfford(buildingData.urbanismResearch) || pop < 200 || gameState.urbanismResearched;
               ui.megastructureResearchBtn.disabled = !canAfford(buildingData.megastructureResearch) || pop < 5000 || gameState.megastructureResearched;
               ui.gmoUpgradeBtn.disabled = !canAfford({cost: buildingData.gmoUpgrade.baseCost * (gameState.gmoLevel + 1), scienceCost: buildingData.gmoUpgrade.scienceCost * (gameState.gmoLevel + 1)}) || pop < 75 || gameState.gmoLevel >= gameState.gmoMaxLevel;
@@ -388,6 +396,8 @@ export function init() {
               
               setTooltip(ui.toolCaseUpgradeBtn, pop < 50 && !gameState.toolCaseUnlocked ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='star' class='w-4 h-4'></i>/<i data-lucide='user' class='w-4 h-4'></i>`, cost: buildingData.toolCaseUpgrade.cost, scienceCost: buildingData.toolCaseUpgrade.scienceCost });
               
+              setTooltip(ui.apartmentResearchBtn, pop < 30 && !gameState.apartmentResearched ? { unlockReq: `30 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `<i data-lucide='home' class='w-4 h-4'></i> → <i data-lucide='building' class='w-4 h-4'></i>`, cost: buildingData.apartmentResearch.cost, scienceCost: buildingData.apartmentResearch.scienceCost });
+              setTooltip(ui.storeResearchBtn, pop < 50 && !gameState.storeResearched ? { unlockReq: `50 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `<i data-lucide='store' class='w-4 h-4'></i> → <i data-lucide='shopping-cart' class='w-4 h-4'></i>`, cost: buildingData.storeResearch.cost, scienceCost: buildingData.storeResearch.scienceCost });
               setTooltip(ui.urbanismResearchBtn, pop < 200 && !gameState.urbanismResearched ? { unlockReq: `200 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `<i data-lucide='building-2' class='w-4 h-4'></i>`, cost: buildingData.urbanismResearch.cost, scienceCost: buildingData.urbanismResearch.scienceCost });
 
               setTooltip(ui.megastructureResearchBtn, pop < 5000 && !gameState.megastructureResearched ? { unlockReq: `5000 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `District`, cost: buildingData.megastructureResearch.cost, scienceCost: buildingData.megastructureResearch.scienceCost });
@@ -697,6 +707,8 @@ export function init() {
                   gameState.buildings.forEach((b, i) => {
                       if (!b) return;
                       const affected =
+                          (flag === 'apartmentResearched' && b.type === 'home') ||
+                          (flag === 'storeResearched' && b.type === 'store') ||
                           (flag === 'urbanismResearched' && (b.type === 'home' || b.type === 'apartment')) ||
                           (flag === 'megastructureResearched' && b.type === 'skyscraper');
                       if (affected) renderGridSlot(i);
@@ -715,6 +727,8 @@ export function init() {
           }, { signal });
 
           ui.toolCaseUpgradeBtn.addEventListener('click', () => createUpgradeListener('toolCaseUnlocked', buildingData.toolCaseUpgrade), { signal });
+          ui.apartmentResearchBtn.addEventListener('click', () => createUpgradeListener('apartmentResearched', buildingData.apartmentResearch), { signal });
+          ui.storeResearchBtn.addEventListener('click', () => createUpgradeListener('storeResearched', buildingData.storeResearch), { signal });
           ui.urbanismResearchBtn.addEventListener('click', () => createUpgradeListener('urbanismResearched', buildingData.urbanismResearch), { signal });
           ui.megastructureResearchBtn.addEventListener('click', () => createUpgradeListener('megastructureResearched', buildingData.megastructureResearch), { signal });
           ui.carUpgradeBtn.addEventListener('click', () => createUpgradeListener('carUnlocked', buildingData.carUpgrade), { signal });

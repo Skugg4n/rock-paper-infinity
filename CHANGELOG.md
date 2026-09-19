@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.28.0 - 2026-09-19
+
+- **People move faster when they are few** — 32 px/s with a handful of dots, easing to 18 in a full city, so an early village feels alive (Ola changed his mind on the slower pace).
+- **Store research** — levelling a store to a super store needs a research too (60 000 ★ + 1 500 science, from 40 population, buyable at 50).
+- **Housing research** — levelling houses (home → apartment) now needs a research first (30 000 ★ + 500 science, shown from 15 population, buyable from 30), like urbanism for skyscrapers and megastructure for districts. Ola: "roligare om man köper/utvecklar den möjligheten innan man kan levla husen".
+- Chapter III design sketch: `docs/superpowers/specs/2026-09-19-chapter-iii-war-design.md`.
+
 ## v1.27.0 - 2026-09-18
 
 ### Ants, second pass (Ola's playtest)

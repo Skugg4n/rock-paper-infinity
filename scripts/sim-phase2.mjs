@@ -29,7 +29,7 @@ const C = P.cost;
 const st = {
   t: 0, stars: START_STARS, science: 0, pop: 0, supplies: 150, alloc: 0.5,
   slots: 10, buildings: [{ type: 'factory' }, { type: 'bank' }],
-  gmo: 0, toolCase: false, car: false, computer: false, urbanism: false, mega: false,
+  gmo: 0, toolCase: false, car: false, computer: false, urbanism: false, mega: false, aptResearch: MODE === 'old', storeResearch: MODE === 'old',
   land1: false, land2: false, sc: 0, stalls: 0, buys: [],
 };
 const POP = { home: 10, apartment: 50, skyscraper: 500, district: 100000 };
@@ -75,7 +75,8 @@ function shop(flow) {
     if (foodNeeded()) {
       if (pop >= 75 && st.gmo < 10 && buy(B.gmoUpgrade.baseCost * (st.gmo + 1), B.gmoUpgrade.scienceCost * (st.gmo + 1))) { st.gmo++; log('gmo'); flow.supply *= 2; continue; }
       const store = st.buildings.find(b => b.type === 'store');
-      if (store && pop >= 50 && buy(C.superStore)) { store.type = 'superStore'; log('superStore'); flow.supply += 40; continue; }
+      if (store && pop >= 50 && !st.storeResearch && buy(B.storeResearch.cost, B.storeResearch.scienceCost)) { st.storeResearch = true; log('store research'); continue; }
+      if (store && pop >= 50 && st.storeResearch && buy(C.superStore)) { store.type = 'superStore'; log('superStore'); flow.supply += 40; continue; }
       if (free() > 0 && buy(C.store)) { st.buildings.push({ type: 'store' }); log('store'); flow.supply += 20; continue; }
       // stalls only while they are cheaper per unit than a store, or no land
       const stallsCheaper = stallCost(st.stalls) / STALL_SUPPLY < C.store / 20 || free() === 0;
@@ -91,6 +92,7 @@ function shop(flow) {
       const pending = (!st.toolCase && pop >= 50) || (!st.car && pop >= 500) || (!st.computer && st.car && pop >= 1000) || (st.sc < P.scMax && pop >= 10000 && st.computer);
       if (pending) break;
     }
+    if (!st.aptResearch && pop >= 30 && buy(B.apartmentResearch.cost, B.apartmentResearch.scienceCost)) { st.aptResearch = true; log('housing research'); continue; }
     if (!st.urbanism && pop >= 200 && buy(C.urbanism, B.urbanismResearch.scienceCost)) { st.urbanism = true; log('urbanism'); mark('urbanism'); continue; }
     if (!st.mega && pop >= 5000 && buy(C.mega, B.megastructureResearch.scienceCost)) { st.mega = true; log('megastructure'); mark('mega'); continue; }
     if (st.sc < P.scMax && pop >= 10000 && buy(P.scCost(st.sc))) { st.sc++; log(`SC x2 (${st.sc})`); mark('sc1'); continue; }
@@ -105,7 +107,7 @@ function shop(flow) {
     };
     if (st.mega && up('skyscraper', 'district', 5000)) { mark('district'); continue; }
     if (st.urbanism && up('apartment', 'skyscraper', 200)) { mark('skyscraper'); continue; }
-    if (up('home', 'apartment', 30)) { mark('apartment'); continue; }
+    if (st.aptResearch && up('home', 'apartment', 30)) { mark('apartment'); continue; }
     // keep one slot for a store while the city is small
     const storeCount = st.buildings.filter(b => b.type === 'store' || b.type === 'superStore').length;
     if (free() > (storeCount === 0 ? 1 : 0) && buy(C.home)) { st.buildings.push({ type: 'home', pop: 0 }); log('home'); continue; }
