@@ -4,6 +4,7 @@ import { preloadIcons, replaceIcons } from './src/icons.js';
 import { VERSION } from './src/version.js';
 import { playChapterCard } from './src/chapterCard.js';
 import { initPerf } from './src/perf.js';
+import { CHECKPOINTS, jumpTo, snapshot, restore, slotInfo } from './src/checkpoints.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -31,6 +32,36 @@ function setDebugVisible(on) {
   }
   const item = document.getElementById('debug-menu-toggle');
   if (item) item.textContent = on ? 'Debug menu: on' : 'Debug menu';
+  document.getElementById('test-menu')?.classList.toggle('hidden', !on);
+  if (on) renderTestMenu();
+}
+
+// Test menu: checkpoints and snapshot slots (src/checkpoints.js)
+function renderTestMenu() {
+  const list = document.getElementById('checkpoint-list');
+  const slots = document.getElementById('slot-list');
+  if (!list || !slots) return;
+  list.innerHTML = '';
+  for (const cp of CHECKPOINTS) {
+    const b = document.createElement('button');
+    b.textContent = cp.label;
+    b.addEventListener('click', () => jumpTo(cp.id));
+    list.appendChild(b);
+  }
+  slots.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const row = document.createElement('div');
+    row.className = 'slot-row';
+    const info = slotInfo(i);
+    const label = document.createElement('span');
+    label.textContent = info ? `${i + 1}: ${info.phase} · ${new Date(info.at).toLocaleTimeString().slice(0, 5)}` : `${i + 1}: empty`;
+    const save = document.createElement('button'); save.textContent = 'Save';
+    save.addEventListener('click', () => { snapshot(i); renderTestMenu(); });
+    const load = document.createElement('button'); load.textContent = 'Load'; load.disabled = !info;
+    load.addEventListener('click', () => restore(i));
+    row.append(label, save, load);
+    slots.appendChild(row);
+  }
 }
 let debugOn = window.location.search.includes('debug') || readDebugFlag();
 // 2.5D experiment: ?tilt leans the city like a model (Ola, 2026-09-19)

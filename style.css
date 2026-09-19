@@ -377,6 +377,20 @@ input[type=range]:focus-visible {
     transition: height 0.3s ease-in-out;
 }
 
+/* Test menu buttons (☰ → Debug menu on) */
+#test-menu button {
+    text-align: left;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #334155;
+    white-space: nowrap;
+}
+#test-menu button:hover { background: #e2e8f0; }
+#test-menu button:disabled { opacity: 0.4; }
+#test-menu .slot-row { display: flex; gap: 4px; align-items: center; }
+#test-menu .slot-row span { flex: 1; color: #94a3b8; }
+
 /* The ☰ menu (Reset, Debug) and the debug menus must sit above the chapter
    card overlay so the player can always get out of the WAR wall. */
 #menu-wrapper,

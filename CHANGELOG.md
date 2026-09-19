@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.33.0 - 2026-09-19
+
+### Test menu, and a critical review
+
+- **☰ → Debug menu on → "Jump to"**: ten checkpoints across the chapters (I start, speed 10, factory ready, factory running; II start, mid city, complete with enemy built, raided with swords open; III war begins, late war). Each writes a prepared save and reloads.
+- **Snapshots**: three slots, Save/Load, so you can leave a moment and come back to it. `src/checkpoints.js`.
+- The phases' save-on-unload is skipped during a jump so the checkpoint is not overwritten.
+- `docs/superpowers/specs/2026-09-19-critical-review.md`: 25 findings across the game with proposals and a suggested build order.
+
 ## v1.32.0 - 2026-09-19
 
 ### War, second pass (Ola's first war playtest)

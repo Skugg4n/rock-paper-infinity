@@ -382,11 +382,18 @@
             <div id="menu-dropdown" class="hidden absolute bottom-14 left-0 bg-white rounded-lg shadow-lg">
                 <button id="reset-btn" class="block px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap">Reset everything</button>
                 <button id="debug-menu-toggle" class="block px-4 py-2 text-sm text-slate-400 hover:bg-slate-100 whitespace-nowrap">Debug menu</button>
+                <!-- Test menu (debug on): jump to a checkpoint, or save/load three snapshot slots -->
+                <div id="test-menu" class="hidden border-t border-slate-100 px-3 py-2 text-xs text-slate-500 min-w-[260px]">
+                    <div class="font-semibold text-slate-400 mb-1">Jump to</div>
+                    <div id="checkpoint-list" class="grid grid-cols-2 gap-1 mb-2"></div>
+                    <div class="font-semibold text-slate-400 mb-1">Snapshots</div>
+                    <div id="slot-list" class="flex flex-col gap-1"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.32.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.33.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

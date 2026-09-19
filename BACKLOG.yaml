@@ -449,6 +449,27 @@ items:
       fights back, cross-water routes, capacity display. Still open: radar
       (next wave), coastline fortification band, tuning after next playtest.
 
+  - id: B039
+    added: 2026-09-19
+    source: "chat 2026-09-19"
+    request: |
+      Save/load is hard to understand; make it easy to jump between parts of
+      the game for testing.
+    status: done
+    resolved_in: v1.33.0
+    notes: "☰ → Debug menu on → Jump to (10 checkpoints) + 3 snapshot slots."
+
+  - id: B040
+    added: 2026-09-19
+    source: "critical review 2026-09-19"
+    request: |
+      Work through the critical review (docs/superpowers/specs/2026-09-19-critical-review.md):
+      legible numbers in II (format + multiplier haircut), radar + tier mode
+      icons + predicted strike, city-complete feedback + food split, row
+      fortification + real tracers, idle return summary.
+    status: open
+    resolved_in: null
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

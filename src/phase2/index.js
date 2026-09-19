@@ -85,7 +85,7 @@ export function init() {
           }
 
           function saveGameState() {
-              if (!savingEnabled) return;
+              if (!savingEnabled || window.__rpiSkipSave) return;
               saveToStorage(SAVE_KEY, serializePhase2(gameState));
           }
           beforeUnloadHandler = () => saveGameState();

@@ -456,6 +456,7 @@ const uiState = {
         }
 
         function saveGame() {
+            if (window.__rpiSkipSave) return;
             const state = {
                 starBalance, totalStarsEarned, totalGamesPlayed, totalWins,
                 energy, reserveEnergy, gameSpeed, starMultiplier, quantumFoam, foamCollapses,
