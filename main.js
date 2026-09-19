@@ -5,6 +5,7 @@ import { VERSION } from './src/version.js';
 import { playChapterCard } from './src/chapterCard.js';
 import { initPerf } from './src/perf.js';
 import { CHECKPOINTS, jumpTo, snapshot, restore, slotInfo } from './src/checkpoints.js';
+import { MODULE_PATHS } from './src/modules.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -77,16 +78,6 @@ document.getElementById('debug-menu-toggle')?.addEventListener('click', () => {
 // Files that make up the game. After a deploy, GitHub Pages' 10-minute cache
 // can hand the browser a mix of old and new modules; if boot then fails we
 // refetch everything once (cache: 'reload') and retry, never touching saves.
-const MODULE_PATHS = [
-  'index.html', 'main.js', 'style.css', 'style-stage2.css', 'roman.js',
-  'src/constants.js', 'src/version.js', 'src/gamePhase.js', 'src/icons.js',
-  'src/chapterCard.js', 'src/save-export.js', 'src/perf.js',
-  'src/phase1/index.js', 'src/phase1/rendering.js', 'src/phase1/upgrades-config.js',
-  'src/phase1/rates.js', 'src/phase1/star-animation.js', 'src/phase1/cost-visual.js',
-  'src/phase1/countdown.js', 'src/phase1/persistence.js', 'src/phase1/upgrade-dashes.js',
-  'src/phase2/index.js', 'src/phase2/rendering.js', 'src/phase2/buildings-config.js',
-  'src/phase2/persistence.js', 'src/phase2/economy.js',
-];
 const RECOVERY_FLAG = 'rpi-recovered';
 
 async function recoverFromStaleCache(err) {
@@ -95,7 +86,9 @@ async function recoverFromStaleCache(err) {
   if (already) {
     console.error('bootstrap failed twice; saves untouched', err);
     const v = document.getElementById('version-info');
-    if (v) v.textContent = `${VERSION} — could not start, try a hard reload (saves are safe)`;
+    if (v) v.textContent = `${VERSION} — could not start. Close this tab and open the game again (saves are safe).`;
+    // One more full refetch in the background so the next open is clean
+    await Promise.allSettled(MODULE_PATHS.map(p => fetch(p, { cache: 'reload' })));
     return;
   }
   try { sessionStorage.setItem(RECOVERY_FLAG, '1'); } catch { /* ignore */ }

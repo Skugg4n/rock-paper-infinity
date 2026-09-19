@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.34.1 - 2026-09-19
+
+### Hotfix: dead page after deploy (again)
+
+- The stale-cache recovery only refetched the modules on its list, and the list had not been updated with the newer modules (war.js, ants.js, islands.js, layout.js, checkpoints.js). New `src/modules.js` holds the list and a test fails if any file on disk is missing from it. A second failure now also refetches everything so the next open is clean.
+
 ## v1.34.0 - 2026-09-19
 
 ### The war becomes readable and dangerous (Ola's second war playtest)
