@@ -96,13 +96,30 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         rects = getSlots()
             .filter(s => s.building)
             .map(s => ({ rect: rel(s.el.getBoundingClientRect()), building: s.building, el: s.el }));
-        // If the plates moved (new land, resize), drop every route so nobody
-        // keeps walking on a street that is no longer there.
+        // If the plates moved (new land, the island appearing, resize), rebuild
+        // every route between the SAME two buildings at the same progress, so
+        // nobody vanishes or jumps: they just continue on the new street.
         const first = rects[0]?.rect;
-        const key = first ? `${Math.round(first.x)},${Math.round(first.y)},${rects.length}` : '';
+        const key = first ? `${Math.round(first.x)},${Math.round(first.y)}` : '';
         if (key !== layoutKey) {
             layoutKey = key;
-            for (const a of ants) { a.path = null; a.wait = Math.random() * 0.5; }
+            const byId = new Map(rects.map(r => [r.building.id, r]));
+            for (const a of ants) {
+                const from = a.from && byId.get(a.from.building.id);
+                const to = a.at && byId.get(a.at.building.id);
+                if (from && to) {
+                    a.from = from; a.at = to;
+                    if (a.path) a.path = streetPath(from.rect, to.rect, getGap());
+                } else { a.path = null; a.at = to || null; a.wait = Math.random() * 0.5; }
+            }
+        } else {
+            // Same layout: keep `at`/`from` pointing at fresh rect entries
+            const byId = new Map(rects.map(r => [r.building.id, r]));
+            for (const a of ants) {
+                if (a.at) a.at = byId.get(a.at.building.id) || null;
+                if (a.from) a.from = byId.get(a.from.building.id) || null;
+                if (!a.at) { a.path = null; }
+            }
         }
         enemyRects = getEnemyTiles().map(el => rel(el.getBoundingClientRect()));
         dpr = window.devicePixelRatio || 1;
@@ -126,7 +143,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const to = candidates.length ? pick(candidates) : null;
         if (!to) return false;
         ant.path = streetPath(from.rect, to.rect, getGap());
-        ant.seg = 0; ant.t = 0; ant.at = to; ant.wait = 0;
+        ant.seg = 0; ant.t = 0; ant.from = from; ant.at = to; ant.wait = 0;
         return true;
     }
 
@@ -185,6 +202,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             if (attack) stepDot(e, dt, SPEED.enemy * 2, (d) => arriveAttack(d));
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });
         }
+        if (attack?.done && enemies.every(e => !e.homeBound && !e.razing)) attack = null;
         draw();
     }
 
@@ -221,17 +239,28 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     // --- War opening -------------------------------------------------------
     function arriveAttack(e) {
         if (!attack) return;
+        if (attack.done) {
+            // Raid over: walk home to the island, then wander there again.
+            if (e.homeBound) { e.homeBound = false; e.razing = false; e.at = pick(enemyRects); e.path = null; e.wait = 0.5; return; }
+            const from = e.at?.rect ?? e.at ?? attack.target.rect;
+            const home = pick(enemyRects);
+            e.path = streetPath(from, home, getGap());
+            e.seg = 0; e.t = 0; e.at = home; e.homeBound = true; e.razing = false; e.wait = 0.2 + Math.random();
+            return;
+        }
         if (e.at === attack.target) {
             if (!e.arrivedFlag) { e.arrivedFlag = true; attack.arrived++; }
-            e.wait = 99; e.razing = true; // stay, visibly, on the plate
-            if (attack.arrived >= attack.needed && !attack.done) {
+            e.wait = 1.5 + Math.random(); e.razing = true; // a moment on the plate, visibly
+            if (attack.arrived >= attack.needed) {
                 attack.done = true;
-                // The house is razed: burnt plate, red ring, icon gone. Scorched
-                // earth is what chapter III is about (vision.md). Then a long
-                // beat before the chapter card so the player sees what happened.
+                // The house is razed: a burnt plate, icon gone, nothing left.
+                // Scorched earth is what chapter III is about (vision.md).
                 attack.target.el.querySelector('.building')?.classList.add('razed');
                 const razed = attack.target.building;
-                setTimeout(() => attack.onDone?.(razed), 2500);
+                enemies.forEach(x => { x.wait = Math.min(x.wait, 1.5 + Math.random()); });
+                const done = attack;
+                setTimeout(() => { done.onDone?.(razed); }, 1500);
+                // clear the raid once everyone is home (checked in step)
             }
             return;
         }
@@ -247,18 +276,21 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
      * enough have arrived and the house is marked captured.
      */
     function startAttack(onDone) {
+        if (attack) return false;
         measure();
         const targets = homes();
-        if (!targets.length || !enemyRects.length) { onDone?.(null); return; }
+        if (!targets.length || !enemyRects.length) return false;
         const target = targets.reduce((best, r) => (r.rect.y + r.rect.x > best.rect.y + best.rect.x ? r : best), targets[0]);
         while (enemies.length < 8 && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; enemies.push(e); }
         attack = { target, arrived: 0, needed: Math.min(5, enemies.length), onDone, done: false };
-        enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.2; e.arrivedFlag = false; });
+        enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.2; e.arrivedFlag = false; e.homeBound = false; e.razing = false; });
+        return true;
     }
+    const raiding = () => !!attack;
 
     function start() { if (reduced || raf) return; lastT = 0; raf = requestAnimationFrame(frame); }
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack }) };
+    return { start, stop, step, setState, startAttack, raiding, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack }) };
 }

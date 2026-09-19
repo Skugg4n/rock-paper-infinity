@@ -63,7 +63,7 @@ export function init() {
               harvestEfficiency: 1,
           };
 
-          const { SAVE_KEY, STARS_TRANSFER_KEY, COMPETITOR_POP, COMPETITOR_STAGE2_POP, COMPETITOR_STAGE3_POP, WAR_POP, DISTRICT_GROWTH_PER_SEC } = PHASE2_CONSTANTS;
+          const { SAVE_KEY, STARS_TRANSFER_KEY, COMPETITOR_POP, WAR_POP, DISTRICT_GROWTH_PER_SEC } = PHASE2_CONSTANTS;
           const parsedSave = loadFromStorage(SAVE_KEY);
           if (parsedSave) {
               parsedSave.buildings = (parsedSave.buildings || []).map(b => b === null ? undefined : b);
@@ -139,21 +139,34 @@ export function init() {
            * then a warehouse, then a radar mast. Stage 3 is the last thing the
            * player sees before III·WAR.
            */
+          const RAID_INTERVAL_MS = 90000;
+          /** Everything chapter II sells has been bought. */
+          function cityComplete() {
+              return !!(gameState.apartmentResearched && gameState.storeResearched && gameState.toolCaseUnlocked &&
+                  gameState.urbanismResearched && gameState.carUnlocked && gameState.computerUnlocked &&
+                  gameState.megastructureResearched && gameState.landExpanded && gameState.landExpansion2 &&
+                  gameState.gmoLevel >= gameState.gmoMaxLevel &&
+                  gameState.superconductorLevel >= buildingData.superconductor.maxLevel);
+          }
+
           function applyCompetitorStage(pop) {
               const el = ui.competitorIsland;
               if (!el) return;
-              // Stages are sticky (never go back when population dips) and the
-              // island stands alone for a minute before its dots build anything.
+              // The competitor builds its capital on its own clock, one tile a
+              // minute, five tiles in all. Stages are sticky.
+              void pop;
               const age = Date.now() - (gameState.competitorSpawnedAt || 0);
-              const byPop = pop >= COMPETITOR_STAGE3_POP ? 3 : pop >= COMPETITOR_STAGE2_POP ? 2 : 1;
-              const allowed = age >= 60000 ? byPop : 1;
-              const stage = Math.max(gameState.competitorStage || 1, allowed);
+              const byTime = Math.min(5, 1 + Math.floor(age / 60000));
+              const stage = Math.max(gameState.competitorStage || 1, byTime);
               gameState.competitorStage = stage;
-              const had2 = el.classList.contains('competitor-stage-2');
-              const had3 = el.classList.contains('competitor-stage-3');
-              el.classList.toggle('competitor-stage-2', stage >= 2);
-              el.classList.toggle('competitor-stage-3', stage >= 3);
-              if ((stage >= 2 && !had2) || (stage >= 3 && !had3)) scheduleIconRefresh();
+              let changed = false;
+              for (let s = 2; s <= 5; s++) {
+                  const cls = `competitor-stage-${s}`;
+                  const had = el.classList.contains(cls);
+                  el.classList.toggle(cls, stage >= s);
+                  if (stage >= s && !had) changed = true;
+              }
+              if (changed) scheduleIconRefresh();
           }
 
           // --- DEBUG FUNCTIONS ---
@@ -355,7 +368,7 @@ export function init() {
               ui.buildSeparator.classList.toggle('hidden', !anyUpgradeVisible);
 
               // III · WAR: teased when the competitor appears, open once they razed a house
-              ui.warBtn.classList.toggle('hidden', !gameState.competitorSpawned);
+              ui.warBtn.classList.toggle('hidden', !gameState.competitorSpawned || gameState.warChosen);
               ui.warBtn.disabled = !gameState.warReady;
               setTooltip(ui.warBtn, gameState.warReady
                   ? { effect: `III · WAR` }
@@ -562,21 +575,21 @@ export function init() {
                   enemySince: gameState.competitorSpawnedAt || 0,
               });
 
-              // III·WAR chapter card once the competitor has grown (WAR_POP)
-              // Requires competitor island to have been visible for at least 5 seconds
-              const competitorVisibleLongEnough = gameState.competitorSpawned &&
-                  (Date.now() - (gameState.competitorSpawnedAt || 0)) >= 5000;
-              if (gameState.population >= WAR_POP && !_warCardTriggered && !gameState.warReady && competitorVisibleLongEnough) {
-                  _warCardTriggered = true;
-                  // The opening of III·WAR: the red dots cross over and raze one of
-                  // our outer houses. The game goes on; the swords button opens.
+              // Raids. The competitor waits until our city is complete (everything
+              // bought) and its own capital stands (stage 3+), then razes one outer
+              // house, walks home, and comes back every RAID_INTERVAL until the
+              // player chooses WAR. (WAR_POP is only a safety net.)
+              const capitalReady = gameState.competitorSpawned && (gameState.competitorStage || 1) >= 3;
+              const ready = capitalReady && !gameState.warChosen && (cityComplete() || gameState.population >= WAR_POP * 4);
+              const sinceRaid = Date.now() - (gameState.lastRaidAt || 0);
+              if (ready && _ants && !_ants.raiding() && sinceRaid >= RAID_INTERVAL_MS) {
                   const onRazed = (building) => {
                       if (building) { building.razed = true; building.population = 0; }
                       gameState.warReady = true;
                       saveGameState();
                       updateAllUI();
                   };
-                  if (_ants) _ants.startAttack(onRazed); else onRazed(null);
+                  if (_ants.startAttack(onRazed)) gameState.lastRaidAt = Date.now();
               }
 
               updateAllUI();

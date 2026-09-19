@@ -390,6 +390,17 @@ items:
     resolved_in: null
     notes: "Sketch: docs/superpowers/specs/2026-09-19-chapter-iii-war-design.md (RPS triangle as weapon kinds, tiers, draft slider, salvage silo). Decide, simulate, then build."
 
+  - id: B035
+    added: 2026-09-19
+    source: "chat 2026-09-19 (ants playtest 2)"
+    request: |
+      Dots vanish/respawn when houses are bought, rows added, enemy spawns.
+      Enemy should raze, go back to its island, keep building its capital,
+      and keep raiding until WAR is clicked; first raid only when our city
+      is complete. Ruins as plain dark plates, no red line.
+    status: done
+    resolved_in: v1.29.0
+
   - id: B029
     added: 2026-09-18
     source: "chat 2026-09-18 (second playtest)"

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.29.0 - 2026-09-19
+
+### The competitor lives its own life (Ola's playtest)
+
+- **Dots no longer vanish and respawn** when a house is bought, land is added or the island appears: every route is rebuilt between the same two buildings at the same progress, so people just keep walking on the new street.
+- **The capital grows on its own clock** — one tile a minute, five in all (factory, warehouse, radar, tower, castle), regardless of our population.
+- **Raids instead of one attack** — the competitor waits until our city is complete (everything bought) and its capital stands, then razes one outer house, walks home, and comes back every 90 s until you choose WAR. The swords button opens after the first razing and the game keeps running.
+- **Ruins are just burnt plates** — dark grey, no red line, ring gone, icon gone; the red dots leave.
+
 ## v1.28.0 - 2026-09-19
 
 - **People move faster when they are few** — 32 px/s with a handful of dots, easing to 18 in a full city, so an early village feels alive (Ola changed his mind on the slower pace).
