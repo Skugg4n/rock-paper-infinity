@@ -130,8 +130,9 @@ what does it relieve, and what outgrows it?
 ## Where the arc might go (working notes, Ola 2026-09-18)
 
 Not committed. Written down so the ideas are not lost, and so chapter II's endgame
-can point in the right direction. If any of this is adopted, the chapter table above,
-the four-chapter rule under "What we won't build", and `gamePhase.js` change together.
+can point in the right direction. If any of this is adopted, the chapter table above
+and `gamePhase.js` change together. Whatever the count, each chapter's mechanic is
+carried forward (see "What we won't build").
 
 **Chapter III · WAR opens slowly.** The competitor's island appears far beyond our
 land at 40k population and *builds*: a factory, then a warehouse, then a radar mast.
@@ -166,7 +167,7 @@ These are explicit non-goals for the project itself — features and surfaces we
 - **No narrative layer.** No characters, no dialogue, no story beats beyond the four chapter titles.
 - **No multiplayer layer.** No social features, leaderboards, or accounts. Everything is local.
 - **No free-to-play extraction.** No ads, no microtransactions, no premium currency, no daily logins. The game is one self-contained thing.
-- **No infinite scaling.** The number of chapters is fixed at four. The end is the *to come* wall, then eventually a final ending in chapter IV.
+- **No infinite scaling.** The game ends. The number of chapters is not fixed at four any more (Ola, 2026-09-18: "4-kapitel-regeln är väl ingen hit om vi kan köra på med andra roliga saker"), but every chapter is a *development that is carried to the end*: its mechanic keeps mattering in later chapters. Chapters are not cliffhangers strung together; they are layers. The end is still an ending, not a wall.
 
 ## Tone
 

@@ -95,6 +95,14 @@ Chapter II UX questions raised (supplies display, plus/minus, food-stop indicato
 something to do while waiting) are in BACKLOG B021–B024 with proposals, pending Ola's
 choice.
 
+## v1.23.0: chapter II helpers (Ola chose all four proposals)
+
+Silo (fill = seconds of food, full at 120 s), net number + time-left hint; hover minus;
+solid/hollow plus; starved ring dot; hand harvest (2 s of food per click, −15 %
+efficiency per click, +10 %/s rest); market stalls (2 000 × 1.25ⁿ, +5/s, ×GMO). Pure
+helpers in `src/phase2/economy.js` with tests. No balance simulation for chapter II
+yet; that is the next pass.
+
 ## Open for Ola
 
 - Is 15–20 min the right length for chapter I? Knobs: cost ratios (1.08 / 1.03 / 1.6),

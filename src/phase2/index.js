@@ -7,6 +7,9 @@ import { mountSaveButtons } from '../save-export.js';
 import { buildingData } from './buildings-config.js';
 import { createRenderer } from './rendering.js';
 import { timed, counter } from '../perf.js';
+import {
+    siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY,
+} from './economy.js';
 
 let logicInterval;
 let fastUiInterval;
@@ -48,6 +51,9 @@ export function init() {
               landExpansion2: false,
               superconductorLevel: 0,
               competitorSpawned: false,
+              // Helpers beside the power line (v1.23.0)
+              stalls: 0,
+              harvestEfficiency: 1,
           };
 
           const { SAVE_KEY, STARS_TRANSFER_KEY, COMPETITOR_POP, COMPETITOR_STAGE2_POP, COMPETITOR_STAGE3_POP, WAR_POP, DISTRICT_GROWTH_PER_SEC } = PHASE2_CONSTANTS;
@@ -81,9 +87,15 @@ export function init() {
               landGrid: document.getElementById('land-grid'),
               populationUi: document.getElementById('population-ui'),
               suppliesUi: document.getElementById('supplies-ui'),
+              siloBtn: document.getElementById('silo-btn'),
+              siloFill: document.getElementById('silo-fill'),
+              supplyNet: document.getElementById('supply-net'),
+              supplyHint: document.getElementById('supply-hint'),
+              harvestPreview: document.getElementById('harvest-preview'),
+              harvestPop: document.getElementById('harvest-pop'),
+              buildStallBtn: document.getElementById('build-stall-btn'),
+              stallCount: document.getElementById('stall-count'),
               populationCountTotal: document.getElementById('population-count-total'),
-              suppliesBar: document.getElementById('supplies-bar'),
-              supplyDelta: document.getElementById('supply-delta'),
               supplyConsumption: document.getElementById('supply-consumption'),
               supplyProduction: document.getElementById('supply-production'),
               debugMenu: document.getElementById('p2-debug-menu'),
@@ -331,6 +343,12 @@ export function init() {
               // Tooltips
               setTooltip(ui.buildHomeBtn, { effect: `+${buildingData.home.capacity} <i data-lucide='users' class='w-4 h-4'></i>`, cost: buildingData.home.cost });
               setTooltip(ui.buildStoreBtn, { effect: `+${buildingData.store.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`, cost: buildingData.store.cost });
+              // Market stall: visible once food matters (5 pop), no land needed
+              ui.buildStallBtn.classList.toggle('hidden', pop < 5 && !(gameState.stalls > 0));
+              ui.buildStallBtn.disabled = gameState.stars < stallCost(gameState.stalls || 0);
+              setTooltip(ui.buildStallBtn, { effect: `+${STALL_SUPPLY * Math.pow(2, gameState.gmoLevel)} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`, cost: stallCost(gameState.stalls || 0) });
+              ui.stallCount.textContent = String(gameState.stalls || 0);
+              ui.stallCount.classList.toggle('hidden', !(gameState.stalls > 0));
               
               const gmoInfo = buildingData.gmoUpgrade;
               setTooltip(ui.gmoUpgradeBtn, pop < 75 && gameState.gmoLevel === 0 ? { unlockReq: `75 <i data-lucide='users' class='w-4 h-4'></i>` } : { effect: `+100% <i data-lucide='shopping-basket' class='w-4 h-4'></i> Eff.`, cost: gmoInfo.baseCost * (gameState.gmoLevel + 1), scienceCost: gmoInfo.scienceCost * (gameState.gmoLevel + 1) });
@@ -393,6 +411,9 @@ export function init() {
               let supplyProduction = 0;
               let currentTotalPopulation = 0;
               const gmoMultiplier = Math.pow(2, gameState.gmoLevel);
+              // Market stalls: the cheap repeatable helper; GMO multiplies them too.
+              supplyProduction += (gameState.stalls || 0) * STALL_SUPPLY * gmoMultiplier;
+              if (!skipGrowth) gameState.harvestEfficiency = recoverHarvestEfficiency(gameState.harvestEfficiency ?? 1);
 
               gameState.buildings.forEach((b) => {
                   if (!b) return;
@@ -418,13 +439,12 @@ export function init() {
                   }
               });
 
-              const oldPop = gameState.population;
               gameState.population = currentTotalPopulation;
-              if (oldPop !== gameState.population) {
-                  // Only refresh action button states — rings are kept alive by fastUiTick,
-                  // so a full DOM rebuild would cause the "flärp" ring reset.
-                  refreshAllBuildingActions();
-              }
+              // Refresh action button states every tick (population OR stars may
+              // have changed what is affordable). Rings are kept alive by
+              // fastUiTick, so a full DOM rebuild would cause the "flärp" ring
+              // reset; this only toggles disabled/upgradeable.
+              refreshAllBuildingActions();
 
               gameState.baseStarPerPerson = baseStarPerPerson;
               gameState.netStarChangePerSecond = netStarChange;
@@ -539,41 +559,34 @@ export function init() {
               const supplyProduction = gameState.cachedSupplyProduction || 0;
               const supplyConsumption = gameState.cachedSupplyConsumption || 0;
               const netSupplyChange = gameState.cachedNetSupplyChange || 0;
-              const maxFlow = Math.max(supplyProduction, supplyConsumption, 1);
-              const magnitudeRatio = Math.min(1, Math.abs(netSupplyChange) / maxFlow);
 
-              ui.suppliesBar.style.transform = `scaleX(${magnitudeRatio})`;
-              if (netSupplyChange >= 0) {
-                  ui.suppliesBar.classList.remove('deficit');
-                  ui.suppliesBar.style.left = '50%';
-                  ui.suppliesBar.style.right = 'auto';
-                  ui.suppliesBar.style.backgroundColor = '#64748b';
-              } else {
-                  ui.suppliesBar.classList.add('deficit');
-                  ui.suppliesBar.style.left = 'auto';
-                  ui.suppliesBar.style.right = '50%';
-                  ui.suppliesBar.style.backgroundColor = '#94a3b8';
-              }
+              // Silo: one vessel, one number. Fill = seconds of food in stock;
+              // the number is the net flow; the hint says how long the stock lasts.
+              const fraction = siloFraction(gameState.supplies, supplyConsumption);
+              ui.siloFill.style.height = `${Math.round(fraction * 100)}%`;
+              const starved = gameState.supplies <= 0 && supplyConsumption > 0;
+              ui.siloBtn.classList.toggle('draining', netSupplyChange < 0 && !starved);
+              ui.siloBtn.classList.toggle('empty', starved);
+              const netRounded = Math.round(netSupplyChange);
+              ui.supplyNet.textContent = `${netRounded >= 0 ? '+' : '−'}${Math.abs(netRounded).toLocaleString('en-US')}/s`;
+              ui.supplyNet.style.color = netRounded >= 0 ? '#475569' : '#b45309';
+              if (starved) ui.supplyHint.textContent = 'empty';
+              else if (netSupplyChange < 0 && supplyConsumption > 0) {
+                  const secondsLeft = gameState.supplies / -netSupplyChange;
+                  ui.supplyHint.textContent = secondsLeft >= 90 ? `${Math.round(secondsLeft / 60)} min` : `${Math.round(secondsLeft)} s`;
+              } else ui.supplyHint.textContent = '';
+              ui.supplyConsumption.textContent = `-${supplyConsumption.toLocaleString('en-US')}`;
+              ui.supplyProduction.textContent = `+${Math.round(supplyProduction).toLocaleString('en-US')}`;
+              ui.harvestPreview.textContent = String(harvestAmount(supplyConsumption, gameState.harvestEfficiency ?? 1));
 
-              if (netSupplyChange === 0) {
-                  ui.supplyDelta.textContent = 'Balanced';
-                  ui.supplyDelta.style.color = '#64748b';
-              } else if (netSupplyChange > 0) {
-                  ui.supplyDelta.textContent = `Surplus +${Math.round(netSupplyChange).toLocaleString('en-US')}/s`;
-                  ui.supplyDelta.style.color = '#475569';
-              } else {
-                  ui.supplyDelta.textContent = `Deficit ${Math.round(netSupplyChange).toLocaleString('en-US')}/s`;
-                  ui.supplyDelta.style.color = '#94a3b8';
-              }
-
-              ui.supplyConsumption.textContent = `-${supplyConsumption.toLocaleString('en-US')}/s`;
-              ui.supplyProduction.textContent = `+${Math.round(supplyProduction).toLocaleString('en-US')}/s`;
-  
-              gameState.buildings.forEach((b) => {
+              gameState.buildings.forEach((b, i) => {
                   if (!b) return;
                   if (b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') {
                       const popRing = document.getElementById(`pop-ring-${b.id}`);
                       if (popRing) popRing.style.strokeDashoffset = 113 - ((b.population / b.capacity) * 113);
+                      // Move-in stopped for lack of food: same colour as the empty silo
+                      const wrapper = ui.landGrid.children[i]?.querySelector('.building');
+                      if (wrapper) wrapper.classList.toggle('starved', starved && b.population < b.capacity);
                   }
               });
               const gmoPercent = (gameState.gmoLevel / gameState.gmoMaxLevel) * 113;
@@ -605,6 +618,25 @@ export function init() {
 
           ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'), { signal });
           ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'), { signal });
+          ui.buildStallBtn.addEventListener('click', () => {
+              const cost = stallCost(gameState.stalls || 0);
+              if (gameState.stars < cost) return;
+              gameState.stars -= cost;
+              gameState.stalls = (gameState.stalls || 0) + 1;
+              updateAllUI();
+          }, { signal });
+          // Hand harvest: the manual action of chapter II. Pays less per click
+          // when hammered, recovers with rest (economy.js).
+          ui.siloBtn.addEventListener('click', () => {
+              const consumption = gameState.cachedSupplyConsumption || 0;
+              const gained = harvestAmount(consumption, gameState.harvestEfficiency ?? 1);
+              gameState.supplies += gained;
+              gameState.harvestEfficiency = spendHarvestEfficiency(gameState.harvestEfficiency ?? 1);
+              ui.harvestPop.textContent = `+${gained.toLocaleString('en-US')}`;
+              ui.harvestPop.classList.remove('go');
+              void ui.harvestPop.offsetWidth; // restart animation
+              ui.harvestPop.classList.add('go');
+          }, { signal });
           
           const createUpgradeListener = (flag, upgradeData) => {
               if (gameState.stars >= (upgradeData.cost || 0) && gameState.science >= (upgradeData.scienceCost || 0) && !gameState[flag]) {

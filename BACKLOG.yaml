@@ -251,13 +251,10 @@ items:
       The supplies row (−60/s Surplus +20/s +80/s) is unreadable. Consider
       showing food as silos that fill and empty, so the player sees
       starvation coming.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.23.0
     notes: |
-      Proposal A: one silo glyph with a fill level (stock) and a small
-      arrow up/down (net). Proposal B: row of small silos, each 1 000
-      supplies, filling left to right; last one blinking when draining.
-      Decide with Ola before building.
+      Built as one silo (seconds of food) + net number + time-left hint.
 
   - id: B022
     added: 2026-09-18
@@ -267,8 +264,8 @@ items:
       the plus that appears; show minus only on hover (it takes space on
       every building). Hard to tell when the plus is greyed for money vs
       working, partly because minus always looks the same.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.23.0
 
   - id: B023
     added: 2026-09-18
@@ -278,8 +275,8 @@ items:
       that stops. Add a faint cue that links food and the housing stop,
       e.g. the ring around a house gets a reddish tint or a small red dot
       at the front of the ring.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.23.0
 
   - id: B024
     added: 2026-09-18
@@ -289,8 +286,8 @@ items:
       Other games have a manual toggle/click with diminishing effect, or a
       cheap repeatable buy that matters less and less until an upgrade
       multiplies it. Chapter II needs something like that.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.23.0
     notes: |
       Proposal: a "hand harvest" click on the supplies (adds a shrinking
       amount of food, diminishing per click within a window), and a cheap

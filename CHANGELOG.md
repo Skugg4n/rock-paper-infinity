@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.23.0 - 2026-09-18
+
+### Chapter II: silo, hover minus, stop cue, something to do (Ola chose 1–4)
+
+- **Food silo** — the "−60/s Surplus +20/s +80/s" row is gone. One vessel fills with seconds of food in stock (full = 2 min at current consumption), one net number beside it, and a hint of how long the stock lasts when draining. Hover shows production and consumption.
+- **Minus only on hover** — sell buttons appear when the building is hovered (always faint on touch). Plus buttons have two clear states: solid dark when affordable, hollow dashed when not. New plus buttons settle in gently instead of a city-wide flash.
+- **Move-in stop cue** — when food is out, houses that still have room get a faint rust ring and a small red dot at the top; the silo goes the same colour.
+- **Hand harvest** — click the silo for two seconds' worth of food; pays less per click when hammered, recovers over ~10 s. A floating "+N" shows the gain.
+- **Plus buttons now update when stars change** — affordability was only refreshed on population change, so a plus could stay hollow long after you could afford it.
+- **Market stalls** — cheap repeatable buy (2 000 × 1.25ⁿ) for +5 food/s each, no land needed, badge shows the count; GMO multiplies them like stores. The helper that matters less and less until research multiplies it.
+- **vision.md** — the four-chapter rule replaced: chapters are layers carried to the end, not cliffhangers.
+- Tests: 101 → 105 (`phase2/economy.test.js`).
+
 ## v1.22.0 - 2026-09-18
 
 ### Chapter II: the competitor gets time to build; Reset reachable from the wall

@@ -192,18 +192,21 @@
                  <span id="population-count-total" class="font-mono font-bold text-lg sm:text-2xl text-slate-600">0</span>
                  <i data-lucide="users" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-500"></i>
             </div>
-            <div id="supplies-ui" class="info-ui flex items-center gap-1.5 sm:gap-2">
-                <div class="flex flex-col items-end gap-1">
-                    <div class="supplies-track">
-                        <div class="center-marker"></div>
-                        <div id="supplies-bar" class="balance-fill transition-all duration-200"></div>
-                    </div>
-                    <div class="flex justify-between w-full gap-2 text-[12px]">
-                        <span id="supply-consumption" class="font-mono text-slate-500">-0/s</span>
-                        <span id="supply-delta" class="font-mono text-slate-600 text-right">Balanced</span>
-                        <span id="supply-production" class="font-mono text-slate-500">+0/s</span>
-                    </div>
+            <div id="supplies-ui" class="info-ui flex items-center gap-2 sm:gap-3">
+                <div class="flex flex-col items-end gap-0.5">
+                    <span id="supply-net" class="font-mono text-sm sm:text-base text-slate-600 tabular-nums">+0/s</span>
+                    <span id="supply-hint" class="font-mono text-[10px] sm:text-xs text-slate-400 tabular-nums"></span>
                 </div>
+                <!-- Silo: fill = seconds of food in stock. Click = hand harvest. -->
+                <button id="silo-btn" class="silo" aria-label="Food silo — click to hand harvest">
+                    <div id="silo-fill" class="silo-fill" style="height: 0%;"></div>
+                    <div class="tooltip">
+                        <div class="effect"><span id="supply-production">+0</span>/s <i data-lucide='shopping-basket' class='w-4 h-4'></i></div>
+                        <div class="effect"><span id="supply-consumption">-0</span>/s <i data-lucide='users' class='w-4 h-4'></i></div>
+                        <div class="unlock-req">hand harvest +<span id="harvest-preview">0</span></div>
+                    </div>
+                </button>
+                <span id="harvest-pop" class="harvest-pop" aria-hidden="true"></span>
                 <i data-lucide="shopping-basket" class="w-5 h-5 text-slate-400"></i>
             </div>
         </div>
@@ -268,6 +271,11 @@
             </div>
             <div id="build-separator" class="w-full h-px bg-slate-300 my-1 hidden"></div>
             <div id="buildings-container" class="flex flex-col items-end gap-3">
+                <button class="btn hidden" id="build-stall-btn">
+                    <i data-lucide="tent" class="w-7 h-7"></i>
+                    <span id="stall-count" class="btn-badge hidden">0</span>
+                    <div class="tooltip"></div>
+                </button>
                 <button class="btn" id="build-store-btn">
                     <i data-lucide="store" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
@@ -294,7 +302,7 @@
         </div>
     </div>
 
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.22.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.23.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

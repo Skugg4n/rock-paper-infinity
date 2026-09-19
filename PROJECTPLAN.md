@@ -85,11 +85,14 @@ Triggered by Ola's playtest 2026-09-18. Spec: `docs/superpowers/specs/2026-09-18
 - [x] Debug menu toggle in ☰ menu + `?debug` (B027)
 - [x] vision.md working notes for chapters III–VI (B026)
 
-### Chapter II UX (decide with Ola first)
-- [ ] Supplies as silos (B021)
-- [ ] Plus/minus on buildings: hover minus, clearer affordability (B022)
-- [ ] Food ↔ housing-stop cue on the building ring (B023)
-- [ ] Something to do while waiting: hand harvest + cheap repeatable (B024)
+### Shipped in v1.23.0 (chapter II UX, Ola chose all four)
+- [x] Food silo + net number (B021)
+- [x] Hover minus, solid/hollow plus (B022)
+- [x] Starved ring + red dot, silo same colour (B023)
+- [x] Hand harvest + market stalls (B024)
+
+### Chapter II next
+- [ ] Downhill feeling mid-chapter (Ola's question 5): windfall after a tier purchase, milestone cascades, periodic shipment. Decide, then build.
 
 ### Next (needs Ola's playtest first)
 - [ ] Tune cost ratios / bank gate after playtest (B015)
