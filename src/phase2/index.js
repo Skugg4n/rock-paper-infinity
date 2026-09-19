@@ -781,13 +781,14 @@ export function init() {
   try {
       initialize();
   } catch (e) {
-      console.error('Phase 2 init: initialize() failed — clearing corrupt save and restarting', e);
+      // Never touch the save here. A failing init is far more likely to be a
+      // stale-cache module mix after a deploy than a corrupt save (2026-09-18:
+      // this path wiped Ola's chapter II and reload-looped). Stop saving and
+      // hand the error to main.js, which refetches modules and retries once.
+      console.error('Phase 2 init: initialize() failed', e);
       savingEnabled = false;
-      localStorage.removeItem(SAVE_KEY);
-      localStorage.removeItem(STARS_TRANSFER_KEY);
-      // Let the page reload to a fresh Phase 2 state
-      setTimeout(() => location.reload(), 0);
-      return;
+      if (abortController) abortController.abort();
+      throw e;
   }
   // Only start ticks if initialize() did not trigger the WAR end-state.
   // When returning to a ≥50k population save, initialize() sets savingEnabled=false

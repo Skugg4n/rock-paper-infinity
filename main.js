@@ -41,6 +41,36 @@ document.getElementById('debug-menu-toggle')?.addEventListener('click', () => {
   document.getElementById('menu-dropdown')?.classList.add('hidden');
 });
 
+// Files that make up the game. After a deploy, GitHub Pages' 10-minute cache
+// can hand the browser a mix of old and new modules; if boot then fails we
+// refetch everything once (cache: 'reload') and retry, never touching saves.
+const MODULE_PATHS = [
+  'index.html', 'main.js', 'style.css', 'style-stage2.css', 'roman.js',
+  'src/constants.js', 'src/version.js', 'src/gamePhase.js', 'src/icons.js',
+  'src/chapterCard.js', 'src/save-export.js', 'src/perf.js',
+  'src/phase1/index.js', 'src/phase1/rendering.js', 'src/phase1/upgrades-config.js',
+  'src/phase1/rates.js', 'src/phase1/star-animation.js', 'src/phase1/cost-visual.js',
+  'src/phase1/countdown.js', 'src/phase1/persistence.js', 'src/phase1/upgrade-dashes.js',
+  'src/phase2/index.js', 'src/phase2/rendering.js', 'src/phase2/buildings-config.js',
+  'src/phase2/persistence.js', 'src/phase2/economy.js',
+];
+const RECOVERY_FLAG = 'rpi-recovered';
+
+async function recoverFromStaleCache(err) {
+  let already = false;
+  try { already = sessionStorage.getItem(RECOVERY_FLAG) === '1'; } catch { /* ignore */ }
+  if (already) {
+    console.error('bootstrap failed twice; saves untouched', err);
+    const v = document.getElementById('version-info');
+    if (v) v.textContent = `${VERSION} — could not start, try a hard reload (saves are safe)`;
+    return;
+  }
+  try { sessionStorage.setItem(RECOVERY_FLAG, '1'); } catch { /* ignore */ }
+  console.warn('bootstrap failed; refetching modules and retrying once', err);
+  await Promise.allSettled(MODULE_PATHS.map(p => fetch(p, { cache: 'reload' })));
+  location.reload();
+}
+
 async function bootstrap() {
   try {
     await preloadIcons();
@@ -61,4 +91,6 @@ async function bootstrap() {
   await setPhase(savedPhase);
 }
 
-bootstrap().catch(err => console.error('bootstrap failed', err));
+bootstrap()
+  .then(() => { try { sessionStorage.removeItem(RECOVERY_FLAG); } catch { /* ignore */ } })
+  .catch(recoverFromStaleCache);

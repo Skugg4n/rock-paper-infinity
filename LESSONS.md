@@ -104,6 +104,17 @@
 **Lesson:** The base action of an incremental game must always be available (Paperclips: you can always click "Make Paperclip").
 **Rule:** "There is always one free action that produces the primary currency."
 
+### #18 — Never delete a save in a catch block
+**Problem:** Phase 2's `initialize()` catch removed the save and reloaded. A stale-cache module mix after a deploy (new `index.js`, old `buildings-config.js`) made init throw deterministically: save gone, reload loop.
+**Cause:** "Corrupt save" was assumed to be the only reason init could fail.
+**Lesson:** A save is the player's property. Code can be wrong far more often than data. Recover by refetching code, never by deleting data.
+**Rule:** "No code path deletes a save except the player's own Reset."
+
+### #19 — No-build ES modules + CDN cache = mixed versions
+**Problem:** Files are cached independently for 10 minutes on GitHub Pages, so a deploy can be loaded half old, half new.
+**Lesson:** Data shared across modules must be tolerant of the other side being one version behind, or boot must detect failure and refetch.
+**Rule:** "After a failed boot, refetch all modules once with cache: 'reload' and retry; and prefer a hard reload right after a deploy when testing."
+
 ## Rules Checklist
 - [ ] Never bump version without updating all files in the checklist
 - [ ] Keep modules focused — one concern per file

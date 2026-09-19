@@ -355,8 +355,9 @@ items:
       building centres (home → store/factory → home); enemy island spawns
       red dots at stage 2; at WAR_POP the red dots cross to our outermost
       house, its ring turns red, the house darkens, then the chapter card.
-      Contained inside the plates per vision.md. Build after the cascade
-      playtest.
+      Ola (later): the dots should BREAK containment: walk outside and
+      between the plates, on the gaps, like roads. Later mix in cars:
+      slightly bigger, faster dots. Build after the cascade playtest.
 
   - id: B029
     added: 2026-09-18

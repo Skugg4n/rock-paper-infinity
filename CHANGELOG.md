@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.25.1 - 2026-09-18
+
+### Hotfix: reload loop after deploy
+
+- **A failed chapter II init no longer deletes the save or reloads in a loop.** Cause: GitHub Pages' 10-minute cache handed the browser the new `phase2/index.js` with the old `buildings-config.js`; init threw, the old handler wiped the chapter II save and reloaded, several times per second. The handler now keeps saves and rethrows.
+- **Stale-cache recovery in main.js** — if boot fails, every module is refetched with `cache: 'reload'` and the page retries once; a second failure shows a note next to the version number and leaves saves alone.
+
 ## v1.25.0 - 2026-09-18
 
 ### Chapter II cascades (Ola chose cascades over windfalls: "rimmar bäst med projektet")
