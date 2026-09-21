@@ -18,8 +18,8 @@ const FUEL_DAYS = 30;        // minerals kept back so the generators do not go d
 const s = initialDeepState();
 let real = 0, wakeUps = 0, buysThisWake = 0;
 const weakAwake = { M: 0, F: 0, E: 0, H: 0 }, weakAsleep = { M: 0, F: 0, E: 0, H: 0 };
-const events = [], log = [], buysPerWake = [], pressesPerTier = [0, 0, 0, 0];
-let starved = 0, minHumans = s.humans, starsDay0 = 0, starsDayEnd = 0;
+const events = [], log = [], buysPerWake = [], pressesPerTier = CRYO.map(() => 0);
+let starved = 0, minHumans = s.humans, starsDay0 = 0, starsDayEnd = 0, stall = 0, worstStall = 0;
 const fmt = (sec) => `${Math.floor(sec / 60)}m${String(Math.round(sec) % 60).padStart(2, '0')}s`;
 const yr = (d) => (d / DAYS_PER_YEAR).toFixed(1);
 const usedChambers = () => ROOMS.reduce((a, t) => a + s.rooms[t], 0);
@@ -90,6 +90,9 @@ while (real < REAL_CAP && !canAscend(s)) {
   starsDayEnd = r.stars;
   weakAwake[r.weakest]++;
   if (r.starving) starved++;
+  // how long the star counter can sit at zero while the player is awake: a stalled counter early
+  // on is the one thing that reads as "broken" rather than as "slow"
+  stall = r.stars > 0 ? 0 : stall + 1; worstStall = Math.max(worstStall, stall);
   minHumans = Math.min(minHumans, s.humans);
   // a human at a wake-up clicks several buttons, not one
   let bought, n = 0;
@@ -123,7 +126,7 @@ if (process.argv.includes('--why')) {
 }
 const share = (o) => COLUMN.map((k) => { const tot = COLUMN.reduce((a, c) => a + o[c], 0) || 1; return `${k} ${Math.round(100 * o[k] / tot)} %`; }).join(' ');
 const avgBuys = buysPerWake.length ? (buysPerWake.reduce((a, b) => a + b, 0) / buysPerWake.length).toFixed(1) : '0';
-console.log(`ended at ${fmt(real)}  year ${yr(s.day)}  surface ${surface(s.doom0, s.day).toFixed(1)} %  wake-ups ${wakeUps} (${avgBuys} buys each, presses I-IV ${pressesPerTier.join('/')})  humans ${Math.round(s.humans)} (low ${Math.round(minHumans)}, hungry ${starved} d)  chambers ${s.chambers}  cryo ${s.cryo + 1}/4  stars/day ${starsDay0.toPrecision(3)} → ${starsDayEnd.toPrecision(3)} (×${(starsDayEnd / (starsDay0 || 1)).toPrecision(2)})  weakest awake ${share(weakAwake)} | asleep ${share(weakAsleep)}  ascent ${canAscend(s)} (ring ${canResurface(s)}, ${Math.round(s.minerals / ASCENT.minerals * 100)} % ore, ${Math.round(s.stars / ASCENT.stars * 100)} % stars)`);
+console.log(`ended at ${fmt(real)}  year ${yr(s.day)}  surface ${surface(s.doom0, s.day).toFixed(1)} %  wake-ups ${wakeUps} (${avgBuys} buys each, presses ${pressesPerTier.join('/')})  humans ${Math.round(s.humans)} (low ${Math.round(minHumans)}, hungry ${starved} d)  longest stall ${worstStall} s  chambers ${s.chambers}  cryo ${s.cryo + 1}/${CRYO.length}  stars/day ${starsDay0.toPrecision(3)} → ${starsDayEnd.toPrecision(3)} (×${(starsDayEnd / (starsDay0 || 1)).toPrecision(2)})  weakest awake ${share(weakAwake)} | asleep ${share(weakAsleep)}  ascent ${canAscend(s)} (ring ${canResurface(s)}, ${Math.round(s.minerals / ASCENT.minerals * 100)} % ore, ${Math.round(s.stars / ASCENT.stars * 100)} % stars)`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

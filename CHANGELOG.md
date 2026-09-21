@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.39.2 - 2026-09-21
+
+### Chapter IV retuned to 802,701: one constant sets the calendar, and cryo goes up to a hundred millennia
+
+- **END_YEAR is the chapter.** `src/phase4/deep.js` derives the surface decay from `END_YEAR` (802701, the year the traveller stops at) and `DOOM_AT_BOOM`, so 15 % is reached in exactly that year. Move the one number and the whole calendar moves with it; `resurfaceDay()` says which day the ring opens. The Wells odometer, not 350 years.
+- **Seven cryo tiers**: a month, a year, a decade, a century, a millennium, ten millennia, a hundred millennia. The top tier carries the last 700,000 years in seven presses, and the prices are set so each tier is bought after a real run of the one below (presses 11/19/16/5/7/11/7 in the simulated run).
+- **The first nine minutes are machines, not time travel.** Cryo I is not bought until 8m45s; up to then the colony digs, builds, levels and reaches its first automations while stars per day climb from 38 to a few thousand. Bigger dormitories (16 beds) and faster growth (people fill empty beds in weeks, not years) cut the worst dead stretch where every hand is on shift and the star counter reads zero from 106 s down to 68 s.
+- **A sleep no longer loops a day at a time.** When a sleeping day leaves nothing that could make the next one different, `sleep()` runs the rest in one step, exactly, not as an estimate. Without it a press of cryo VII would be 36 million iterations in the browser. A test sleeps 20,000 days both ways and compares.
+- **Asleep the generators burn half the ore** (the lifts are still, nothing moves but the machines), which keeps minerals from being the only thing the wake-up summary ever complains about.
+- **Simulation**: 21m44s to resurface in year 802701, 76 wake-ups with 3.8 buys each, 50,679 people and no hungry days, weakest awake M 23 % F 30 % E 29 % H 18 %. New summary field: longest stall (how long the star counter can read zero while awake).
+
 ## v1.39.1 - 2026-09-21
 
 ### Chapter IV: the four columns tuned, the sleep earned (rules and simulation, still no UI)
