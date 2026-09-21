@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.39.1 - 2026-09-21
+
+### Chapter IV: the four columns tuned, the sleep earned (rules and simulation, still no UI)
+
+- **The four columns now mean the same thing.** M, F, E and H are each a SURPLUS PER DAY: ore mined minus the ore the generators burn, food grown minus food eaten, energy made minus energy drawn, and hands not on duty (counted in what a day of those hands is worth). Stars per day = 10 × the smallest of the four, so the dot on the weakest column is a straight instruction: raise that one. Before, people were a stock measured against four flows, which pinned the bottleneck on humans 1143 days out of 1158.
+- **Every upgrade still pays for itself.** What a room costs to run grows with its level too (`upkeepMultiplier`), but far slower than what it makes, so the columns stay tied together without a purchase ever making the colony poorer. Hands and power are both shared out in a fixed order, a fraction at a time: the lights first, and ore before food, because a colony that stops mining never lights up again.
+- **The colony cannot grow itself into a famine.** Creches only run while the farms bring in a quarter more than the colony will eat when it wakes, and only while there are beds. A dormitory does two jobs: rooms are beds, levels are better quarters, so the colony ends the chapter a few thousand strong instead of a few billion. Nobody goes hungry in the simulated run.
+- **Cryo is a staircase, not a button.** The sleep tiers cost far more, a press only makes sense when the colony runs itself (mine, farm and generator automated), and the sensor on the shaft wakes everyone the day the ring opens instead of a century past it. Advanced automation is the top of its ladder (×100, once).
+- **Simulation** (`node scripts/sim-phase4.mjs`, new flags `--all` and `--why`): 23m51s to resurface at year 347, 58 wake-ups with 3.2 buys each (cryo presses I-IV 8/26/23/1), 5687 people and no hungry days, weakest awake M 33 % F 25 % E 21 % H 22 %. Purchase log reads rooms, levels, automation I, cryo I, automation II, cryo II, automation III, cryo III, advanced automation, cryo IV.
+
 ## v1.39.0 - 2026-09-21
 
 ### Chapter IV · THE DEEP: design sketch, rules and simulation (no UI yet)
