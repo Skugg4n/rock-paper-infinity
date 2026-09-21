@@ -159,3 +159,27 @@ day rising 10³–10⁴× over the chapter.
 4. Should the surface heal faster if we stop burning fuel (generators)? A green
    choice: solar shafts vs. fuel. It would give energy a second axis.
 5. Animals: a nuisance (eat food) or a resource (hunt = food)? Or both, in order.
+
+## Ola on the first mockup (2026-09-21)
+
+- Hard to tell what is active now and what unlocks later. Keep the design simple.
+- Too much information at once, but pretty. Sync it with the earlier chapters: no
+  gradient backgrounds. Consider **dark mode for this chapter** to show the deep and
+  the claustrophobia, with a faint light from our chambers.
+- Time labels y m d: keep. Advisor line: keep (text in one place is fine).
+- The crust: **fog of war**. Dark until we break through and look. Alternative: the
+  silhouette of a bombed city above.
+- General rule for IV: **never show all the cards at once.** Things appear as the
+  colony develops.
+
+### Proposal for mockup 2 (next session)
+
+- Dark chapter: the palette flips when we go down (chapters as layers: I–III light,
+  IV dark, V the light returns). Rock is near-black, dug chambers glow faintly, the
+  ants are the light. Flat fills only, no gradients, like the plates in II.
+- Three states drawn, not one: minute 0 (shaft, rubble, one chamber, one bar, one
+  button), minute 5 (three chambers, four bars, the bottleneck dot, cryo teased grey),
+  first wake-up (replay strip appears, the ring is revealed for the first time).
+- Teasers exactly as in II: a greyed icon appears when the previous step is bought,
+  never before. No bottom row of far-future rooms.
+- Crust stays black until the first probe returns; then the ring appears as an estimate.
