@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV · THE DEEP · 3D mockup 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+<style>
+/* Mockup 6 of the chapter IV board. Mockup 5, sharpened:
+   five floors instead of three, no rounded corners anywhere, bridges at the
+   floor's own height and thickness so a floor is one cross shaped slab, the
+   shaft is the stairs (people walk in, vanish, come out lower down), and the
+   people are tiny points like the dots of chapter II.
+
+   TWO COLOURS:
+     rock   #0f141b   the background, and the well that seals the shaft
+     plate  #1e2733   every slab, every bridge, the shaft, the hatch rim
+   One lamp hangs near the way in, so the light falls off with depth and the
+   lowest floor is nearly dark. No textures, no fog, no gradients, no third
+   colour. The people carry the only other light. Every number is by hand. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+    background-color: #070a0e;
+    color: #8fa1b6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    user-select: none;
+}
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.hdr {
+    width: 1440px;
+    margin: 0 auto;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 0 72px;
+    background: #070a0e;
+}
+.chapter-mark {
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    font-size: 22px;
+    color: #55637a;
+}
+.ver { margin-left: auto; font-size: 10px; color: #2f3949; }
+
+.stage {
+    position: relative;
+    width: 1440px;
+    height: 900px;
+    margin: 0 auto 26px;
+    background: #0f141b;
+    overflow: hidden;
+}
+#scene { position: absolute; inset: 0; }
+#scene canvas { display: block; }
+#labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+/* ---- labels anchored to plates ------------------------------------------ */
+.lbl { position: absolute; pointer-events: none; }
+.lbl-in {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9fb0c4;
+    transition: opacity 250ms ease;
+}
+.lbl-in .lvl {
+    position: absolute;
+    left: 2px;
+    bottom: 2px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #3c4a5c;
+    color: #dbe4f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    line-height: 17px;
+    text-align: center;
+}
+.lbl-in .auto { position: absolute; right: 3px; top: 3px; color: #64748b; }
+.dig-ring { animation: dig 9s ease-in-out infinite alternate; }
+@keyframes dig { from { stroke-dashoffset: 46; } to { stroke-dashoffset: 38; } }
+.ring-base { stroke: #2a3442; }
+.ring-fg { transform: rotate(-90deg); transform-origin: 50% 50%; }
+
+/* ---- chrome, the same as mockups 3 to 5 ---------------------------------- */
+.btn {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    padding: 0.75rem;
+    border-radius: 9999px;
+    background-color: #1e2733;
+    color: #aab8c9;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    border: 0;
+    z-index: 10;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn.is-locked { opacity: 0.3; cursor: default; }
+.btn.is-locked:hover { transform: none; }
+
+.bar { position: relative; width: 24px; }
+.track {
+    width: 24px;
+    height: 160px;
+    border-radius: 9999px;
+    background: #1e2733;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+}
+.fill { width: 100%; border-radius: 9999px; background: #7d8fa5; }
+.stop-dot {
+    position: absolute;
+    left: 50%;
+    margin-left: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: #dc2626;
+}
+.col-head { font-size: 12px; color: #93a3b8; width: 24px; text-align: center; }
+.col-foot { font-size: 11px; color: #55637a; width: 24px; text-align: center; letter-spacing: 0.08em; }
+.caption { position: absolute; left: 72px; bottom: 22px; font-size: 11px; color: #37424f; z-index: 10; }
+.chrome { z-index: 10; }
+
+#fallback {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #55637a;
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+    <span class="chapter-mark">IV · THE DEEP</span>
+    <span class="ver mono">mockup 0.6</span>
+</header>
+
+<div class="stage">
+    <div id="scene"></div>
+    <div id="labels"></div>
+    <div id="fallback" class="mono">this view needs WebGL</div>
+
+    <!-- time -->
+    <div class="chrome" style="position:absolute; left:72px; top:76px;">
+        <div class="mono" style="display:grid; grid-template-columns:auto 16px auto 16px auto; align-items:baseline; column-gap:4px;">
+            <span style="font-size:48px; font-weight:700; color:#dbe4f0; line-height:1;">0</span>
+            <span style="font-size:18px; color:#3b4757; text-align:center;">·</span>
+            <span style="font-size:24px; color:#5f6d80; line-height:1;">4</span>
+            <span style="font-size:18px; color:#3b4757; text-align:center;">·</span>
+            <span style="font-size:24px; color:#5f6d80; line-height:1;">12</span>
+            <span style="font-size:9px; color:#3b4757; letter-spacing:0.18em; text-align:center;">y</span>
+            <span></span>
+            <span style="font-size:9px; color:#3b4757; letter-spacing:0.18em; text-align:center;">m</span>
+            <span></span>
+            <span style="font-size:9px; color:#3b4757; letter-spacing:0.18em; text-align:center;">d</span>
+        </div>
+    </div>
+
+    <!-- what we hold -->
+    <div class="chrome" style="position:absolute; right:72px; top:76px; display:flex; flex-direction:column; align-items:flex-end; gap:14px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span class="mono" style="font-size:22px; font-weight:700; color:#c3cfdd;">420</span>
+            <i data-lucide="gem" class="w-5 h-5" style="color:#5f6d80;"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span class="mono" style="font-size:22px; font-weight:700; color:#c3cfdd;">1 260</span>
+            <i data-lucide="star" class="w-5 h-5" style="color:#5f6d80;"></i>
+        </div>
+    </div>
+
+    <!-- the four columns, the shortest marked -->
+    <div class="chrome" style="position:absolute; left:80px; top:392px;">
+        <div class="mono" style="display:flex; gap:20px; margin-bottom:6px;">
+            <span class="col-head">18</span><span class="col-head">23</span><span class="col-head">11</span><span class="col-head">16</span>
+        </div>
+        <div style="display:flex; gap:20px;">
+            <div class="bar"><div class="track"><div class="fill" style="height:108px;"></div></div></div>
+            <div class="bar"><div class="track"><div class="fill" style="height:132px;"></div></div></div>
+            <div class="bar">
+                <div class="track"><div class="fill" style="height:64px;"></div></div>
+                <span class="stop-dot" style="bottom:74px;"></span>
+            </div>
+            <div class="bar"><div class="track"><div class="fill" style="height:96px;"></div></div></div>
+        </div>
+        <div class="mono" style="display:flex; gap:20px; margin-top:8px;">
+            <span class="col-foot">M</span><span class="col-foot">F</span><span class="col-foot">E</span><span class="col-foot">H</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:26px; color:#7d8fa5;">
+            <span class="mono" style="font-size:20px; font-weight:700;">110</span>
+            <span style="display:flex; align-items:center;">
+                <i data-lucide="star" class="w-4 h-4"></i>
+                <span class="mono" style="font-size:12px; margin:0 2px;">/</span>
+                <i data-lucide="sun" class="w-4 h-4"></i>
+            </span>
+        </div>
+    </div>
+
+    <!-- the buttons -->
+    <button class="btn" style="left:1312px; top:300px;" aria-label="Dig">
+        <i data-lucide="shovel" class="w-7 h-7"></i>
+    </button>
+    <button class="btn" style="left:1312px; top:372px;" aria-label="Build a room">
+        <i data-lucide="hammer" class="w-7 h-7"></i>
+    </button>
+    <button class="btn" style="left:1312px; top:444px;" aria-label="Level">
+        <i data-lucide="chevrons-up" class="w-7 h-7"></i>
+    </button>
+    <button class="btn is-locked" style="left:1312px; top:516px;" aria-label="Cryo">
+        <i data-lucide="snowflake" class="w-7 h-7"></i>
+    </button>
+
+    <span class="caption mono">5 min</span>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const ROCK = 0x0f141b;
+const PLATE = 0x1e2733;
+const PEOPLE = 0xdbe4f0;
+
+const PITCH = 2.6;        // cell to cell
+const PLATE_W = 2.0;      // a slab is this wide, so the street between two is 0.6
+const PLATE_H = 0.26;     // and this thin
+const FLOOR_GAP = 3.2;
+const SHAFT_R = 0.52;
+const WALK_Y = 0.22;      // the people walk on top of the slab
+
+/* Five floors: the first is the one they have had longest, and each one below
+   is thinner. The last is a single landing with the next chamber being dug,
+   at the bottom of the shaft. */
+const FLOORS = [
+    { cells: [
+        { x: 0, z: 0, lid: true },
+        { x: 0, z: -1, room: 'pickaxe', lvl: 2 },
+        { x: -1, z: 0, room: 'sprout', lvl: 1, auto: true },
+        { x: 0, z: 1, room: 'bed', lvl: 1 },
+        { x: 1, z: 0, room: 'zap', lvl: 2 },
+        { x: 2, z: 0, room: 'zap', lvl: 1 },
+        { x: 3, z: 0, room: 'zap', lvl: 1 }
+    ], people: 26 },
+    { cells: [
+        { x: 0, z: 0, landing: true },
+        { x: 0, z: -1, room: 'snowflake', lvl: 1 },
+        { x: -1, z: 0, room: 'pickaxe', lvl: 1 },
+        { x: 1, z: 0, room: 'zap', lvl: 1 },
+        { x: 0, z: 1, room: 'sprout', lvl: 1, auto: true }
+    ], people: 16 },
+    { cells: [
+        { x: 0, z: 0, landing: true },
+        { x: 0, z: -1, room: 'pickaxe', lvl: 1 },
+        { x: -1, z: 0, room: 'bed', lvl: 1 },
+        { x: 1, z: 0, room: 'zap', lvl: 1 }
+    ], people: 10 },
+    { cells: [
+        { x: 0, z: 0, landing: true },
+        { x: 0, z: -1, room: 'pickaxe', lvl: 1 },
+        { x: 1, z: 0, room: 'sprout', lvl: 1 }
+    ], people: 5 },
+    { cells: [
+        { x: 0, z: 0, landing: true, dig: true }
+    ], people: 0 }
+];
+FLOORS.forEach(function (f, i) { f.y = -i * FLOOR_GAP; });
+const BOTTOM = FLOORS[FLOORS.length - 1].y;
+
+const host = document.getElementById('scene');
+const labelHost = document.getElementById('labels');
+
+let renderer;
+try {
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (e) {
+    document.getElementById('fallback').style.display = 'flex';
+}
+
+if (renderer) {
+    const W = host.clientWidth, H = host.clientHeight;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W, H);
+    renderer.setClearColor(ROCK, 1);
+    host.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer({ element: labelHost });
+    labelRenderer.setSize(W, H);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(ROCK);
+
+    const camera = new THREE.PerspectiveCamera(40, W / H, 0.1, 400);
+    camera.position.set(15, 7.5, 20);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0.8, -5.6, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.enablePan = true;                 // right drag
+    controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN
+    };
+    controls.enableZoom = true;
+    controls.minDistance = 9;
+    controls.maxDistance = 52;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.3;
+    controls.minPolarAngle = 0.42;             // never straight above
+    controls.maxPolarAngle = 1.33;             // never under the floors
+    controls.update();
+    // the turntable is there to show the model; the moment the player takes hold
+    // of it, it is theirs, and it never starts turning again on its own
+    controls.addEventListener('start', function () { controls.autoRotate = false; });
+    renderer.domElement.addEventListener('wheel', function () { controls.autoRotate = false; }, { passive: true });
+
+    // one lamp, hanging where they came in: everything below it falls away
+    scene.add(new THREE.AmbientLight(0xffffff, 0.09));
+    const lamp = new THREE.PointLight(0xffffff, 44, 0, 1.25);
+    lamp.position.set(1.2, 8, 1.6);
+    scene.add(lamp);
+
+    const plateMat = new THREE.MeshLambertMaterial({ color: PLATE });
+    const rockMat = new THREE.MeshLambertMaterial({ color: ROCK });
+
+    const plateGeo = new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_W);
+    const solids = [];
+
+    function addPlate(x, y, z, s) {
+        const m = new THREE.Mesh(plateGeo, plateMat);
+        m.position.set(x, y, z);
+        if (s) m.scale.set(s, 1, s);
+        scene.add(m);
+        solids.push(m);
+        return m;
+    }
+
+    // a bridge is the floor itself, only narrower: same height, same thickness,
+    // so a floor reads as one sharp slab and not as plates with sticks between
+    const bridgeGeo = new THREE.BoxGeometry(PITCH - PLATE_W + 0.04, PLATE_H, 0.84);
+    function addBridge(ax, az, bx, bz, y) {
+        const m = new THREE.Mesh(bridgeGeo, plateMat);
+        m.position.set((ax + bx) / 2 * PITCH, y, (az + bz) / 2 * PITCH);
+        if (az !== bz) m.rotation.y = Math.PI / 2;
+        scene.add(m);
+        solids.push(m);
+    }
+
+    // ---- the shaft: plate colour, and it is also the stairs ----
+    const shaftH = -0.05 - BOTTOM;
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_R, SHAFT_R, shaftH, 32), plateMat);
+    shaft.position.set(0, BOTTOM + shaftH / 2, 0);
+    scene.add(shaft);
+    solids.push(shaft);
+
+    // ---- labels ----
+    const labels = [];
+    function makeLabel(html, x, y, z) {
+        const wrap = document.createElement('div');
+        wrap.className = 'lbl';
+        const inner = document.createElement('div');
+        inner.className = 'lbl-in';
+        inner.innerHTML = html;
+        wrap.appendChild(inner);
+        const obj = new CSS2DObject(wrap);
+        obj.position.set(x, y, z);
+        scene.add(obj);
+        labels.push({ obj, inner });
+    }
+
+    // ---- build ----
+    FLOORS.forEach(function (floor) {
+        const taken = new Map();
+        floor.cells.forEach(function (c) { taken.set(c.x + ',' + c.z, c); });
+        floor.segments = [];
+
+        floor.cells.forEach(function (c) {
+            addPlate(c.x * PITCH, floor.y, c.z * PITCH);
+
+            if (c.lid) {
+                // the way in from chapter III, closed: a raised rim in plate, a
+                // well of rock sunk inside it, and the bar laid across
+                const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.84, 0.84, 0.18, 32), plateMat);
+                rim.position.set(0, floor.y + PLATE_H / 2 + 0.04, 0);
+                scene.add(rim);
+                const well = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.2, 32), rockMat);
+                well.position.set(0, floor.y + PLATE_H / 2 + 0.02, 0);
+                scene.add(well);
+                const bar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.14, 0.3), plateMat);
+                bar.position.set(0, floor.y + PLATE_H / 2 + 0.14, 0);
+                scene.add(bar);
+                solids.push(rim, well, bar);
+            } else if (c.dig) {
+                makeLabel(
+                    '<svg viewBox="0 0 40 40" style="width:34px;height:34px;">' +
+                    '<circle class="ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle>' +
+                    '<circle class="ring-fg dig-ring" cx="20" cy="20" r="18" fill="none" stroke-width="3" ' +
+                    'stroke-dasharray="113" stroke-dashoffset="43" style="stroke:#7d8fa5;"></circle></svg>',
+                    0.95, floor.y + 0.42, 0
+                );
+            } else if (c.room) {
+                let html = '<i data-lucide="' + c.room + '" class="w-7 h-7"></i>';
+                html += '<span class="lvl mono">' + c.lvl + '</span>';
+                if (c.auto) html += '<i data-lucide="repeat" class="auto w-3.5 h-3.5"></i>';
+                makeLabel(html, c.x * PITCH, floor.y + 0.45, c.z * PITCH);
+            }
+        });
+
+        floor.cells.forEach(function (c) {
+            [[1, 0], [0, 1]].forEach(function (d) {
+                const n = taken.get((c.x + d[0]) + ',' + (c.z + d[1]));
+                if (!n) return;
+                addBridge(c.x, c.z, n.x, n.z, floor.y);
+                // an automated room is one nobody walks to, so no street either
+                if (c.auto || n.auto) return;
+                floor.segments.push({
+                    a: new THREE.Vector3(c.x * PITCH, floor.y + WALK_Y, c.z * PITCH),
+                    b: new THREE.Vector3(n.x * PITCH, floor.y + WALK_Y, n.z * PITCH),
+                    aHub: c.x === 0 && c.z === 0,
+                    bHub: n.x === 0 && n.z === 0
+                });
+            });
+        });
+    });
+
+    // ---- the people: tiny points, and the shaft is their staircase ----
+    function mulberry32(a) {
+        return function () {
+            a |= 0; a = a + 0x6D2B79F5 | 0;
+            let t = Math.imul(a ^ a >>> 15, 1 | a);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+    const rnd = mulberry32(20260921);
+    const walkable = FLOORS.filter(function (f) { return f.segments.length > 0; });
+
+    const folk = [];
+    FLOORS.forEach(function (floor, fi) {
+        for (let i = 0; i < floor.people; i++) {
+            const seg = floor.segments[i % floor.segments.length];
+            folk.push({
+                floor: fi, seg: seg, t: rnd(), dir: rnd() < 0.5 ? 1 : -1,
+                speed: 0.09 + rnd() * 0.16,
+                state: 'street', clock: 0, dur: 0,
+                from: new THREE.Vector3(), to: new THREE.Vector3()
+            });
+        }
+    });
+
+    const pos = new Float32Array(folk.length * 3);
+    const dots = new THREE.BufferGeometry();
+    dots.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const people = new THREE.Points(dots, new THREE.PointsMaterial({ color: PEOPLE, size: 0.06 }));
+    people.frustumCulled = false;
+    scene.add(people);
+
+    function pickSegmentAtHub(floor) {
+        const hubbed = floor.segments.filter(function (s) { return s.aHub || s.bHub; });
+        const list = hubbed.length ? hubbed : floor.segments;
+        return list[Math.floor(rnd() * list.length)];
+    }
+
+    function stepPerson(p, dt) {
+        if (p.state === 'street') {
+            p.t += p.dir * p.speed * dt;
+            if (p.t >= 1 || p.t <= 0) {
+                const atA = p.t <= 0;
+                p.t = atA ? 0 : 1;
+                p.dir = atA ? 1 : -1;
+                const atHub = atA ? p.seg.aHub : p.seg.bHub;
+                // at the head of the stairs, one in three takes them
+                if (atHub && rnd() < 0.34 && walkable.length > 1) {
+                    const here = FLOORS[p.floor];
+                    let next = p.floor + (rnd() < 0.72 ? 1 : -1);      // mostly down
+                    if (next < 0) next = 1;
+                    while (next >= 0 && next < FLOORS.length && FLOORS[next].segments.length === 0) next++;
+                    if (next >= FLOORS.length) next = p.floor - 1;
+                    if (next >= 0 && next !== p.floor && FLOORS[next].segments.length) {
+                        p.state = 'enter';
+                        p.clock = 0;
+                        p.dur = 0.55;
+                        p.from.lerpVectors(p.seg.a, p.seg.b, atA ? 0.24 : 0.76);
+                        p.to.set(0, here.y + WALK_Y, 0);
+                        p.next = next;
+                    }
+                }
+            }
+        } else {
+            p.clock += dt;
+            if (p.clock >= p.dur) {
+                if (p.state === 'enter') {
+                    // inside the shaft now, and out of sight: the climb takes a while
+                    p.state = 'stairs';
+                    p.clock = 0;
+                    p.dur = 1 + rnd() * 2;
+                    p.from.set(0, FLOORS[p.floor].y + WALK_Y, 0);
+                    p.to.set(0, FLOORS[p.next].y + WALK_Y, 0);
+                } else if (p.state === 'stairs') {
+                    p.floor = p.next;
+                    p.seg = pickSegmentAtHub(FLOORS[p.floor]);
+                    const hubAtA = p.seg.aHub;
+                    p.state = 'exit';
+                    p.clock = 0;
+                    p.dur = 0.55;
+                    p.from.set(0, FLOORS[p.floor].y + WALK_Y, 0);
+                    p.to.lerpVectors(p.seg.a, p.seg.b, hubAtA ? 0.24 : 0.76);
+                    p.t = hubAtA ? 0 : 1;
+                    p.dir = hubAtA ? 1 : -1;
+                } else {
+                    p.state = 'street';
+                }
+            }
+        }
+    }
+
+    function personPosition(p, out) {
+        if (p.state === 'street') {
+            // they keep to the street between two slabs, never over a room
+            out.lerpVectors(p.seg.a, p.seg.b, 0.24 + p.t * 0.52);
+        } else {
+            out.lerpVectors(p.from, p.to, Math.min(1, p.clock / p.dur));
+        }
+    }
+
+    // ---- labels: crisp, sized with the zoom, hidden when something is in front ----
+    const ray = new THREE.Raycaster();
+    const tmp = new THREE.Vector3();
+    function updateLabels() {
+        labels.forEach(function (l) {
+            l.obj.getWorldPosition(tmp);
+            const dist = camera.position.distanceTo(tmp);
+            const s = Math.min(1.2, Math.max(0.4, 20 / dist));
+            l.inner.style.transform = 'scale(' + s.toFixed(3) + ')';
+            ray.set(camera.position, tmp.clone().sub(camera.position).normalize());
+            const hit = ray.intersectObjects(solids, false)[0];
+            l.inner.style.opacity = (hit && hit.distance < dist - 0.5) ? '0' : '1';
+        });
+    }
+
+    const clock = new THREE.Clock();
+    const p3 = new THREE.Vector3();
+    function frame() {
+        const dt = Math.min(clock.getDelta(), 0.05);
+        for (let i = 0; i < folk.length; i++) {
+            stepPerson(folk[i], dt);
+            personPosition(folk[i], p3);
+            pos[i * 3] = p3.x; pos[i * 3 + 1] = p3.y; pos[i * 3 + 2] = p3.z;
+        }
+        dots.attributes.position.needsUpdate = true;
+        controls.update();
+        updateLabels();
+        renderer.render(scene, camera);
+        labelRenderer.render(scene, camera);
+        requestAnimationFrame(frame);
+    }
+    frame();
+
+    window.addEventListener('resize', function () {
+        const w = host.clientWidth, h = host.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+        labelRenderer.setSize(w, h);
+    });
+
+    lucide.createIcons();
+}
+</script>
+</body>
+</html>
