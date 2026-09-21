@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV · THE DEEP · side view mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+/* Static mockup of the chapter IV board. No game logic: every number is placed by hand.
+   Visual language borrowed from index.html, style.css and style-stage2.css:
+   white plates with soft shadows, no borders, mono numbers, round .btn buttons,
+   the doomsday ring from III, the dark tooltip, Bebas Neue for the chapter mark. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+    background-color: #f1f5f9;
+    color: #334155;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    user-select: none;
+    overflow-x: auto;
+}
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- stage ------------------------------------------------------------- */
+.stage {
+    position: relative;
+    width: 1440px;
+    height: 900px;
+    margin: 0 auto;
+    overflow: hidden;
+    background: linear-gradient(180deg, #e4e9f1 0%, #d6dde7 34%, #c4cdda 70%, #b6c0d0 100%);
+}
+.layer { position: absolute; inset: 0; pointer-events: none; }
+
+/* The excavation is drawn as one shape so the shaft, the corridors and the
+   chambers share a single shadow and read as one carved cavity. */
+.cavity { filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.18)); }
+.cavity rect { fill: #ffffff; }
+.ghost rect { fill: #ffffff; opacity: 0.32; }
+.ghost rect.deeper { opacity: 0.16; }
+.rubble rect { opacity: 0.95; }
+
+/* ---- crust ------------------------------------------------------------- */
+.crust { position: absolute; top: 0; left: 0; }
+
+/* ---- chambers ---------------------------------------------------------- */
+.room {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+}
+.room .lvl {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #475569;
+    color: #fff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    line-height: 18px;
+    text-align: center;
+}
+.room .auto { position: absolute; right: 12px; top: 10px; color: #a3aebf; }
+.room.teaser { color: #97a3b4; opacity: 0.5; }
+.room.teaser.deeper { opacity: 0.26; }
+
+/* ---- ants -------------------------------------------------------------- */
+.ant {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: #1e3a8a;
+    opacity: 0.9;
+    animation: ant-step 11s ease-in-out infinite alternate;
+}
+@keyframes ant-step { from { transform: translateX(0); } to { transform: translateX(14px); } }
+
+/* ---- rings ------------------------------------------------------------- */
+.ring-base { stroke: #e2e8f0; }
+.ring-fg { transform: rotate(-90deg); transform-origin: 50% 50%; }
+.ring-ghost { stroke: #94a3b8; opacity: 0.45; transform: rotate(-90deg); transform-origin: 50% 50%; }
+.dig-ring { animation: dig 9s ease-in-out infinite alternate; }
+@keyframes dig { from { stroke-dashoffset: 46; } to { stroke-dashoffset: 38; } }
+
+/* ---- buttons (chapter III) --------------------------------------------- */
+.btn {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    padding: 0.75rem;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    color: #475569;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    border: 0;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+.btn.is-locked { opacity: 0.4; cursor: default; }
+.btn.is-locked:hover { transform: none; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+.btn-badge {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #475569;
+    color: #fff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+}
+
+/* One tooltip is left open so the hover state is visible in the mockup. */
+.tooltip {
+    position: absolute;
+    right: 124%;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #1e2b3b;
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+.tooltip .cost, .tooltip .effect { display: flex; align-items: center; gap: 4px; }
+.tooltip .effect { color: #cbd5e1; }
+
+/* ---- resource columns --------------------------------------------------- */
+.bar { position: relative; width: 26px; }
+.track {
+    width: 26px;
+    height: 200px;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.fill { width: 100%; border-radius: 9999px; background: #64748b; }
+.stop-dot {
+    position: absolute;
+    left: 50%;
+    margin-left: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: #b91c1c;
+}
+
+/* ---- replay strip ------------------------------------------------------- */
+.replay-line { position: absolute; height: 2px; border-radius: 2px; background: #cbd5e1; }
+.tick { position: absolute; width: 1px; background: #b3bfcd; }
+.replay-ico { position: absolute; color: #64748b; }
+.replay-ico.stalled { color: #c3ccd8; }
+.replay-ico .flag {
+    position: absolute;
+    right: -3px;
+    top: -3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: #b45309;
+}
+
+/* ---- top right feed ----------------------------------------------------- */
+.advisor {
+    border-top: 1px solid rgba(100, 116, 139, 0.25);
+    padding-top: 6px;
+    color: #334155;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.chapter-mark {
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    font-size: 22px;
+    color: #aab4c3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ant, .dig-ring { animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+    <!-- ============ THE BOARD (svg: crust, cavity, rubble) ============ -->
+    <svg class="layer" width="1440" height="900" viewBox="0 0 1440 900" aria-hidden="true">
+        <!-- what is not dug yet: the same shapes, barely there -->
+        <g class="ghost">
+            <rect x="676" y="606" width="88" height="250" rx="14"/>
+            <rect x="468" y="628" width="168" height="88" rx="16"/>
+            <rect x="636" y="659" width="48" height="26"/>
+            <rect x="804" y="628" width="168" height="88" rx="16"/>
+            <rect x="756" y="659" width="48" height="26"/>
+            <rect class="deeper" x="468" y="746" width="168" height="88" rx="16"/>
+            <rect class="deeper" x="636" y="777" width="48" height="26"/>
+            <rect class="deeper" x="804" y="746" width="168" height="88" rx="16"/>
+            <rect class="deeper" x="756" y="777" width="48" height="26"/>
+        </g>
+
+        <!-- the excavation -->
+        <g class="cavity">
+            <rect x="676" y="200" width="88" height="414" rx="14"/>
+            <rect x="468" y="256" width="168" height="88" rx="16"/>
+            <rect x="636" y="287" width="48" height="26"/>
+            <rect x="804" y="256" width="168" height="88" rx="16"/>
+            <rect x="756" y="287" width="48" height="26"/>
+            <rect x="468" y="380" width="168" height="88" rx="16"/>
+            <rect x="636" y="411" width="48" height="26"/>
+            <rect x="804" y="380" width="168" height="88" rx="16"/>
+            <rect x="756" y="411" width="48" height="26"/>
+            <rect x="468" y="504" width="168" height="88" rx="16"/>
+            <rect x="636" y="535" width="48" height="26"/>
+            <rect x="804" y="512" width="140" height="72" rx="16"/>
+            <rect x="756" y="535" width="52" height="26"/>
+        </g>
+
+        <!-- the exit was blown: the top of the shaft is rubble -->
+        <g class="rubble">
+            <rect x="680" y="204" width="36" height="22" rx="5" fill="#98a3b3" transform="rotate(-8 698 215)"/>
+            <rect x="716" y="200" width="42" height="19" rx="5" fill="#aab4c2" transform="rotate(6 737 210)"/>
+            <rect x="686" y="228" width="32" height="21" rx="5" fill="#8d99aa" transform="rotate(12 702 238)"/>
+            <rect x="720" y="226" width="38" height="23" rx="6" fill="#9fabb9" transform="rotate(-5 739 237)"/>
+            <rect x="696" y="250" width="46" height="18" rx="5" fill="#93a0b0" transform="rotate(3 719 259)"/>
+            <rect x="678" y="248" width="24" height="17" rx="5" fill="#a6b1bf" transform="rotate(-14 690 256)"/>
+            <rect x="738" y="246" width="24" height="19" rx="5" fill="#8b98a9" transform="rotate(9 750 255)"/>
+            <!-- loose rock at the chamber being dug -->
+            <rect x="948" y="540" width="20" height="14" rx="4" fill="#a4aebd" transform="rotate(11 958 547)"/>
+            <rect x="936" y="560" width="15" height="11" rx="3" fill="#97a2b1" transform="rotate(-9 943 565)"/>
+        </g>
+    </svg>
+
+    <!-- ============ CRUST ============ -->
+    <svg class="crust" width="1440" height="80" viewBox="0 0 1440 80" aria-hidden="true">
+        <defs>
+            <linearGradient id="crustFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0d1524"/>
+                <stop offset="60%" stop-color="#1e293b"/>
+                <stop offset="100%" stop-color="#334155"/>
+            </linearGradient>
+        </defs>
+        <path id="crust-path" fill="url(#crustFill)"></path>
+    </svg>
+
+    <!-- ============ TIME: the counter that goes up ============ -->
+    <div style="position:absolute; left:72px; top:78px;">
+        <div class="mono" style="display:grid; grid-template-columns:auto 18px auto 18px auto; align-items:baseline; column-gap:4px;">
+            <span style="font-size:52px; font-weight:700; color:#334155; line-height:1;">12</span>
+            <span style="font-size:20px; color:#a3aebf; text-align:center;">·</span>
+            <span style="font-size:26px; color:#64748b; line-height:1;">03</span>
+            <span style="font-size:20px; color:#a3aebf; text-align:center;">·</span>
+            <span style="font-size:26px; color:#64748b; line-height:1;">14</span>
+
+            <span class="mono" style="font-size:9px; color:#a3aebf; letter-spacing:0.18em; text-align:center;">y</span>
+            <span></span>
+            <span class="mono" style="font-size:9px; color:#a3aebf; letter-spacing:0.18em; text-align:center;">m</span>
+            <span></span>
+            <span class="mono" style="font-size:9px; color:#a3aebf; letter-spacing:0.18em; text-align:center;">d</span>
+        </div>
+    </div>
+
+    <!-- ============ DOOMSDAY RING, now emptying ============ -->
+    <div style="position:absolute; left:688px; top:56px; width:64px; height:64px;">
+        <div style="position:absolute; inset:0; border-radius:9999px; background:#ffffff; box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.12), 0 2px 4px -2px rgb(0 0 0 / 0.1);"></div>
+        <svg viewBox="0 0 40 40" style="position:absolute; inset:0; width:100%; height:100%;">
+            <circle class="ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle>
+            <!-- ghost arc: where the ring stood before the last sleep -->
+            <circle class="ring-ghost" cx="20" cy="20" r="18" fill="none" stroke-width="3"
+                    stroke-dasharray="113" stroke-dashoffset="34"></circle>
+            <circle class="ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="3"
+                    stroke-dasharray="113" stroke-dashoffset="43" style="stroke:#0f172a;"></circle>
+        </svg>
+        <i data-lucide="skull" class="w-5 h-5" style="position:absolute; inset:0; margin:auto; color:#94a3b8;"></i>
+    </div>
+    <div class="mono" style="position:absolute; left:660px; top:126px; width:120px; text-align:center; font-size:13px; color:#64748b;">62 %</div>
+
+    <!-- ============ WAKE-UP REPLAY: the last sleep, in icons ============ -->
+    <div style="position:absolute; left:540px; top:150px; width:360px; height:44px;">
+        <div class="replay-line" style="left:0; top:26px; width:360px;"></div>
+        <!-- day ticks -->
+        <div class="tick" style="left:4px;  top:30px; height:7px;"></div>
+        <div class="tick" style="left:28px; top:30px; height:4px;"></div>
+        <div class="tick" style="left:52px; top:30px; height:4px;"></div>
+        <div class="tick" style="left:76px; top:30px; height:7px;"></div>
+        <div class="tick" style="left:100px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:124px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:148px;top:30px; height:7px;"></div>
+        <div class="tick" style="left:172px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:196px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:220px;top:30px; height:7px;"></div>
+        <div class="tick" style="left:244px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:268px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:292px;top:30px; height:7px;"></div>
+        <div class="tick" style="left:316px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:340px;top:30px; height:4px;"></div>
+        <div class="tick" style="left:356px;top:30px; height:7px;"></div>
+        <!-- what ran, what stalled -->
+        <div class="replay-ico" style="left:0;    top:2px;"><i data-lucide="snowflake" class="w-4 h-4"></i></div>
+        <div class="replay-ico" style="left:88px; top:2px;"><i data-lucide="zap" class="w-4 h-4"></i></div>
+        <div class="replay-ico" style="left:168px;top:2px;"><i data-lucide="sprout" class="w-4 h-4"></i></div>
+        <div class="replay-ico stalled" style="left:248px;top:2px;">
+            <i data-lucide="pickaxe" class="w-4 h-4"></i><span class="flag"></span>
+        </div>
+        <div class="replay-ico" style="left:344px;top:2px;"><i data-lucide="eye" class="w-4 h-4"></i></div>
+    </div>
+
+    <!-- ============ ROOMS ============ -->
+    <!-- row 1: generator, automated -->
+    <div class="room" style="left:468px; top:256px; width:168px; height:88px;">
+        <i data-lucide="zap" class="w-8 h-8"></i>
+        <span class="lvl mono">3</span>
+        <i data-lucide="repeat" class="auto w-3.5 h-3.5"></i>
+    </div>
+    <!-- row 1: farm, automated -->
+    <div class="room" style="left:804px; top:256px; width:168px; height:88px;">
+        <i data-lucide="sprout" class="w-8 h-8"></i>
+        <span class="lvl mono">2</span>
+        <i data-lucide="repeat" class="auto w-3.5 h-3.5"></i>
+    </div>
+
+    <!-- row 2: mine, still worked by hand -->
+    <div class="room" style="left:468px; top:380px; width:168px; height:88px;">
+        <i data-lucide="pickaxe" class="w-8 h-8"></i>
+        <span class="lvl mono">4</span>
+        <span class="ant" style="left:52px; bottom:16px; animation-delay:-2s;"></span>
+        <span class="ant" style="left:96px; bottom:13px; animation-delay:-7s;"></span>
+    </div>
+    <!-- row 2: dormitory -->
+    <div class="room" style="left:804px; top:380px; width:168px; height:88px;">
+        <i data-lucide="bed" class="w-8 h-8"></i>
+        <span class="lvl mono">2</span>
+        <span class="ant" style="left:112px; bottom:15px; animation-delay:-4s;"></span>
+    </div>
+
+    <!-- row 3: cryo hall -->
+    <div class="room" style="left:468px; top:504px; width:168px; height:88px;">
+        <i data-lucide="snowflake" class="w-8 h-8"></i>
+        <span class="lvl mono">1</span>
+    </div>
+    <!-- row 3: the chamber being dug -->
+    <div class="room" style="left:804px; top:512px; width:140px; height:72px;">
+        <svg viewBox="0 0 40 40" style="position:absolute; left:50px; top:16px; width:40px; height:40px;">
+            <circle class="ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle>
+            <circle class="ring-fg dig-ring" cx="20" cy="20" r="18" fill="none" stroke-width="3"
+                    stroke-dasharray="113" stroke-dashoffset="43" style="stroke:#475569;"></circle>
+        </svg>
+        <i data-lucide="shovel" class="w-4 h-4" style="position:absolute; left:64px; top:30px; color:#a3aebf;"></i>
+    </div>
+
+    <!-- row 4: teased -->
+    <div class="room teaser" style="left:468px; top:628px; width:168px; height:88px;">
+        <i data-lucide="pickaxe" class="w-8 h-8"></i>
+    </div>
+    <div class="room teaser" style="left:804px; top:628px; width:168px; height:88px;">
+        <i data-lucide="sun" class="w-8 h-8"></i>
+    </div>
+    <!-- row 5: teased, deeper -->
+    <div class="room teaser deeper" style="left:468px; top:746px; width:168px; height:88px;">
+        <i data-lucide="paw-print" class="w-8 h-8"></i>
+    </div>
+    <div class="room teaser deeper" style="left:804px; top:746px; width:168px; height:88px;">
+        <i data-lucide="flask-conical" class="w-8 h-8"></i>
+    </div>
+
+    <!-- ants on the shaft and in the corridors -->
+    <span class="ant" style="left:700px; top:596px; animation-delay:-1s;"></span>
+    <span class="ant" style="left:730px; top:598px; animation-delay:-6s;"></span>
+    <span class="ant" style="left:646px; top:305px; animation-delay:-3s;"></span>
+    <span class="ant" style="left:764px; top:426px; animation-delay:-9s;"></span>
+    <span class="ant" style="left:706px; top:470px; animation-delay:-5s;"></span>
+
+    <!-- ============ LEFT: the four columns ============ -->
+    <div style="position:absolute; left:80px; top:382px;">
+        <!-- counts -->
+        <div class="mono" style="display:flex; gap:22px; font-size:12px; color:#64748b; margin-bottom:6px;">
+            <span style="width:26px; text-align:center;">41</span>
+            <span style="width:26px; text-align:center;">33</span>
+            <span style="width:26px; text-align:center;">18</span>
+            <span style="width:26px; text-align:center;">27</span>
+        </div>
+        <!-- bars -->
+        <div style="display:flex; gap:22px;">
+            <div class="bar"><div class="track"><div class="fill" style="height:168px;"></div></div></div>
+            <div class="bar"><div class="track"><div class="fill" style="height:140px;"></div></div></div>
+            <div class="bar">
+                <div class="track"><div class="fill" style="height:84px;"></div></div>
+                <span class="stop-dot" style="bottom:94px;"></span>
+            </div>
+            <div class="bar"><div class="track"><div class="fill" style="height:124px;"></div></div></div>
+        </div>
+        <!-- letters -->
+        <div class="mono" style="display:flex; gap:22px; font-size:11px; color:#94a3b8; margin-top:8px; letter-spacing:0.08em;">
+            <span style="width:26px; text-align:center;">M</span>
+            <span style="width:26px; text-align:center;">F</span>
+            <span style="width:26px; text-align:center;">E</span>
+            <span style="width:26px; text-align:center;">H</span>
+        </div>
+        <!-- stars per day -->
+        <div style="display:flex; align-items:center; gap:8px; margin-top:28px; color:#64748b;">
+            <span class="mono" style="font-size:20px; font-weight:700;">2 140</span>
+            <span style="display:flex; align-items:center;">
+                <i data-lucide="star" class="w-4 h-4"></i>
+                <span class="mono" style="font-size:12px; margin:0 2px;">/</span>
+                <i data-lucide="sun" class="w-4 h-4"></i>
+            </span>
+        </div>
+    </div>
+
+    <!-- ============ TOP RIGHT: stock and the advisor ============ -->
+    <div style="position:absolute; right:72px; top:78px; display:flex; flex-direction:column; align-items:flex-end; gap:14px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span class="mono" style="font-size:22px; font-weight:700; color:#475569;">1 240</span>
+            <i data-lucide="gem" class="w-5 h-5" style="color:#64748b;"></i>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span class="mono" style="font-size:22px; font-weight:700; color:#475569;">18 402</span>
+            <i data-lucide="star" class="w-5 h-5" style="color:#64748b;"></i>
+        </div>
+        <div class="advisor mono" style="width:340px; text-align:left;">
+            Year 12: the farms ran. The mine stalled.
+        </div>
+    </div>
+
+    <!-- ============ RIGHT: the buttons ============ -->
+    <button class="btn" style="left:1312px; top:300px;" aria-label="Build a room">
+        <i data-lucide="hammer" class="w-7 h-7"></i>
+    </button>
+    <button class="btn" style="left:1312px; top:372px;" aria-label="Level">
+        <i data-lucide="chevrons-up" class="w-7 h-7"></i>
+    </button>
+    <button class="btn is-locked" style="left:1312px; top:444px;" aria-label="Automate">
+        <i data-lucide="repeat" class="w-7 h-7"></i>
+    </button>
+    <button class="btn" style="left:1312px; top:516px;" aria-label="Cryo">
+        <i data-lucide="snowflake" class="w-7 h-7"></i>
+        <span class="btn-badge">1 y</span>
+        <span class="tooltip">
+            <span class="cost"><span class="mono">5k</span><i data-lucide="star" class="w-4 h-4"></i></span>
+            <span class="effect"><span class="mono">-3 %</span><i data-lucide="skull" class="w-4 h-4"></i></span>
+        </span>
+    </button>
+    <button class="btn is-locked" style="left:1312px; top:588px;" aria-label="Probe">
+        <i data-lucide="radar" class="w-7 h-7"></i>
+    </button>
+    <button class="btn is-locked" style="left:1312px; top:764px;" aria-label="Ascent">
+        <i data-lucide="arrow-up-from-line" class="w-7 h-7"></i>
+    </button>
+
+    <!-- ============ chapter mark and mockup version ============ -->
+    <div style="position:absolute; left:72px; bottom:34px; display:flex; align-items:baseline; gap:10px;">
+        <span class="chapter-mark">IV · THE DEEP</span>
+        <span class="mono" style="font-size:10px; color:#c0c9d6;">mockup 0.1</span>
+    </div>
+
+</div>
+
+<script>
+// The underside of the crust is rock, not a ruler line: a fixed jagged edge.
+(function () {
+    var jag = [6, 14, 4, 11, 18, 7, 3, 12, 9, 16, 5, 10, 13, 4, 8, 15, 6, 11, 3, 9, 14, 5, 12, 7];
+    var d = 'M1440,0 L1440,42';
+    for (var i = 0; i < jag.length; i++) {
+        var x = 1440 - (i + 1) * 60;
+        d += ' L' + (x + 30) + ',' + (42 + jag[i]);
+        d += ' L' + x + ',' + (42 + (jag[(i + 5) % jag.length] >> 1));
+    }
+    d += ' L0,0 Z';
+    document.getElementById('crust-path').setAttribute('d', d);
+})();
+lucide.createIcons();
+</script>
+</body>
+</html>
