@@ -3,6 +3,42 @@
 Status: **sketch for discussion**, numbers in `src/phase4/deep.js` + `scripts/sim-phase4.mjs`,
 no UI. Ola's direction from 2026-09-21 first, then the proposal, then open questions.
 
+## Kort, för Ola
+
+- **Idén i en mening:** ytan läker bara med tid, tid kan inte köpas, och cryo är hur man spenderar den. Automation gör det säkert att sova länge.
+- **Fyra kolumner** (malm, mat, energi, människor) som dagliga överskott. Stjärnor per dag = 10 × den svagaste. En prick på den kortaste stapeln säger vad du ska köpa härnäst.
+- **Klockan** går år 0 → 50 000 år. Först puttrar maskinerna, sedan tidsförkortning i sex steg (månad, år, 10, 100, 1 000, 10 000 år).
+- **Vad man vet om ytan** kommer bara från prober och spejare (din idé): ett osäkert procenttal som skärps med varje sond som kommer tillbaka, och några kommer tillbaka fel.
+- **Sidovy:** schakt från den brända skorpan, kammare i rader neråt. Mockup på väg i `docs/mockups/deep-side-view.html`.
+- Detaljerna nedan är arbetsanteckningar; kritiken från designagenten ligger i en egen fil, `2026-09-21-chapter-iv-critique.md`.
+
+## Ola's direction, round 2 (2026-09-21)
+
+- **Time ends at 50 000 years, or 500 000.** Orders of magnitude more than the first sketch's 350. Machines that chug along, faster and faster but still slow, until time compression begins. (Rules retuned: healing constant ~29 000 years, cryo ladder I–VI up to 10 000 years per press.)
+- **Probes and scouts.** A percent that says the odds the world is habitable again. The player sends probes or scouts; some come back, some do not, some come back as monsters or mad, or with bad or unreliable news. Steps 3–4.
+- **Side view: go.**
+
+## Probes and scouts (proposal, replaces "animals as samples")
+
+After the boom nobody can see the surface. The ring on the crust is not the truth, it
+is the colony's **estimate**: wide and grey at first ("40 ± 40 %"), sharpened by every
+probe that returns. Sending a probe costs minerals and energy (later a scout costs a
+person) and takes years of colony time, so the answer arrives at a wake-up:
+
+| outcome | odds (early → late) | what the player sees |
+|---|---|---|
+| returns with a reading | 40 → 80 % | the estimate narrows toward the true surface value |
+| does not return | 40 → 10 % | the ring stays wide; one probe icon crossed out |
+| returns wrong (mad, lying instrument) | 15 → 5 % | the estimate jumps the wrong way; the next good probe corrects it |
+| returns as a monster | 5 → 5 % | a chamber goes dark until cleared (the wake-up fault) |
+
+The estimate is the chapter's version of III's intel: without probes you are guessing
+when to build the ascent; with them the percent becomes a number you can trust. The
+ascent can be attempted at any time; attempting it at a bad true value loses the party
+(people) and the ring widens again. That is how the ending stays a decision and not a
+countdown, and why the "%" Ola asked for is the right display: it is a belief, not a
+fact.
+
 ## Ola's direction (so nothing is forgotten)
 
 - New mechanics, as every chapter. **Time** is the big counter: day, month, year.
@@ -79,10 +115,14 @@ per buy, only after the third). The steps are teased greyed, the way II does it.
 ## Time (the counter)
 
 Day · Month · Year from Year 0 at the boom. One real second = one day at the start.
-Cryo is a room and a purchase ladder: cryo I sleeps 1 month per press, cryo II a year,
-III 10 years, IV 100 years. A press zooms (the day counter spins, the ring drains a
-little), slows, and the people come out. The player's real time per century falls from
-hours to seconds across the chapter: the same escalation as stars in I.
+The chapter ends around year 50 000 (Ola, round 2), so the counter is the star
+counter of chapter I again: slow digits first, then years, then millennia flying.
+Cryo is a room and a purchase ladder: cryo I sleeps a month per press, II a year,
+III 10 years, IV 100, V 1 000, VI 10 000. A press zooms (the counter spins, the
+ring drains a little), slows, and the people come out. Before the first cryo (about
+eight real minutes) it is pure machine-building: rooms, levels, the first automation,
+stars per day climbing steadily. The surface heals with a constant of ~29 000 years,
+so 15 % comes at ~50 000 years.
 
 ## Steps, with the numbers game behind each
 
@@ -119,106 +159,3 @@ day rising 10³–10⁴× over the chapter.
 4. Should the surface heal faster if we stop burning fuel (generators)? A green
    choice: solar shafts vs. fuel. It would give energy a second axis.
 5. Animals: a nuisance (eat food) or a resource (hunt = food)? Or both, in order.
-
-## Critique (game-design consultant, 2026-09-21)
-
-Read against vision.md; numbers from running `scripts/sim-phase4.mjs` as it stands.
-
-### 1. Is the idea new, or does it collapse?
-
-As written it collapses. Cryo I–IV at 5k / 60k / 800k / 12M stars is a time-warp bought
-with the main currency: Cookie Clicker's time machine, AdVenture Capitalist's time warp.
-"Time cannot be bought" is not true in the build: you cannot buy the ring, but you buy
-the rate at which you spend the clock, which is the same purchase one step removed. Each
-sleep is a run, the wake-up panel is the reward screen, upgrades carry over: a prestige
-loop wearing a parka. Rooms plus crew plus flooded chambers plus mutiny is Fallout
-Shelter's vocabulary; the only thing keeping it out is that crew is pooled and never
-assigned. Keep it pooled, and never let the player click a person. Two twists, either
-one enough, both better:
-
-**A. Sleep is a program you write, not a button you press.** Before freezing, fill a
-short icon queue: when minerals > pip, build mine; when food < pip, wake. The hatch
-closes and you cannot intervene for a century. The skill is writing an autopilot that
-survives 100 years alone, which the doc claims and does not implement (precedent:
-Paperclips' investment engine, Kittens' automation).
-
-**B. Sleeping costs people; only waking grows them.** Sleep is free money today. Make
-each slept year cost ~0.5 % of the colony permanently while growth (2 %/year) runs only
-awake. Every press becomes a dilemma with no dominant answer: arrive early as a machine
-with a skeleton crew, or late with a crowd. Two endings off one number, no text.
-
-### 2. The loop, minute by minute
-
-**First five minutes.** 0:00 the boom seals the shaft, ants walk down, salvage is a
-mineral count, one dig glyph blinks once on the rock face. 0:00–0:20 the toy: press
-rock, a chamber opens, rubble falls, a number moves, and it must feel like the RPS click
-of chapter I or the chapter has no toy. 0:20–1:30 the staircase: dig, place room, the
-weakest of four columns takes the marker, dig what it points at; six to eight purchases
-in seventy seconds. 1:30–3:00 the first stall, twenty to thirty seconds with nothing
-affordable: the stop cue, with the greyed snowflake already on screen so the stall
-points somewhere. 3:00–4:00 the first sleep, one month, the counter spins, the ring
-twitches. The sim buys cryo I at 1:20, before any stall, so the relief lands before the
-need; push it to ~3:30.
-
-**Mid-chapter wake-up (minute 9, year 40, one year slept).** The counter decelerates to
-a stop, four columns show what accumulated, a chamber or two sits dark with a fault
-glyph, the ring's new arc stands against a ghost of last press. Decisions: repair or let
-it compound, spend on the weakest column or the next cryo tier, re-arm the queue.
-
-**Dead stretches, measured.** Minutes 5–14 of the sim are one move repeated: dig, dorm,
-dig, dorm. Minutes 14–19 are pure waiting on the ring. Stars per day goes 200 to 213
-across the whole chapter, so the power line is flat and the 10³–10⁴× target is missed by
-three orders of magnitude. 1058 wake-ups against a target of 40–60. Humans fall from 50
-to 21, because the starting dorm caps at 20 and cryo freezes the 2 %/year growth: the
-colony is awake for three of its 347 years. The cause is structural.
-`stars = 10 · min(M, F, E, H)` mixes three geometric terms with one that can only climb
-while awake, so the marker locks on H on day one and never leaves (H is weakest 1143
-days out of 1148). A min() of four only walks if all four climb at the same order. Fix
-before any UI: make H a multiplier on min(M, F, E), or carry growth geometrically
-through dorm capacity. Cryo IV is mis-shaped too: 36 500 days per press covers the whole
-350-year chapter in 3.5 presses; the top tier should still need ~15 presses.
-
-### 3. Steps 4 and 5: the fault budget
-
-One mechanic, three faces, all scaled to sleep length and traceable to a number the
-player set. **Faults per wake-up** = ceil(daysSlept / 90), capped at 6, minus one per
-automation level on the affected room: sleep longer, wake to more damage.
-- **Flood** (early): the chamber is dark and offline until repaired with minerals.
-- **Mutiny** (mid): not a die roll. Pressure = 1 − awakeDays / (3 · years). Sleep
-  greedily and the bar fills; when it tops, a chamber turns red, keeps its output, and
-  takes a neighbour every following wake-up until paid in stars or walled off and lost.
-- **Animals** (late, under 35 % surface): they come *down* the shaft, only possible
-  because the surface is healing. They eat food, then (after a trap room) they are food,
-  then they are **samples**. Chance per wake-up = (35 − surface) / 35.
-
-Step 5 falls out: the ascent costs minerals + energy + people + samples, and the mutiny
-chambers decide how many climb. The ending is the sum of every sleep taken.
-
-### 4. The five open questions
-
-1. **Side view.** Down is the subject, and a crust band at the top keeps the goal above
-   the play area at all times. A plate grid just repeats II.
-2. **Two currencies, as proposed.** Minerals buy rock, stars buy time and tech: min()
-   stays about production, stars stay the line carried down from I–III.
-3. **Mutiny as a visible faction**, a red chamber that spreads, never a wake-up event.
-   Chapter III's complaint was precisely that unseen things happened.
-4. **Green choice, inverted.** Not a hidden penalty on the heal rate (invisible equals
-   random) but a **solar shaft**: drill one hole up for cheap energy, and that hole is
-   how the animals get in. Reopening the surface becomes a decision with a picture.
-5. **Animals both, in order:** nuisance, hunt, sample gate.
-
-### 5. What would make Ola say "för random"
-
-- **Hidden probability tables at wake-ups.** Every fault must derive from sleep length,
-  automation level or awake time, with its driving bar on screen as the sleep is chosen.
-- **Four numbers moving at once.** Colour exactly one thing, the shortest bar. Two
-  coloured things and causality is gone.
-- **A ring that moves invisibly.** Drain it live during the sleep zoom in step with the
-  day counter, leaving the old position as a ghost arc so presses compare by eye.
-- **Automation with no tell.** When a room automates, the ants stop walking to it: that
-  explains "runs without people" and needs no words.
-
-The strongest move available: play the wake-up as a three-second replay of the century
-at 4x instead of a summary panel. The chamber goes dark and its column drops in the same
-frame, so cause and effect touch on screen. Spaceplan's register, and the cheapest way
-to show a hundred years without a line of text.
