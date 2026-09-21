@@ -199,3 +199,22 @@ do, depth is rows further from the shaft (like the coast rows in III). One light
 dark rock background and chambers as slightly lighter plates, nothing else. The ring
 stays at the top. The side view can return as the ascent itself in chapter V.
 Mockup 3 = the chapter II board in this dark, sealed-centre form, three states as before.
+
+## The view is decided: a real 3D model (2026-09-21, mockups 5 and 6)
+
+Ola's own sketch: floors of flat plates stacked around a vertical shaft, seen in true
+3D (three.js, no build), slowly rotating, zoomable, never clicked. All buying and info
+lives around it (Spaceplan's planet view). Mockup 5 proved it holds with two colours.
+Ola's notes for mockup 6 and the real build:
+- People tiny, like the dots of II; more of them on older floors: a bustling colony
+  (the feel of the classic city and park sims, simple but alive).
+- The shaft is the **stairs**: people walk into it and pop out on another floor after a
+  moment. A visible spiral stair only if it is cheap and reads.
+- Left drag rotates, wheel zooms, right drag pans. Auto-rotate until the first touch.
+- More than three floors when the model allows (the sim gives ~100 chambers).
+- Knife-sharp plates, bridges at the same height as floors. Two colours. No hint text.
+- A "micro-sim" of the colony is tempting; parked as an idea, the bustle should come
+  from the people's movement, not from new mechanics.
+Build order once mockup 6 is approved: scene module (src/phase4/scene.js) fed by the
+rules (deep.js), then the chrome (bars, buttons, time, ring), then the descent from
+III into this scene, then cryo and wake-ups.
