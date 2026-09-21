@@ -14,5 +14,5 @@ export const MODULE_PATHS = [
   'src/phase2/ants.js', 'src/phase2/buildings-config.js', 'src/phase2/economy.js',
   'src/phase2/index.js', 'src/phase2/islands.js', 'src/phase2/layout.js',
   'src/phase2/persistence.js', 'src/phase2/rendering.js',
-  'src/phase3/war.js',
+  'src/phase3/war.js', 'src/phase4/deep.js',
 ];

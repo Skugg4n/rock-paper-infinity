@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.39.0 - 2026-09-21
+
+### Chapter IV · THE DEEP: design sketch, rules and simulation (no UI yet)
+
+- `docs/superpowers/specs/2026-09-21-chapter-iv-the-deep-design.md`: Ola's direction (side view, shaft, boom, chambers, M F E H, Paperclips ladders, staggered cryo, five steps) and the proposal: **time heals and cannot be bought**; the doomsday ring runs backwards over ~350 years; cryo freezes mouths and hands, automation makes long sleeps safe; stars per day = 10 × the weakest of minerals, food, energy, people, so the bottleneck walks around four columns.
+- `src/phase4/deep.js` (pure rules) + tests, `scripts/sim-phase4.mjs` (greedy player). First run: 19 min to year 347, but people are the bottleneck nearly always and the colony starves: tuning next.
+
 ## v1.38.0 - 2026-09-19
 
 ### The war ends when the earth is done, and a bombed-out enemy comes back stronger
