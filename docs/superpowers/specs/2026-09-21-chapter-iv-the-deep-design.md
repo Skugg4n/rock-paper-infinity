@@ -183,3 +183,19 @@ day rising 10³–10⁴× over the chapter.
 - Teasers exactly as in II: a greyed icon appears when the previous step is bought,
   never before. No bottom row of far-future rooms.
 - Crust stays black until the first probe returns; then the ring appears as an estimate.
+
+## Ola on mockup 2, and a change of view (2026-09-21)
+
+Ola: too dark, the tone ladder reads as several lights (should be one light); seen from
+the side the corridor should meet the room at its floor; the people would float; the
+rubble plug at the top will not look good; skip the ants if they cannot be good;
+sceptical of the day's design in general.
+
+Proposal (Claude): **drop the side view.** It forces physics the game never had
+(floors, gravity, ladders, a plug). Instead the deep is the same top-down plate board
+as II and III, inverted: the hole dug at the end of III becomes a sealed centre plate;
+chambers are dug outward from it, corridors are streets, the ants walk as they already
+do, depth is rows further from the shaft (like the coast rows in III). One light: a
+dark rock background and chambers as slightly lighter plates, nothing else. The ring
+stays at the top. The side view can return as the ascent itself in chapter V.
+Mockup 3 = the chapter II board in this dark, sealed-centre form, three states as before.
