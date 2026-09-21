@@ -218,3 +218,13 @@ Ola's notes for mockup 6 and the real build:
 Build order once mockup 6 is approved: scene module (src/phase4/scene.js) fed by the
 rules (deep.js), then the chrome (bars, buttons, time, ring), then the descent from
 III into this scene, then cryo and wake-ups.
+
+## Locked: mockup 8 is the reference (2026-09-21, Ola: "Yes! Gå på ditt förslag.")
+
+`docs/mockups/deep-3d-8.html` is the visual reference for the real build: true 3D
+(three.js from CDN, no build), two colours, sharp slabs, five floors round a shaft,
+seeded per-plate maps with houses along lanes, people on a walking graph, stairs
+entered on foot through lanes, reset-view button, full bleed, chrome floating on top.
+Build order: `src/phase4/scene.js` (the scene, fed by `deep.js` state) → chrome (time,
+bars with the bottleneck dot, counters, buttons, ring) → the descent from III into the
+scene → cryo, sleep fast-forward and wake-up replay → probes and the ascent.

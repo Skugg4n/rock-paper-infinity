@@ -571,3 +571,13 @@ items:
       the button a shovel (v1.37.0). Design IV (THE DEEP) around digging down.
     status: open
     resolved_in: null
+
+  - id: B048
+    added: 2026-09-21
+    source: "chat 2026-09-21 (chapter IV design day)"
+    request: |
+      Build chapter IV THE DEEP for real from mockup 8 (docs/mockups/deep-3d-8.html)
+      and the rules in src/phase4/deep.js: scene.js, chrome, descent from III,
+      cryo/sleep/wake-up replay, probes, ascent. Spec: 2026-09-21-chapter-iv-the-deep-design.md
+    status: open
+    resolved_in: null
