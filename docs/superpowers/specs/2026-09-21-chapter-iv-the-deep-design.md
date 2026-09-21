@@ -1,4 +1,4 @@
-# Chapter IV · THE DEEP — design sketch v1 (2026-09-21)
+# Chapter IV · THE DEEP · design sketch v1 (2026-09-21)
 
 Status: **sketch for discussion**, numbers in `src/phase4/deep.js` + `scripts/sim-phase4.mjs`,
 no UI. Ola's direction from 2026-09-21 first, then the proposal, then open questions.
