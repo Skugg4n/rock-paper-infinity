@@ -331,3 +331,52 @@ With `--raid` all six stay inside the time and behind windows (behind 42 to
 first tier, they take the lead in the middle and hold it. The window is narrow:
 `ENEMY_TIER_BASE_S` 92 drops two seeds to behind 25 %, 85 lifts them; the war is
 still bistable around who holds the tier when the ladder gets expensive.
+
+### Commit 2: air defence, the uphill after artillery
+
+Ola: "after artillery the game is over, only mop-up". From their tier V
+(`waveMode`): two waves in three come through the air (their tier's mode,
+ranged or area) and every `GROUND_EVERY` (3rd) wave is still a landing party.
+Air waves ignore the guards; only air defence absorbs them, by the same rule
+(`MAX_ABSORB`), at `AIR_UNIT_COST` 20 arms a unit. What gets through kills
+`AIR_GROUND_KILL` (0.1) guards per unit of power. `resolveLanding` takes
+`airDefence` and `mode`; `landingLosses` gives the share the visuals script as
+shot down. The quartermaster (and the sim player) buy `AIR_PER_GROUND` 2 air
+units per guard once the air control has opened (first air wave). Air units
+eat and cost upkeep like any unit.
+
+Item 14 of the playtest ("the enemy is still easy") asked for more pushes if
+the sim was still under behind 40 %. It is not (40 to 43 %), but the extra push
+while we lead (`isPush`: every 3rd wave while our tier is higher, on top of
+every 5th) went in anyway because it only bites in the situation the tester
+called easy; in the sim it moves nothing by more than a plate.
+
+| seed | length | behind | ahead | lead changes | plates lost | their tiles razed | island silent | doomsday | behind after our V |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 21m51s | 42 % | 14 % | 2 | 19 | 10 | 0 % | 87 % | 64 % |
+| 2 | 20m51s | 42 % | 17 % | 2 | 25 | 11 | 0 % | 85 % | 66 % |
+| 3 | 20m31s | 43 % | 16 % | 2 | 21 | 9 | 0 % | 88 % | 68 % |
+| 4 | 20m11s | 42 % | 19 % | 2 | 18 | 11 | 0 % | 86 % | 67 % |
+| 5 | 20m31s | 40 % | 19 % | 2 | 22 | 12 | 0 % | 87 % | 63 % |
+| 6 | 19m51s | 41 % | 15 % | 2 | 21 | 10 | 0 % | 85 % | 66 % |
+
+We reach tier V at 7m31s in every seed. A player who never buys air defence
+(`AIR_PER_GROUND` 0) loses 24 to 28 plates instead of 18 to 25: air defence is
+a real second purchase, not decoration. With `--raid`: behind 41 to 44 %,
+plates lost 15 to 27.
+
+### What this pass did not solve
+
+- **The late war is a siege, not a race.** Once they lead (around minute 9)
+  the research pressure (×1.9 per tier they hold) keeps us behind until they
+  leave; we never raze another of their tiles after that in the sim (their
+  shield outgrows our force). The climb after V is defending (◆, guards, air
+  defence), not catching up. A way back up the ladder (a catch-up discount, or
+  salvage buying research) would be the next lever if Ola wants the ups and
+  downs back.
+- **The sim player has no banked science**; a real player arrives with tens of
+  millions from chapter II. With the 90 s cooldown that no longer lets anyone
+  buy ahead, but the first tier at 3:00 is always affordable for a human.
+- **The right-hand column is long** once every control is open (tier, intel,
+  radar, raid, quartermaster, auto strike, strike, sword, air, shield, stall):
+  on a 900 px high window it reaches the people counter.

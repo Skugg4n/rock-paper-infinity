@@ -206,7 +206,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, guardsOff: false, hitEdges: [] };
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [] };
     let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
     const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
@@ -519,12 +519,35 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             combat = true;
             return route.edge;
         } else {
-            const shells = mode === 'area' ? 3 : 1;
+            // Through the air. Our air defence shoots down its share (`losses`,
+            // scripted from the rule) over our own island, near the end of the
+            // flight; at least one shell always gets through (MAX_ABSORB).
+            const base = mode === 'area' ? 3 : 1;
+            const shells = losses > 0 ? Math.max(base, 3) : base;
+            const down = Math.min(shells - 1, Math.round(shells * Math.max(0, Math.min(1, losses))));
+            let first = true;
             for (let i = 0; i < shells; i++) {
-                effects.push({ type: 'arc', from: c(from), to: jitter(c(target.rect), 10), t: -i * 0.35, dur: 1.4, color: COLORS.enemy, size: mode === 'area' ? 4 : 2.5,
-                    onImpact: i === 0 ? () => { flash(c(target.rect), mode === 'area' ? 44 : 26, COLORS.enemy); onImpact?.(); } : () => flash(jitter(c(target.rect), 12), 22, COLORS.enemy) });
+                const intercepted = i >= shells - down;
+                const hit = !intercepted && first;
+                if (hit) first = false;
+                effects.push({ type: 'arc', from: c(from), to: jitter(c(target.rect), 10), t: -i * 0.3, dur: 1.4, color: COLORS.enemy, size: mode === 'area' ? 4 : 2.5,
+                    interceptAt: intercepted ? 0.72 + Math.random() * 0.16 : undefined,
+                    onImpact: hit ? () => { flash(c(target.rect), mode === 'area' ? 44 : 26, COLORS.enemy); onImpact?.(); } : () => flash(jitter(c(target.rect), 12), 22, COLORS.enemy) });
             }
         }
+    }
+    /** Where a shell is at k (0-1) of its flight: a parabola between from and to. */
+    function arcPos(e, k) {
+        const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y;
+        const h = Math.hypot(dx, dy) * 0.35;
+        return { x: e.from.x + dx * k, y: e.from.y + dy * k - h * 4 * k * (1 - k) };
+    }
+    /** Air defence, made visible: small posts around the whole coast road, one per ten units. */
+    function airPosts() {
+        const n = Math.min(16, Math.round((state.airDefence || 0) / 10));
+        if (!n || !rects.length || guardsGone) return [];
+        const R = ring(), P = ringLength(R);
+        return Array.from({ length: n }, (_, i) => ringPoint(R, (i + 0.5) * P / n));
     }
 
     /** Our strike on an enemy tile (by index in enemyRects). Same shapes, blue. */
@@ -590,6 +613,17 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         // arcs and flashes
         for (const e of effects) {
             e.t += dt;
+            if (e.type === 'arc' && !e.hit && e.interceptAt !== undefined && e.t >= e.dur * e.interceptAt) {
+                // shot down over our island: a tracer from the nearest post, a small burst, gone
+                e.hit = true;
+                const p = arcPos(e, e.interceptAt);
+                const posts = airPosts();
+                const post = posts.length ? posts.reduce((a, b) => ((a.x - p.x) ** 2 + (a.y - p.y) ** 2 <= (b.x - p.x) ** 2 + (b.y - p.y) ** 2 ? a : b)) : jitter(p, 40);
+                effects.push({ type: 'tracer', from: post, to: p, t: 0, dur: 0.18, color: COLORS.person });
+                flash(p, 10, COLORS.person);
+                e.t = e.dur;        // the shell is gone
+                continue;
+            }
             if (e.type === 'arc' && !e.hit && e.t >= e.dur) { e.hit = true; e.onImpact?.(); }
         }
         for (let i = effects.length - 1; i >= 0; i--) { const e = effects[i]; if (e.t >= e.dur + (e.type === 'arc' ? 0 : 0)) effects.splice(i, 1); }
@@ -739,6 +773,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         return best;
     }
     function drawWar() {
+        for (const p of airPosts()) {
+            ctx.fillStyle = COLORS.person; ctx.globalAlpha = 0.8;
+            ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+        }
         for (const g of guardPositions()) {
             ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.globalAlpha = 0.95 * (g.fade ?? 1);
             ctx.arc(g.x, g.y, RADIUS.person + 0.3, 0, Math.PI * 2); ctx.fill();
@@ -760,6 +798,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 ctx.arc(e.x, e.y, e.size * (0.3 + 0.7 * k), 0, Math.PI * 2); ctx.stroke();
             } else if (e.type === 'arc') {
                 // a shell through the air: a parabola between from and to
+                if (e.hit && e.interceptAt !== undefined) continue;
                 const k = Math.min(1, e.t / e.dur);
                 const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y;
                 const dist = Math.hypot(dx, dy);

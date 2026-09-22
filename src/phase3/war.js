@@ -191,6 +191,21 @@ export function waveInterval(waveCount) {
     return Math.max(20, 40 - waveCount * 1.5);
 }
 
+/** Every PUSH_EVERY-th wave is a push (double size). */
+export const PUSH_EVERY = 5;
+/** While we hold the lead they push every PUSH_AHEAD_EVERY-th wave instead (0 = no extra pushes). */
+export const PUSH_AHEAD_EVERY = 3;
+/**
+ * Is wave number `waveCount` a push (double size)?
+ * @param {number} waveCount
+ * @param {number} ourTier
+ * @param {number} enemyTier
+ */
+export function isPush(waveCount, ourTier = 0, enemyTier = 0) {
+    if (waveCount % PUSH_EVERY === 0) return true;
+    return PUSH_AHEAD_EVERY > 0 && ourTier > enemyTier && waveCount % PUSH_AHEAD_EVERY === 0;
+}
+
 /** Units in the next wave: grows for twenty waves, then holds at 50. */
 export function waveSize(waveCount) {
     return 10 + Math.min(waveCount, 20) * 2;
@@ -306,9 +321,51 @@ export function resolveStrike({ force, power, enemyDefence, enemyPower, tileHp }
  */
 export const relativePower = (tier, against) => TIERS[tier].power / TIERS[against].power;
 
-/** A landing: `size` enemy units at their tier against our defence and a plate. */
-export function resolveLanding({ size, enemyTier, ourTier, defence, hp }) {
-    return resolveHit({ power: size * relativePower(enemyTier, ourTier), defence, defencePower: 1, hp });
+/**
+ * AIR DEFENCE, the second climb (war-playtest-3). From tier V their shells and
+ * missiles fly over the guards: ranged and area waves ignore ground defence
+ * and only air defence absorbs them, by the same rule (MAX_ABSORB). Ground
+ * landings still meet the guards, and their air waves kill some guards where
+ * they land. An air unit costs twice a ground unit.
+ */
+export const AIR_UNIT_COST = 20;
+/** Guards killed by an air wave: this share of the power that got through (in units). */
+export const AIR_GROUND_KILL = 0.1;
+/** From their tier V on, one wave in GROUND_EVERY is still a landing party (with their weapons); the rest come through the air. */
+export const GROUND_EVERY = 3;
+/**
+ * How a wave comes: 'melee' (a landing party that walks), or the tier's own
+ * mode through the air ('ranged', 'area'). Below tier V everything walks.
+ * @param {number} enemyTier
+ * @param {number} waveCount - the wave's number (1..)
+ */
+export function waveMode(enemyTier, waveCount) {
+    const mode = TIERS[enemyTier].mode;
+    if (mode === 'melee') return 'melee';
+    return waveCount % GROUND_EVERY === 0 ? 'melee' : mode;
+}
+export const isAirMode = (mode) => mode === 'ranged' || mode === 'area';
+
+/**
+ * A landing: `size` enemy units at their tier against our defence and a plate.
+ * A ground wave (`mode` melee) meets the guards (`defence`); an air wave meets
+ * only `airDefence` and kills guards where it lands.
+ * @returns {{ razed, hpLeft, defenceLost, airLost, absorbed }}
+ */
+export function resolveLanding({ size, enemyTier, ourTier, defence, airDefence = 0, hp, mode = 'melee' }) {
+    const power = size * relativePower(enemyTier, ourTier);
+    if (!isAirMode(mode)) return { ...resolveHit({ power, defence, defencePower: 1, hp }), airLost: 0 };
+    const r = resolveHit({ power, defence: airDefence, defencePower: 1, hp });
+    const through = power - r.absorbed;
+    const groundLost = Math.min(defence, Math.ceil(through * AIR_GROUND_KILL));
+    return { razed: r.razed, hpLeft: r.hpLeft, absorbed: r.absorbed, airLost: r.defenceLost, defenceLost: groundLost };
+}
+/** Share (0-1) of a wave that the relevant defence stops: what the visuals script as falling. */
+export function landingLosses({ size, enemyTier, ourTier, defence, airDefence = 0, mode = 'melee' }) {
+    const power = size * relativePower(enemyTier, ourTier);
+    if (!(power > 0)) return 0;
+    const d = isAirMode(mode) ? airDefence : defence;
+    return Math.min(1, Math.min(power * MAX_ABSORB, d) / power);
 }
 
 /** Our strike: `force` units at our tier against their defence and a tile. */
@@ -361,8 +418,10 @@ export function enemyCatchUp(ourTier, enemyTier) {
 export const STANCE_RATIO = { defend: [3, 1], balanced: [1, 1], attack: [1, 3] };
 /**
  * Auto quartermaster: how to spend `arms` this second. Buys whichever side is
- * furthest under the stance ratio (defence : force), one unit at a time.
- * Returns { defence, force } units to buy. It never strikes: releasing the
+ * furthest under the stance ratio (defence : force), one unit at a time. Once
+ * their weapons fly (`air.on`), the home side is split between guards and air
+ * defence (AIR_PER_GROUND air units per guard) and air units count as defence.
+ * Returns { defence, force, air } units to buy. It never strikes: releasing the
  * force is always the player's call (or the auto-strike toggle).
  * @param {number} arms - what it may spend (see quartermasterBudget)
  * @param {number} defence
@@ -370,15 +429,29 @@ export const STANCE_RATIO = { defend: [3, 1], balanced: [1, 1], attack: [1, 3] }
  * @param {number} unitCost
  * @param {string} [stance='balanced']
  */
-export function autoBuy(arms, defence, force, unitCost, stance = 'balanced') {
+export function autoBuy(arms, defence, force, unitCost, stance = 'balanced', air = null) {
     const [wd, wf] = STANCE_RATIO[stance] || STANCE_RATIO.balanced;
-    let d = 0, f = 0, left = arms;
-    while (left >= unitCost) {
-        if ((defence + d) / wd <= (force + f) / wf) d++; else f++;
-        left -= unitCost;
+    let d = 0, f = 0, a = 0, left = arms;
+    const airOn = !!air?.on;
+    const airUnits = () => (airOn ? (air.units || 0) + a : 0);
+    for (;;) {
+        const home = defence + d + airUnits();
+        const wantHome = home / wd <= (force + f) / wf;
+        if (wantHome && airOn && airUnits() < (defence + d) * AIR_PER_GROUND) {
+            if (left < AIR_UNIT_COST) break;
+            a++; left -= AIR_UNIT_COST;
+        } else if (wantHome) {
+            if (left < unitCost) break;
+            d++; left -= unitCost;
+        } else {
+            if (left < unitCost) break;
+            f++; left -= unitCost;
+        }
     }
-    return { defence: d, force: f };
+    return { defence: d, force: f, air: a };
 }
+/** Once their weapons fly, the quartermaster keeps this many air units per guard (two waves in three come through the air). */
+export const AIR_PER_GROUND = 2;
 /** The quartermaster's stances, cycled with one button; 'off' hands the yard back to you. */
 export const STANCES = ['balanced', 'defend', 'attack', 'off'];
 

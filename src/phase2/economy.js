@@ -56,3 +56,26 @@ export function spendHarvestEfficiency(efficiency) {
 export function recoverHarvestEfficiency(efficiency, seconds = 1) {
     return Math.min(1, efficiency + 0.1 * seconds);
 }
+
+const COUNT_SUFFIXES = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+/**
+ * Astronomical numbers kept readable (chapters II and III): three significant
+ * figures and a suffix, so 1,902,143,493,053 reads "1.90 T". Below a thousand
+ * the plain whole number. Past the suffixes, scientific notation. Callers put
+ * the full number in a title for hover. Chapter I keeps its own formatting
+ * and its Roman numerals.
+ * @param {number} n
+ * @returns {string}
+ */
+export function formatCount(n) {
+    if (!Number.isFinite(n)) return String(n);
+    const sign = n < 0 ? '-' : '';
+    const a = Math.abs(n);
+    if (a < 1000) return sign + String(Math.round(a));
+    let tier = Math.floor(Math.log10(a) / 3);
+    const fixed = (v) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
+    let text = fixed(a / Math.pow(10, 3 * tier));
+    if (Number(text) >= 1000) { tier++; text = fixed(a / Math.pow(10, 3 * tier)); }   // 999.6 k is 1.00 M
+    if (tier >= COUNT_SUFFIXES.length) return sign + a.toExponential(2).replace('e+', 'e');
+    return `${sign}${text} ${COUNT_SUFFIXES[tier]}`;
+}

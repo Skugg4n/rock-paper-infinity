@@ -9,7 +9,7 @@ import { buildingData } from './buildings-config.js';
 import { createRenderer } from './rendering.js';
 import { timed, counter } from '../perf.js';
 import {
-    siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY,
+    siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY, formatCount,
 } from './economy.js';
 import { createAnts } from './ants.js';
 import { createIsland } from './islands.js';
@@ -17,9 +17,10 @@ import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap, waveStandingK, defenceStandingK,
     SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
-    resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, MAX_ABSORB, plateMaxHp, tierScienceCost, armsPerSecond,
+    resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, plateMaxHp, tierScienceCost, armsPerSecond,
     TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S, RAID_S, raidCost,
     revealNext, isShown, quartermasterBudget, QM_KEEP_S, STANCE_RATIO, hpYield, enemyMayResearch,
+    waveMode, isAirMode, AIR_UNIT_COST, landingLosses, isPush,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -218,6 +219,22 @@ export function init() {
               const s = document.createElement('span'); s.id = 'auto-badge'; s.className = 'btn-badge hidden';
               ui.autoBtn.appendChild(s); return s;
           });
+          ui.buyAirBtn = once('buy-air-btn', () => {
+              const b = document.createElement('button');
+              b.className = 'btn hidden'; b.id = 'buy-air-btn';
+              b.setAttribute('aria-label', 'Buy air defence');
+              b.innerHTML = `<i data-lucide="shield-half" class="w-7 h-7"></i><div class="tooltip"></div>`;
+              ui.buyDefenceBtn.before(b);
+              return b;
+          });
+          ui.warAirRow = once('war-air-row', () => {
+              const row = document.createElement('div');
+              row.id = 'war-air-row'; row.className = 'flex items-center gap-2 hidden';
+              row.innerHTML = `<i data-lucide="shield-half" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-400"></i><span id="war-air" class="font-mono font-bold text-lg sm:text-2xl text-slate-600 tabular-nums">0</span>`;
+              ui.warDefence.parentElement.after(row);
+              return row;
+          });
+          ui.warAir = document.getElementById('war-air');
           ui.warArmsRow = ui.warArms.parentElement;
           if (!ui.warArmsRow.querySelector('.tooltip')) {
               ui.warArmsRow.classList.add('hud-tip');
@@ -333,29 +350,33 @@ export function init() {
                   w.lastWaveAt = w.t; w.waveCount++;
                   const target = pickTarget(warPlates(), warRand);
                   if (target) {
-                      const push = w.waveCount % 5 === 0;
+                      // a push every fifth wave, and every third while we hold the lead
+                      const push = isPush(w.waveCount, w.tier, w.enemyTier);
                       const size = Math.round(waveSize(w.waveCount) * waveStandingK(standing) * (push ? 2 : 1));
-                      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push };
+                      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push, mode: waveMode(w.enemyTier, w.waveCount) };
                       const ti = gameState.buildings.findIndex(b => b && b.id === target.id);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       if (w.radar && targetEl) targetEl.classList.add('targeted');
-                      if (w.radar) logWar(push ? `Intel: a large force is heading for ${target.type}.` : `Radar: landing party heading for ${target.type}.`, push);
+                      const skyward = isAirMode(w.pendingWave.mode);
+                      if (w.radar) logWar(push ? `Intel: a large ${skyward ? 'salvo' : 'force'} is heading for ${target.type}.` : skyward ? `Radar: a salvo is on its way to ${target.type}.` : `Radar: landing party heading for ${target.type}.`, push);
                   }
               }
               if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
-                  const { targetId, size } = w.pendingWave; w.pendingWave = null;
+                  const { targetId, size } = w.pendingWave;
+                  const mode = w.pendingWave.mode || TIERS[w.enemyTier].mode;
+                  w.pendingWave = null;
                   const b = gameState.buildings.find(x => x && x.id === targetId);
                   if (b && !b.razed) {
                       const enemy = TIERS[w.enemyTier];
                       const ti = gameState.buildings.findIndex(x => x && x.id === targetId);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       targetEl?.classList.add('targeted');   // the plate under attack is marked as soon as they set out
-                      // What you see is the rule: the share of dots that fall on the way is what our defence absorbs.
-                      const ratio = relativePower(w.enemyTier, w.tier);
-                      const losses = Math.min(1, Math.min(size * ratio * MAX_ABSORB, w.defence) / (size * ratio));
-                      const impact = () => { targetEl?.classList.remove('targeted'); resolveWave(targetId, size, enemy); };
+                      // What you see is the rule: the share that falls on the way is what the
+                      // defence that can reach it absorbs (guards on the ground, air defence in the sky).
+                      const losses = landingLosses({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air || 0, mode });
+                      const impact = () => { targetEl?.classList.remove('targeted'); resolveWave(targetId, size, enemy, mode); };
                       if (_ants) {
-                          const edge = _ants.launchWave({ targetBuildingId: targetId, count: size, mode: enemy.mode, losses, onImpact: impact });
+                          const edge = _ants.launchWave({ targetBuildingId: targetId, count: size, mode, losses, onImpact: impact });
                           if (edge && edge !== 's' && !(w.hitEdges || []).includes(edge)) w.hitEdges = (w.hitEdges || []).concat([edge]);
                       } else impact();
                   }
@@ -402,8 +423,9 @@ export function init() {
               const stance = w.stance || 'balanced';
               if (w.autoBought && stance !== 'off') {
                   const budget = quartermasterBudget(w.arms, armsPerSecond(w.tier) * w.armsShare);
-                  const buy = autoBuy(budget, w.defence, w.force, UNIT_COST, stance);
-                  w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
+                  const buy = autoBuy(budget, w.defence, w.force, UNIT_COST, stance, { on: isShown(w, 'air'), units: w.air || 0 });
+                  w.arms -= (buy.defence + buy.force) * UNIT_COST + buy.air * AIR_UNIT_COST;
+                  w.defence += buy.defence; w.force += buy.force; w.air = (w.air || 0) + buy.air;
               }
               // Auto strike (its own toggle, off by default): only when the force
               // can take the toughest tile still standing, never into a wall.
@@ -435,6 +457,7 @@ export function init() {
               tier: 'Interior: the laboratory can develop better weapons. It is slow, and they are working on theirs.',
               auto: 'Interior: a quartermaster could buy units for us, at a ratio you set.',
               autoStrike: 'Interior: the generals offer to strike on their own whenever a strike would raze.',
+              air: 'Interior: air defence can be built (twice the price of a guard). Guards still stop what walks ashore.',
           };
           const ROCKET_FROM = 55;
 
@@ -444,7 +467,7 @@ export function init() {
            * defence absorbed (the visuals were scripted from the same rule).
            * Weapons are relative (war.js): what decides it is who is ahead.
            */
-          function resolveWave(targetId, size, enemy) {
+          function resolveWave(targetId, size, enemy, mode = enemy.mode) {
               const w = gameState.war; if (!w?.active) return;
               const i = gameState.buildings.findIndex(b => b && b.id === targetId);
               const b = gameState.buildings[i];
@@ -452,15 +475,24 @@ export function init() {
               if (!b || b.razed) return;
               const hp = b.hp ?? plateMaxHp(b.type, b.fort || 0);
               const ratio = relativePower(w.enemyTier, w.tier);
-              const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, hp });
+              const air = isAirMode(mode);
+              const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air || 0, hp, mode });
               const fallen = Math.min(size, Math.round(r.absorbed / ratio));
               const reached = size - fallen;
               w.defence = Math.max(0, w.defence - r.defenceLost);
+              w.air = Math.max(0, (w.air || 0) - r.airLost);
               b.hp = r.hpLeft;
               w.scorchOurs += enemy.scorch;
-              if (enemy.mode === 'area') { gameState.supplies = Math.max(0, gameState.supplies * 0.8); logWar('Status: their strike hit our stores. Food lost.', true); }
-              const story = `${size} ${enemy.id} landed; ${fallen} fell to our defence, ${reached} reached ${b.type}`;
-              const cost = r.defenceLost > 0 ? ` We lost ${r.defenceLost} defenders.` : '';
+              if (air && !w.airSeen) {
+                  w.airSeen = true;
+                  logWar('Status: their shells go over our guards. We need something that reaches the sky.', true);
+              }
+              if (mode === 'area') { gameState.supplies = Math.max(0, gameState.supplies * 0.8); logWar('Status: their strike hit our stores. Food lost.', true); }
+              const story = air
+                  ? `${size} ${enemy.id} came through the air; ${fallen} shot down, ${reached} hit ${b.type}`
+                  : `${size} ${enemy.id} landed; ${fallen} fell to our defence, ${reached} reached ${b.type}`;
+              const lost = [r.defenceLost > 0 ? `${r.defenceLost} guards` : '', r.airLost > 0 ? `${r.airLost} air defence` : ''].filter(Boolean).join(' and ');
+              const cost = lost ? ` We lost ${lost}.` : '';
               if (r.razed) {
                   b.razed = true; b.population = 0; b.fort = 0; b.hp = 0;
                   w.scorchOurs += enemy.scorch * 4;
@@ -529,6 +561,15 @@ export function init() {
               if (!active) return;
               const tier = TIERS[w.tier];
               ui.warDefence.textContent = Math.round(w.defence).toLocaleString('en-US');
+              const airOpen = isShown(w, 'air');
+              ui.warAirRow.classList.toggle('hidden', !airOpen);
+              ui.warAir.textContent = Math.round(w.air || 0).toLocaleString('en-US');
+              ui.buyAirBtn.classList.toggle('hidden', !airOpen);
+              ui.buyAirBtn.disabled = w.arms < AIR_UNIT_COST;
+              {
+                  const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
+                  setTooltip(ui.buyAirBtn, { effect: `+${n} <i data-lucide='shield-half' class='w-4 h-4'></i> <span class='tip-note'>stops shells</span>`, armsCost: n * AIR_UNIT_COST });
+              }
               ui.warForce.textContent = Math.round(w.force).toLocaleString('en-US');
               ui.warArms.textContent = Math.floor(w.arms).toLocaleString('en-US');
               ui.warArmsRate.textContent = `+${(armsPerSecond(w.tier) * w.armsShare).toFixed(0)}/s`;
@@ -583,7 +624,7 @@ export function init() {
                   ui.radarBtn.classList.toggle('radar-spotted', !!p);
                   const heading = p ? gameState.buildings.find(b => b && b.id === p.targetId)?.type : null;
                   setTooltip(ui.radarBtn, silentNow ? { effect: `<i data-lucide='radar' class='w-4 h-4'></i> quiet` }
-                      : p ? { effect: `${p.size} ${TIERS[w.enemyTier].id} → ${heading || '?'} in ${next} s` }
+                      : p ? { effect: `${p.size} ${TIERS[w.enemyTier].id} ${isAirMode(p.mode) ? `<i data-lucide='shield-half' class='w-4 h-4'></i>` : `<i data-lucide='shield' class='w-4 h-4'></i>`} → ${heading || '?'} in ${next} s` }
                       : { effect: `<i data-lucide='radar' class='w-4 h-4'></i> next landing in ${next} s` });
               } else {
                   ui.radarBadge.classList.add('hidden');
@@ -787,7 +828,7 @@ export function init() {
                   const slot = ui.landGrid.children[index];
                   const sellBtn = slot ? slot.querySelector('.sell-btn') : null;
                   if (sellBtn) {
-                      sellBtn.textContent = `${refund >= 1000 ? Math.round(refund / 1000) + 'k' : refund}★`;
+                      sellBtn.textContent = `${formatCount(refund)}★`;
                       sellBtn.classList.add('sell-confirm');
                   }
                   const timeout = setTimeout(() => cancelPendingSell(buildingId), 3000);
@@ -850,9 +891,9 @@ export function init() {
                   html += `<div class="unlock-req">${unlockReq}</div>`;
               } else {
                   if (effect) html += `<div class="effect">${effect}</div>`;
-                  if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('en-US')}</span><i data-lucide="star" class="w-4 h-4 text-slate-300"></i></div>`;
-                  if (armsCost) html += `<div class="cost"><span class="font-mono">${armsCost.toLocaleString('en-US')}</span><i data-lucide="hammer" class="w-4 h-4 text-slate-300"></i></div>`;
-                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (cost) html += `<div class="cost"><span class="font-mono">${formatCount(cost)}</span><i data-lucide="star" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (armsCost) html += `<div class="cost"><span class="font-mono">${formatCount(armsCost)}</span><i data-lucide="hammer" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${formatCount(scienceCost)}</span><i data-lucide="atom" class="w-4 h-4 text-slate-300"></i></div>`;
               }
               tooltipEl.innerHTML = html;
               if (!tooltipListenersAttached.has(el)) {
@@ -906,6 +947,9 @@ export function init() {
   
   
               // Disabled state for basic buildings
+              // In the war the column is full of war; home and store come back when there is land to rebuild on
+              ui.buildHomeBtn.classList.toggle('hidden', !!gameState.war?.active && !hasEmptySlot);
+              ui.buildStoreBtn.classList.toggle('hidden', !!gameState.war?.active && !hasEmptySlot);
               ui.buildHomeBtn.disabled = !canAfford(buildingData.home) || !hasEmptySlot;
               ui.buildStoreBtn.disabled = !canAfford(buildingData.store) || !hasEmptySlot;
   
@@ -1042,7 +1086,7 @@ export function init() {
               if (gameState.war?.active && netStarChange > 0) {
                   // The factory makes arms instead of goods, and the army costs upkeep
                   const w = gameState.war;
-                  const units = (w.defence || 0) + (w.force || 0);
+                  const units = (w.defence || 0) + (w.force || 0) + (w.air || 0);
                   netStarChange = netStarChange * (1 - w.armsShare) - netStarChange * UPKEEP_SHARE_PER_UNIT * units;
                   gameState.netStarChangePerSecond = netStarChange;
               }
@@ -1051,7 +1095,7 @@ export function init() {
                   gameState.science = Math.max(0, gameState.science + netScienceChange);
               }
 
-              const troops = gameState.war?.active ? ((gameState.war.defence || 0) + (gameState.war.force || 0)) * FOOD_PER_UNIT : 0;
+              const troops = gameState.war?.active ? ((gameState.war.defence || 0) + (gameState.war.force || 0) + (gameState.war.air || 0)) * FOOD_PER_UNIT : 0;
               const supplyConsumption = gameState.population + troops;
               const netSupplyChange = supplyProduction - supplyConsumption;
 
@@ -1119,6 +1163,7 @@ export function init() {
                   ourTier: gameState.war?.tier || 0,
                   enemyTier: gameState.war?.enemyTier || 0,
                   defence: gameState.war?.defence || 0,
+                  airDefence: gameState.war?.air || 0,
                   guardsOff: !!gameState.war?.enemyLeft || !!gameState.shipChosen,
                   hitEdges: gameState.war?.hitEdges || [],
               });
@@ -1147,6 +1192,15 @@ export function init() {
               saveGameState();
           }
   
+          /** A counter: short form in the text, the whole number in the title (hover). */
+          function showCount(el, value) {
+              const n = Math.round(value);
+              if (el.dataset.n === String(n)) return;
+              el.dataset.n = String(n);
+              el.textContent = formatCount(n);
+              el.title = n.toLocaleString('en-US');
+          }
+          const perPerson = (v) => (v >= 1000 ? formatCount(v) : v.toFixed(1));
           function fastUiTick() {
               counter('p2:fastUiTick');
               timed('p2:fastUiTick', _fastUiTickBody);
@@ -1157,22 +1211,23 @@ export function init() {
               _displayedScience += (gameState.science - _displayedScience) * COUNTER_LERP;
               if (Math.abs(gameState.stars - _displayedStars) < 0.5) _displayedStars = gameState.stars;
               if (Math.abs(gameState.science - _displayedScience) < 0.5) _displayedScience = gameState.science;
-              ui.starCount.textContent = Math.round(_displayedStars).toLocaleString('en-US');
-              ui.scienceCount.textContent = Math.round(_displayedScience).toLocaleString('en-US');
+              // Astronomical, but readable: 1.90 T, the full number on hover
+              showCount(ui.starCount, _displayedStars);
+              showCount(ui.scienceCount, _displayedScience);
               ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
               const capacity = gameState.buildings.reduce((a, b) => a + ((b && !b.razed && b.capacity) ? b.capacity : 0), 0);
               ui.populationCapacity.textContent = capacity > 0 ? `${capacity.toLocaleString('en-US')} ◻` : '';
 
-              ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('en-US')}/s`;
+              ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${formatCount(gameState.netStarChangePerSecond || 0)}/s`;
               ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#64748b' : '#94a3b8';
-              ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('en-US')}/s`;
+              ui.netScienceChange.textContent = `+${formatCount(gameState.netScienceChangePerSecond || 0)}/s`;
 
               const baseStarPerPerson = calculateBaseStarPerPerson();
               const w2 = gameState.war;
               const doomK = w2?.active ? scorchYield(doomsday(w2.scorchOurs + w2.scorchTheirs)) : 1;
               ui.starsPerPerson.textContent = doomK < 0.995
-                  ? `${(baseStarPerPerson * doomK).toFixed(1)} /person · scorched −${Math.round((1 - doomK) * 100)} %`
-                  : `${baseStarPerPerson.toFixed(1)} /person`;
+                  ? `${perPerson(baseStarPerPerson * doomK)} /person · scorched −${Math.round((1 - doomK) * 100)} %`
+                  : `${perPerson(baseStarPerPerson)} /person`;
 
               const supplyProduction = gameState.cachedSupplyProduction || 0;
               const supplyConsumption = gameState.cachedSupplyConsumption || 0;
@@ -1278,6 +1333,12 @@ export function init() {
           const batchSize = (arms) => Math.max(1, Math.floor(arms * 0.1 / UNIT_COST));
           ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.defence += n; updateAllUI(); }, { signal });
           ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.force += n; updateAllUI(); }, { signal });
+          ui.buyAirBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || !isShown(w, 'air')) return;
+              if (w.arms < AIR_UNIT_COST) { flashArms(); return; }
+              const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
+              w.arms -= n * AIR_UNIT_COST; w.air = (w.air || 0) + n; updateAllUI();
+          }, { signal });
           /** Short of arms: the arms counter flashes, so the eye goes to where hammers come from. */
           function flashArms() {
               const row = ui.warArmsRow;

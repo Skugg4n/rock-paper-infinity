@@ -4,6 +4,7 @@ import {
     enemyCatchUp, autoBuy, tierScienceCost, DOOMSDAY_SCALE, relativePower, resolveLanding, resolveOurStrike, canRazeTile, ENEMY_TILE_HP,
     waveStandingK, defenceStandingK, ENEMY_DEFENCE_REGROW, enemyDefenceCap, RESEARCH_CATCHUP,
     FIRST_TIER_PREMIUM, quartermasterBudget, QM_KEEP_S, STANCES, revealNext, isShown, REVEAL_GAP_S, TIER_REVEAL_S, hpYield,
+    waveMode, GROUND_EVERY, AIR_GROUND_KILL, AIR_UNIT_COST, landingLosses,
 } from './war.js';
 
 describe('war rules', () => {
@@ -111,13 +112,13 @@ describe('war rules', () => {
     });
 
     test('autoBuy alternates and never overspends', () => {
-        expect(autoBuy(55, 0, 0, 10)).toEqual({ defence: 3, force: 2 });
-        expect(autoBuy(9, 0, 0, 10)).toEqual({ defence: 0, force: 0 });
-        expect(autoBuy(30, 0, 10, 10)).toEqual({ defence: 3, force: 0 });
+        expect(autoBuy(55, 0, 0, 10)).toMatchObject({ defence: 3, force: 2 });
+        expect(autoBuy(9, 0, 0, 10)).toMatchObject({ defence: 0, force: 0 });
+        expect(autoBuy(30, 0, 10, 10)).toMatchObject({ defence: 3, force: 0 });
         // the stances are ratios, not either-or: shield 3 : 1, sword 1 : 3
-        expect(autoBuy(40, 0, 0, 10, 'defend')).toEqual({ defence: 3, force: 1 });
-        expect(autoBuy(40, 0, 0, 10, 'attack')).toEqual({ defence: 1, force: 3 });
-        expect(autoBuy(80, 30, 0, 10, 'defend')).toEqual({ defence: 0, force: 8 });
+        expect(autoBuy(40, 0, 0, 10, 'defend')).toMatchObject({ defence: 3, force: 1 });
+        expect(autoBuy(40, 0, 0, 10, 'attack')).toMatchObject({ defence: 1, force: 3 });
+        expect(autoBuy(80, 30, 0, 10, 'defend')).toMatchObject({ defence: 0, force: 8 });
     });
 
     test('the quartermaster leaves a reserve in the yard and never strikes', () => {
@@ -139,6 +140,35 @@ describe('war rules', () => {
         // the tier button waits for both the clock and four landings
         w.landings = 4; w.t = TIER_REVEAL_S - 1; expect(revealNext(w)).toBeNull();
         w.t = TIER_REVEAL_S; expect(revealNext(w)).toBe('tier');
+    });
+
+    test('from tier V their shells fly over the guards; one wave in three still walks', () => {
+        expect(waveMode(3, 3)).toBe('melee');                       // repeaters: everything walks
+        expect(waveMode(4, 1)).toBe('ranged');
+        expect(waveMode(4, GROUND_EVERY)).toBe('melee');            // a landing party with artillery behind it
+        expect(waveMode(6, 2)).toBe('area');
+        // an air wave ignores the guards: 400 guards stop nothing, 400 air units stop 70 %
+        const guardsOnly = resolveLanding({ size: 40, enemyTier: 4, ourTier: 4, defence: 400, airDefence: 0, hp: 100, mode: 'ranged' });
+        expect(guardsOnly.hpLeft).toBe(60);
+        expect(guardsOnly.defenceLost).toBe(Math.ceil(40 * AIR_GROUND_KILL));   // and it kills guards where it lands
+        const sky = resolveLanding({ size: 40, enemyTier: 4, ourTier: 4, defence: 400, airDefence: 400, hp: 100, mode: 'ranged' });
+        expect(sky.hpLeft).toBe(88);
+        expect(sky.airLost).toBeGreaterThan(0);
+        // a ground wave still meets the guards and never touches the air defence
+        const ground = resolveLanding({ size: 40, enemyTier: 4, ourTier: 4, defence: 400, airDefence: 0, hp: 100, mode: 'melee' });
+        expect(ground.hpLeft).toBe(88);
+        expect(ground.airLost).toBe(0);
+        expect(landingLosses({ size: 40, enemyTier: 4, ourTier: 4, defence: 400, airDefence: 0, mode: 'area' })).toBe(0);
+        expect(landingLosses({ size: 40, enemyTier: 4, ourTier: 4, defence: 400, airDefence: 400, mode: 'area' })).toBeCloseTo(0.7);
+    });
+
+    test('once their weapons fly the quartermaster buys air defence too', () => {
+        const noAir = autoBuy(200, 0, 0, 10, 'balanced');
+        expect(noAir.air).toBe(0);
+        const air = autoBuy(400, 10, 30, 10, 'balanced', { on: true, units: 0 });
+        expect(air.air).toBeGreaterThan(0);
+        expect(air.air * AIR_UNIT_COST + (air.defence + air.force) * 10).toBeLessThanOrEqual(400);
+        expect(AIR_UNIT_COST).toBe(20);
     });
 
     test('a damaged plate yields its share of HP', () => {

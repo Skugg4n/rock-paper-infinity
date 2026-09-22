@@ -13,6 +13,7 @@
 
 import { buildingData } from './buildings-config.js';
 import { FORT_COST, plateMaxHp } from '../phase3/war.js';
+import { formatCount } from './economy.js';
 
 /**
  * Generates the inner HTML string for a building slot.
@@ -40,7 +41,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     if (war && building.razed) {
         const clearCost = Math.round((buildingData[building.type]?.cost || 0) * 0.3);
         actionButtons += `<button class="building-action-btn clear-btn" data-building-id="${building.id}" ${stars >= clearCost ? '' : 'disabled'}>×
-            <div class="tooltip"><div class="cost">${clearCost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
+            <div class="tooltip"><div class="cost">${formatCount(clearCost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
         </button>`;
         return `<div class="${classes}">${actionButtons}</div>`;
     }
@@ -57,7 +58,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     if (building.type !== 'factory' && building.type !== 'bank') {
         const refund = (buildingData[building.type]?.cost || 0) * 0.7;
         actionButtons += `<button class="building-action-btn sell-btn" data-building-id="${building.id}">-
-            <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
+            <div class="tooltip"><div class="effect">+${formatCount(Math.floor(refund))} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
         </button>`;
     }
 
@@ -88,7 +89,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
             actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" data-building-id="${building.id}" data-upgrade-target="${upgradeTarget}" ${canAfford ? '' : 'disabled'}>+
                 <div class="tooltip">
                     <div class="effect">${effectHTML}</div>
-                    <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
+                    <div class="cost">${formatCount(upgradeInfo.cost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
                 </div>
             </button>`;
         }

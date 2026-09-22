@@ -897,8 +897,8 @@ items:
     request: |
       After artillery the game is over, only mop-up. There must be a second
       climb: air defence as a second defence type from tier V.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: "war-playtest-3 commit 2 (unreleased)"
 
   - id: B082
     added: 2026-09-22
@@ -907,8 +907,8 @@ items:
       Stars and research are astronomically high next to the costs; no feeling
       for what anything means. Keep the big numbers but make them readable
       (k, M, B, T, Qa, full number on hover) in chapters II and III.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: "war-playtest-3 commit 2 (unreleased)"
 
   - id: B083
     added: 2026-09-22
@@ -917,5 +917,10 @@ items:
       The enemy is still very easy to beat; the missiles are "not entirely
       harmless now, maybe better". Re-check with the sim after air defence;
       if still too easy, push more often while we lead.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: "war-playtest-3 commit 2 (unreleased)"
+    notes: |
+      Sim after air defence: behind 40 to 43 % (not under 40), so the extra
+      push was not required; it went in anyway (every 3rd wave while we lead)
+      because it only bites where the tester found the war easy. It moves the
+      sim by at most a plate.

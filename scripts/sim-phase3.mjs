@@ -18,6 +18,7 @@ import {
   nextEnemyTierAt, pickTarget, resolveLanding, resolveOurStrike, canRazeTile, plateMaxHp, autoBuy,
   tierScienceCost, enemyCatchUp, TIER_COOLDOWN_S, WAVE_WARNING_S, RAID_S, raidCost,
   revealNext, isShown, quartermasterBudget, hpYield, QM_KEEP_S, enemyMayResearch,
+  waveMode, isAirMode, AIR_UNIT_COST, isPush,
 } from '../src/phase3/war.js';
 
 const seed = Number(process.argv[2] || 1);
@@ -48,6 +49,7 @@ w.lastTierAt = -999;
 w.enemyRazedUntil = [0, 0, 0, 0, 0];
 w.enemyTileHp = [0, 0, 0, 0, 0].map(() => ENEMY_TILE_HP);
 w.regroupAt = 0;
+w.air = 0;                                          // air defence units (from their tier V)
 let stars = 0, science = 0;
 const log = []; const events = [];
 let leadChanges = 0, lastLead = 0, razedOurs = 0, razedTheirs = 0, behindS = 0, aheadS = 0, silentS = 0;
@@ -93,8 +95,10 @@ function quartermaster() {
   // sets aside at most a third of what is in the yard this second.
   const reserve = w.wantRaid ? Math.min(raidCost(w.raids || 0), w.arms / 3) : 0;
   const budget = quartermasterBudget(Math.max(0, w.arms - reserve), armsPerSecond(w.tier) * w.armsShare);
-  const buy = autoBuy(budget, w.defence, w.force, UNIT_COST, 'balanced');
-  w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
+  // Once their shells fly (the air defence button has opened), it buys air defence too.
+  const buy = autoBuy(budget, w.defence, w.force, UNIT_COST, 'balanced', { on: isShown(w, 'air'), units: w.air });
+  w.arms -= (buy.defence + buy.force) * UNIT_COST + buy.air * AIR_UNIT_COST;
+  w.defence += buy.defence; w.force += buy.force; w.air += buy.air;
 }
 
 /** The strike button, pressed by hand the moment it shows a tick. */
@@ -150,19 +154,21 @@ function warTick() {
     w.lastWaveAt = w.t; w.waveCount++;
     const target = pickTarget(plates, randTarget);
     if (target) {
-      const push = w.waveCount % 5 === 0;
+      const push = isPush(w.waveCount, w.tier, w.enemyTier);
       const size = Math.round(waveSize(w.waveCount) * waveStandingK(standing) * (push ? 2 : 1));
-      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push };
+      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push, mode: waveMode(w.enemyTier, w.waveCount) };
     }
   }
   if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
-    const { targetId, size } = w.pendingWave; w.pendingWave = null;
+    const { targetId, size, mode } = w.pendingWave; w.pendingWave = null;
     const b = plates.find(p => p.id === targetId);
     w.landings = (w.landings || 0) + 1;
     if (b && !b.razed) {
       const enemy = TIERS[w.enemyTier];
-      const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, hp: b.hp });
+      const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air, hp: b.hp, mode });
       w.defence = Math.max(0, w.defence - r.defenceLost);
+      w.air = Math.max(0, w.air - r.airLost);
+      if (isAirMode(mode)) w.airSeen = true;
       b.hp = r.hpLeft;
       w.scorchOurs += enemy.scorch;
       if (r.razed) {
@@ -183,7 +189,7 @@ function warTick() {
 
 while (w.t < 3600 && !w.shipReady) {
   const inc = income();
-  const upkeep = inc * UPKEEP_SHARE_PER_UNIT * (w.defence + w.force);
+  const upkeep = inc * UPKEEP_SHARE_PER_UNIT * (w.defence + w.force + w.air);
   stars += Math.max(0, inc * (1 - w.armsShare) - upkeep);
   science += scienceRate();
   playerActions();
@@ -194,7 +200,7 @@ while (w.t < 3600 && !w.shipReady) {
   if (lead < 0) behindS++; else if (lead > 0) aheadS++;
   if (w.tier >= 4 && !tierVAt) tierVAt = w.t;
   if (w.tier >= 4 && !w.enemyLeft) { lateS++; if (lead < 0) lateBehindS++; }
-  if (w.t % 60 === 0) log.push({ t: w.t, tier: w.tier, etier: w.enemyTier, def: Math.round(w.defence), force: Math.round(w.force), edef: Math.round(w.enemyDefence), standing: plates.filter(p => !p.razed).length, doom: Math.round(doomsday(w.scorchOurs + w.scorchTheirs)), theirStanding: 5 - w.enemyRazedUntil.filter(x => x > 0).length, salvage: Math.round(w.salvage) });
+  if (w.t % 60 === 0) log.push({ t: w.t, tier: w.tier, etier: w.enemyTier, def: Math.round(w.defence), air: Math.round(w.air), force: Math.round(w.force), edef: Math.round(w.enemyDefence), standing: plates.filter(p => !p.razed).length, doom: Math.round(doomsday(w.scorchOurs + w.scorchTheirs)), theirStanding: 5 - w.enemyRazedUntil.filter(x => x > 0).length, salvage: Math.round(w.salvage) });
 }
 const t = w.t;
 const fmt = s => `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
