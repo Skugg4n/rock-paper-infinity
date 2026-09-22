@@ -11,13 +11,16 @@
  * is on screen, greyed, so the player knows there is one.
  */
 
-import { PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from '../constants.js';
+import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from '../constants.js';
 import {
     initialDeepState, tickDay, sleep, digCost, roomCost, levelCost, automationCost,
     ROOM_FOR_COLUMN, COLUMN, ROOMS, DAYS_PER_YEAR, RESURFACE_AT, CRYO, CHAPTER_V,
     cryoLabel, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
     clearChamber, clearDarkType, stalledRooms, ascentOffered, attemptAscent, ASCENT,
+    startBuild, completeBuilds, buildProgress, buildPending,
 } from './deep.js';
+import { conditions, advisorLines, pushFeed, ROOM_WORD, ROOM_WORDS } from './advisor.js';
+import { ledger, buySentence, preview, deltaText } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout } from './layout.js';
 import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
 import { createCrust } from './crust.js';
@@ -28,9 +31,6 @@ import { doomsday } from '../phase3/war.js';
 
 const { SAVE_KEY, MAX_CATCHUP_DAYS } = PHASE4_CONSTANTS;
 const BAR_H = 160;                 // the track's height in CSS pixels
-/** What the advisor calls the room that fixes each column. */
-const ROOM_WORD = { mine: 'mine', farm: 'farm', generator: 'generator', dorm: 'dormitory' };
-const ROOM_WORDS = { mine: 'mines', farm: 'farms', generator: 'generators', dorm: 'dormitories' };
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** How long a cryo press takes in real time: the walk in, the counter, the walk out. */
@@ -126,10 +126,14 @@ export function init() {
         minerals: document.getElementById('deep-minerals'),
         stars: document.getElementById('deep-stars'),
         advisor: document.getElementById('deep-advisor'),
+        feed: document.getElementById('deep-feed'),
         starsDay: document.getElementById('deep-stars-day'),
         heads: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-head-${c}`)])),
         fills: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-fill-${c}`)])),
         dots: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-dot-${c}`)])),
+        ghosts: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-ghost-${c}`)])),
+        deltas: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-delta-${c}`)])),
+        bars: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-bar-${c}`)])),
         digBtn: document.getElementById('deep-dig-btn'),
         roomBtns: ['mine', 'farm', 'generator', 'dorm'].map((t) => ({ type: t, el: document.getElementById(`deep-room-${t}`) })),
         levelBtn: document.getElementById('deep-level-btn'),
@@ -168,6 +172,9 @@ export function init() {
     let busy = false;
     let advisorLine = '';           // what the wake-up said, until the strip goes away
     let spin = null;                // the counter running up: { from, to, k, dur, resolve }
+    let feed = [];                  // the advisor's last lines, oldest first
+    let toldAbout = null;           // the conditions the last feed line was written about
+    let hovering = null;            // { kind, type } of the button under the cursor, for the preview
 
     // --- the day's report, for the bars and the advisor ---
     // A dry run on a copy: the same numbers the next real day will give, without
@@ -186,6 +193,10 @@ export function init() {
         const t = el.querySelector('.tooltip');
         if (t && t.innerHTML !== html) t.innerHTML = html;
     }
+    /** A sentence goes into a tooltip as text, never as markup. */
+    const escapeText = (s2) => String(s2).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+    /** Costs and one plain sentence: the tooltip of a purchase says what will happen. */
+    const says = (sentence) => `<span class="deep-says">${escapeText(sentence)}</span>`;
     const cost = (n, icon) => `<span class="deep-mono">${formatCount(n)}</span><i data-lucide="${icon}" class="w-4 h-4"></i>`;
     const mineralCost = (n) => cost(n, 'gem');
     const starCost = (n) => cost(n, 'star');
@@ -207,9 +218,14 @@ export function init() {
         ui.stars.textContent = formatCount(state.stars);
         ui.starsDay.textContent = formatCount(report.stars);
 
-        // the bars: all four to the same scale, the weakest marked
+        // the bars: all four to the same scale, the weakest marked. When a purchase button is
+        // under the cursor, the ghost shows where each bar WOULD stand once that purchase is
+        // finished, with the change written over it. That is the whole answer to "I buy
+        // electricity and BOOM all humans drop": now you see the drop before you pay for it.
         const parts = report.parts;
-        const scale = Math.max(1, ...COLUMN.map((c) => Math.abs(parts[c])));
+        const ahead = hovering ? preview(state, hovering.kind, hovering.type, report) : null;
+        const scale = Math.max(1, ...COLUMN.map((c) => Math.abs(parts[c])),
+            ...(ahead ? COLUMN.map((c) => Math.abs(ahead.parts[c])) : []));
         for (const c of COLUMN) {
             const h = Math.round(BAR_H * Math.max(0, Math.min(1, parts[c] / scale)));
             ui.fills[c].style.height = `${h}px`;
@@ -217,34 +233,67 @@ export function init() {
             const weakest = c === report.weakest;
             ui.dots[c].classList.toggle('hidden', !weakest);
             if (weakest) ui.dots[c].style.bottom = `${Math.min(BAR_H - 4, h + 10)}px`;
+            const g = ui.ghosts[c], d = ui.deltas[c];
+            if (ahead) {
+                const gh = Math.round(BAR_H * Math.max(0, Math.min(1, ahead.parts[c] / scale)));
+                g.style.height = `${gh}px`;
+                g.classList.toggle('is-down', ahead.delta[c] < -0.5);
+                g.classList.add('is-on');
+                d.textContent = deltaText(ahead.delta[c], c);
+                d.classList.toggle('is-down', ahead.delta[c] < -0.5);
+                d.classList.add('is-on');
+            } else {
+                g.classList.remove('is-on');
+                d.classList.remove('is-on');
+                d.textContent = '';
+            }
         }
         ui.advisor.textContent = advisorLine
             || `Year ${cal.year}: the ${ROOM_WORD[ROOM_FOR_COLUMN[report.weakest]]} is the bottleneck.`;
+        // the feed: the last five things worth saying, newest at the bottom
+        if (ui.feed.childElementCount !== feed.length
+            || (feed.length && ui.feed.lastElementChild.textContent !== feed[feed.length - 1])) {
+            ui.feed.textContent = '';
+            for (const line of feed) {
+                const row = document.createElement('div');
+                row.className = 'deep-feed-line';
+                row.textContent = line;
+                ui.feed.appendChild(row);
+            }
+        }
+        // each bar says where its number came from, in a sentence
+        for (const c of COLUMN) setTooltip(ui.bars[c], escapeText(ledger(c, state, report)));
 
         // the buttons
         const digPrice = digCost(state.chambers);
-        ui.digBtn.classList.toggle('is-locked', state.minerals < digPrice);
-        setTooltip(ui.digBtn, mineralCost(digPrice));
+        ui.digBtn.classList.toggle('is-locked', state.minerals < digPrice || buildPending(state, 'dig'));
+        setTooltip(ui.digBtn, mineralCost(digPrice) + says(buySentence('dig', null, state)));
+        showBuild(ui.digBtn, 'dig', null);
 
         const free = freeChamber(layout) >= 0;
         for (const { type, el } of ui.roomBtns) {
             const price = roomCost(type, state.rooms[type] || 0);
-            el.classList.toggle('is-locked', !free || state.minerals < price);
-            setTooltip(el, mineralCost(price));
+            el.classList.toggle('is-locked', !free || state.minerals < price || buildPending(state, 'room', type));
+            setTooltip(el, mineralCost(price) + says(buySentence('room', type, state)));
+            showBuild(el, 'room', type);
         }
 
         const weakType = ROOM_FOR_COLUMN[report.weakest];
         const levelPrice = levelCost(weakType, state.level[weakType] || 0);
-        ui.levelBtn.classList.toggle('is-locked', state.stars < levelPrice);
-        setTooltip(ui.levelBtn, roomMark(weakType) + starCost(levelPrice));
+        ui.levelBtn.classList.toggle('is-locked', state.stars < levelPrice || buildPending(state, 'level', weakType));
+        setTooltip(ui.levelBtn, roomMark(weakType) + starCost(levelPrice) + says(buySentence('level', weakType, state)));
+        showBuild(ui.levelBtn, 'level', weakType);
 
         // automation is teased only once the first level is bought
         const anyLevel = Object.values(state.level).some((l) => l > 0);
         ui.autoBtn.classList.toggle('hidden', !anyLevel);
         if (anyLevel) {
             const autoPrice = automationCost(weakType, state.auto[weakType] || 0);
-            ui.autoBtn.classList.toggle('is-locked', !(state.stars >= autoPrice));
-            setTooltip(ui.autoBtn, Number.isFinite(autoPrice) ? roomMark(weakType) + starCost(autoPrice) : roomMark(weakType));
+            ui.autoBtn.classList.toggle('is-locked', !(state.stars >= autoPrice) || buildPending(state, 'auto', weakType));
+            setTooltip(ui.autoBtn, Number.isFinite(autoPrice)
+                ? roomMark(weakType) + starCost(autoPrice) + says(buySentence('auto', weakType, state))
+                : roomMark(weakType));
+            showBuild(ui.autoBtn, 'auto', weakType);
         }
         // ---- cryo: the first press digs the hall, every press after it is a sleep ----
         const tier = state.cryo;
@@ -304,44 +353,79 @@ export function init() {
         afterChange();
     }
 
-    // --- buying ---
+    /** The filling ring on a button while its order is being built. */
+    function showBuild(el, kind, type) {
+        const mark = el.querySelector('.deep-build');
+        if (!mark) return;
+        const job = (state.builds || []).find((j) => j.kind === kind && (type === null || j.type === type));
+        mark.classList.toggle('is-on', !!job);
+        if (job) mark.style.setProperty('--p', `${Math.round(buildProgress(state, job) * 100)}%`);
+    }
+    /** Hovering a purchase is what draws the ghosts; leaving it puts the bars back. */
+    function watchHover(el, kind, type) {
+        el.addEventListener('mouseenter', () => { hovering = { kind, type }; updateChrome(); }, { signal });
+        el.addEventListener('mouseleave', () => { hovering = null; updateChrome(); }, { signal });
+    }
+
+    // --- buying: the price now, the thing itself in a few days ---------------
     function dig() {
         const price = digCost(state.chambers);
-        if (state.minerals < price) return;
+        if (state.minerals < price || buildPending(state, 'dig')) return;
         state.minerals -= price;
-        state.chambers += 1;
-        layout.slots.push(null);
+        startBuild(state, 'dig');
         afterChange();
     }
     function buildRoom(type) {
         const slot = freeChamber(layout);
-        if (slot < 0) return;
+        if (slot < 0 || buildPending(state, 'room', type)) return;
         const price = roomCost(type, state.rooms[type] || 0);
         if (state.minerals < price) return;
         state.minerals -= price;
-        state.rooms[type] = (state.rooms[type] || 0) + 1;
-        layout.slots[slot] = type;
+        // the chamber is spoken for the moment the order goes in, so the next order
+        // cannot be given the same one
+        layout.slots[slot] = null;
+        startBuild(state, 'room', { type, slot });
         mendType(type);
         afterChange();
     }
     /** Levels the room type that fixes the weakest column: the dot is the instruction. */
     function levelWeakest() {
         const type = ROOM_FOR_COLUMN[report.weakest];
+        if (buildPending(state, 'level', type)) return;
         const price = levelCost(type, state.level[type] || 0);
         if (state.stars < price) return;
         state.stars -= price;
-        state.level[type] += 1;
+        startBuild(state, 'level', { type });
         mendType(type);
         afterChange();
     }
     function automateWeakest() {
         const type = ROOM_FOR_COLUMN[report.weakest];
+        if (buildPending(state, 'auto', type)) return;
         const price = automationCost(type, state.auto[type] || 0);
         if (!Number.isFinite(price) || state.stars < price) return;
         state.stars -= price;
-        state.auto[type] += 1;
+        startBuild(state, 'auto', { type });
         mendType(type);
         afterChange();
+    }
+
+    /**
+     * What an order does when its day comes. The rules move the state; the layout has to be
+     * told where a new room went, and a fresh chamber has to exist to put the next one in.
+     */
+    function landBuilds() {
+        const done = completeBuilds(state);
+        if (!done.length) return false;
+        for (const job of done) {
+            if (job.kind === 'dig') layout.slots.push(null);
+            else if (job.kind === 'room') {
+                const slot = job.slot >= 0 && job.slot < layout.slots.length ? job.slot : freeChamber(layout);
+                if (slot >= 0) layout.slots[slot] = job.type;
+            }
+        }
+        layout = normalizeLayout(state, layout);
+        return true;
     }
 
     // --- cryo: the hall, the ladder, and the press that spends a century -------
@@ -422,6 +506,16 @@ export function init() {
         const day0 = state.day;
         await (scene ? scene.gather(SLEEP_TIMING.gather) : Promise.resolve());
         const sum = sleep(state, days);
+        if (sum.built && sum.built.length) {
+            for (const job of sum.built) {
+                if (job.kind === 'dig') layout.slots.push(null);
+                else if (job.kind === 'room') {
+                    const slot = job.slot >= 0 && job.slot < layout.slots.length ? job.slot : freeChamber(layout);
+                    if (slot >= 0) layout.slots[slot] = job.type;
+                }
+            }
+            layout = normalizeLayout(state, layout);
+        }
         state.stalled = stalledRooms(state, sum);
         const landed = resolveDueProbes(state, layout.slots, Math.random);
         saveGame();
@@ -475,6 +569,14 @@ export function init() {
         playChapterCard({ roman: CHAPTER_V.roman, title: CHAPTER_V.title, mode: 'to-come', dark: true });
     }
 
+    /** One pass of the advisor: a line only when a condition is not what it was. */
+    function speak() {
+        const now = conditions(state, report);
+        const lines = advisorLines(toldAbout, now);
+        toldAbout = now;
+        if (lines.length) feed = pushFeed(feed, lines);
+    }
+
     function setBusy(on) {
         busy = on;
         ui.root.classList.toggle('is-busy', on);
@@ -488,6 +590,13 @@ export function init() {
     for (const { type, el } of ui.roomBtns) el.addEventListener('click', guarded(() => buildRoom(type)), { signal });
     ui.levelBtn.addEventListener('click', guarded(levelWeakest), { signal });
     ui.autoBtn.addEventListener('click', guarded(automateWeakest), { signal });
+    // the preview: every purchase button shows its own future on the bars
+    watchHover(ui.digBtn, 'dig', null);
+    for (const { type, el } of ui.roomBtns) watchHover(el, 'room', type);
+    ui.levelBtn.addEventListener('mouseenter', () => { hovering = { kind: 'level', type: ROOM_FOR_COLUMN[report.weakest] }; updateChrome(); }, { signal });
+    ui.levelBtn.addEventListener('mouseleave', () => { hovering = null; updateChrome(); }, { signal });
+    ui.autoBtn.addEventListener('mouseenter', () => { hovering = { kind: 'auto', type: ROOM_FOR_COLUMN[report.weakest] }; updateChrome(); }, { signal });
+    ui.autoBtn.addEventListener('mouseleave', () => { hovering = null; updateChrome(); }, { signal });
     ui.cryoBtn.addEventListener('click', guarded(pressCryo), { signal });
     ui.cryoUpBtn.addEventListener('click', guarded(buyCryoTier), { signal });
     ui.probeBtn.addEventListener('click', guarded(sendProbe), { signal });
@@ -495,6 +604,20 @@ export function init() {
     // the replay strip stays until the next thing the player does
     ui.root.addEventListener('click', () => { if (replay.visible()) replay.hide(); }, { signal, capture: true });
     ui.resetBtn.addEventListener('click', () => { scene?.resetView(); ui.resetBtn.classList.remove('is-on'); }, { signal });
+    // "Reset everything" in the shared menu: each chapter says what that means for its own save
+    document.getElementById('reset-btn')?.addEventListener('click', () => {
+        if (!confirm('Reset all progress? This cannot be undone.')) return;
+        savingEnabled = false;
+        stopClock();
+        if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler);
+        try {
+            localStorage.removeItem(SAVE_KEY);
+            localStorage.removeItem(PHASE2_CONSTANTS.SAVE_KEY);
+            localStorage.removeItem(PHASE1_CONSTANTS.SAVE_KEY);
+            localStorage.removeItem(PHASE_KEY);
+        } catch { /* ignore */ }
+        setTimeout(() => location.reload(), 0);
+    }, { signal });
     window.addEventListener('resize', () => scene?.resize(), { signal });
     window.addEventListener('beforeunload', beforeUnloadHandler);
 
@@ -508,7 +631,11 @@ export function init() {
         // whole night: there is no offline progress in the deep yet.
         const days = Math.max(1, Math.min(MAX_CATCHUP_DAYS, elapsed));
         lastDayAt = now;
-        for (let i = 0; i < days; i++) report = tickDay(state, state.asleep);
+        for (let i = 0; i < days; i++) {
+            landBuilds();
+            report = tickDay(state, state.asleep);
+        }
+        speak();
         scene?.setState(state, layout);
         updateChrome();
         saveGame();

@@ -52,7 +52,7 @@ body.in-deep {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #9fb0c4;
+    color: #2b3442;
     transition: opacity 250ms ease;
 }
 .deep-lbl-in .lvl {
@@ -70,8 +70,8 @@ body.in-deep {
     line-height: 17px;
     text-align: center;
 }
-.deep-lbl-in .auto { position: absolute; right: 3px; top: 3px; color: #64748b; }
-.deep-lbl-in .ring-base { stroke: #2a3442; }
+.deep-lbl-in .auto { position: absolute; right: 3px; top: 3px; color: #5b6676; }
+.deep-lbl-in .ring-base { stroke: #aab3c0; }
 .deep-lbl-in .ring-fg {
     transform: rotate(-90deg);
     transform-origin: 50% 50%;
@@ -158,8 +158,10 @@ body.in-deep {
 .deep-clock .deep-unit { font-size: 9px; color: #3b4757; letter-spacing: 0.18em; text-align: center; }
 
 /* ---- what we hold -------------------------------------------------------- */
+/* clear of the button column (right: 72px, 56px wide): the advisor's feed is text now,
+   and text that runs under a row of buttons is text nobody can read */
 #deep-hold {
-    right: 72px;
+    right: 148px;
     top: 56px;
     display: flex;
     flex-direction: column;
@@ -169,7 +171,7 @@ body.in-deep {
 .deep-hold-row { display: flex; align-items: center; gap: 10px; }
 .deep-hold-row i { color: #5f6d80; }
 .deep-amount { font-size: 22px; font-weight: 700; color: #c3cfdd; }
-#deep-advisor { font-size: 11px; color: #55637a; min-height: 14px; }
+#deep-advisor { font-size: 11px; color: #55637a; min-height: 14px; max-width: 280px; text-align: right; white-space: normal; line-height: 1.45; }
 
 /* ---- the four columns ---------------------------------------------------- */
 #deep-columns { left: 80px; top: 50%; transform: translateY(-50%); }
@@ -353,3 +355,110 @@ body.in-deep #menu-btn i { color: #8fa1b6; }
 .deep-replay-bar { width: 4px; border-radius: 2px; background: #3c4a5c; }
 .deep-replay-col.is-top .deep-replay-bar { background: #dc2626; }
 .deep-replay-col.is-top { color: #8fa1b6; }
+
+/* The shared controls belong to the shell and must stay reachable in the deep:
+   the chapter's chrome floats at z-index 10 to 12, so the menu and the version
+   line are lifted clear of it. (Ola, v1.40.0: "the menu cannot be clicked".) */
+body.in-deep #menu-wrapper { z-index: 1500; }
+body.in-deep #version-info { z-index: 1400; }
+
+/* ---- v1.41.1: text is the explanation model in this chapter ---------------
+   Ola, after playing v1.40.0: icons alone failed here. Four numbers moved at
+   once and nothing said why. So the deep gets sentences: a feed top right, a
+   ledger on every bar, and one line on every purchase. */
+
+#deep-feed {
+    margin-top: 10px;
+    width: 280px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #55637a;
+    text-align: right;
+    white-space: normal;
+}
+.deep-feed-line { margin-top: 3px; }
+/* the newest line is the one being said now */
+.deep-feed-line:last-child { color: #8fa1b6; }
+
+/* tooltips that hold a sentence wrap, and the bars' tooltips open to the right
+   because the bars sit against the left edge of the window */
+#phase-deep .tooltip.deep-tip-wide {
+    white-space: normal;
+    width: 260px;
+    display: block;
+    line-height: 1.45;
+}
+#phase-deep .tooltip.deep-tip-right {
+    right: auto;
+    left: 132%;
+}
+#phase-deep .deep-says {
+    display: block;
+    margin-top: 6px;
+    color: #9fb0c4;
+    font-size: 12px;
+}
+#phase-deep .tooltip.deep-tip-wide .deep-says:first-child { margin-top: 0; }
+#phase-deep .deep-bar { cursor: help; }
+#phase-deep .deep-bar:hover .tooltip { opacity: 1; }
+
+/* ---- the preview: where a bar WOULD stand once the purchase is finished ---- */
+.deep-track { position: relative; }
+.deep-ghost {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 0;
+    border-radius: 9999px;
+    background: repeating-linear-gradient(-45deg, #7d8fa5 0 3px, transparent 3px 6px);
+    opacity: 0;
+    transition: height 200ms ease, opacity 200ms ease;
+    pointer-events: none;
+}
+.deep-ghost.is-on { opacity: 0.55; }
+.deep-ghost.is-down { background: repeating-linear-gradient(-45deg, #dc2626 0 3px, transparent 3px 6px); }
+.deep-delta {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(100% + 22px);
+    font-size: 10px;
+    color: #9fb0c4;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+}
+.deep-delta.is-on { opacity: 1; }
+.deep-delta.is-down { color: #dc2626; }
+
+/* ---- an order under way: the ring fills on the button that placed it ------ */
+#phase-deep .deep-build {
+    position: absolute;
+    inset: -3px;
+    border-radius: 9999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 300ms ease;
+    background: conic-gradient(#7d8fa5 var(--p, 0%), transparent 0);
+    mask: radial-gradient(circle, transparent 0 25px, #000 25px);
+    -webkit-mask: radial-gradient(circle, transparent 0 25px, #000 25px);
+}
+#phase-deep .deep-build.is-on { opacity: 0.85; }
+/* a button waiting on its own order reads as busy, not as unaffordable */
+#phase-deep .btn.is-locked:has(.deep-build.is-on) { opacity: 0.6; }
+
+/* the same ring on the plate itself, so the order is visible where the room will be */
+.deep-lbl-in .building {
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    background: conic-gradient(#4a5666 var(--p, 0%), transparent 0);
+    mask: radial-gradient(circle, transparent 0 22px, #000 22px);
+    -webkit-mask: radial-gradient(circle, transparent 0 22px, #000 22px);
+}
+.deep-lbl-in .building.is-on { opacity: 0.9; }
+.deep-lbl-in.is-building .ring-fg { stroke: #4a5666; }

@@ -142,8 +142,6 @@ export function init() {
               supplyProduction: document.getElementById('supply-production'),
               debugMenu: document.getElementById('p2-debug-menu'),
               debugToggleBtn: document.getElementById('debug-toggle-btn'),
-              menuBtn: document.getElementById('menu-btn'),
-              menuDropdown: document.getElementById('menu-dropdown'),
               resetBtn: document.getElementById('reset-btn'),
               buildHomeBtn: document.getElementById('build-home-btn'),
               buildStoreBtn: document.getElementById('build-store-btn'),
@@ -575,7 +573,6 @@ export function init() {
               ui.debugMenu.style.display = isHidden ? 'block' : 'none';
           }, { signal });
 
-          ui.menuBtn.addEventListener('click', () => ui.menuDropdown.classList.toggle('hidden'), { signal });
           ui.resetBtn.addEventListener('click', () => {
               if (!confirm('Reset all progress? This cannot be undone.')) return;
               savingEnabled = false;

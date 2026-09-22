@@ -10,6 +10,24 @@ import { MODULE_PATHS } from './src/modules.js';
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
 
+// The menu, the version line and the test menu live OUTSIDE the phase containers, so
+// they belong to the shell. Chapters I and II each wired the toggle themselves, which
+// meant the button was simply dead in any chapter that did not (Ola, playing IV in
+// v1.40.0: "the menu cannot be clicked"). Wire it once, here, for every chapter there
+// will ever be. Each phase still owns what "Reset everything" means for its own save.
+const menuBtn = document.getElementById('menu-btn');
+const menuDropdown = document.getElementById('menu-dropdown');
+menuBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  menuDropdown?.classList.toggle('hidden');
+});
+document.addEventListener('click', (e) => {
+  if (menuDropdown && !menuDropdown.classList.contains('hidden')
+      && !menuDropdown.contains(e.target) && e.target !== menuBtn && !menuBtn?.contains(e.target)) {
+    menuDropdown.classList.add('hidden');
+  }
+});
+
 // Debug menus: on with ?debug in the URL or the "Debug menu" item in the ☰
 // menu (persisted in localStorage). The invisible trigger sits top-left.
 function readDebugFlag() {

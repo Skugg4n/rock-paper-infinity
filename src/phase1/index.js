@@ -52,8 +52,7 @@ import { timed, counter } from "../perf.js";
         const debugGamesPlayedEl = document.getElementById('debug-games-played');
         const dynamicStyles = document.getElementById('dynamic-styles');
 const tooltip = document.getElementById('tooltip');
-const menuBtn = document.getElementById('menu-btn');
-const menuDropdown = document.getElementById('menu-dropdown');
+const menuDropdown = document.getElementById('menu-dropdown');   // main.js owns the toggle; this closes it
 const resetBtn = document.getElementById('reset-btn');
 
         let listenerController = null;
@@ -262,7 +261,6 @@ function scheduleUIUpdate() {
             setupButtons();
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
-            menuBtn.addEventListener('click', () => menuDropdown.classList.toggle('hidden'), { signal });
             resetBtn.addEventListener('click', resetGame, { signal });
 
             updateAnimationSpeed();

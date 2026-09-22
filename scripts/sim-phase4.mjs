@@ -8,6 +8,7 @@
 import {
   ROOMS, COLUMN, ROOM_FOR_COLUMN, ROOM, initialDeepState, tickDay, sleep, surface, canResurface, canAscend,
   roomMultiplier, digCost, roomCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, ASCENT,
+  startBuild, completeBuilds, buildPending, BUILD_DAYS,
 } from '../src/phase4/deep.js';
 
 const WAIT_DAYS = 30;        // a human waits this long awake for a purchase; longer than that, they sleep
@@ -22,7 +23,8 @@ const events = [], log = [], buysPerWake = [], pressesPerTier = CRYO.map(() => 0
 let starved = 0, minHumans = s.humans, starsDay0 = 0, starsDayEnd = 0, stall = 0, worstStall = 0;
 const fmt = (sec) => `${Math.floor(sec / 60)}m${String(Math.round(sec) % 60).padStart(2, '0')}s`;
 const yr = (d) => (d / DAYS_PER_YEAR).toFixed(1);
-const usedChambers = () => ROOMS.reduce((a, t) => a + s.rooms[t], 0);
+// a chamber an order has already claimed is not an empty one
+const usedChambers = () => ROOMS.reduce((a, t) => a + s.rooms[t], 0) + (s.builds || []).filter((j) => j.kind === 'room').length;
 const crewOf = (t) => (s.auto[t] > 0 ? 0 : s.rooms[t] * ROOM[t].crew * roomMultiplier(s.level[t], s.auto[t]));
 
 /**
@@ -42,27 +44,28 @@ function buy(report) {
   const wantRoom = t !== 'dorm' && t !== 'auto';
   // 1. a room of the weakest kind, or a chamber to put it in (minerals)
   if (wantRoom || bedsFull) {
-    if (usedChambers() < s.chambers && s.minerals >= roomCost(t, s.rooms[t]) + FUEL_RESERVE) {
-      s.minerals -= roomCost(t, s.rooms[t]); s.rooms[t]++; return `room ${t} ×${s.rooms[t]}`;
+    if (usedChambers() < s.chambers && !buildPending(s, 'room', t) && s.minerals >= roomCost(t, s.rooms[t]) + FUEL_RESERVE) {
+      s.minerals -= roomCost(t, s.rooms[t]); startBuild(s, 'room', { type: t }); return `room ${t} ordered (${BUILD_DAYS.room} d)`;
     }
-    if (usedChambers() >= s.chambers && s.minerals >= digCost(s.chambers) + FUEL_RESERVE) {
-      s.minerals -= digCost(s.chambers); s.chambers++; return `dig chamber ${s.chambers}`;
+    if (usedChambers() >= s.chambers && !buildPending(s, 'dig') && s.minerals >= digCost(s.chambers) + FUEL_RESERVE) {
+      s.minerals -= digCost(s.chambers); startBuild(s, 'dig'); return `dig chamber ${s.chambers + 1} ordered (${BUILD_DAYS.dig} d)`;
     }
   }
   // 2. take people off a job: automate the room type that eats the most crew (stars)
   if (t === 'auto') {
-    const hungriest = ROOMS.filter((r) => crewOf(r) > 0).sort((a, b) => crewOf(b) - crewOf(a))[0];
+    const hungriest = ROOMS.filter((r) => crewOf(r) > 0 && !buildPending(s, 'auto', r)).sort((a, b) => crewOf(b) - crewOf(a))[0];
     if (hungriest && s.stars >= automationCost(hungriest, s.auto[hungriest])) {
-      s.stars -= automationCost(hungriest, s.auto[hungriest]); s.auto[hungriest]++;
-      return `auto ${hungriest} ${s.auto[hungriest]}`;
+      s.stars -= automationCost(hungriest, s.auto[hungriest]); startBuild(s, 'auto', { type: hungriest });
+      return `auto ${hungriest} ${s.auto[hungriest] + 1} ordered (${BUILD_DAYS.auto} d)`;
     }
     t = 'dorm';
   }
   // 3. level or automate the weakest, cheaper first (stars)
   const lv = levelCost(t, s.level[t]), au = automationCost(t, s.auto[t]);
-  if (lv <= au && s.stars >= lv) { s.stars -= lv; s.level[t]++; return `level ${t} ${s.level[t]}`; }
-  if (s.stars >= au) { s.stars -= au; s.auto[t]++; return `auto ${t} ${s.auto[t]}`; }
-  if (s.stars >= lv) { s.stars -= lv; s.level[t]++; return `level ${t} ${s.level[t]}`; }
+  const canLv = !buildPending(s, 'level', t), canAu = !buildPending(s, 'auto', t);
+  if (canLv && lv <= au && s.stars >= lv) { s.stars -= lv; startBuild(s, 'level', { type: t }); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
+  if (canAu && s.stars >= au) { s.stars -= au; startBuild(s, 'auto', { type: t }); return `auto ${t} ${s.auto[t] + 1} ordered (${BUILD_DAYS.auto} d)`; }
+  if (canLv && s.stars >= lv) { s.stars -= lv; startBuild(s, 'level', { type: t }); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
   // 4. a longer sleep (stars)
   const next = CRYO[s.cryo + 1];
   if (next && s.stars >= next.cost) { s.stars -= next.cost; s.cryo++; return `${next.id} (${next.days} d)`; }
@@ -83,6 +86,7 @@ function waitDays(report) {
 
 let summaryWeakest = null;   // what the wake-up summary said stalled while the colony slept
 while (real < REAL_CAP && !canAscend(s)) {
+  completeBuilds(s);                    // nothing is instant: orders land on their day
   const r = tickDay(s, false);
   if (summaryWeakest) { r.weakest = summaryWeakest; summaryWeakest = null; }
   real += 1;
@@ -99,6 +103,8 @@ while (real < REAL_CAP && !canAscend(s)) {
   while ((bought = buy(r)) && n < 25) { events.push({ real, day: s.day, e: bought }); n++; buysThisWake++; }
   // Nothing affordable and the wait is long: press cryo. Only when the colony runs itself,
   // which is the lesson the chapter teaches: a manual room stops the moment everyone lies down.
+  // Orders in flight are no reason to stay awake: a sleep finishes them, which is the
+  // whole point of automating first and then lying down.
   if (n === 0 && s.cryo >= 0 && waitDays(r) > WAIT_DAYS) {
     const safe = s.auto.mine > 0 && s.auto.farm > 0 && s.auto.generator > 0;
     if (safe) {
@@ -118,6 +124,7 @@ while (real < REAL_CAP && !canAscend(s)) {
 // Where the colony stood when the run ended: the numbers to look at when a run stalls.
 if (process.argv.includes('--why')) {
   const mult = (t) => roomMultiplier(s.level[t], s.auto[t]);
+  console.log('builds', JSON.stringify(s.builds || []));
   console.log('state', JSON.stringify({ rooms: s.rooms, level: s.level, auto: s.auto, chambers: s.chambers, minerals: +s.minerals.toPrecision(4), food: +s.food.toPrecision(4), stars: +s.stars.toPrecision(4), humans: Math.round(s.humans) }));
   console.log('units', ROOMS.map((t) => `${t} ${(s.rooms[t] * mult(t)).toPrecision(4)}`).join('  '));
   const r = tickDay({ ...s, rooms: { ...s.rooms }, level: { ...s.level }, auto: { ...s.auto } }, false);

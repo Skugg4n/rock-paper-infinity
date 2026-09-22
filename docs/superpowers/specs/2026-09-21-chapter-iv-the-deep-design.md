@@ -311,3 +311,40 @@ the old arithmetic when nothing is dark.
 Still open: the fault budget of step 4 beyond the monster (flood, mutiny, animals),
 the sleep-as-a-program idea from the critique, and everything Ola asked for after
 playing v1.40.0 (see the v1.41.1 entry in CHANGELOG.md).
+
+## Ola on slice 1, and what v1.41.1 did about it (2026-09-22)
+
+He played v1.40.0. The verdict that matters most is a reversal:
+
+> **Text is allowed in chapter IV.** Icons alone failed here. Four numbers moved at
+> once and nothing on screen said why. Tooltips and the advisor may use plain
+> sentences. "Icons over text" still governs chapters I to III.
+
+1. **The menu could not be clicked.** Not a z-index: `#menu-btn` was wired by chapter
+   I and chapter II each for themselves, so it was dead in any chapter that did not
+   wire it. The toggle moved to `main.js`, where the button lives.
+2. **An advisor feed** (`src/phase4/advisor.js`, pure and tested): last five lines,
+   top right, driven by the rules. A line is written when a CONDITION CHANGES, never
+   on a timer, which is what keeps it from becoming noise.
+3. **Cause and effect before the click.** Ola: "I buy electricity and BOOM all humans
+   drop; I cannot understand what will happen."
+   - every bar hovers to its ledger in plain English;
+   - every purchase button draws ghost bars at the values the four columns would read
+     once it is finished, with signed deltas above them, from `preview()` in
+     `src/phase4/readout.js`, which runs the real rules on a clone rather than
+     estimating; a test asserts the promise equals what buying it actually gives;
+   - purchases are ORDERS: `BUILD_DAYS` in `deep.js`, a filling ring on the button and
+     the plate, resources at purchase, effect at completion, and a sleep finishes them.
+4. **The home view is a true fit**: the eight corners of the colony's bounding box
+   projected onto the camera's axes, both field-of-view angles used, recomputed when a
+   chamber is added and when the window resizes.
+5. **Light city, dark rock**: the palette is flipped. Light slabs, near-black rock and
+   background, lanes and houses cut in the rock colour, dark people on light ground.
+
+**Balance moved, deliberately.** Build times are the first change to the chapter's
+economy since it was tuned. Ola's sketch (dig 20, room 10, level 15, automation 30)
+cost the simulated run 21 real minutes of standing about: 42m39s against the 20 to 30
+minute target. The shipped ladder is 8 / 5 / 6 / 12, which gives **27m58s to resurface
+in year 802701, 80 wake-ups with 3.6 buys each, 33,436 people, no hungry days, longest
+stall 58 s** (shorter than the 68 s of the run before orders existed). Run
+`scripts/sim-phase4.mjs` before touching them again. The sim still ignores probes.

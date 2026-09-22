@@ -15,7 +15,7 @@ export const MODULE_PATHS = [
   'src/phase2/index.js', 'src/phase2/islands.js', 'src/phase2/layout.js',
   'src/phase2/persistence.js', 'src/phase2/rendering.js',
   'src/phase3/war.js',
-  'src/phase4/crust.js', 'src/phase4/deep.js', 'src/phase4/index.js',
-  'src/phase4/layout.js', 'src/phase4/persistence.js', 'src/phase4/replay.js',
-  'src/phase4/scene.js',
+  'src/phase4/advisor.js', 'src/phase4/crust.js', 'src/phase4/deep.js',
+  'src/phase4/index.js', 'src/phase4/layout.js', 'src/phase4/persistence.js',
+  'src/phase4/readout.js', 'src/phase4/replay.js', 'src/phase4/scene.js',
 ];

@@ -579,6 +579,73 @@ items:
       Build chapter IV THE DEEP for real from mockup 8 (docs/mockups/deep-3d-8.html)
       and the rules in src/phase4/deep.js: scene.js, chrome, descent from III,
       cryo/sleep/wake-up replay, probes, ascent. Spec: 2026-09-21-chapter-iv-the-deep-design.md
-    progress: "slice 1 (descent, scene, chrome, dig/rooms/levels/automation, save) shipped in v1.40.0"
+    progress: "slice 1 (descent, scene, chrome, dig/rooms/levels/automation, save) shipped in v1.40.0; slice 2 (cryo, wake-up replay, probes and the crust, ascent) shipped in v1.41.0"
+    status: open
+    resolved_in: null
+
+  - id: B049
+    added: 2026-09-22
+    source: "chat 2026-09-22 (Ola's playtest of v1.40.0)"
+    request: |
+      BUG: the menu button cannot be clicked in DEEP. The full bleed canvas or
+      the chrome overlay covers it. Every global control must work in DEEP:
+      the menu, the version label, the debug and test menu.
+    status: open
+    resolved_in: null
+
+  - id: B050
+    added: 2026-09-22
+    source: "chat 2026-09-22 (Ola's playtest of v1.40.0)"
+    request: |
+      An advisor FEED top right in chapter IV, like chapter III's war room:
+      last five lines, mono, wrapping, driven by the rules and not only by the
+      bottleneck. Each line fires once per condition CHANGE, never every second.
+      "We are running low on food: 18 days left." / "The generator needs 2 more
+      hands; the mine is idle." / "Energy is short: rooms run at 60 %." /
+      "People are hungry; the colony is shrinking." / "The bottleneck moved
+      from minerals to food."
+      Ola's decision with it: TEXT IS ALLOWED as the explanation model in
+      chapter IV. Icons alone failed here, so tooltips and the advisor may use
+      plain sentences. This overrides "icons over text" for chapter IV only.
+    status: open
+    resolved_in: null
+
+  - id: B051
+    added: 2026-09-22
+    source: "chat 2026-09-22 (Ola's playtest of v1.40.0)"
+    request: |
+      Cause and effect BEFORE the click. Ola: "I buy electricity and BOOM all
+      humans drop; I cannot understand what will happen."
+      a. Every bar gets a hover tooltip in plain text with its ledger.
+      b. Hovering any purchase button previews the result on the bars: ghost
+         segments at the predicted values with small signed deltas above each
+         bar, computed by running deep.js on a cloned state for one day, and
+         one sentence in the button's tooltip.
+      c. Purchases take colony days to finish: a filling ring, resources at
+         purchase, effect at completion, a sleep completes them. Constants in
+         deep.js, tested, and folded into sim-phase4.
+    status: open
+    resolved_in: null
+
+  - id: B052
+    added: 2026-09-22
+    source: "chat 2026-09-22 (Ola's playtest of v1.40.0)"
+    request: |
+      RESET VIEW must fit the colony to the viewport: bounding box over all
+      plates and floors, camera distance and target set so it fills the window
+      with a margin. Both on reset and as the default home view, recomputed
+      when a chamber is added.
+    status: open
+    resolved_in: null
+
+  - id: B053
+    added: 2026-09-22
+    source: "chat 2026-09-22 (Ola's playtest of v1.40.0)"
+    request: |
+      LIGHT CITY, DARK ROCK. Flip the palette: plates one flat light colour
+      (lit tops a little brighter than the sides), rock and background near
+      black, lanes and houses cut in the rock colour, labels dark on light
+      plates. Two colours still. Ola: "we build in life and light, buried in
+      black stone."
     status: open
     resolved_in: null

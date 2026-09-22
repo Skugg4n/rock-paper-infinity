@@ -326,6 +326,72 @@ export function upkeepMultiplier(level, auto) {
     return Math.pow(1.5, level) * Math.pow(1.7, Math.max(0, Math.min(auto, 3) - 1)) * Math.pow(6, adv);
 }
 
+/* ---------------------------------------------------------------------------
+ * NOTHING IS INSTANT (v1.41.1, Ola: "I buy electricity and BOOM all humans drop;
+ * I cannot understand what will happen")
+ *
+ * A purchase is an ORDER, not an event. The ore and the stars go the moment it is
+ * placed, and the colony then spends days actually digging the chamber or wiring the
+ * automation. The plate and the button carry a filling ring while it is under way, so
+ * the change arrives somewhere the player is already looking, at a speed they can read.
+ * A sleep finishes whatever was still being built, because the machines do not stop.
+ * ------------------------------------------------------------------------ */
+export const BUILD_DAYS = { dig: 8, room: 5, level: 6, auto: 12 };
+/* Ola's sketch said 20 / 10 / 15 / 30. Those are the right SHAPE (a chamber is quick, an
+ * automation is the slow one) but at one real second to the colony's day they cost the run
+ * 21 real minutes of standing about: 42m39s to resurface against the chapter's 20 to 30
+ * minute target. These are the same ladder at the pace the game actually runs: 27m58s, and
+ * the longest the star counter ever reads zero is 58 s, shorter than before orders existed.
+ * Run scripts/sim-phase4.mjs before touching them again. */
+
+/**
+ * Place an order. The caller has already taken the price; this only says when it lands.
+ * @param {object} s - state, mutated
+ * @param {'dig'|'room'|'level'|'auto'} kind
+ * @param {object} [opts]
+ * @param {string} [opts.type] - the room type, for everything but a dig
+ * @param {number} [opts.slot] - which chamber a new room goes into
+ * @returns {object} the job
+ */
+export function startBuild(s, kind, { type = null, slot = -1 } = {}) {
+    const job = { kind, type, slot, startDay: s.day, doneDay: s.day + BUILD_DAYS[kind] };
+    s.builds = (s.builds || []).concat([job]);
+    return job;
+}
+
+/** How far along a job is, 0 to 1. */
+export function buildProgress(s, job) {
+    const span = job.doneDay - job.startDay;
+    if (!(span > 0)) return 1;
+    return Math.max(0, Math.min(1, (s.day - job.startDay) / span));
+}
+
+/** Is this room type already waiting on an order of this kind? One at a time, per kind. */
+export function buildPending(s, kind, type = null) {
+    return (s.builds || []).some((j) => j.kind === kind && (type === null || j.type === type));
+}
+
+/**
+ * Everything whose day has come. Called once per colony day, and by `sleep()`, never from
+ * `tickDay` itself: a dry run on a clone must show today's numbers and not tomorrow's.
+ *
+ * @param {object} s - state, mutated
+ * @returns {Array<object>} the jobs that finished, for the layout and the scene to follow
+ */
+export function completeBuilds(s) {
+    const done = [], still = [];
+    for (const job of s.builds || []) (job.doneDay <= s.day ? done : still).push(job);
+    if (!done.length) return done;
+    s.builds = still;
+    for (const job of done) {
+        if (job.kind === 'dig') s.chambers += 1;
+        else if (job.kind === 'room') s.rooms[job.type] = (s.rooms[job.type] || 0) + 1;
+        else if (job.kind === 'level') s.level[job.type] = (s.level[job.type] || 0) + 1;
+        else if (job.kind === 'auto') s.auto[job.type] = (s.auto[job.type] || 0) + 1;
+    }
+    return done;
+}
+
 /** Fresh colony: what came down the hole. */
 export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people = 10 } = {}) {
     return {
@@ -339,6 +405,7 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         darkSlots: [],                      // which chambers those are; the scene's business, not the rules'
         stalled: {},                        // room types that stopped during the last sleep
         probes: [], probesSent: 0,          // in flight: { sentDay, dueDay }
+        builds: [],                         // ordered, not yet finished: { kind, type, slot, startDay, doneDay }
         est: { ...ESTIMATE_START }, estRevealed: false,
         ascended: false,
         cryo: -1, doom0,
@@ -421,7 +488,15 @@ export function tickDay(s, asleep = false) {
     const weakest = COLUMN.reduce((a, k) => (parts[k] < parts[a] ? k : a), 'M');
     const stars = STARS_PER_UNIT * Math.max(0, parts[weakest]);
     s.stars += stars; s.day += 1;
-    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, hands, born, starving, stars, weakest, parts, capacity, staff, power };
+    // What each room actually drew and who actually stood in it. The bars are hovered and have
+    // to say where their number came from (Ola: "I buy electricity and BOOM all humans drop"),
+    // and a sentence cannot be written from a fraction alone.
+    const draw = {}, crew = {};
+    for (const t of ROOMS) {
+        draw[t] = drawing(t) * ROOM[t].energy * power[t];
+        crew[t] = s.auto[t] > 0 ? 0 : live(t) * ROOM[t].crew * upkeep(t) * staff[t];
+    }
+    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, hands, born, starving, stars, weakest, parts, capacity, staff, power, draw, crew, eaten: eat, awake };
 }
 
 /**
@@ -436,6 +511,8 @@ export function sleep(s, days) {
     /** How much of a room type actually turned over that day: crew and power, whichever is shorter. */
     const worked = (r, t) => Math.min(r.staff[t], r.power[t]);
     for (let i = 0; i < days;) {
+        // the machines do not stop when the people lie down: orders land on their day
+        if ((s.builds || []).length) sum.built = (sum.built || []).concat(completeBuilds(s));
         const r = tickDay(s, true);
         i++; sum.days++;
         sum.minerals += r.minerals; sum.food += r.food; sum.stars += r.stars; sum.born += r.born;
@@ -447,7 +524,9 @@ export function sleep(s, days) {
         // mines bring in at least as much as they burn), every remaining day is that same day. Run
         // them in one step: the same numbers exactly, not an estimate. Without this, one press of
         // the top cryo tier would be tens of millions of loops, in the browser as well as here.
-        if (r.born === 0 && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0) {
+        // ... and while something is still being built, tomorrow is NOT today, so the days
+        // have to be lived one at a time until the queue is empty.
+        if (r.born === 0 && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).length) {
             const n = Math.max(0, Math.min(days - i, Math.ceil(opens - s.day)));
             if (n > 0) {
                 s.minerals += n * r.parts.M; s.food += n * r.food; s.stars += n * r.stars; s.day += n;

@@ -19,12 +19,14 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { placeChamber, floorCount } from './layout.js';
 import { digCost } from './deep.js';
 
-/* TWO COLOURS. rock is the background, the lanes and the houses cut into the
-   slabs; plate is every slab, every bridge, the shaft. The people are the only
-   other light. */
-const ROCK = 0x0f141b;
-const PLATE = 0x1e2733;
-const PEOPLE = 0xdbe4f0;
+/* TWO COLOURS, and since v1.41.1 they are the other way round (Ola: "we build in
+   life and light, buried in black stone"). ROCK is the background and everything cut
+   into a slab: the lanes, the houses, the openings. PLATE is every slab, every bridge,
+   the shaft, in one flat light colour, and the lamp above leaves the tops brighter
+   than the sides. The people are dark dots on that light ground. */
+const ROCK = 0x0a0d12;
+const PLATE = 0xd5dbe3;
+const PEOPLE = 0x333c4a;
 
 const PITCH = 2.6;        // cell to cell
 const PLATE_W = 2.0;      // a slab is this wide, so the street between two is 0.6
@@ -144,9 +146,9 @@ export function createScene(container, opts = {}) {
     controls.addEventListener('start', tookHold);
     renderer.domElement.addEventListener('wheel', tookHold, { passive: true });
 
-    // one lamp, hanging where they came in: everything below it falls away
-    scene.add(new THREE.AmbientLight(0xffffff, 0.09));
-    const lamp = new THREE.PointLight(0xffffff, 44, 0, 1.25);
+    // one lamp, hanging where they came in: everything below it falls away into the rock
+    scene.add(new THREE.AmbientLight(0xffffff, 0.34));
+    const lamp = new THREE.PointLight(0xffffff, 26, 0, 1.25);
     lamp.position.set(1.2, 8, 1.6);
     scene.add(lamp);
 
@@ -177,6 +179,7 @@ export function createScene(container, opts = {}) {
     let structure = '';
     let digLabel = null;
     let lastState = null;
+    let lastPlan = null;                    // what the home view was last fitted to
     let dead = false;                       // disposed: a late timer must not touch the buffers
     let march = null;                       // everyone walking somewhere at once: cryo, or the way up
     const cryoAt = new THREE.Vector3(0, 0, 0);
@@ -257,7 +260,7 @@ export function createScene(container, opts = {}) {
     const RING_SVG = '<svg viewBox="0 0 40 40" style="width:34px;height:34px;">'
         + '<circle class="ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle>'
         + `<circle class="ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="3" stroke-dasharray="${RING_LEN}" `
-        + `stroke-dashoffset="${RING_LEN}" style="stroke:#7d8fa5;"></circle></svg>`;
+        + `stroke-dashoffset="${RING_LEN}" style="stroke:#4a5666;"></circle></svg>`;
 
     /** The cells of a floor: its landing, and every chamber dug on it. */
     function planFloors(state, layout) {
@@ -442,11 +445,13 @@ export function createScene(container, opts = {}) {
                     // a room that stopped while the colony slept, and a chamber something took
                     html += '<span class="stall hidden"></span>';
                     html += '<span class="dark hidden"></span>';
+                    html += '<span class="building"></span>';
                     const rec = makeLabel(html, cx, y + 0.45, cz, 'room');
                     rec.cell = c;
                     rec.lvlEl = rec.inner.querySelector('.lvl');
                     rec.stallEl = rec.inner.querySelector('.stall');
                     rec.darkEl = rec.inner.querySelector('.dark');
+                    rec.buildEl = rec.inner.querySelector('.building');
                     rec.darkEl.addEventListener('click', () => opts.onClearDark?.(c.slot));
                     if (c.room === 'cryo') cryoAt.set(cx, y + WALK_Y, cz);
                 }
@@ -536,18 +541,55 @@ export function createScene(container, opts = {}) {
         opts.onLabels?.();
     }
 
-    /** The view the reset button comes back to: far enough out to hold what is dug. */
+    const FIT_MARGIN = 1.14;        // air around the colony so nothing touches the window's edge
+
+    /**
+     * The home view: the whole colony, fitted to the window. Every plate goes into a box,
+     * the box into a sphere (the camera orbits, so the worst rotation is the one that has to
+     * fit), and the distance falls out of whichever of the two field-of-view angles is the
+     * tighter. That way it fills the window on a wide monitor and on a narrow one alike, and
+     * a colony ten floors deep is framed as honestly as one with three chambers.
+     *
+     * Recomputed whenever the colony's shape changes and whenever the window does. The camera
+     * only jumps there if the player has not taken hold of it; the reset button is how they
+     * ask for it back.
+     */
     function framing(plan) {
-        let span = 1;
-        plan.forEach((f) => f.cells.forEach((c) => { span = Math.max(span, Math.abs(c.x), Math.abs(c.z)); }));
-        const radius = (span + 0.5) * PITCH;
-        const depth = (plan.length - 1) * FLOOR_GAP;
-        const dist = Math.max(12, 8 + radius * 1.9 + depth * 0.8);
-        const tgt = new THREE.Vector3(0, -depth / 2, 0);
-        const dir = new THREE.Vector3(0.498, 0.485, 0.723);
+        if (!plan || !plan.length) return;
+        lastPlan = plan;
+        const box = new THREE.Box3();
+        plan.forEach((f) => f.cells.forEach((c) => {
+            box.expandByPoint(new THREE.Vector3(c.x * PITCH - PLATE_W / 2, f.y - PLATE_H, c.z * PITCH - PLATE_W / 2));
+            // the labels float above their plate, so the top of the box is above the slab
+            box.expandByPoint(new THREE.Vector3(c.x * PITCH + PLATE_W / 2, f.y + 0.9, c.z * PITCH + PLATE_W / 2));
+        }));
+        if (box.isEmpty()) return;
+        const tgt = box.getCenter(new THREE.Vector3());
+        const dir = new THREE.Vector3(0.498, 0.485, 0.723).normalize();
+        // The exact fit, not a bounding sphere: a sphere around a wide flat colony is mostly
+        // air, and the model ends up a postage stamp in the middle of the window. Project the
+        // eight corners of the box into the camera's own axes and take the distance at which
+        // the last of them is still inside the frustum. Both angles are used, so it fills a
+        // wide monitor and a narrow one alike.
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(up, dir).normalize();
+        const camUp = new THREE.Vector3().crossVectors(dir, right).normalize();
+        const vFov = camera.fov * Math.PI / 180;
+        const tanV = Math.tan(vFov / 2);
+        const tanH = tanV * Math.max(0.2, camera.aspect);
+        let dist = 1;
+        const q = new THREE.Vector3();
+        for (let i = 0; i < 8; i++) {
+            q.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).sub(tgt);
+            const need = q.dot(dir) + Math.max(Math.abs(q.dot(right)) / tanH, Math.abs(q.dot(camUp)) / tanV);
+            dist = Math.max(dist, need);
+        }
+        dist *= FIT_MARGIN;
         const wasDefault = camera.position.distanceTo(defPos) < 0.001;
         defTgt = tgt;
         defPos = tgt.clone().addScaledVector(dir, dist);
+        controls.maxDistance = Math.max(70, dist * 1.8);   // never clamp the fit away
+        controls.minDistance = Math.min(9, dist * 0.35);
         if (!touched || wasDefault) {
             camera.position.copy(defPos);
             controls.target.copy(defTgt);
@@ -588,6 +630,9 @@ export function createScene(container, opts = {}) {
 
     function refresh(state) {
         lastState = state;
+        // the ring on the chamber being dug: while an order is under way it shows how far
+        // along the digging is, and before that how much of its price has been brought in
+        const digJob = (state.builds || []).find((j) => j.kind === 'dig');
         const darkSlots = state.darkSlots || [];
         for (const l of labels) {
             if (l.kind !== 'room' || !l.cell?.room) continue;
@@ -599,9 +644,28 @@ export function createScene(container, opts = {}) {
             l.darkEl?.classList.toggle('hidden', darkSlots.indexOf(l.cell.slot) < 0);
         }
         if (digLabel?.ring) {
-            const cost = digCost(state.chambers);
-            const frac = Math.max(0, Math.min(1, cost > 0 ? (state.minerals || 0) / cost : 0));
+            let frac;
+            if (digJob) {
+                const span = digJob.doneDay - digJob.startDay;
+                frac = span > 0 ? (state.day - digJob.startDay) / span : 1;
+            } else {
+                const cost = digCost(state.chambers);
+                frac = cost > 0 ? (state.minerals || 0) / cost : 0;
+            }
+            frac = Math.max(0, Math.min(1, frac));
             digLabel.ring.setAttribute('stroke-dashoffset', (RING_LEN * (1 - frac)).toFixed(1));
+            digLabel.inner.classList.toggle('is-building', !!digJob);
+        }
+        // and a ring on any plate whose room is being built or upgraded
+        for (const l of labels) {
+            if (l.kind !== 'room' || !l.cell?.room || !l.buildEl) continue;
+            const job = (state.builds || []).find((j) => j.type === l.cell.room && j.kind !== 'dig');
+            l.buildEl.classList.toggle('is-on', !!job);
+            if (job) {
+                const span = job.doneDay - job.startDay;
+                const p = span > 0 ? Math.max(0, Math.min(1, (state.day - job.startDay) / span)) : 1;
+                l.buildEl.style.setProperty('--p', `${Math.round(p * 100)}%`);
+            }
         }
         if (!march) setPeople(state);
     }
@@ -828,6 +892,7 @@ export function createScene(container, opts = {}) {
             camera.updateProjectionMatrix();
             renderer.setSize(W, H);
             labelRenderer.setSize(W, H);
+            framing(lastPlan);              // a narrower window needs a longer lens
         },
         /** Everyone walks to the cryo hall and is gone. Resolves when the last one is in. */
         gather(seconds = 1.5) { return startMarch('gather', seconds); },

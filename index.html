@@ -444,6 +444,7 @@
                 <i data-lucide="star" class="w-5 h-5"></i>
             </div>
             <div class="deep-mono" id="deep-advisor"></div>
+            <div class="deep-mono" id="deep-feed"></div>
         </div>
 
         <!-- the four columns, the shortest marked -->
@@ -455,21 +456,41 @@
                 <span class="deep-col-head" id="deep-head-H">0</span>
             </div>
             <div class="deep-bars">
-                <div class="deep-bar">
-                    <div class="deep-track"><div class="deep-fill" id="deep-fill-M"></div></div>
+                <div class="deep-bar" id="deep-bar-M">
+                    <span class="deep-delta deep-mono" id="deep-delta-M"></span>
+                    <div class="deep-track">
+                        <div class="deep-ghost" id="deep-ghost-M"></div>
+                        <div class="deep-fill" id="deep-fill-M"></div>
+                    </div>
                     <span class="deep-stop-dot hidden" id="deep-dot-M"></span>
+                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
                 </div>
-                <div class="deep-bar">
-                    <div class="deep-track"><div class="deep-fill" id="deep-fill-F"></div></div>
+                <div class="deep-bar" id="deep-bar-F">
+                    <span class="deep-delta deep-mono" id="deep-delta-F"></span>
+                    <div class="deep-track">
+                        <div class="deep-ghost" id="deep-ghost-F"></div>
+                        <div class="deep-fill" id="deep-fill-F"></div>
+                    </div>
                     <span class="deep-stop-dot hidden" id="deep-dot-F"></span>
+                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
                 </div>
-                <div class="deep-bar">
-                    <div class="deep-track"><div class="deep-fill" id="deep-fill-E"></div></div>
+                <div class="deep-bar" id="deep-bar-E">
+                    <span class="deep-delta deep-mono" id="deep-delta-E"></span>
+                    <div class="deep-track">
+                        <div class="deep-ghost" id="deep-ghost-E"></div>
+                        <div class="deep-fill" id="deep-fill-E"></div>
+                    </div>
                     <span class="deep-stop-dot hidden" id="deep-dot-E"></span>
+                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
                 </div>
-                <div class="deep-bar">
-                    <div class="deep-track"><div class="deep-fill" id="deep-fill-H"></div></div>
+                <div class="deep-bar" id="deep-bar-H">
+                    <span class="deep-delta deep-mono" id="deep-delta-H"></span>
+                    <div class="deep-track">
+                        <div class="deep-ghost" id="deep-ghost-H"></div>
+                        <div class="deep-fill" id="deep-fill-H"></div>
+                    </div>
                     <span class="deep-stop-dot hidden" id="deep-dot-H"></span>
+                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
                 </div>
             </div>
             <div class="deep-mono deep-col-feet">
@@ -492,49 +513,60 @@
         <div class="deep-chrome deep-btn-col">
             <button class="btn" id="deep-dig-btn" aria-label="Dig a chamber">
                 <i data-lucide="shovel" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn deep-room-btn" id="deep-room-mine" data-room="mine" aria-label="Mine">
                 <i data-lucide="pickaxe" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn deep-room-btn" id="deep-room-farm" data-room="farm" aria-label="Farm">
                 <i data-lucide="sprout" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn deep-room-btn" id="deep-room-generator" data-room="generator" aria-label="Generator">
                 <i data-lucide="zap" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn deep-room-btn" id="deep-room-dorm" data-room="dorm" aria-label="Dormitory">
                 <i data-lucide="bed" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn" id="deep-level-btn" aria-label="Level the weakest">
                 <i data-lucide="chevrons-up" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn" id="deep-auto-btn" aria-label="Automate the weakest">
                 <i data-lucide="repeat" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn is-locked" id="deep-cryo-btn" aria-label="Cryo">
                 <i data-lucide="snowflake" class="w-7 h-7"></i>
                 <span class="deep-badge deep-mono hidden" id="deep-cryo-badge"></span>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn hidden" id="deep-cryo-up" aria-label="A longer sleep">
                 <i data-lucide="chevrons-up" class="w-7 h-7"></i>
                 <span class="deep-badge deep-mono" id="deep-cryo-up-badge"></span>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn hidden" id="deep-probe-btn" aria-label="Send a probe">
                 <i data-lucide="radar" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn is-locked" id="deep-ascend-btn" aria-label="The way up">
                 <i data-lucide="arrow-up-from-line" class="w-7 h-7"></i>
-                <div class="tooltip"></div>
+                <span class="deep-build"></span>
+                <div class="tooltip deep-tip-wide"></div>
             </button>
             <button class="btn" id="deep-reset-view" aria-label="Reset the view">
                 <i data-lucide="scan" class="w-6 h-6"></i>
@@ -566,7 +598,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.41.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.41.1</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">
