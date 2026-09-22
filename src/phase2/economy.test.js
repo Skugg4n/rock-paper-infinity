@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency,
-    SILO_SECONDS, STALL_SUPPLY,
+    SILO_SECONDS, STALL_SUPPLY, formatCount,
 } from './economy.js';
 
 describe('phase2 economy', () => {
@@ -32,5 +32,18 @@ describe('phase2 economy', () => {
         expect(e).toBeLessThan(0.25);
         for (let i = 0; i < 10; i++) e = recoverHarvestEfficiency(e);
         expect(e).toBe(1);
+    });
+
+    test('formatCount keeps astronomical numbers readable', () => {
+        expect(formatCount(1902143493053)).toBe('1.90 T');
+        expect(formatCount(0)).toBe('0');
+        expect(formatCount(999.4)).toBe('999');
+        expect(formatCount(1234)).toBe('1.23 k');
+        expect(formatCount(12345)).toBe('12.3 k');
+        expect(formatCount(123456)).toBe('123 k');
+        expect(formatCount(999600)).toBe('1.00 M');          // rounding carries into the next suffix
+        expect(formatCount(2.5e15)).toBe('2.50 Qa');
+        expect(formatCount(-45000)).toBe('-45.0 k');
+        expect(formatCount(1e40)).toBe('1.00e40');
     });
 });

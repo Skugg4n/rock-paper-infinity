@@ -775,3 +775,166 @@ items:
     status: partial
     resolved_in: v1.43.0
     notes: "Awake: people walk, build rings fill, the star machine on the lid throws rock, paper, scissors at a speed set by stars a day and flashes a star on a win. Asleep: the years, ore and stars roll and automated rooms pulse. Not yet: a visible countdown to the next decision while awake (the tooltips say \"affordable in N days\", nothing on screen says it unasked)."
+
+  # --- Chapter III playtest 3 (Ola and a tester, v1.42.0), branch war-playtest-3 ---
+  - id: B070
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Too much at once at the start of the war (buttons, blinking, running).
+      Introduce things one at a time, teased grey before they open. The tier
+      button came so early that the tester bought four or five tiers before
+      knowing what they did. Keep "the enemy appears, builds slowly, gathers,
+      attacks" exactly as it is ("SKITBRA").
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+    notes: |
+      Start: arms slider, shield, sword, war room. Then one per 6 s at most:
+      strike (force > 0), ◆ (first landing), radar (second), intel (radar
+      bought), raiding party (first strike), tier (3 min AND 4 landings),
+      quartermaster (tier II), auto strike (tier III). TIER_COOLDOWN_S 90, first
+      tier ×1.5, and their laboratory opens at 200 s.
+
+  - id: B071
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Guards only stand on the south side, do not fight, stand still while the
+      enemy walks past, and stay when everyone leaves. Make them a line along
+      the coasts landings arrive on, walking to meet a landing and firing; the
+      scripted losses fall where they stand, on our island; they leave with the
+      withdraw and the descent.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B072
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Our attacking troops are beaten by invisible things mid-ocean, and move
+      oddly (to a corner, then a diagonal). Strike losses only on their island;
+      crossings along our coast, straight across the water, along theirs.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B073
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      The radar tooltip sticks out of the window. Tooltips in the right-hand
+      button column open to the left and stay inside the window.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B074
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Defending houses is unclear: plates blink, the corner button often does
+      nothing (districts could not be fortified at all). ◆ always visible on
+      every targetable plate with its price; short of arms the arms counter
+      flashes. Damaged plates must matter: yield scales with HP, and they show it.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+    notes: |
+      The district bug: the ◆ state was only refreshed for plates that have an
+      upgrade, so on a district it stayed frozen at its first (disabled) state.
+
+  - id: B075
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      After purchase the radar looks like a button but is not. Style it as an
+      instrument: no ring, flat, only the badge and the pulse.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B076
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      The quartermaster is bad: it spends on what you did not want, and you
+      cannot attack when you want. It only buys, at the stance ratio, never
+      strikes; the strike button is always manual and shows ✓/×; a separate
+      auto-strike toggle appears after tier III, off by default.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+    notes: |
+      Stances are ratios (shield 3:1, scale 1:1, sword 1:3) plus off, and the
+      quartermaster keeps 15 s of arms production in the yard for ◆, radar, raids.
+
+  - id: B077
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Arms are unclear ("hammers make defence or swords, but how do you get
+      hammers"). Tooltip on the hammer counter, star and hammer at the slider's
+      ends, and one pulse of the slider early in the war if the factory is idle.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B078
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      The enemy rocket should visibly be built before they leave: from
+      doomsday 55 % the tile stands with a filling ring that is full at the
+      launch. Guards and people leave with the withdraw and the descent.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B079
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      A longer fade to black before THE DEEP, drawn out like the WAR card.
+    status: open
+    resolved_in: null
+    notes: |
+      Handed to the chapter IV session: the ship button's card is the seam with
+      chapter IV (src/phase2/index.js goDeep, playChapterCard 'IV' / 'THE DEEP':
+      add slow: true and a hold matching the WAR card's 5000 ms).
+
+  - id: B080
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Two sliders in the war (industry/research and arms) are confusing. During
+      the war hide the industry/research slider, fix research at half, and say
+      so once in the war room.
+    status: done
+    resolved_in: "war-playtest-3 commit 1 (unreleased)"
+
+  - id: B081
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      After artillery the game is over, only mop-up. There must be a second
+      climb: air defence as a second defence type from tier V.
+    status: done
+    resolved_in: "war-playtest-3 commit 2 (unreleased)"
+
+  - id: B082
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      Stars and research are astronomically high next to the costs; no feeling
+      for what anything means. Keep the big numbers but make them readable
+      (k, M, B, T, Qa, full number on hover) in chapters II and III.
+    status: done
+    resolved_in: "war-playtest-3 commit 2 (unreleased)"
+
+  - id: B083
+    added: 2026-09-22
+    source: "playtest of III (v1.42.0), Ola and a tester"
+    request: |
+      The enemy is still very easy to beat; the missiles are "not entirely
+      harmless now, maybe better". Re-check with the sim after air defence;
+      if still too easy, push more often while we lead.
+    status: done
+    resolved_in: "war-playtest-3 commit 2 (unreleased)"
+    notes: |
+      Sim after air defence: behind 40 to 43 % (not under 40), so the extra
+      push was not required; it went in anyway (every 3rd wave while we lead)
+      because it only bites where the tester found the war easy. It moves the
+      sim by at most a plate.

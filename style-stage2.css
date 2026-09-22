@@ -630,9 +630,15 @@ body.tilt #city-area {
 #phase-city.war .building-slot .building:not(.razed):not(.factory) {
     background-color: color-mix(in srgb, #ffffff calc(var(--hp, 1) * 100%), #94a3b8);
 }
-/* Fortify (◆ + level) bottom-left, clear ruin (×) centre */
-.fort-btn { bottom: -8px; left: -8px; top: auto; background-color: #475569; color: #fff; font-size: 10px; }
-.fort-btn:disabled { background-color: #fff !important; color: #94a3b8; box-shadow: inset 0 0 0 1.5px #cbd5e1; }
+/* Fortify: a pill bottom-left on every plate the enemy can target, level ◆ price.
+   Never disabled: short of arms it goes hollow and a click flashes the arms counter. */
+.fort-btn { bottom: -8px; left: -8px; top: auto; width: auto; min-width: 18px; padding: 0 5px; border-radius: 9px; gap: 2px; background-color: #475569; color: #fff; font-size: 10px; white-space: nowrap; }
+.fort-btn .fort-cost { font-size: 9px; opacity: 0.85; }
+.fort-btn.short { background-color: #fff !important; color: #94a3b8; box-shadow: inset 0 0 0 1.5px #cbd5e1; }
+@media (min-width: 640px) { .fort-btn { font-size: 11px; height: 20px; } .fort-btn .fort-cost { font-size: 10px; } }
+/* A damaged plate works at its share of HP: shaded (above) and a small amber dot */
+.building .hp-dot { display: none; position: absolute; bottom: 4px; right: 4px; width: 6px; height: 6px; border-radius: 9999px; background: #d97706; opacity: 0.9; pointer-events: none; }
+.building.damaged .hp-dot { display: block; }
 .clear-btn { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 28px; height: 28px; background-color: #f1f5f9; color: #334155; font-size: 16px; }
 .clear-btn:disabled { opacity: 0.4; }
 /* Enemy tiles razed by us, and the island when they have left */
@@ -644,18 +650,22 @@ body.tilt #city-area {
 @keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 12% { transform: translateY(-14px); opacity: 1; } 78% { opacity: 1; } 100% { transform: translateY(-820px) scale(0.85); opacity: 0; } }
 @keyframes rocket-tremble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1px, -1px); } 50% { transform: translate(-1px, 1px); } 75% { transform: translate(1px, 1px); } }
 #war-ui input[type=range] { accent-color: #475569; }
-/* Radar after purchase: an instrument, not a buy; the badge counts down, it pulses once a wave is spotted */
-.btn.radar-on { cursor: default; }
-.btn.radar-on.radar-spotted { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.35); animation: radar-pulse 1s ease-in-out infinite; }
-@keyframes radar-pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.35); } 50% { box-shadow: 0 0 0 6px rgba(185, 28, 28, 0.12); } }
+/* Radar after purchase: an instrument, not a button. No ring, no lift, flat; only
+   the countdown badge, and a pulse on the dish while a landing is on its way. */
+#phase-city .btn.radar-on { cursor: default; background: transparent; box-shadow: none; }
+#phase-city .btn.radar-on:hover { transform: none; box-shadow: none; }
+#phase-city .btn.radar-on svg { color: #64748b; }
+#phase-city .btn.radar-on.radar-spotted svg { color: #b91c1c; animation: radar-dish 1s ease-in-out infinite; }
+@keyframes radar-dish { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 /* War room feed, top right under people and food: every line stays readable, the newest is darkest */
 #war-room { text-align: left; border-top: 1px solid rgba(100, 116, 139, 0.25); padding-top: 6px; }
 #war-room div { opacity: 0.62; transition: opacity 600ms ease; white-space: normal; margin-bottom: 3px; }
 #war-room div:last-child { opacity: 1; color: #334155; }
 #war-room div.grim { color: #b45309; }
-/* Radar: the plate the next wave is heading for — a pulsing ring and a dot */
-.building.targeted { animation: target-ring 900ms ease-in-out infinite; }
-@keyframes target-ring { 0%, 100% { box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.25); } 50% { box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.7); } }
+/* Radar: the plate the next wave is heading for. A steady red ring and a dot,
+   set once with a single settle (plates do not blink; playtest 2026-09-22). */
+.building.targeted { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.55); animation: target-mark 500ms ease-out 1; }
+@keyframes target-mark { 0% { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0); } 100% { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.55); } }
 .building.targeted::before {
     content: '';
     position: absolute;
@@ -663,10 +673,8 @@ body.tilt #city-area {
     width: 9px; height: 9px;
     border-radius: 9999px;
     background: #b91c1c;
-    animation: radar-pulse 900ms ease-in-out infinite;
     z-index: 12;
 }
-@keyframes radar-pulse { 0%, 100% { transform: scale(0.7); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } }
 /* Enemy tiles show damage like ours */
 .enemy-factory, .enemy-tile { background-color: color-mix(in srgb, #f8fafc calc(var(--hp, 1) * 100%), #94a3b8); }
 /* The launch: a glow under the rocket, then it climbs, then rubble */
@@ -760,3 +768,33 @@ body.tilt #city-area {
         scroll-behavior: auto !important;
     }
 }
+
+/* ---- war-playtest-3 -------------------------------------------------------- */
+/* Tooltips in the right-hand button column open to the left of the button, so
+   they never run off the edge of the window (JS nudges them in if they would). */
+#phase-city #upgrades-container .tooltip,
+#phase-city #buildings-container .tooltip {
+    left: auto; right: calc(100% + 10px); bottom: 50%; transform: translateY(50%); align-items: flex-end;
+}
+/* HUD tooltips (top left) open to the right */
+#phase-city .hud-tip { position: relative; }
+#phase-city .tooltip.tip-right { left: calc(100% + 10px); bottom: 50%; transform: translateY(50%); align-items: flex-start; }
+#phase-city .tooltip .tip-note { font-size: 11px; color: #94a3b8; display: inline-flex; align-items: center; gap: 3px; }
+/* Strike verdict: ✓ would raze, × would not; always on the button while force is ready */
+#strike-verdict { background: #334155; }
+#strike-verdict.no { background: #cbd5e1; color: #475569; }
+/* Auto strike toggle and the quartermaster's ratio */
+#auto-strike-badge { display: flex; align-items: center; justify-content: center; padding: 0; width: 18px; }
+#auto-strike-badge.hidden { display: none; }
+#auto-badge { font-size: 9px; padding: 0 4px; }
+/* The arms counter flashes when a purchase is short of hammers */
+#war-ui .flash-short { animation: flash-short 700ms ease-out 1; border-radius: 6px; }
+@keyframes flash-short { 0% { background: rgba(217, 119, 6, 0.35); } 100% { background: transparent; } }
+/* The arms slider says "here" once, early in the war, if the factory is idle */
+#war-ui .pulse-once { animation: pulse-once 1400ms ease-in-out 1; border-radius: 6px; }
+@keyframes pulse-once { 0%, 100% { box-shadow: 0 0 0 0 rgba(71, 85, 105, 0); } 40% { box-shadow: 0 0 0 5px rgba(71, 85, 105, 0.25); } }
+/* Their rocket under construction: the tile stands from doomsday 55 %, its ring fills to the launch */
+#competitor-island.enemy-rocket-building .enemy-rocket { display: flex; opacity: 0.9; transform: none; }
+#competitor-island .enemy-rocket .rocket-build { opacity: 0; transition: opacity 800ms ease; }
+#competitor-island.enemy-rocket-building .enemy-rocket .rocket-build { opacity: 1; }
+#competitor-island.enemy-launch .enemy-rocket .rocket-build, #competitor-island.enemy-left .enemy-rocket .rocket-build { opacity: 0; }

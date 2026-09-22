@@ -13,6 +13,7 @@
 
 import { buildingData } from './buildings-config.js';
 import { FORT_COST, plateMaxHp } from '../phase3/war.js';
+import { formatCount } from './economy.js';
 
 /**
  * Generates the inner HTML string for a building slot.
@@ -40,24 +41,24 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     if (war && building.razed) {
         const clearCost = Math.round((buildingData[building.type]?.cost || 0) * 0.3);
         actionButtons += `<button class="building-action-btn clear-btn" data-building-id="${building.id}" ${stars >= clearCost ? '' : 'disabled'}>×
-            <div class="tooltip"><div class="cost">${clearCost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
+            <div class="tooltip"><div class="cost">${formatCount(clearCost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
         </button>`;
         return `<div class="${classes}">${actionButtons}</div>`;
     }
+    // During the war every plate the enemy can target carries its ◆ and the
+    // price, always visible once the first landing has shown what it is for.
+    // Never `disabled`: short of arms, a click flashes the arms counter instead.
+    if (war && war.fort && !building.razed && building.type !== 'factory' && building.type !== 'bank') {
+        actionButtons += fortButtonHTML(building, war.arms);
+    }
     if (war && !building.razed && building.type !== 'factory' && building.type !== 'bank') {
-        const level = building.fort || 0;
-        const cost = FORT_COST(level);
-        const maxHp = plateMaxHp(building.type, level);
-        const hpNow = Math.round(building.hp ?? maxHp);
-        actionButtons += `<button class="building-action-btn fort-btn" data-building-id="${building.id}" ${war.arms >= cost ? '' : 'disabled'}>${level > 0 ? level : '◆'}
-            <div class="tooltip"><div class="effect">${hpNow}/${maxHp} <i data-lucide='shield' class='w-4 h-4'></i> → ${plateMaxHp(building.type, level + 1)}</div><div class="cost">${cost} <i data-lucide='hammer' class='w-4 h-4 text-slate-300'></i></div></div>
-        </button>`;
+        actionButtons += `<span class="hp-dot" aria-hidden="true"></span>`;
     }
 
     if (building.type !== 'factory' && building.type !== 'bank') {
         const refund = (buildingData[building.type]?.cost || 0) * 0.7;
         actionButtons += `<button class="building-action-btn sell-btn" data-building-id="${building.id}">-
-            <div class="tooltip"><div class="effect">+${Math.floor(refund).toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
+            <div class="tooltip"><div class="effect">+${formatCount(Math.floor(refund))} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
         </button>`;
     }
 
@@ -88,7 +89,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
             actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" data-building-id="${building.id}" data-upgrade-target="${upgradeTarget}" ${canAfford ? '' : 'disabled'}>+
                 <div class="tooltip">
                     <div class="effect">${effectHTML}</div>
-                    <div class="cost">${upgradeInfo.cost.toLocaleString('en-US')} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
+                    <div class="cost">${formatCount(upgradeInfo.cost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
                 </div>
             </button>`;
         }
@@ -130,6 +131,23 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     return `<div class="${classes}">${content}${actionButtons}</div>`;
 }
 
+/** The inner parts of the ◆ button: level, price, and the tooltip (HP now → after). */
+function fortParts(building) {
+    const level = building.fort || 0;
+    const cost = FORT_COST(level);
+    const maxHp = plateMaxHp(building.type, level);
+    const hpNow = Math.max(0, Math.round(building.hp ?? maxHp));
+    return {
+        cost,
+        label: `${level > 0 ? level : ''}◆<span class="fort-cost">${cost}</span>`,
+        tip: `<div class="effect">${hpNow}/${maxHp} <i data-lucide='shield' class='w-4 h-4'></i> → ${plateMaxHp(building.type, level + 1)}</div><div class="cost">${cost} <i data-lucide='hammer' class='w-4 h-4 text-slate-300'></i></div>`,
+    };
+}
+function fortButtonHTML(building, arms) {
+    const f = fortParts(building);
+    return `<button class="building-action-btn fort-btn${arms >= f.cost ? '' : ' short'}" data-building-id="${building.id}" data-cost="${f.cost}"><span class="fort-label">${f.label}</span><div class="tooltip">${f.tip}</div></button>`;
+}
+
 /**
  * Factory that creates the renderer bound to a specific land grid and icon
  * refresh function.
@@ -165,7 +183,7 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
                 population: gameState.population,
                 notifiedUpgrades,
                 initialLoadDone,
-                war: gameState.war?.active ? { arms: gameState.war.arms } : null,
+                war: gameState.war?.active ? { arms: gameState.war.arms, fort: !!gameState.war.shown?.fort } : null,
             });
             slot.classList.remove('empty');
             const typeLabel = building.type.replace(/([A-Z])/g, ' $1').toLowerCase().replace(/^./, c => c.toUpperCase());
@@ -194,6 +212,23 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
         const innerDiv = slot.querySelector('.building');
         if (!innerDiv) return;
 
+        // The ◆ button: every targetable plate, districts included (they have no
+        // upgrade, which is why this used to be skipped and the button froze).
+        const fortBtn = innerDiv.querySelector('.fort-btn');
+        if (fortBtn && gameState.war?.active) {
+            const f = fortParts(building);
+            fortBtn.classList.toggle('short', gameState.war.arms < f.cost);
+            if (fortBtn.dataset.cost !== String(f.cost)) {
+                fortBtn.dataset.cost = String(f.cost);
+                fortBtn.querySelector('.fort-label').innerHTML = f.label;
+            }
+            const tip = fortBtn.querySelector('.tooltip');
+            const hpKey = `${Math.round(building.hp ?? -1)}/${building.fort || 0}`;
+            if (tip && tip.dataset.key !== hpKey) { tip.dataset.key = hpKey; tip.innerHTML = f.tip; }
+        }
+        const clearBtn0 = innerDiv.querySelector('.clear-btn');
+        if (clearBtn0) clearBtn0.disabled = gameState.stars < Math.round((buildingData[building.type]?.cost || 0) * 0.3);
+
         let upgradeTarget = null;
         if (building.type === 'home' && gameState.apartmentResearched) upgradeTarget = 'apartment';
         else if (building.type === 'store' && gameState.storeResearched) upgradeTarget = 'superStore';
@@ -211,10 +246,6 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
             else innerDiv.classList.remove('upgradeable');
 
             // Keep upgrade button disabled state current
-            const fortBtn = innerDiv.querySelector('.fort-btn');
-            if (fortBtn && gameState.war?.active) fortBtn.disabled = gameState.war.arms < FORT_COST(building.fort || 0);
-            const clearBtn = innerDiv.querySelector('.clear-btn');
-            if (clearBtn) clearBtn.disabled = gameState.stars < Math.round((buildingData[building.type]?.cost || 0) * 0.3);
             const upgradeBtn = innerDiv.querySelector('.upgrade-btn');
             if (upgradeBtn) {
                 upgradeBtn.disabled = !canAfford;

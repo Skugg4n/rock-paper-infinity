@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.44.0 - 2026-09-22 (war-playtest-3 merged)
+
+### Chapter III, playtest 3 (Ola and a tester, v1.42.0): a slower start, one thing at a time, guards that fight
+
+- **One thing at a time.** The war opens with the arms slider, the shield, the sword and the war room, nothing else. Every other control arrives on its own, greyed until it can be afforded, at most one every six seconds, with one line in the war room: the strike (once there is force), the ◆ on the plates (after the first landing), the radar (after the second), intel (after the radar), the raiding party (after the first strike), the laboratory (after three minutes AND four landings), the quartermaster (after tier II), auto strike (after tier III). The enemy's opening (appears, builds, gathers, attacks) is untouched.
+- **The ladder can no longer be bought in one breath.** 90 s between tiers (was 45), the first tier costs half as much again, and their laboratory opens at 200 s, just after ours can. Their clock no longer restarts when we take the lead (that made a lead permanent with the longer cooldown); it runs a little faster instead (88 s base, was 95).
+- **Guards that fight.** One guard per five defence units stands on the coast road. Most face their island; once a landing has come ashore on another coast, half of them spread to hold that coast too. When a landing party comes, the nearest guards walk along the coast to where it lands and fire; the landers that fall, fall there, on our island, with the shot coming from a guard. The guards stand down when the enemy leaves and go down the hatch with everyone else.
+- **Crossings you can follow.** Every route between the islands is straight legs only: along their coast, straight across the water, along our coast to the landing point nearest the target, up the streets. Our strikes lose their men on their island, never out at sea.
+- **Defending a plate is a visible button.** Every plate the enemy can target carries a ◆ pill with its price, districts included (on a district the button was frozen in its first state; fixed). Short of hammers, a click flashes the arms counter instead of doing nothing. A damaged plate works at its share of HP (stars, research, food, move-ins), is shaded and carries a small amber dot, so repair is worth it. Targeted plates hold a steady red ring instead of blinking.
+- **The quartermaster only buys.** At a ratio you choose (shield 3:1, scale 1:1, sword 1:3, or off), keeping 15 s of arms in the yard for ◆, radar and raids. It never strikes. The strike button always shows ✓ or ×, and a separate auto-strike toggle (target icon) arrives after tier III, off until you turn it on.
+- **One slider.** During the war the industry/research slider is hidden and research runs at half ("Research runs at half. The factory is yours."). The hammer counter says where hammers come from; the arms slider pulses once early on if the factory is idle.
+- **Readable instruments.** The bought radar is flat, no ring, only its countdown and a pulse on the dish. Tooltips in the right-hand column open to the left and are nudged inside the window.
+- **Their rocket is built in sight.** From doomsday 55 % the rocket stands on their island with an amber ring that is full at the launch.
+- **Fixed:** a landing whose last survivor arrived alone was cleared before it landed (the plate stayed marked and nothing happened).
+- Sim, seeds 1 to 6: 20 to 22 minutes, behind 40 to 44 %, ahead 14 to 19 %, 17 to 21 plates lost, their island silent 0 %, doomsday 85 to 88 %.
+- Handed over to the chapter IV session: the slower fade into THE DEEP at the ship button (B079).
+
+### Chapter III: the uphill after artillery, and numbers you can read
+
+- **Air defence, the second climb.** From their tier V their shells and missiles fly over the guards: two waves in three come through the air and only air defence (shield-half, twice the price of a guard) stops them, by the same 70 % rule; every third wave is still a landing party that the guards meet. An air wave also kills some guards where it lands. The counter and the button appear, grey, the first time a salvo lands ("their shells go over our guards. We need something that reaches the sky."). Air defence stands on the coast as small posts and shoots its share of the shells down over our own island. The quartermaster buys it too, two per guard, once it has opened; the radar says whether the next wave walks or flies.
+- **While we lead they push harder**: every third wave is a push (double size) while we hold the higher tier, on top of every fifth.
+- **Astronomical but readable.** Stars, science, income and every cost in chapters II and III read as 1.90 T, 81.0 M, +294 M/s; the full number is on hover. Chapter I and its Roman numerals are untouched.
+- In the war, the home and store buttons stay out of the column until there is land to rebuild on.
+- Sim, seeds 1 to 6: 20 to 22 minutes, behind 40 to 43 %, ahead 14 to 19 %, 18 to 25 plates lost, doomsday 85 to 88 %. After we reach tier V (7m31s) we are behind 63 to 68 % of the time until they leave. A player who never buys air defence loses 24 to 28 plates instead.
+
 ## v1.43.1 - 2026-09-22
 
 - The descent card into THE DEEP is now slow and dark like the WAR card: long fade, IV, then the title, a click or five seconds ends it (Ola's playtest note via the WAR session).

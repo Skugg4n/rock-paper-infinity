@@ -9,7 +9,7 @@ import { buildingData } from './buildings-config.js';
 import { createRenderer } from './rendering.js';
 import { timed, counter } from '../perf.js';
 import {
-    siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY,
+    siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY, formatCount,
 } from './economy.js';
 import { createAnts } from './ants.js';
 import { createIsland } from './islands.js';
@@ -17,8 +17,10 @@ import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap, waveStandingK, defenceStandingK,
     SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
-    resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, MAX_ABSORB, plateMaxHp, tierScienceCost, armsPerSecond,
+    resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, plateMaxHp, tierScienceCost, armsPerSecond,
     TIER_COOLDOWN_S, enemyCatchUp, autoBuy, AUTO_COST, STANCES, INTEL_COST, WAVE_WARNING_S, RAID_S, raidCost,
+    revealNext, isShown, quartermasterBudget, QM_KEEP_S, STANCE_RATIO, hpYield, enemyMayResearch,
+    waveMode, isAirMode, AIR_UNIT_COST, landingLosses, isPush,
 } from '../phase3/war.js';
 
 let logicInterval;
@@ -194,7 +196,57 @@ export function init() {
               allocationSliderContainer: document.getElementById('allocation-slider-container'),
               buildSeparator: document.getElementById('build-separator'),
           };
-  
+
+          // Chapter III parts that are built here rather than in index.html (the
+          // shell belongs to the chapter IV session): the auto-strike toggle, the
+          // strike verdict badge, the quartermaster's ratio badge, the arms
+          // tooltip and the rocket's construction ring. Built once; init can run
+          // again after a teardown, so every part is looked up first.
+          const once = (id, make) => document.getElementById(id) || make();
+          ui.autoStrikeBtn = once('auto-strike-btn', () => {
+              const b = document.createElement('button');
+              b.className = 'btn hidden'; b.id = 'auto-strike-btn';
+              b.setAttribute('aria-label', 'Auto strike: strike whenever a strike would raze');
+              b.innerHTML = `<i data-lucide="target" class="w-7 h-7"></i><span class="btn-badge hidden" id="auto-strike-badge"><i data-lucide="repeat" class="w-3 h-3"></i></span><div class="tooltip"></div>`;
+              ui.strikeBtn.before(b);
+              return b;
+          });
+          ui.autoStrikeBadge = document.getElementById('auto-strike-badge');
+          ui.strikeVerdict = once('strike-verdict', () => {
+              const s = document.createElement('span'); s.id = 'strike-verdict'; s.className = 'btn-badge hidden';
+              ui.strikeBtn.appendChild(s); return s;
+          });
+          ui.autoBadge = once('auto-badge', () => {
+              const s = document.createElement('span'); s.id = 'auto-badge'; s.className = 'btn-badge hidden';
+              ui.autoBtn.appendChild(s); return s;
+          });
+          ui.buyAirBtn = once('buy-air-btn', () => {
+              const b = document.createElement('button');
+              b.className = 'btn hidden'; b.id = 'buy-air-btn';
+              b.setAttribute('aria-label', 'Buy air defence');
+              b.innerHTML = `<i data-lucide="shield-half" class="w-7 h-7"></i><div class="tooltip"></div>`;
+              ui.buyDefenceBtn.before(b);
+              return b;
+          });
+          ui.warAirRow = once('war-air-row', () => {
+              const row = document.createElement('div');
+              row.id = 'war-air-row'; row.className = 'flex items-center gap-2 hidden';
+              row.innerHTML = `<i data-lucide="shield-half" class="w-5 h-5 sm:w-6 sm:h-6 text-slate-400"></i><span id="war-air" class="font-mono font-bold text-lg sm:text-2xl text-slate-600 tabular-nums">0</span>`;
+              ui.warDefence.parentElement.after(row);
+              return row;
+          });
+          ui.warAir = document.getElementById('war-air');
+          ui.warArmsRow = ui.warArms.parentElement;
+          if (!ui.warArmsRow.querySelector('.tooltip')) {
+              ui.warArmsRow.classList.add('hud-tip');
+              ui.warArmsRow.insertAdjacentHTML('beforeend', '<div class="tooltip tip-right"></div>');
+          }
+          const rocketTile = ui.competitorIsland.querySelector('.enemy-rocket');
+          const rocketRing = rocketTile?.querySelector('.rocket-build circle.progress-ring-fg') || (() => {
+              rocketTile?.insertAdjacentHTML('afterbegin', `<svg class="progress-ring rocket-build" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="2" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #b45309;"></circle></svg>`);
+              return rocketTile?.querySelector('.rocket-build circle.progress-ring-fg') || document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          })();
+
           /**
            * The competitor's island grows as the player's city does: factory,
            * then a warehouse, then a radar mast. Stage 3 is the last thing the
@@ -231,11 +283,13 @@ export function init() {
               w.lastTierAt = -999;
               w.auto = false;
               w.enemyRazedUntil = [0, 0, 0, 0, 0];
+              w.shown = {};
               gameState.war = w;
               gameState.warChosen = true;
               applyWarPresentation({ tilt: false });        // the camera lowers after the card
               logWar('We are at war. The generals are ready for your command.');
-              logWar('War room: the factory can make arms. Fists first.');
+              logWar('War room: the factory can make arms. Push the slider toward the hammer. Fists first.');
+              logWar('Research runs at half. The factory is yours.');
               logWar('Intel: enemy shipyard active. Expect landings from the south.');
               saveGameState();
               updateAllUI();
@@ -245,6 +299,10 @@ export function init() {
               if (!w?.active) return;
               ui.phaseCity.classList.add('war');
               if (tilt) document.body.classList.add('tilt'); // the camera lowers (6 s transition)
+              // One slider in the war: research is fixed at half, the arms slider is yours.
+              gameState.populationAllocation = 0.5;
+              ui.allocationSlider.value = 50;
+              ui.allocationSliderContainer.style.display = 'none';
               ui.warUi.classList.remove('hidden');
               ui.doomsday.classList.remove('hidden');
               ui.armsSlider.value = Math.round((w.armsShare || 0.3) * 100);
@@ -280,7 +338,7 @@ export function init() {
                   logWar(`Status: they are back. Rebuilt, dug in, and they field ${TIERS[w.enemyTier].id}.`, true);
               }
               // the enemy escalates on its own jittered clock
-              if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
+              if (w.t >= w.nextTierAt && enemyMayResearch(w.t) && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
                   w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier, w.tier - w.enemyTier);
                   logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
               }
@@ -293,29 +351,35 @@ export function init() {
                   w.lastWaveAt = w.t; w.waveCount++;
                   const target = pickTarget(warPlates(), warRand);
                   if (target) {
-                      const push = w.waveCount % 5 === 0;
+                      // a push every fifth wave, and every third while we hold the lead
+                      const push = isPush(w.waveCount, w.tier, w.enemyTier);
                       const size = Math.round(waveSize(w.waveCount) * waveStandingK(standing) * (push ? 2 : 1));
-                      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push };
+                      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push, mode: waveMode(w.enemyTier, w.waveCount) };
                       const ti = gameState.buildings.findIndex(b => b && b.id === target.id);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       if (w.radar && targetEl) targetEl.classList.add('targeted');
-                      if (w.radar) logWar(push ? `Intel: a large force is heading for ${target.type}.` : `Radar: landing party heading for ${target.type}.`, push);
+                      const skyward = isAirMode(w.pendingWave.mode);
+                      if (w.radar) logWar(push ? `Intel: a large ${skyward ? 'salvo' : 'force'} is heading for ${target.type}.` : skyward ? `Radar: a salvo is on its way to ${target.type}.` : `Radar: landing party heading for ${target.type}.`, push);
                   }
               }
               if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
-                  const { targetId, size } = w.pendingWave; w.pendingWave = null;
+                  const { targetId, size } = w.pendingWave;
+                  const mode = w.pendingWave.mode || TIERS[w.enemyTier].mode;
+                  w.pendingWave = null;
                   const b = gameState.buildings.find(x => x && x.id === targetId);
                   if (b && !b.razed) {
                       const enemy = TIERS[w.enemyTier];
                       const ti = gameState.buildings.findIndex(x => x && x.id === targetId);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       targetEl?.classList.add('targeted');   // the plate under attack is marked as soon as they set out
-                      // What you see is the rule: the share of dots that fall on the way is what our defence absorbs.
-                      const ratio = relativePower(w.enemyTier, w.tier);
-                      const losses = Math.min(1, Math.min(size * ratio * MAX_ABSORB, w.defence) / (size * ratio));
-                      const impact = () => { targetEl?.classList.remove('targeted'); resolveWave(targetId, size, enemy); };
-                      if (_ants) _ants.launchWave({ targetBuildingId: targetId, count: size, mode: enemy.mode, losses, onImpact: impact });
-                      else impact();
+                      // What you see is the rule: the share that falls on the way is what the
+                      // defence that can reach it absorbs (guards on the ground, air defence in the sky).
+                      const losses = landingLosses({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air || 0, mode });
+                      const impact = () => { targetEl?.classList.remove('targeted'); resolveWave(targetId, size, enemy, mode); };
+                      if (_ants) {
+                          const edge = _ants.launchWave({ targetBuildingId: targetId, count: size, mode, losses, onImpact: impact });
+                          if (edge && edge !== 's' && !(w.hitEdges || []).includes(edge)) w.hitEdges = (w.hitEdges || []).concat([edge]);
+                      } else impact();
                   }
               }
               // food and land suffer: scorch cuts production, and the war room says so once
@@ -344,19 +408,59 @@ export function init() {
                   if (w.leaveStage === 2 && w.t - w.leaveAt >= 11) { w.leaveStage = 3; ui.competitorIsland.classList.remove('enemy-launch', 'enemy-ignite'); ui.competitorIsland.classList.add('enemy-rubble'); logWar('We have not had the resources to do the same. But there is a secret plan. Go deep.'); }
                   if (w.leaveStage >= 3 && w.salvage >= SHIP_SALVAGE && !w.shipReady) { w.shipReady = true; }
               }
-              if (w.auto) {
-                  const stance = w.stance || 'balanced';
-                  const buy = autoBuy(w.arms, w.defence, w.force, UNIT_COST, stance);
-                  w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
-                  // Strike only when the force can take the toughest tile still
-                  // standing, so the quartermaster never throws units at a wall.
-                  if (stance !== 'defend') {
-                      const up = (w.enemyRazedUntil || []).map((until, i) => ({ until, i })).filter(t => !(t.until > 0));
-                      const hardest = up.length ? Math.max(...up.map(({ i }) => w.enemyTileHp?.[i] ?? ENEMY_TILE_HP)) : 0;
-                      if (hardest > 0 && canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence, hardest)) tryStrike();
+              // Their rocket is underway long before they leave: from doomsday
+              // ROCKET_FROM the tile stands on their island, its ring filling
+              // until DOOMSDAY_LEAVE.
+              if (!w.enemyLeft) {
+                  const building = doom >= ROCKET_FROM;
+                  ui.competitorIsland.classList.toggle('enemy-rocket-building', building);
+                  if (building) {
+                      rocketRing.style.strokeDashoffset = String(113 - 113 * Math.min(1, (doom - ROCKET_FROM) / (DOOMSDAY_LEAVE - ROCKET_FROM)));
+                      if (!w.saidRocket) { w.saidRocket = true; logWar('Intel: they have started building something tall on their island. A rocket.', true); }
                   }
+              } else ui.competitorIsland.classList.remove('enemy-rocket-building');
+              // The quartermaster only buys, at the stance ratio, and keeps
+              // QM_KEEP_S seconds of arms in the yard for you. It never strikes.
+              const stance = w.stance || 'balanced';
+              if (w.autoBought && stance !== 'off') {
+                  const budget = quartermasterBudget(w.arms, armsPerSecond(w.tier) * w.armsShare);
+                  const buy = autoBuy(budget, w.defence, w.force, UNIT_COST, stance, { on: isShown(w, 'air'), units: w.air || 0 });
+                  w.arms -= (buy.defence + buy.force) * UNIT_COST + buy.air * AIR_UNIT_COST;
+                  w.defence += buy.defence; w.force += buy.force; w.air = (w.air || 0) + buy.air;
+              }
+              // Auto strike (its own toggle, off by default): only when the force
+              // can take the toughest tile still standing, never into a wall.
+              if (w.autoStrike && isShown(w, 'autoStrike') && !w.enemyLeft && w.force > 0) {
+                  const up = (w.enemyRazedUntil || []).map((until, i) => ({ until, i })).filter(t => !(t.until > 0));
+                  const hardest = up.length ? Math.max(...up.map(({ i }) => w.enemyTileHp?.[i] ?? ENEMY_TILE_HP)) : 0;
+                  if (hardest > 0 && canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence, hardest)) tryStrike();
+              }
+              // One control at a time, teased grey until it can be afforded.
+              const opened = revealNext(w);
+              if (opened) {
+                  if (REVEAL_LINES[opened]) logWar(REVEAL_LINES[opened]);
+                  if (opened === 'fort') gameState.buildings.forEach((b, i) => { if (b) renderGridSlot(i); });
+              }
+              // The first minute: if nothing is coming out of the factory, the slider says so, once.
+              if (!w.sliderPulsed && w.t >= 6 && w.t <= 60 && w.arms < UNIT_COST && w.defence + w.force === 0) {
+                  w.sliderPulsed = true;
+                  const row = ui.armsSlider.parentElement;
+                  row.classList.remove('pulse-once'); void row.offsetWidth; row.classList.add('pulse-once');
               }
           }
+          /** What the war room says when a control opens. */
+          const REVEAL_LINES = {
+              strike: 'Interior: our force can cross now. The crosshair shows ✓ when a strike would raze.',
+              fort: 'Interior: every plate can be fortified and repaired (◆, paid in hammers). A damaged plate works at half strength.',
+              radar: 'Interior: a radar would tell us when and where they land.',
+              intel: 'Interior: an intel office could read their weapons and their shield.',
+              raid: 'Interior: a raiding party could knock out their defence for a while.',
+              tier: 'Interior: the laboratory can develop better weapons. It is slow, and they are working on theirs.',
+              auto: 'Interior: a quartermaster could buy units for us, at a ratio you set.',
+              autoStrike: 'Interior: the generals offer to strike on their own whenever a strike would raze.',
+              air: 'Interior: air defence can be built (twice the price of a guard). Guards still stop what walks ashore.',
+          };
+          const ROCKET_FROM = 55;
 
           /**
            * A landing resolves when the survivors reach the plate. `size` is the
@@ -364,21 +468,32 @@ export function init() {
            * defence absorbed (the visuals were scripted from the same rule).
            * Weapons are relative (war.js): what decides it is who is ahead.
            */
-          function resolveWave(targetId, size, enemy) {
+          function resolveWave(targetId, size, enemy, mode = enemy.mode) {
               const w = gameState.war; if (!w?.active) return;
               const i = gameState.buildings.findIndex(b => b && b.id === targetId);
-              const b = gameState.buildings[i]; if (!b || b.razed) return;
+              const b = gameState.buildings[i];
+              w.landings = (w.landings || 0) + 1;
+              if (!b || b.razed) return;
               const hp = b.hp ?? plateMaxHp(b.type, b.fort || 0);
               const ratio = relativePower(w.enemyTier, w.tier);
-              const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, hp });
+              const air = isAirMode(mode);
+              const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air || 0, hp, mode });
               const fallen = Math.min(size, Math.round(r.absorbed / ratio));
               const reached = size - fallen;
               w.defence = Math.max(0, w.defence - r.defenceLost);
+              w.air = Math.max(0, (w.air || 0) - r.airLost);
               b.hp = r.hpLeft;
               w.scorchOurs += enemy.scorch;
-              if (enemy.mode === 'area') { gameState.supplies = Math.max(0, gameState.supplies * 0.8); logWar('Status: their strike hit our stores. Food lost.', true); }
-              const story = `${size} ${enemy.id} landed; ${fallen} fell to our defence, ${reached} reached ${b.type}`;
-              const cost = r.defenceLost > 0 ? ` We lost ${r.defenceLost} defenders.` : '';
+              if (air && !w.airSeen) {
+                  w.airSeen = true;
+                  logWar('Status: their shells go over our guards. We need something that reaches the sky.', true);
+              }
+              if (mode === 'area') { gameState.supplies = Math.max(0, gameState.supplies * 0.8); logWar('Status: their strike hit our stores. Food lost.', true); }
+              const story = air
+                  ? `${size} ${enemy.id} came through the air; ${fallen} shot down, ${reached} hit ${b.type}`
+                  : `${size} ${enemy.id} landed; ${fallen} fell to our defence, ${reached} reached ${b.type}`;
+              const lost = [r.defenceLost > 0 ? `${r.defenceLost} guards` : '', r.airLost > 0 ? `${r.airLost} air defence` : ''].filter(Boolean).join(' and ');
+              const cost = lost ? ` We lost ${lost}.` : '';
               if (r.razed) {
                   b.razed = true; b.population = 0; b.fort = 0; b.hp = 0;
                   w.scorchOurs += enemy.scorch * 4;
@@ -404,6 +519,7 @@ export function init() {
               const strikeRatio = relativePower(w.tier, w.enemyTier), enemyDefence0 = w.enemyDefence;
               const losses = Math.min(1, Math.min(force * strikeRatio, enemyDefence0) / (force * strikeRatio));
               w.force = 0; // released
+              w.strikes = (w.strikes || 0) + 1;
               const impact = () => {
                   const ww = gameState.war; if (!ww?.active) return;
                   const hp = ww.enemyTileHp?.[pickIdx] ?? ENEMY_TILE_HP;
@@ -437,18 +553,30 @@ export function init() {
           function updateWarUI() {
               const w = gameState.war;
               const active = !!w?.active;
-              [ui.buyDefenceBtn, ui.buyForceBtn, ui.strikeBtn, ui.tierBtn].forEach(btn => btn.classList.toggle('hidden', !active));
+              [ui.buyDefenceBtn, ui.buyForceBtn].forEach(btn => btn.classList.toggle('hidden', !active));
+              ui.strikeBtn.classList.toggle('hidden', !active || !isShown(w, 'strike'));
+              ui.tierBtn.classList.toggle('hidden', !active || !isShown(w, 'tier'));
+              ui.autoStrikeBtn.classList.toggle('hidden', !active || !isShown(w, 'autoStrike') || w.enemyLeft);
               if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); ui.raidBtn.classList.add('hidden'); }
               ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
               if (!active) return;
               const tier = TIERS[w.tier];
               ui.warDefence.textContent = Math.round(w.defence).toLocaleString('en-US');
+              const airOpen = isShown(w, 'air');
+              ui.warAirRow.classList.toggle('hidden', !airOpen);
+              ui.warAir.textContent = Math.round(w.air || 0).toLocaleString('en-US');
+              ui.buyAirBtn.classList.toggle('hidden', !airOpen);
+              ui.buyAirBtn.disabled = w.arms < AIR_UNIT_COST;
+              {
+                  const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
+                  setTooltip(ui.buyAirBtn, { effect: `+${n} <i data-lucide='shield-half' class='w-4 h-4'></i> <span class='tip-note'>stops shells</span>`, armsCost: n * AIR_UNIT_COST });
+              }
               ui.warForce.textContent = Math.round(w.force).toLocaleString('en-US');
               ui.warArms.textContent = Math.floor(w.arms).toLocaleString('en-US');
               ui.warArmsRate.textContent = `+${(armsPerSecond(w.tier) * w.armsShare).toFixed(0)}/s`;
               ui.warTier.textContent = `${tier.numeral} ${tier.id}`;
               ui.warEnemyTier.textContent = w.intel ? `${TIERS[w.enemyTier].numeral} ${TIERS[w.enemyTier].id}` : '?';
-              ui.intelBtn.classList.toggle('hidden', !active || !!w.intel);
+              ui.intelBtn.classList.toggle('hidden', !active || !!w.intel || !isShown(w, 'intel'));
               ui.intelBtn.disabled = w.arms < INTEL_COST;
               setTooltip(ui.intelBtn, { effect: `<i data-lucide='eye' class='w-4 h-4'></i> intel`, armsCost: INTEL_COST });
               ui.tierBadge.textContent = w.tier < TIERS.length - 1 ? TIERS[w.tier + 1].numeral : tier.numeral;
@@ -463,12 +591,12 @@ export function init() {
               const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0, w.enemyTier - w.tier) : null;
               const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
               ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
-              ui.autoBtn.classList.toggle('hidden', !active);
-              ui.autoBtn.classList.toggle('toggled', !!w.autoBought);
-              // The quartermaster's stance: shield = only defence, scale = both, sword = only force + strikes
+              ui.autoBtn.classList.toggle('hidden', !active || !isShown(w, 'auto'));
+              ui.autoBtn.classList.toggle('toggled', !!w.autoBought && (w.stance || 'balanced') !== 'off');
+              // The quartermaster's stance, a ratio defence : force (shield 3:1, scale 1:1, sword 1:3), or off
               {
                   const stance = w.stance || 'balanced';
-                  const stanceIcon = { defend: 'shield-check', balanced: 'scale', attack: 'sword' }[stance];
+                  const stanceIcon = { defend: 'shield-check', balanced: 'scale', attack: 'sword', off: 'pause' }[stance];
                   const wantIcon = w.autoBought ? stanceIcon : 'repeat';
                   if (ui.autoBtn.dataset.icon !== wantIcon) {
                       ui.autoBtn.dataset.icon = wantIcon;
@@ -479,13 +607,13 @@ export function init() {
               }
               // Raiding party: a helper you send in; while it is there their defence is nothing
               const raidLeft = Math.max(0, Math.ceil((w.raidUntil || 0) - w.t));
-              ui.raidBtn.classList.toggle('hidden', !active || w.enemyLeft);
+              ui.raidBtn.classList.toggle('hidden', !active || w.enemyLeft || !isShown(w, 'raid'));
               ui.raidBtn.disabled = raidLeft > 0 || w.arms < raidCost(w.raids || 0);
               ui.raidBtn.classList.toggle('active-raid', raidLeft > 0);
               setTooltip(ui.raidBtn, raidLeft > 0 ? { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> ${raidLeft} s` } : { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> their <i data-lucide='shield' class='w-4 h-4'></i> → 0 for ${RAID_S} s`, armsCost: raidCost(w.raids || 0) });
               // Radar: a purchase, then an instrument: the badge counts down to the next landing,
               // the tooltip says how big it is and where it is heading once it is spotted.
-              ui.radarBtn.classList.toggle('hidden', !active || w.enemyLeft);
+              ui.radarBtn.classList.toggle('hidden', !active || w.enemyLeft || !isShown(w, 'radar'));
               ui.radarBtn.classList.toggle('radar-on', !!w.radar);
               if (w.radar) {
                   const p = w.pendingWave;
@@ -497,7 +625,7 @@ export function init() {
                   ui.radarBtn.classList.toggle('radar-spotted', !!p);
                   const heading = p ? gameState.buildings.find(b => b && b.id === p.targetId)?.type : null;
                   setTooltip(ui.radarBtn, silentNow ? { effect: `<i data-lucide='radar' class='w-4 h-4'></i> quiet` }
-                      : p ? { effect: `${p.size} ${TIERS[w.enemyTier].id} → ${heading || '?'} in ${next} s` }
+                      : p ? { effect: `${p.size} ${TIERS[w.enemyTier].id} ${isAirMode(p.mode) ? `<i data-lucide='shield-half' class='w-4 h-4'></i>` : `<i data-lucide='shield' class='w-4 h-4'></i>`} → ${heading || '?'} in ${next} s` }
                       : { effect: `<i data-lucide='radar' class='w-4 h-4'></i> next landing in ${next} s` });
               } else {
                   ui.radarBadge.classList.add('hidden');
@@ -507,10 +635,29 @@ export function init() {
               // enemy tiles show damage like ours
               enemyTileEls().forEach((el, i) => { const hp = w.enemyTileHp?.[i]; el.style.setProperty('--hp', hp === undefined ? '1' : (hp / ENEMY_TILE_HP).toFixed(2)); });
               ui.autoBtn.disabled = !w.autoBought && w.arms < AUTO_COST;
-              setTooltip(ui.autoBtn, w.autoBought ? { effect: `${w.stance || 'balanced'}` } : { effect: `<i data-lucide='repeat' class='w-4 h-4'></i> quartermaster`, armsCost: AUTO_COST });
+              {
+                  const stance = w.stance || 'balanced';
+                  const ratio = STANCE_RATIO[stance];
+                  const ratioHtml = ratio ? `${ratio[0]} <i data-lucide='shield' class='w-4 h-4'></i> : ${ratio[1]} <i data-lucide='swords' class='w-4 h-4'></i>` : 'off';
+                  setTooltip(ui.autoBtn, w.autoBought
+                      ? { effect: `${ratioHtml}<br><span class='tip-note'>keeps ${QM_KEEP_S} s of <i data-lucide='hammer' class='w-3 h-3 inline'></i> · never strikes</span>` }
+                      : { effect: `<i data-lucide='repeat' class='w-4 h-4'></i> buys at a ratio`, armsCost: AUTO_COST });
+                  ui.autoBadge.textContent = ratio ? `${ratio[0]}:${ratio[1]}` : '';
+                  ui.autoBadge.classList.toggle('hidden', !w.autoBought || !ratio);
+              }
+              // Auto strike: its own toggle, off until you turn it on
+              ui.autoStrikeBtn.classList.toggle('toggled', !!w.autoStrike);
+              ui.autoStrikeBadge.classList.toggle('hidden', !w.autoStrike);
+              setTooltip(ui.autoStrikeBtn, { effect: w.autoStrike ? `<i data-lucide='crosshair' class='w-4 h-4'></i> on ✓ only` : `<i data-lucide='crosshair' class='w-4 h-4'></i> off` });
               // Predicted strike: ✓ if force × power beats their defence and a tile
               const canRaze = canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence);
               ui.strikeBtn.classList.toggle('will-raze', canRaze && w.force > 0);
+              // the verdict, always on the button: ✓ would raze a tile, × would not
+              ui.strikeVerdict.textContent = canRaze ? '✓' : '×';
+              ui.strikeVerdict.classList.toggle('hidden', !(w.force > 0) || w.enemyLeft);
+              ui.strikeVerdict.classList.toggle('no', !canRaze);
+              // arms: say where they come from
+              setTooltip(ui.warArmsRow, { effect: `<i data-lucide='hammer' class='w-4 h-4'></i> from the <i data-lucide='factory' class='w-4 h-4'></i> · <i data-lucide='star' class='w-4 h-4'></i> ↔ <i data-lucide='hammer' class='w-4 h-4'></i> slider` });
               ui.warEnemyDefence.textContent = w.intel ? Math.round(w.enemyDefence).toLocaleString('en-US') : '?';
               ui.shipBtn.disabled = !w.shipReady;
               const batch = batchSize(w.arms);
@@ -682,7 +829,7 @@ export function init() {
                   const slot = ui.landGrid.children[index];
                   const sellBtn = slot ? slot.querySelector('.sell-btn') : null;
                   if (sellBtn) {
-                      sellBtn.textContent = `${refund >= 1000 ? Math.round(refund / 1000) + 'k' : refund}★`;
+                      sellBtn.textContent = `${formatCount(refund)}★`;
                       sellBtn.classList.add('sell-confirm');
                   }
                   const timeout = setTimeout(() => cancelPendingSell(buildingId), 3000);
@@ -729,6 +876,14 @@ export function init() {
           // --- TOOLTIP & UI UPDATE LOGIC ---
           const tooltipListenersAttached = new WeakSet();
 
+          /** Keeps a tooltip inside the window: measured when shown, nudged in by the overflow. */
+          function clampTooltip(tip) {
+              tip.style.translate = '0 0';
+              const r = tip.getBoundingClientRect(), m = 8;
+              const dx = r.left < m ? m - r.left : (r.right > innerWidth - m ? innerWidth - m - r.right : 0);
+              const dy = r.top < m ? m - r.top : (r.bottom > innerHeight - m ? innerHeight - m - r.bottom : 0);
+              if (dx || dy) tip.style.translate = `${Math.round(dx)}px ${Math.round(dy)}px`;
+          }
           function setTooltip(el, { effect, cost, scienceCost, armsCost, unlockReq }) {
               const tooltipEl = el.querySelector('.tooltip');
               if (!tooltipEl) return;
@@ -737,13 +892,13 @@ export function init() {
                   html += `<div class="unlock-req">${unlockReq}</div>`;
               } else {
                   if (effect) html += `<div class="effect">${effect}</div>`;
-                  if (cost) html += `<div class="cost"><span class="font-mono">${cost.toLocaleString('en-US')}</span><i data-lucide="star" class="w-4 h-4 text-slate-300"></i></div>`;
-                  if (armsCost) html += `<div class="cost"><span class="font-mono">${armsCost.toLocaleString('en-US')}</span><i data-lucide="hammer" class="w-4 h-4 text-slate-300"></i></div>`;
-                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${scienceCost.toLocaleString('en-US')}</span><i data-lucide="atom" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (cost) html += `<div class="cost"><span class="font-mono">${formatCount(cost)}</span><i data-lucide="star" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (armsCost) html += `<div class="cost"><span class="font-mono">${formatCount(armsCost)}</span><i data-lucide="hammer" class="w-4 h-4 text-slate-300"></i></div>`;
+                  if (scienceCost) html += `<div class="cost-science"><span class="font-mono">${formatCount(scienceCost)}</span><i data-lucide="atom" class="w-4 h-4 text-slate-300"></i></div>`;
               }
               tooltipEl.innerHTML = html;
               if (!tooltipListenersAttached.has(el)) {
-                  el.addEventListener('mouseenter', () => tooltipEl.style.setProperty('--tooltip-opacity', 1), { signal });
+                  el.addEventListener('mouseenter', () => { tooltipEl.style.setProperty('--tooltip-opacity', 1); clampTooltip(tooltipEl); }, { signal });
                   el.addEventListener('mouseleave', () => tooltipEl.style.setProperty('--tooltip-opacity', 0), { signal });
                   tooltipListenersAttached.add(el);
               }
@@ -793,6 +948,9 @@ export function init() {
   
   
               // Disabled state for basic buildings
+              // In the war the column is full of war; home and store come back when there is land to rebuild on
+              ui.buildHomeBtn.classList.toggle('hidden', !!gameState.war?.active && !hasEmptySlot);
+              ui.buildStoreBtn.classList.toggle('hidden', !!gameState.war?.active && !hasEmptySlot);
               ui.buildHomeBtn.disabled = !canAfford(buildingData.home) || !hasEmptySlot;
               ui.buildStoreBtn.disabled = !canAfford(buildingData.store) || !hasEmptySlot;
   
@@ -868,8 +1026,14 @@ export function init() {
         function _logicTickBody(skipGrowth) {
               const baseStarPerPerson = calculateBaseStarPerPerson();
 
-              const popForStars = gameState.population * (1 - gameState.populationAllocation);
-              const popForScience = gameState.population * gameState.populationAllocation;
+              // During the war a damaged plate's people work at its share of HP (hpYield)
+              const warOn = !!gameState.war?.active;
+              const hpK = (b) => (warOn && !b.razed ? hpYield(b.hp, plateMaxHp(b.type, b.fort || 0)) : 1);
+              const workforce = warOn
+                  ? gameState.buildings.reduce((a, b) => a + (b && !b.razed ? (b.population || 0) * hpK(b) : 0), 0)
+                  : gameState.population;
+              const popForStars = workforce * (1 - gameState.populationAllocation);
+              const popForScience = workforce * gameState.populationAllocation;
 
               // Scorched land yields less: the war is felt in the numbers
               const yieldK = gameState.war?.active ? scorchYield(doomsday(gameState.war.scorchOurs + gameState.war.scorchTheirs)) : 1;
@@ -889,7 +1053,7 @@ export function init() {
                   if (b.type === 'factory') netStarChange += buildingData.factoryIncome.income;
                   if (b.type === 'bank') netStarChange -= 30;
                   if (b.type === 'store' || b.type === 'superStore') {
-                      supplyProduction += b.supply * gmoMultiplier;
+                      supplyProduction += b.supply * gmoMultiplier * hpK(b);
                       netStarChange -= b.upkeep;
                   }
                   if ((b.type === 'home' || b.type === 'apartment' || b.type === 'skyscraper' || b.type === 'district') && !b.razed) {
@@ -902,6 +1066,7 @@ export function init() {
                               b.prodTimer = (b.prodTimer || 0) + 1;
                               if (b.prodTimer >= 5) { b.prodTimer = 0; growthRate = 1; }
                           }
+                          if (warOn) growthRate = Math.round(growthRate * hpK(b));
                           b.population = Math.min(b.capacity, b.population + growthRate);
                       }
                       currentTotalPopulation += b.population;
@@ -922,7 +1087,7 @@ export function init() {
               if (gameState.war?.active && netStarChange > 0) {
                   // The factory makes arms instead of goods, and the army costs upkeep
                   const w = gameState.war;
-                  const units = (w.defence || 0) + (w.force || 0);
+                  const units = (w.defence || 0) + (w.force || 0) + (w.air || 0);
                   netStarChange = netStarChange * (1 - w.armsShare) - netStarChange * UPKEEP_SHARE_PER_UNIT * units;
                   gameState.netStarChangePerSecond = netStarChange;
               }
@@ -931,7 +1096,7 @@ export function init() {
                   gameState.science = Math.max(0, gameState.science + netScienceChange);
               }
 
-              const troops = gameState.war?.active ? ((gameState.war.defence || 0) + (gameState.war.force || 0)) * FOOD_PER_UNIT : 0;
+              const troops = gameState.war?.active ? ((gameState.war.defence || 0) + (gameState.war.force || 0) + (gameState.war.air || 0)) * FOOD_PER_UNIT : 0;
               const supplyConsumption = gameState.population + troops;
               const netSupplyChange = supplyProduction - supplyConsumption;
 
@@ -999,6 +1164,9 @@ export function init() {
                   ourTier: gameState.war?.tier || 0,
                   enemyTier: gameState.war?.enemyTier || 0,
                   defence: gameState.war?.defence || 0,
+                  airDefence: gameState.war?.air || 0,
+                  guardsOff: !!gameState.war?.enemyLeft || !!gameState.shipChosen,
+                  hitEdges: gameState.war?.hitEdges || [],
               });
 
               // Raids. The competitor waits until our city is complete (everything
@@ -1025,6 +1193,15 @@ export function init() {
               saveGameState();
           }
   
+          /** A counter: short form in the text, the whole number in the title (hover). */
+          function showCount(el, value) {
+              const n = Math.round(value);
+              if (el.dataset.n === String(n)) return;
+              el.dataset.n = String(n);
+              el.textContent = formatCount(n);
+              el.title = n.toLocaleString('en-US');
+          }
+          const perPerson = (v) => (v >= 1000 ? formatCount(v) : v.toFixed(1));
           function fastUiTick() {
               counter('p2:fastUiTick');
               timed('p2:fastUiTick', _fastUiTickBody);
@@ -1035,22 +1212,23 @@ export function init() {
               _displayedScience += (gameState.science - _displayedScience) * COUNTER_LERP;
               if (Math.abs(gameState.stars - _displayedStars) < 0.5) _displayedStars = gameState.stars;
               if (Math.abs(gameState.science - _displayedScience) < 0.5) _displayedScience = gameState.science;
-              ui.starCount.textContent = Math.round(_displayedStars).toLocaleString('en-US');
-              ui.scienceCount.textContent = Math.round(_displayedScience).toLocaleString('en-US');
+              // Astronomical, but readable: 1.90 T, the full number on hover
+              showCount(ui.starCount, _displayedStars);
+              showCount(ui.scienceCount, _displayedScience);
               ui.populationCountTotal.textContent = gameState.population.toLocaleString('en-US');
               const capacity = gameState.buildings.reduce((a, b) => a + ((b && !b.razed && b.capacity) ? b.capacity : 0), 0);
               ui.populationCapacity.textContent = capacity > 0 ? `${capacity.toLocaleString('en-US')} ◻` : '';
 
-              ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${Math.round(gameState.netStarChangePerSecond || 0).toLocaleString('en-US')}/s`;
+              ui.netStarChange.textContent = `${(gameState.netStarChangePerSecond || 0) >= 0 ? '+' : ''}${formatCount(gameState.netStarChangePerSecond || 0)}/s`;
               ui.netStarChange.style.color = (gameState.netStarChangePerSecond || 0) >= 0 ? '#64748b' : '#94a3b8';
-              ui.netScienceChange.textContent = `+${Math.round(gameState.netScienceChangePerSecond || 0).toLocaleString('en-US')}/s`;
+              ui.netScienceChange.textContent = `+${formatCount(gameState.netScienceChangePerSecond || 0)}/s`;
 
               const baseStarPerPerson = calculateBaseStarPerPerson();
               const w2 = gameState.war;
               const doomK = w2?.active ? scorchYield(doomsday(w2.scorchOurs + w2.scorchTheirs)) : 1;
               ui.starsPerPerson.textContent = doomK < 0.995
-                  ? `${(baseStarPerPerson * doomK).toFixed(1)} /person · scorched −${Math.round((1 - doomK) * 100)} %`
-                  : `${baseStarPerPerson.toFixed(1)} /person`;
+                  ? `${perPerson(baseStarPerPerson * doomK)} /person · scorched −${Math.round((1 - doomK) * 100)} %`
+                  : `${perPerson(baseStarPerPerson)} /person`;
 
               const supplyProduction = gameState.cachedSupplyProduction || 0;
               const supplyConsumption = gameState.cachedSupplyConsumption || 0;
@@ -1083,7 +1261,16 @@ export function init() {
                       // Move-in stopped for lack of food: same colour as the empty silo
                       const wrapper = ui.landGrid.children[i]?.querySelector('.building');
                       if (wrapper) wrapper.classList.toggle('starved', starved && b.population < b.capacity);
-                      if (wrapper && gameState.war?.active) wrapper.style.setProperty('--hp', (Math.max(0, b.hp ?? plateMaxHp(b.type, b.fort || 0)) / plateMaxHp(b.type, b.fort || 0)).toFixed(2));
+                  }
+                  // Damaged plates: shaded by HP, and a small amber dot (they work at that share)
+                  if (gameState.war?.active && b.type !== 'factory' && b.type !== 'bank') {
+                      const wrapper = ui.landGrid.children[i]?.querySelector('.building');
+                      if (wrapper) {
+                          const max = plateMaxHp(b.type, b.fort || 0);
+                          const k = Math.max(0, b.hp ?? max) / max;
+                          wrapper.style.setProperty('--hp', k.toFixed(2));
+                          wrapper.classList.toggle('damaged', !b.razed && k < 0.999);
+                      }
                   }
               });
               const gmoPercent = (gameState.gmoLevel / gameState.gmoMaxLevel) * 113;
@@ -1112,6 +1299,7 @@ export function init() {
                   if (w?.active && b && !b.razed) {
                       const cost = FORT_COST(b.fort || 0);
                       if (w.arms >= cost) { w.arms -= cost; b.fort = (b.fort || 0) + 1; b.hp = plateMaxHp(b.type, b.fort); renderGridSlot(i); logWar(`Interior: ${b.type} fortified and repaired. HP ${b.hp}.`); updateAllUI(); }
+                      else flashArms();
                   }
                   return;
               }
@@ -1146,6 +1334,17 @@ export function init() {
           const batchSize = (arms) => Math.max(1, Math.floor(arms * 0.1 / UNIT_COST));
           ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.defence += n; updateAllUI(); }, { signal });
           ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.force += n; updateAllUI(); }, { signal });
+          ui.buyAirBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || !isShown(w, 'air')) return;
+              if (w.arms < AIR_UNIT_COST) { flashArms(); return; }
+              const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
+              w.arms -= n * AIR_UNIT_COST; w.air = (w.air || 0) + n; updateAllUI();
+          }, { signal });
+          /** Short of arms: the arms counter flashes, so the eye goes to where hammers come from. */
+          function flashArms() {
+              const row = ui.warArmsRow;
+              row.classList.remove('flash-short'); void row.offsetWidth; row.classList.add('flash-short');
+          }
           ui.intelBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.intel) return;
               if (w.arms >= INTEL_COST) { w.arms -= INTEL_COST; w.intel = true; logWar(`Intel: office opened. The enemy fields ${TIERS[w.enemyTier].id}.`); updateAllUI(); }
@@ -1169,9 +1368,9 @@ export function init() {
                   logWar(`Interior: ${TIERS[w.tier].id} developed. Units are stronger.`);
                   const pulled = enemyCatchUp(w.tier, w.enemyTier);
                   if (pulled > w.enemyTier) { w.enemyTier = pulled; logWar(`Intel: enemy has stolen blueprints for ${TIERS[w.enemyTier].id}.`, true); }
-                  // A weapon they have never seen sends their laboratory back to the
-                  // drawing board; while they are behind they push twice as hard.
-                  if (w.tier > w.enemyTier) { w.nextTierAt = nextEnemyTierAt(w.t || 0, warRand, w.enemyTier, w.tier - w.enemyTier); logWar('Intel: their laboratory has gone quiet. They have nothing like this.'); }
+                  // Their laboratory keeps its own clock (war-playtest-3: the old
+                  // "back to the drawing board" restart made a lead permanent).
+                  if (w.tier > w.enemyTier) logWar('Intel: they have nothing like this. Yet.');
                   updateAllUI();
               }
           }, { signal });
@@ -1186,8 +1385,14 @@ export function init() {
               } else {
                   const i = STANCES.indexOf(w.stance || 'balanced');
                   w.stance = STANCES[(i + 1) % STANCES.length];
-                  w.auto = true;
+                  w.auto = w.stance !== 'off';
               }
+              updateAllUI();
+          }, { signal });
+          ui.autoStrikeBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.active || !isShown(w, 'autoStrike')) return;
+              w.autoStrike = !w.autoStrike;
+              logWar(w.autoStrike ? 'Interior: the generals will strike whenever a strike would raze.' : 'Interior: strikes are yours again.');
               updateAllUI();
           }, { signal });
           ui.armsSlider.addEventListener('input', (e) => { if (gameState.war?.active) gameState.war.armsShare = e.target.value / 100; updateAllUI(); }, { signal });
@@ -1326,6 +1531,7 @@ export function init() {
           }
 
             ui.allocationSlider.addEventListener('input', (e) => {
+                if (gameState.war?.active) { e.target.value = 50; return; }
                 gameState.populationAllocation = e.target.value / 100;
             }, { signal });
 

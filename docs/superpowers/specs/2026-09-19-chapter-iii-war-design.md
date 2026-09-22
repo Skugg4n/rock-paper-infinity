@@ -271,3 +271,112 @@ to 30 plates lost, 18 to 26 minutes, doomsday at 85 %.
   fewer people, less science, a slower answer, and more plates razed. It reads
   well, the war turns and stays turned, but it means a helper that prevents the
   first loss would flatten the whole chapter.
+
+## Playtest 3 (2026-09-22), war-playtest-3 branch: one thing at a time
+
+Ola and a tester played v1.42.0. What worked: the enemy appearing, building,
+gathering and attacking ("SKITBRA"), kept exactly as it is. What did not:
+everything else arriving at once, guards that stood still, troops dying at sea,
+a ◆ button that often did nothing, a quartermaster that spent your arms and
+struck when you did not want it to, two sliders, and a tier button so early
+that the tester bought four or five tiers before knowing what one did.
+
+### Disclosure (war.js `REVEAL_ORDER`, `revealNext`)
+
+At war start only the arms slider, shield, sword and the war room. Then, at
+most one per `REVEAL_GAP_S` (6 s), each greyed until affordable and never
+closed again: strike (force > 0), ◆ (first landing), radar (second landing),
+intel (radar bought), raiding party (first strike), tier (`TIER_REVEAL_S` 180 s
+AND `TIER_REVEAL_LANDINGS` 4), quartermaster (tier II), auto strike (tier III),
+air defence (their first air wave; commit 2). The sim opens controls with the
+same function, so the sim player cannot research before the button exists.
+
+### Rules that changed
+
+1. `TIER_COOLDOWN_S` 45 to 90 and `FIRST_TIER_PREMIUM` 1.5 on tier II: a
+   banked chapter II science pile can no longer buy the ladder in a minute.
+2. `ENEMY_FIRST_TIER_S` 200: their laboratory opens just after ours can. With
+   the old 75 s they were two tiers up before our button existed, and every
+   seed was a rout (behind 93 to 98 %).
+3. **Their clock no longer restarts when we take the lead** (rule 9 of the
+   previous pass is gone). With a 90 s cooldown the restart made any lead of
+   ours permanent: they caught up in about a minute, stood level until our
+   cooldown ended, and fell behind again (behind 0 %, ahead 40 %, one plate
+   lost). Instead their laboratory is a little faster: `ENEMY_TIER_BASE_S` 95
+   to 88.
+4. The quartermaster buys at a stance ratio (`STANCE_RATIO`: shield 3:1, scale
+   1:1, sword 1:3, or off), keeps `QM_KEEP_S` 15 s of arms production in the
+   yard (`quartermasterBudget`), and never strikes. The sim player now keeps
+   that reserve for repairs, strikes by hand when the button shows ✓, and
+   fortifies unhit plates only from surplus above the reserve.
+5. `hpYield`: a damaged plate's people earn, research and move in at its share
+   of HP; stores sell at that share. The sim weights income and science the
+   same way.
+6. Research is fixed at half during the war (the industry/research slider is
+   hidden), which is what the sim always assumed.
+
+### Sim after commit 1 (auto quartermaster on the scale, seeds 1 to 6)
+
+| seed | length | behind | ahead | lead changes | plates lost | their tiles razed | island silent | doomsday | we reach V | behind after V |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 21m51s | 42 % | 14 % | 2 | 18 | 10 | 0 % | 87 % | 7m31s | 64 % |
+| 2 | 21m31s | 44 % | 16 % | 2 | 19 | 11 | 0 % | 87 % | 7m31s | 67 % |
+| 3 | 20m31s | 43 % | 16 % | 2 | 19 | 9 | 0 % | 87 % | 7m31s | 68 % |
+| 4 | 20m31s | 43 % | 18 % | 2 | 17 | 11 | 0 % | 88 % | 7m31s | 68 % |
+| 5 | 20m31s | 40 % | 19 % | 2 | 18 | 11 | 0 % | 85 % | 7m31s | 63 % |
+| 6 | 20m11s | 42 % | 15 % | 2 | 21 | 10 | 0 % | 87 % | 7m31s | 67 % |
+
+With `--raid` all six stay inside the time and behind windows (behind 42 to
+45 %), plates lost 12 to 17. The shape is the same as before: we lead after the
+first tier, they take the lead in the middle and hold it. The window is narrow:
+`ENEMY_TIER_BASE_S` 92 drops two seeds to behind 25 %, 85 lifts them; the war is
+still bistable around who holds the tier when the ladder gets expensive.
+
+### Commit 2: air defence, the uphill after artillery
+
+Ola: "after artillery the game is over, only mop-up". From their tier V
+(`waveMode`): two waves in three come through the air (their tier's mode,
+ranged or area) and every `GROUND_EVERY` (3rd) wave is still a landing party.
+Air waves ignore the guards; only air defence absorbs them, by the same rule
+(`MAX_ABSORB`), at `AIR_UNIT_COST` 20 arms a unit. What gets through kills
+`AIR_GROUND_KILL` (0.1) guards per unit of power. `resolveLanding` takes
+`airDefence` and `mode`; `landingLosses` gives the share the visuals script as
+shot down. The quartermaster (and the sim player) buy `AIR_PER_GROUND` 2 air
+units per guard once the air control has opened (first air wave). Air units
+eat and cost upkeep like any unit.
+
+Item 14 of the playtest ("the enemy is still easy") asked for more pushes if
+the sim was still under behind 40 %. It is not (40 to 43 %), but the extra push
+while we lead (`isPush`: every 3rd wave while our tier is higher, on top of
+every 5th) went in anyway because it only bites in the situation the tester
+called easy; in the sim it moves nothing by more than a plate.
+
+| seed | length | behind | ahead | lead changes | plates lost | their tiles razed | island silent | doomsday | behind after our V |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 21m51s | 42 % | 14 % | 2 | 19 | 10 | 0 % | 87 % | 64 % |
+| 2 | 20m51s | 42 % | 17 % | 2 | 25 | 11 | 0 % | 85 % | 66 % |
+| 3 | 20m31s | 43 % | 16 % | 2 | 21 | 9 | 0 % | 88 % | 68 % |
+| 4 | 20m11s | 42 % | 19 % | 2 | 18 | 11 | 0 % | 86 % | 67 % |
+| 5 | 20m31s | 40 % | 19 % | 2 | 22 | 12 | 0 % | 87 % | 63 % |
+| 6 | 19m51s | 41 % | 15 % | 2 | 21 | 10 | 0 % | 85 % | 66 % |
+
+We reach tier V at 7m31s in every seed. A player who never buys air defence
+(`AIR_PER_GROUND` 0) loses 24 to 28 plates instead of 18 to 25: air defence is
+a real second purchase, not decoration. With `--raid`: behind 41 to 44 %,
+plates lost 15 to 27.
+
+### What this pass did not solve
+
+- **The late war is a siege, not a race.** Once they lead (around minute 9)
+  the research pressure (×1.9 per tier they hold) keeps us behind until they
+  leave; we never raze another of their tiles after that in the sim (their
+  shield outgrows our force). The climb after V is defending (◆, guards, air
+  defence), not catching up. A way back up the ladder (a catch-up discount, or
+  salvage buying research) would be the next lever if Ola wants the ups and
+  downs back.
+- **The sim player has no banked science**; a real player arrives with tens of
+  millions from chapter II. With the 90 s cooldown that no longer lets anyone
+  buy ahead, but the first tier at 3:00 is always affordable for a human.
+- **The right-hand column is long** once every control is open (tier, intel,
+  radar, raid, quartermaster, auto strike, strike, sword, air, shield, stall):
+  on a 900 px high window it reaches the people counter.

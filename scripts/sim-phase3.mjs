@@ -1,8 +1,11 @@
-// Chapter III war simulation. The player is the AUTO QUARTERMASTER on the
-// balanced stance (what most players run): it keeps defence and force level,
-// strikes the moment a tile can be razed, researches the next tier as soon as
-// science and the cooldown allow, repairs the worst plate and fortifies the
-// weakest. The loop below is the game's own `warTick` (src/phase2/index.js)
+// Chapter III war simulation. The player runs the AUTO QUARTERMASTER on the
+// balanced stance (what most players do): it keeps defence and force level
+// and leaves QM_KEEP_S seconds of arms in the yard. The player strikes by hand
+// the moment the strike button shows a tick (a tile can be razed), researches
+// the next tier as soon as the tier button has opened and science and the
+// cooldown allow, repairs the worst plate and fortifies the weakest. Controls
+// open one at a time (revealNext), exactly as in the game. The loop below is
+// the game's own `warTick` (src/phase2/index.js)
 // step for step, so the numbers here are the numbers Ola plays: standingK,
 // the push every fifth wave, the warning delay, the silent island and the
 // regroup. Rules come from src/phase3/war.js and are never duplicated here.
@@ -14,6 +17,8 @@ import {
   scorchYield, SHIP_SALVAGE, initialWarState, rng, doomsday, waveInterval, waveSize, waveStandingK, defenceStandingK,
   nextEnemyTierAt, pickTarget, resolveLanding, resolveOurStrike, canRazeTile, plateMaxHp, autoBuy,
   tierScienceCost, enemyCatchUp, TIER_COOLDOWN_S, WAVE_WARNING_S, RAID_S, raidCost,
+  revealNext, isShown, quartermasterBudget, hpYield, QM_KEEP_S, enemyMayResearch,
+  waveMode, isAirMode, AIR_UNIT_COST, isPush,
 } from '../src/phase3/war.js';
 
 const seed = Number(process.argv[2] || 1);
@@ -32,8 +37,10 @@ const types = ['factory', 'bank', 'district', 'district', 'skyscraper', 'skyscra
 const plates = types.map((type, i) => ({ id: i + 1, type, row: Math.floor(i / 5), fort: 0, razed: false, hp: plateMaxHp(type), max: plateMaxHp(type), clearAt: 0 }));
 const popOf = { district: 100000, skyscraper: 500, apartment: 50, home: 10 };
 const pop = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0), 0);
-const income = () => pop() * 1100 * 0.5 * scorchYield(doomsday(w.scorchOurs + w.scorchTheirs));
-const scienceRate = () => pop() * 0.5;
+// A damaged plate works at its share of HP (hpYield): income and research both.
+const workforce = () => plates.filter(p => !p.razed).reduce((a, p) => a + (popOf[p.type] || 0) * hpYield(p.hp, p.max), 0);
+const income = () => workforce() * 1100 * 0.5 * scorchYield(doomsday(w.scorchOurs + w.scorchTheirs));
+const scienceRate = () => workforce() * 0.5;
 const w = initialWarState(0);
 w.t = 0;
 w.scienceRate0 = pop() * 0.5;                       // research potential at war start
@@ -42,22 +49,23 @@ w.lastTierAt = -999;
 w.enemyRazedUntil = [0, 0, 0, 0, 0];
 w.enemyTileHp = [0, 0, 0, 0, 0].map(() => ENEMY_TILE_HP);
 w.regroupAt = 0;
+w.air = 0;                                          // air defence units (from their tier V)
 let stars = 0, science = 0;
 const log = []; const events = [];
 let leadChanges = 0, lastLead = 0, razedOurs = 0, razedTheirs = 0, behindS = 0, aheadS = 0, silentS = 0;
+let lateS = 0, lateBehindS = 0, tierVAt = 0;   // after we reach tier V (artillery) until they leave: is there still a climb?
 const say = e => events.push({ t: w.t, e });
 
 /** The human half of the auto player: research, repair, fortify, clear, raid. */
 function playerActions() {
-  if (w.tier < TIERS.length - 1 && w.t - w.lastTierAt >= TIER_COOLDOWN_S) {
+  if (isShown(w, 'tier') && w.tier < TIERS.length - 1 && w.t - w.lastTierAt >= TIER_COOLDOWN_S) {
     const cost = tierScienceCost(w.tier + 1, w.scienceRate0, w.enemyTier - w.tier);
     if (science >= cost) {
       science -= cost; w.tier++; w.lastTierAt = w.t;
       say(`OUR tier ${TIERS[w.tier].numeral} ${TIERS[w.tier].id}`);
       const pulled = enemyCatchUp(w.tier, w.enemyTier);
       if (pulled > w.enemyTier) { w.enemyTier = pulled; say(`ENEMY catches up to ${TIERS[w.enemyTier].numeral}`); }
-      // A weapon they have never seen sends their laboratory back to the drawing board.
-      if (w.tier > w.enemyTier) w.nextTierAt = nextEnemyTierAt(w.t, randTier, w.enemyTier, w.tier - w.enemyTier);
+      // Their laboratory keeps its own clock: no restart when we take the lead.
     }
   }
   // the ◆ button: repairs to full and adds a fortification level
@@ -65,11 +73,14 @@ function playerActions() {
   const damaged = plates.filter(p => target(p) && p.hp < p.max && p.fort < 6).sort((a, b) => a.hp / a.max - b.hp / b.max)[0];
   if (damaged && w.arms >= FORT_COST(damaged.fort)) { w.arms -= FORT_COST(damaged.fort); damaged.fort++; damaged.max = plateMaxHp(damaged.type, damaged.fort); damaged.hp = damaged.max; }
   const weakest = plates.filter(target).sort((a, b) => a.fort - b.fort || b.row - a.row)[0];
-  if (weakest && weakest.fort < 3 && w.arms >= FORT_COST(weakest.fort) + UNIT_COST * 5) { w.arms -= FORT_COST(weakest.fort); weakest.fort++; weakest.max = plateMaxHp(weakest.type, weakest.fort); weakest.hp += FORT_HP; }
+  // Fortifying a plate that has not been hit comes out of surplus only: the
+  // quartermaster's reserve is what the player keeps for repairs.
+  const keep = QM_KEEP_S * armsPerSecond(w.tier) * w.armsShare;
+  if (weakest && weakest.fort < 3 && w.arms >= FORT_COST(weakest.fort) + keep + UNIT_COST * 5) { w.arms -= FORT_COST(weakest.fort); weakest.fort++; weakest.max = plateMaxHp(weakest.type, weakest.fort); weakest.hp += FORT_HP; }
   // The raiding party: worth it when their shield, not their wall, is what
   // stops us. The quartermaster has to be told to hold arms back for it
   // (see `reserve`), because on its own it spends every arm the second it has one.
-  w.wantRaid = useRaid && !w.enemyLeft && (w.raidUntil || 0) <= w.t
+  w.wantRaid = useRaid && isShown(w, 'raid') && !w.enemyLeft && (w.raidUntil || 0) <= w.t
     && !canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence) && canRazeTile(w.force, w.tier, w.enemyTier, 0);
   if (w.wantRaid && w.arms >= raidCost(w.raids || 0)) {
     w.arms -= raidCost(w.raids || 0); w.raids = (w.raids || 0) + 1; w.raidUntil = w.t + RAID_S; w.wantRaid = false; say('raiding party sent');
@@ -78,13 +89,20 @@ function playerActions() {
   for (const p of plates) if (p.razed && stars >= 2e6 && w.t >= p.clearAt) { stars -= 2e6; p.razed = false; p.fort = 0; p.max = plateMaxHp(p.type); p.hp = p.max; }
 }
 
-/** The auto quartermaster, balanced stance: buy, then strike when a tile can fall. */
+/** The auto quartermaster, balanced stance: it only buys (the quartermaster opens after tier II; before that the player buys by hand at the same ratio). */
 function quartermaster() {
   // Saving for a raid means buying fewer units, never none: the quartermaster
   // sets aside at most a third of what is in the yard this second.
   const reserve = w.wantRaid ? Math.min(raidCost(w.raids || 0), w.arms / 3) : 0;
-  const buy = autoBuy(Math.max(0, w.arms - reserve), w.defence, w.force, UNIT_COST, 'balanced');
-  w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
+  const budget = quartermasterBudget(Math.max(0, w.arms - reserve), armsPerSecond(w.tier) * w.armsShare);
+  // Once their shells fly (the air defence button has opened), it buys air defence too.
+  const buy = autoBuy(budget, w.defence, w.force, UNIT_COST, 'balanced', { on: isShown(w, 'air'), units: w.air });
+  w.arms -= (buy.defence + buy.force) * UNIT_COST + buy.air * AIR_UNIT_COST;
+  w.defence += buy.defence; w.force += buy.force; w.air += buy.air;
+}
+
+/** The strike button, pressed by hand the moment it shows a tick. */
+function strike() {
   if (w.enemyLeft || w.force <= 0) return;
   const visible = w.enemyRazedUntil.map((until, i) => ({ i, until })).filter(x => !(x.until > 0));
   if (!visible.length) return;
@@ -102,6 +120,7 @@ function quartermaster() {
     w.scorchTheirs += tier.scorch * 10;
     razedTheirs++; say(`we razed tile ${pick}`);
   }
+  w.strikes = (w.strikes || 0) + 1;
 }
 
 /** The game's warTick, step for step. */
@@ -123,7 +142,7 @@ function warTick() {
     if (w.enemyTier < w.tier) { w.enemyTier = w.tier; w.nextTierAt = nextEnemyTierAt(w.t, randTier, w.enemyTier); }
     say(`THEY ARE BACK, rebuilt, with ${TIERS[w.enemyTier].id}`);
   }
-  if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
+  if (w.t >= w.nextTierAt && enemyMayResearch(w.t) && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
     w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, randTier, w.enemyTier, w.tier - w.enemyTier);
     say(`ENEMY tier ${TIERS[w.enemyTier].numeral}`);
   }
@@ -135,18 +154,21 @@ function warTick() {
     w.lastWaveAt = w.t; w.waveCount++;
     const target = pickTarget(plates, randTarget);
     if (target) {
-      const push = w.waveCount % 5 === 0;
+      const push = isPush(w.waveCount, w.tier, w.enemyTier);
       const size = Math.round(waveSize(w.waveCount) * waveStandingK(standing) * (push ? 2 : 1));
-      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push };
+      w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push, mode: waveMode(w.enemyTier, w.waveCount) };
     }
   }
   if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
-    const { targetId, size } = w.pendingWave; w.pendingWave = null;
+    const { targetId, size, mode } = w.pendingWave; w.pendingWave = null;
     const b = plates.find(p => p.id === targetId);
+    w.landings = (w.landings || 0) + 1;
     if (b && !b.razed) {
       const enemy = TIERS[w.enemyTier];
-      const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, hp: b.hp });
+      const r = resolveLanding({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air, hp: b.hp, mode });
       w.defence = Math.max(0, w.defence - r.defenceLost);
+      w.air = Math.max(0, w.air - r.airLost);
+      if (isAirMode(mode)) w.airSeen = true;
       b.hp = r.hpLeft;
       w.scorchOurs += enemy.scorch;
       if (r.razed) {
@@ -160,11 +182,14 @@ function warTick() {
   const doom = doomsday(w.scorchOurs + w.scorchTheirs);
   if (!w.enemyLeft && doom >= DOOMSDAY_LEAVE) { w.enemyLeft = true; say(`ENEMY LEAVES (spaceship) at doomsday ${Math.round(doom)} %`); }
   quartermaster();
+  if (isShown(w, 'strike')) strike();
+  const opened = revealNext(w);
+  if (opened) say(`(opens: ${opened})`);
 }
 
 while (w.t < 3600 && !w.shipReady) {
   const inc = income();
-  const upkeep = inc * UPKEEP_SHARE_PER_UNIT * (w.defence + w.force);
+  const upkeep = inc * UPKEEP_SHARE_PER_UNIT * (w.defence + w.force + w.air);
   stars += Math.max(0, inc * (1 - w.armsShare) - upkeep);
   science += scienceRate();
   playerActions();
@@ -173,10 +198,12 @@ while (w.t < 3600 && !w.shipReady) {
   const lead = Math.sign(w.tier - w.enemyTier);
   if (lead !== 0 && lead !== lastLead) { leadChanges++; lastLead = lead; }
   if (lead < 0) behindS++; else if (lead > 0) aheadS++;
-  if (w.t % 60 === 0) log.push({ t: w.t, tier: w.tier, etier: w.enemyTier, def: Math.round(w.defence), force: Math.round(w.force), edef: Math.round(w.enemyDefence), standing: plates.filter(p => !p.razed).length, doom: Math.round(doomsday(w.scorchOurs + w.scorchTheirs)), theirStanding: 5 - w.enemyRazedUntil.filter(x => x > 0).length, salvage: Math.round(w.salvage) });
+  if (w.tier >= 4 && !tierVAt) tierVAt = w.t;
+  if (w.tier >= 4 && !w.enemyLeft) { lateS++; if (lead < 0) lateBehindS++; }
+  if (w.t % 60 === 0) log.push({ t: w.t, tier: w.tier, etier: w.enemyTier, def: Math.round(w.defence), air: Math.round(w.air), force: Math.round(w.force), edef: Math.round(w.enemyDefence), standing: plates.filter(p => !p.razed).length, doom: Math.round(doomsday(w.scorchOurs + w.scorchTheirs)), theirStanding: 5 - w.enemyRazedUntil.filter(x => x > 0).length, salvage: Math.round(w.salvage) });
 }
 const t = w.t;
 const fmt = s => `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
-console.log(`seed ${seed}: ended at ${fmt(t)}  lead changes ${leadChanges}  behind ${Math.round(100 * behindS / t)} % of the time, ahead ${Math.round(100 * aheadS / t)} %  plates lost ${razedOurs} (min standing ${Math.min(...log.map(r => r.standing))}/20)  their tiles razed ${razedTheirs}  island silent ${Math.round(100 * silentS / t)} %  doomsday ${Math.round(doomsday(w.scorchOurs + w.scorchTheirs))} %`);
+console.log(`seed ${seed}: ended at ${fmt(t)}  lead changes ${leadChanges}  behind ${Math.round(100 * behindS / t)} % of the time, ahead ${Math.round(100 * aheadS / t)} %  plates lost ${razedOurs} (min standing ${Math.min(...log.map(r => r.standing))}/20)  their tiles razed ${razedTheirs}  island silent ${Math.round(100 * silentS / t)} %  doomsday ${Math.round(doomsday(w.scorchOurs + w.scorchTheirs))} %  our V at ${fmt(tierVAt)}, then behind ${lateS ? Math.round(100 * lateBehindS / lateS) : 0} %`);
 if (!process.argv.includes('--quiet')) for (const e of events) console.log(`  ${fmt(e.t).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

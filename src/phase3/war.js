@@ -72,12 +72,71 @@ export const DOOMSDAY_LEAVE = 85;
 export const ENEMY_REGROUP_S = 90;
 /** What scorch does to yield: stars and food per second are multiplied by this. */
 export const scorchYield = (doomPercent) => 1 - 0.6 * Math.max(0, Math.min(100, doomPercent)) / 100;
-/** Seconds of development between our tier purchases. */
-export const TIER_COOLDOWN_S = 45;
+/**
+ * Seconds of development between our tier purchases. 90 s so that a banked
+ * science pile from chapter II cannot buy four tiers before the player has
+ * seen what one of them does (playtest 2026-09-22).
+ */
+export const TIER_COOLDOWN_S = 90;
+/** The first tier costs this much more than the rule says: the first rung is the lesson. */
+export const FIRST_TIER_PREMIUM = 1.5;
+/** The tier button opens only after this much war AND this many landings, whichever is later. */
+export const TIER_REVEAL_S = 180;
+export const TIER_REVEAL_LANDINGS = 4;
+/**
+ * Progressive disclosure of the war controls, in order. Each entry opens (teased
+ * grey until affordable) when its condition holds, and never closes again. At
+ * most one opens per REVEAL_GAP_S, so two conditions that come true together
+ * still arrive one at a time. Slider, shield, sword and the war room are there
+ * from the first second.
+ * `w` fields read: force, landings, strikes, radar, tier, t, airSeen.
+ */
+export const REVEAL_GAP_S = 6;
+export const REVEAL_ORDER = [
+    { id: 'strike', when: (w) => w.force > 0 },
+    { id: 'fort', when: (w) => (w.landings || 0) >= 1 },
+    { id: 'radar', when: (w) => (w.landings || 0) >= 2 },
+    { id: 'intel', when: (w) => !!w.radar },
+    { id: 'raid', when: (w) => (w.strikes || 0) >= 1 },
+    { id: 'tier', when: (w) => (w.t || 0) >= TIER_REVEAL_S && (w.landings || 0) >= TIER_REVEAL_LANDINGS },
+    { id: 'auto', when: (w) => (w.tier || 0) >= 1 },
+    { id: 'autoStrike', when: (w) => (w.tier || 0) >= 2 },
+    { id: 'air', when: (w) => !!w.airSeen },
+];
+/**
+ * Opens the next control whose time has come, at most one per REVEAL_GAP_S.
+ * Mutates `w.shown` (id → true) and `w.lastRevealAt`; returns the id opened, or null.
+ * @param {object} w - war state
+ */
+export function revealNext(w) {
+    w.shown = w.shown || {};
+    const t = w.t || 0;
+    if (t - (w.lastRevealAt ?? -Infinity) < REVEAL_GAP_S) return null;
+    const next = REVEAL_ORDER.find(r => !w.shown[r.id] && r.when(w));
+    if (!next) return null;
+    w.shown[next.id] = true; w.lastRevealAt = t;
+    return next.id;
+}
+/** Has this control been opened yet? */
+export const isShown = (w, id) => !!w?.shown?.[id];
 /** The enemy never falls more than this many tiers behind us (checkpoint). */
 export const ENEMY_MAX_LAG = 1;
-/** One-time price (arms) of the auto quartermaster: buys units and strikes for you. */
+/** One-time price (arms) of the auto quartermaster: buys units at the stance ratio, never strikes. */
 export const AUTO_COST = 400;
+/**
+ * The quartermaster keeps this many seconds of arms production in the yard,
+ * so there is always something left for a fortification, the radar or a raid.
+ */
+export const QM_KEEP_S = 15;
+/** Arms the quartermaster may spend this second: everything above the reserve. */
+export const quartermasterBudget = (arms, armsRate) => Math.max(0, arms - QM_KEEP_S * Math.max(0, armsRate));
+/**
+ * A damaged plate works at the share of HP it has left: its people earn and
+ * research that share, its store sells that share. Repair is worth it.
+ * @param {number|undefined} hp
+ * @param {number} max
+ */
+export const hpYield = (hp, max) => (hp === undefined || hp === null || !(max > 0) ? 1 : Math.max(0, Math.min(1, hp / max)));
 /** Intel office: shows the enemy's tier and the Intel lines in the war room. */
 export const INTEL_COST = 150;
 /** Raiding party (helper): knocks their defence to zero for RAID_S seconds; the price climbs per raid. */
@@ -94,7 +153,7 @@ export function initialWarState(now = 0) {
         active: true, startedAt: now,
         arms: 0, armsShare: 0.3,
         defence: 0, force: 0, tier: 0,
-        enemyTier: 0, enemyDefence: ENEMY_DEFENCE_START, waveCount: 0, lastWaveAt: now, nextTierAt: now + 75,
+        enemyTier: 0, enemyDefence: ENEMY_DEFENCE_START, waveCount: 0, lastWaveAt: now, nextTierAt: now + ENEMY_FIRST_TIER_S,
         scorchOurs: 0, scorchTheirs: 0, salvage: 0,
         enemyLeft: false, shipReady: false,
         autoStrike: false,
@@ -132,20 +191,45 @@ export function waveInterval(waveCount) {
     return Math.max(20, 40 - waveCount * 1.5);
 }
 
+/** Every PUSH_EVERY-th wave is a push (double size). */
+export const PUSH_EVERY = 5;
+/** While we hold the lead they push every PUSH_AHEAD_EVERY-th wave instead (0 = no extra pushes). */
+export const PUSH_AHEAD_EVERY = 3;
+/**
+ * Is wave number `waveCount` a push (double size)?
+ * @param {number} waveCount
+ * @param {number} ourTier
+ * @param {number} enemyTier
+ */
+export function isPush(waveCount, ourTier = 0, enemyTier = 0) {
+    if (waveCount % PUSH_EVERY === 0) return true;
+    return PUSH_AHEAD_EVERY > 0 && ourTier > enemyTier && waveCount % PUSH_AHEAD_EVERY === 0;
+}
+
 /** Units in the next wave: grows for twenty waves, then holds at 50. */
 export function waveSize(waveCount) {
     return 10 + Math.min(waveCount, 20) * 2;
 }
 
+/**
+ * Their laboratory opens after ours can: no enemy tier before this many seconds
+ * of war, so the first minutes are fists against fists while the controls
+ * arrive one at a time (the tier button opens at TIER_REVEAL_S).
+ */
+export const ENEMY_FIRST_TIER_S = 200;
+export const enemyMayResearch = (t) => t >= ENEMY_FIRST_TIER_S;
 /** How much harder they push their laboratory per tier they are behind us. */
 export const ENEMY_PUSH_PER_TIER = 1;
+/** Seconds their laboratory needs for its first tier; 15 % longer for each after. */
+export const ENEMY_TIER_BASE_S = 88;
 /**
- * When the enemy takes its next tier: 95 s for the first, 15 % longer for each
- * after, with a small jitter (±15 %) so the clock is steady and the swings in
- * the war come from the rules rather than from luck. A weapon they have never
- * seen sends them back to the drawing board (the caller restarts this clock
- * whenever we take the lead), but while they are behind they push twice as
- * hard: one tier behind halves the wait.
+ * When the enemy takes its next tier: ENEMY_TIER_BASE_S for the first, 15 %
+ * longer for each after, with a small jitter (±15 %) so the clock is steady and
+ * the swings in the war come from the rules rather than from luck. While they
+ * are behind when a tier lands they push twice as hard on the next: one tier
+ * behind halves the wait. Their clock never restarts because of us (until
+ * war-playtest-3 a lead of ours sent them "back to the drawing board", which
+ * made the lead permanent once research had to wait 90 s between tiers).
  * @param {number} now - seconds
  * @param {function} rand
  * @param {number} [tierReached=0] - the tier they just reached
@@ -153,7 +237,7 @@ export const ENEMY_PUSH_PER_TIER = 1;
  */
 export function nextEnemyTierAt(now, rand, tierReached = 0, behindBy = 0) {
     const push = 1 + ENEMY_PUSH_PER_TIER * Math.max(0, behindBy);
-    return now + 95 * Math.pow(1.15, tierReached) * (0.85 + rand() * 0.3) / push;
+    return now + ENEMY_TIER_BASE_S * Math.pow(1.15, tierReached) * (0.85 + rand() * 0.3) / push;
 }
 
 /**
@@ -237,9 +321,51 @@ export function resolveStrike({ force, power, enemyDefence, enemyPower, tileHp }
  */
 export const relativePower = (tier, against) => TIERS[tier].power / TIERS[against].power;
 
-/** A landing: `size` enemy units at their tier against our defence and a plate. */
-export function resolveLanding({ size, enemyTier, ourTier, defence, hp }) {
-    return resolveHit({ power: size * relativePower(enemyTier, ourTier), defence, defencePower: 1, hp });
+/**
+ * AIR DEFENCE, the second climb (war-playtest-3). From tier V their shells and
+ * missiles fly over the guards: ranged and area waves ignore ground defence
+ * and only air defence absorbs them, by the same rule (MAX_ABSORB). Ground
+ * landings still meet the guards, and their air waves kill some guards where
+ * they land. An air unit costs twice a ground unit.
+ */
+export const AIR_UNIT_COST = 20;
+/** Guards killed by an air wave: this share of the power that got through (in units). */
+export const AIR_GROUND_KILL = 0.1;
+/** From their tier V on, one wave in GROUND_EVERY is still a landing party (with their weapons); the rest come through the air. */
+export const GROUND_EVERY = 3;
+/**
+ * How a wave comes: 'melee' (a landing party that walks), or the tier's own
+ * mode through the air ('ranged', 'area'). Below tier V everything walks.
+ * @param {number} enemyTier
+ * @param {number} waveCount - the wave's number (1..)
+ */
+export function waveMode(enemyTier, waveCount) {
+    const mode = TIERS[enemyTier].mode;
+    if (mode === 'melee') return 'melee';
+    return waveCount % GROUND_EVERY === 0 ? 'melee' : mode;
+}
+export const isAirMode = (mode) => mode === 'ranged' || mode === 'area';
+
+/**
+ * A landing: `size` enemy units at their tier against our defence and a plate.
+ * A ground wave (`mode` melee) meets the guards (`defence`); an air wave meets
+ * only `airDefence` and kills guards where it lands.
+ * @returns {{ razed, hpLeft, defenceLost, airLost, absorbed }}
+ */
+export function resolveLanding({ size, enemyTier, ourTier, defence, airDefence = 0, hp, mode = 'melee' }) {
+    const power = size * relativePower(enemyTier, ourTier);
+    if (!isAirMode(mode)) return { ...resolveHit({ power, defence, defencePower: 1, hp }), airLost: 0 };
+    const r = resolveHit({ power, defence: airDefence, defencePower: 1, hp });
+    const through = power - r.absorbed;
+    const groundLost = Math.min(defence, Math.ceil(through * AIR_GROUND_KILL));
+    return { razed: r.razed, hpLeft: r.hpLeft, absorbed: r.absorbed, airLost: r.defenceLost, defenceLost: groundLost };
+}
+/** Share (0-1) of a wave that the relevant defence stops: what the visuals script as falling. */
+export function landingLosses({ size, enemyTier, ourTier, defence, airDefence = 0, mode = 'melee' }) {
+    const power = size * relativePower(enemyTier, ourTier);
+    if (!(power > 0)) return 0;
+    const d = isAirMode(mode) ? airDefence : defence;
+    return Math.min(1, Math.min(power * MAX_ABSORB, d) / power);
 }
 
 /** Our strike: `force` units at our tier against their defence and a tile. */
@@ -271,7 +397,8 @@ export const RESEARCH_CATCHUP = 1.9;
 export function tierScienceCost(k, sciencePotential0, behindBy = 0) {
     const base = Math.max(500, sciencePotential0) * 70;
     const pressure = Math.pow(RESEARCH_CATCHUP, Math.max(-1, Math.min(2, behindBy)));
-    return Math.round(base * Math.pow(1.26, k - 1) * pressure);
+    const first = k === 1 ? FIRST_TIER_PREMIUM : 1;
+    return Math.round(base * Math.pow(1.26, k - 1) * pressure * first);
 }
 
 /**
@@ -285,25 +412,48 @@ export function enemyCatchUp(ourTier, enemyTier) {
 }
 
 /**
- * Auto quartermaster: how to spend `arms` this second. Keeps defence at least
- * equal to force, then alternates. Returns { defence, force } units to buy.
- * @param {number} arms
+ * The stance ratio, defence : force. Shield holds three at home for every one
+ * sent, the scale keeps them level, the sword sends three for every one kept.
+ */
+export const STANCE_RATIO = { defend: [3, 1], balanced: [1, 1], attack: [1, 3] };
+/**
+ * Auto quartermaster: how to spend `arms` this second. Buys whichever side is
+ * furthest under the stance ratio (defence : force), one unit at a time. Once
+ * their weapons fly (`air.on`), the home side is split between guards and air
+ * defence (AIR_PER_GROUND air units per guard) and air units count as defence.
+ * Returns { defence, force, air } units to buy. It never strikes: releasing the
+ * force is always the player's call (or the auto-strike toggle).
+ * @param {number} arms - what it may spend (see quartermasterBudget)
  * @param {number} defence
  * @param {number} force
  * @param {number} unitCost
+ * @param {string} [stance='balanced']
  */
-export function autoBuy(arms, defence, force, unitCost, stance = 'balanced') {
-    let d = 0, f = 0, left = arms;
-    while (left >= unitCost) {
-        if (stance === 'defend') d++;
-        else if (stance === 'attack') f++;
-        else if (defence + d <= force + f) d++; else f++;
-        left -= unitCost;
+export function autoBuy(arms, defence, force, unitCost, stance = 'balanced', air = null) {
+    const [wd, wf] = STANCE_RATIO[stance] || STANCE_RATIO.balanced;
+    let d = 0, f = 0, a = 0, left = arms;
+    const airOn = !!air?.on;
+    const airUnits = () => (airOn ? (air.units || 0) + a : 0);
+    for (;;) {
+        const home = defence + d + airUnits();
+        const wantHome = home / wd <= (force + f) / wf;
+        if (wantHome && airOn && airUnits() < (defence + d) * AIR_PER_GROUND) {
+            if (left < AIR_UNIT_COST) break;
+            a++; left -= AIR_UNIT_COST;
+        } else if (wantHome) {
+            if (left < unitCost) break;
+            d++; left -= unitCost;
+        } else {
+            if (left < unitCost) break;
+            f++; left -= unitCost;
+        }
     }
-    return { defence: d, force: f };
+    return { defence: d, force: f, air: a };
 }
-/** The quartermaster's three stances, cycled with one button. */
-export const STANCES = ['defend', 'balanced', 'attack'];
+/** Once their weapons fly, the quartermaster keeps this many air units per guard (two waves in three come through the air). */
+export const AIR_PER_GROUND = 2;
+/** The quartermaster's stances, cycled with one button; 'off' hands the yard back to you. */
+export const STANCES = ['balanced', 'defend', 'attack', 'off'];
 
 /** Base HP for a plate of `type` plus fortification. */
 export function plateMaxHp(type, fort = 0) {
