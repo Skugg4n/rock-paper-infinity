@@ -3,6 +3,7 @@ import {
     TIERS, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, rng,
     enemyCatchUp, autoBuy, tierScienceCost, DOOMSDAY_SCALE, relativePower, resolveLanding, resolveOurStrike, canRazeTile, ENEMY_TILE_HP,
     waveStandingK, defenceStandingK, ENEMY_DEFENCE_REGROW, enemyDefenceCap, RESEARCH_CATCHUP,
+    FIRST_TIER_PREMIUM, quartermasterBudget, QM_KEEP_S, STANCES, revealNext, isShown, REVEAL_GAP_S, TIER_REVEAL_S, hpYield,
 } from './war.js';
 
 describe('war rules', () => {
@@ -33,8 +34,8 @@ describe('war rules', () => {
         const rand = rng(1);
         for (let i = 0; i < 20; i++) {
             const t = nextEnemyTierAt(1000, rand, 0);
-            expect(t).toBeGreaterThanOrEqual(1000 + 80);
-            expect(t).toBeLessThanOrEqual(1000 + 110);
+            expect(t).toBeGreaterThanOrEqual(1000 + 74);
+            expect(t).toBeLessThanOrEqual(1000 + 102);
             expect(nextEnemyTierAt(0, () => 0.5, 4)).toBeGreaterThan(nextEnemyTierAt(0, () => 0.5, 0));
         }
     });
@@ -113,14 +114,45 @@ describe('war rules', () => {
         expect(autoBuy(55, 0, 0, 10)).toEqual({ defence: 3, force: 2 });
         expect(autoBuy(9, 0, 0, 10)).toEqual({ defence: 0, force: 0 });
         expect(autoBuy(30, 0, 10, 10)).toEqual({ defence: 3, force: 0 });
-        expect(autoBuy(30, 0, 0, 10, 'defend')).toEqual({ defence: 3, force: 0 });
-        expect(autoBuy(30, 0, 0, 10, 'attack')).toEqual({ defence: 0, force: 3 });
+        // the stances are ratios, not either-or: shield 3 : 1, sword 1 : 3
+        expect(autoBuy(40, 0, 0, 10, 'defend')).toEqual({ defence: 3, force: 1 });
+        expect(autoBuy(40, 0, 0, 10, 'attack')).toEqual({ defence: 1, force: 3 });
+        expect(autoBuy(80, 30, 0, 10, 'defend')).toEqual({ defence: 0, force: 8 });
+    });
+
+    test('the quartermaster leaves a reserve in the yard and never strikes', () => {
+        expect(quartermasterBudget(100, 2)).toBe(100 - QM_KEEP_S * 2);
+        expect(quartermasterBudget(10, 2)).toBe(0);
+        expect(STANCES).toContain('off');
+    });
+
+    test('controls open one at a time, in order, and never close', () => {
+        const w = { t: 0, force: 0, landings: 0, tier: 0 };
+        expect(revealNext(w)).toBeNull();                 // only the basics at the start
+        w.force = 3; w.landings = 2;
+        expect(revealNext(w)).toBe('strike');
+        expect(revealNext(w)).toBeNull();                 // the next waits its turn
+        w.t = REVEAL_GAP_S; expect(revealNext(w)).toBe('fort');
+        w.t += REVEAL_GAP_S; expect(revealNext(w)).toBe('radar');
+        w.force = 0; w.t += REVEAL_GAP_S;
+        expect(isShown(w, 'strike')).toBe(true);         // sticky
+        // the tier button waits for both the clock and four landings
+        w.landings = 4; w.t = TIER_REVEAL_S - 1; expect(revealNext(w)).toBeNull();
+        w.t = TIER_REVEAL_S; expect(revealNext(w)).toBe('tier');
+    });
+
+    test('a damaged plate yields its share of HP', () => {
+        expect(hpYield(5, 10)).toBe(0.5);
+        expect(hpYield(undefined, 10)).toBe(1);
+        expect(hpYield(-3, 10)).toBe(0);
+        expect(hpYield(20, 10)).toBe(1);
     });
 
     test('tier cost ignores the current slider and grows per tier', () => {
-        expect(tierScienceCost(1, 1000)).toBe(70000);
-        expect(tierScienceCost(2, 1000)).toBeGreaterThan(tierScienceCost(1, 1000));
-        expect(tierScienceCost(1, 0)).toBe(35000);
+        expect(tierScienceCost(1, 1000)).toBe(70000 * FIRST_TIER_PREMIUM);   // the first rung is the lesson
+        expect(tierScienceCost(3, 1000)).toBeGreaterThan(tierScienceCost(2, 1000));
+        expect(tierScienceCost(2, 1000)).toBe(Math.round(70000 * 1.26));
+        expect(tierScienceCost(1, 0)).toBe(35000 * FIRST_TIER_PREMIUM);
     });
 
     test('research under fire is dear, a lead is cheap to keep', () => {

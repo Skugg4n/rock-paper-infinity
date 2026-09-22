@@ -58,23 +58,135 @@ export function streetPath(src, dst, gap) {
 }
 
 /**
- * A route between the islands: from a tile, straight across the water to the
- * street left of the target's column just below the whole grid, up that street
- * to the street under the target's row, then in. Never through a plate.
+ * The coast road round our island: a rectangle just outside the plates'
+ * bounding box, in the water's edge. Guards stand on it; landings arrive on it.
+ * @param {{x,y,w,h}} grid - bounding box of all plates
+ * @param {number} gap
+ */
+export function coastRing(grid, gap) {
+    const off = Math.max(2, gap) * 0.9;
+    return { x: grid.x - off, y: grid.y - off, w: grid.w + 2 * off, h: grid.h + 2 * off };
+}
+/** Perimeter of the ring. Ring coordinate s runs clockwise from the top-left corner. */
+export const ringLength = (R) => 2 * (R.w + R.h);
+/** The point at ring coordinate s. */
+export function ringPoint(R, s) {
+    const P = ringLength(R);
+    let u = ((s % P) + P) % P;
+    if (u < R.w) return { x: R.x + u, y: R.y };
+    u -= R.w; if (u < R.h) return { x: R.x + R.w, y: R.y + u };
+    u -= R.h; if (u < R.w) return { x: R.x + R.w - u, y: R.y + R.h };
+    u -= R.w; return { x: R.x, y: R.y + R.h - u };
+}
+/** Ring coordinate of the ring point nearest to p. */
+export function ringCoord(R, p) {
+    const cx = Math.max(R.x, Math.min(R.x + R.w, p.x)), cy = Math.max(R.y, Math.min(R.y + R.h, p.y));
+    const d = { n: Math.abs(p.y - R.y), e: Math.abs(p.x - (R.x + R.w)), s: Math.abs(p.y - (R.y + R.h)), w: Math.abs(p.x - R.x) };
+    const edge = Object.keys(d).reduce((a, b) => (d[b] < d[a] ? b : a), 'n');
+    if (edge === 'n') return cx - R.x;
+    if (edge === 'e') return R.w + (cy - R.y);
+    if (edge === 's') return R.w + R.h + (R.x + R.w - cx);
+    return 2 * R.w + R.h + (R.y + R.h - cy);
+}
+/** Signed shortest distance along the ring from s0 to s1. */
+export function ringDelta(R, s0, s1) {
+    const P = ringLength(R);
+    let d = ((s1 - s0) % P + P) % P;
+    if (d > P / 2) d -= P;
+    return d;
+}
+/** The walk along the ring from s0 to s1 the short way: corners included, so every leg is straight. */
+export function ringWalk(R, s0, s1) {
+    const d = ringDelta(R, s0, s1);
+    const corners = [0, R.w, R.w + R.h, 2 * R.w + R.h];
+    const P = ringLength(R);
+    const pts = [ringPoint(R, s0)];
+    const passed = [];
+    for (const c of corners) {
+        for (const k of [-1, 0, 1]) {
+            const cc = c + k * P;
+            const rel = cc - s0;
+            if ((d > 0 && rel > 0 && rel < d) || (d < 0 && rel < 0 && rel > d)) passed.push(rel);
+        }
+    }
+    passed.sort((a, b) => (d > 0 ? a - b : b - a)).forEach(rel => pts.push(ringPoint(R, s0 + rel)));
+    pts.push(ringPoint(R, s1));
+    return pts;
+}
+/**
+ * Which coast a landing on `dst` arrives at: the nearest edge of the island,
+ * the side facing the enemy winning ties and counted one plate closer.
+ * @returns {'n'|'e'|'s'|'w'}
+ */
+export function nearestEdge(dst, grid, facing = 's') {
+    const unit = dst.h || 1;
+    const d = {
+        s: grid.y + grid.h - (dst.y + dst.h), n: dst.y - grid.y,
+        e: grid.x + grid.w - (dst.x + dst.w), w: dst.x - grid.x,
+    };
+    d[facing] -= unit;
+    const order = [facing, ...['e', 'w', 's', 'n'].filter(e => e !== facing)];
+    return order.reduce((a, b) => (d[b] < d[a] - 0.5 ? b : a), order[0]);
+}
+/**
+ * The last stretch: where on the coast a party lands for `dst`, and the
+ * streets from there to the plate (never through another plate).
+ */
+function landingRoute(dst, gap, R, edge) {
+    const g = Math.max(2, gap);
+    const b = { x: dst.x + dst.w / 2, y: dst.y + dst.h / 2 };
+    const vx = dst.x - g / 2;                 // the street left of its column
+    const below = dst.y + dst.h + g / 2;      // the street under its row
+    const above = dst.y - g / 2;              // the street over its row
+    if (edge === 'n') return [{ x: vx, y: R.y }, { x: vx, y: above }, { x: b.x, y: above }, b];
+    if (edge === 'e') return [{ x: R.x + R.w, y: below }, { x: b.x, y: below }, b];
+    if (edge === 'w') return [{ x: R.x, y: below }, { x: b.x, y: below }, b];
+    return [{ x: vx, y: R.y + R.h }, { x: vx, y: below }, { x: b.x, y: below }, b];
+}
+/**
+ * A route between the islands, every leg straight: from a tile along their
+ * coast to the crossing point, straight across the water to our coast, along
+ * our coast to the landing point nearest the target, then up the streets and
+ * in. Never through a plate, never a diagonal. The enemy island lies south.
+ *
+ * The returned array carries markers (indices into it): `theirCoast` (first
+ * point on their coast road), `crossFrom` (leaving their coast), `ourCoast`
+ * (reaching ours), `land` (the landing point) and `edge` (n/e/s/w). Reverse
+ * it with `reversePath` to walk it the other way with the markers kept.
  *
  * @param {{x,y,w,h}} from - tile on the other island
  * @param {{x,y,w,h}} dst - target plate
  * @param {number} gap
  * @param {{x,y,w,h}} grid - bounding box of all plates
+ * @param {{x,y,w,h}} [theirs] - bounding box of their tiles (defaults to `from`)
  */
-export function crossPath(from, dst, gap, grid) {
+export function crossPath(from, dst, gap, grid, theirs = from) {
     const g = Math.max(2, gap);
+    const R = coastRing(grid, g);
     const a = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
-    const b = { x: dst.x + dst.w / 2, y: dst.y + dst.h / 2 };
-    const vx = dst.x - g / 2;
-    const yBottom = grid.y + grid.h + g / 2;
-    const yRow = dst.y + dst.h + g / 2;
-    return [a, { x: vx, y: yBottom }, { x: vx, y: yRow }, { x: b.x, y: yRow }, b];
+    const edge = nearestEdge(dst, grid, 's');
+    const inland = landingRoute(dst, g, R, edge);
+    const L = inland[0];
+    // the crossing: straight below the landing point if we can, else below the ring corner we walk round
+    let X = L.x;
+    if (edge === 'e') X = R.x + R.w;
+    else if (edge === 'w') X = R.x;
+    else if (edge === 'n') X = L.x > R.x + R.w / 2 ? R.x + R.w : R.x;
+    const Xc = Math.max(theirs.x - g, Math.min(theirs.x + theirs.w + g, X));
+    const Ty = theirs.y - g * 0.8;           // their coast road, on the side facing us
+    const C2 = { x: Math.max(R.x, Math.min(R.x + R.w, Xc)), y: R.y + R.h };
+    const walk = ringWalk(R, ringCoord(R, C2), ringCoord(R, L)).slice(1, -1);
+    const path = [a, { x: a.x, y: Ty }, { x: Xc, y: Ty }, C2, ...walk, ...inland];
+    path.theirCoast = 1; path.crossFrom = 2; path.ourCoast = 3; path.land = 4 + walk.length; path.edge = edge;
+    return path;
+}
+/** Reverses a crossPath, keeping its markers pointing at the same places. */
+export function reversePath(path) {
+    const r = [...path].reverse();
+    const n = path.length - 1;
+    for (const k of ['theirCoast', 'crossFrom', 'ourCoast', 'land']) if (path[k] !== undefined) r[k] = n - path[k];
+    r.edge = path.edge;
+    return r;
 }
 
 /**
@@ -94,7 +206,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0 };
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, guardsOff: false, hitEdges: [] };
     let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
     const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
@@ -170,7 +282,12 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const x2 = Math.max(...rects.map(r => r.rect.x + r.rect.w)), y2 = Math.max(...rects.map(r => r.rect.y + r.rect.h));
         return { x: Math.min(...xs), y: Math.min(...ys), w: x2 - Math.min(...xs), h: y2 - Math.min(...ys) };
     };
-    const reverse = (path) => [...path].reverse();
+    const theirBox = () => {
+        if (!enemyRects.length) return null;
+        const x = Math.min(...enemyRects.map(r => r.x)), y = Math.min(...enemyRects.map(r => r.y));
+        return { x, y, w: Math.max(...enemyRects.map(r => r.x + r.w)) - x, h: Math.max(...enemyRects.map(r => r.y + r.h)) - y };
+    };
+    const cross = (from, dst) => crossPath(from, dst, getGap(), gridBox(), theirBox() || from);
     const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0 && !r.building.razed);
     const works = () => rects.filter(r => WORK.has(r.building.type) && !r.building.razed);
 
@@ -240,7 +357,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     /** Advances the simulation by dt seconds and draws. */
     function step(dt, now = performance.now()) {
         clock += dt;
-        if (now - lastMeasure > 1000) { measure(); reconcile(); lastMeasure = now; }
+        if (now - lastMeasure > 1000) { measure(); reconcile(); reconcileGuards(); lastMeasure = now; }
         for (const a of ants) stepDot(a, dt, speedOf(a.kind), (d) => {
             if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetPath(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
             if (!newTrip(d)) d.wait = 1;
@@ -297,7 +414,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             if (e.homeBound) { e.homeBound = false; e.razing = false; e.settled = true; e.at = pick(enemyRects); e.path = null; e.wait = 0.5; return; }
             const from = e.at?.rect ?? e.at ?? attack.target.rect;
             const home = pick(enemyRects);
-            e.path = reverse(crossPath(home, from, getGap(), gridBox()));
+            e.path = reversePath(cross(home, from));
             e.seg = 0; e.t = 0; e.at = home; e.homeBound = true; e.razing = false; e.wait = 0.2 + Math.random();
             return;
         }
@@ -319,7 +436,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         }
         // route from wherever the enemy is (its island tile) across the water to the target
         const from = e.at?.rect ?? e.at ?? pick(enemyRects);
-        e.path = crossPath(from, attack.target.rect, getGap(), gridBox());
+        e.path = cross(from, attack.target.rect);
         e.seg = 0; e.t = 0; e.at = attack.target; e.wait = 0.2 + Math.random() * 1.5;
     }
 
@@ -347,6 +464,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const rect = layoutRect(tileEl, area);
         withdrawing = { rect, onDone };
         enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.5; e.razing = false; e.homeBound = false; });
+        dismissGuards(null);      // the war is over for them: our guards stand down and walk home
         if (!enemies.length) { withdrawing = null; onDone?.(); }
     }
     /** Everyone walks into one plate (the hatch down). onDone when all are in. */
@@ -355,7 +473,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const rect = { rect: layoutRect(slotEl, area), building: { id: 'hatch' } };
         gather = { rect, onDone };
         ants.forEach(a => { a.path = null; a.wait = Math.random() * 1.2; });
-        if (!ants.length) { gather = null; onDone?.(); }
+        dismissGuards(rect);      // the guards leave the coast and go down with everyone
+        if (!ants.length && !guards.length) { gather = null; peopleGone = true; onDone?.(); }
     }
 
     /**
@@ -363,10 +482,22 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
      * and hit the plate; ranged/area: one arc through the air per few units.
      * `onImpact()` fires once, when the first dots land or the arc lands.
      */
-    /** Marks `losses` (0–1) of the dots to fall on the last stretch of the way: what the defence absorbs, made visible. */
-    function scriptLosses(dots, losses) {
+    /**
+     * Marks `losses` (0-1) of the dots to fall: what the other side's defence
+     * absorbs, made visible. They fall on the defenders' ground, never at sea:
+     * a landing party falls where our guards meet it (from `from`, the point it
+     * reaches our coast, to shortly after the landing point), a strike of ours
+     * falls on their island (after it reaches their coast). `fallSeg` is a
+     * position along the path in segments (seg + t).
+     */
+    function scriptLosses(dots, losses, from, to) {
         const fall = Math.round(dots.length * Math.max(0, Math.min(1, losses || 0)));
-        dots.forEach((d, i) => { if (i < fall) d.fallAt = 0.55 + Math.random() * 0.4; });
+        dots.forEach((d, i) => {
+            if (i >= fall || !d.path) return;
+            const last = d.path.length - 1 - 0.15;
+            const lo = Math.min(from, last), hi = Math.max(lo, Math.min(to, last));
+            d.fallSeg = lo + Math.random() * (hi - lo);
+        });
     }
     function launchWave({ targetBuildingId, count, mode, losses = 0, onImpact }) {
         measure();
@@ -375,13 +506,18 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const from = enemyRects.length ? pick(enemyRects) : { x: canvas.width / dpr / 2, y: canvas.height / dpr, w: 0, h: 0 };
         if (mode === 'melee') {
             const dots = [];
+            let route = null;
             for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
-                const d = { kind: 'enemy', at: target, from: { rect: from }, path: crossPath(from, target.rect, getGap(), gridBox()), seg: 0, t: 0, wait: Math.random() * 1.5, wave: true };
-                dots.push(d);
+                route = cross(from, target.rect);
+                dots.push({ kind: 'enemy', at: target, from: { rect: from }, path: route, seg: 0, t: 0, wait: Math.random() * 1.5, wave: true });
             }
-            scriptLosses(dots, losses);
-            waves.push({ dots, target, onImpact, done: false, kind: 'enemy' });
+            // our guards meet them on the coast; the fallen fall there, on our island
+            scriptLosses(dots, losses, Math.max(route.ourCoast, route.land - 0.3), route.land + 0.9);
+            const responders = respond(route[route.land]);
+            if (route.edge && route.edge !== 's' && !state.hitEdges.includes(route.edge)) state.hitEdges = [...state.hitEdges, route.edge];
+            waves.push({ dots, target, onImpact, done: false, kind: 'enemy', responders });
             combat = true;
+            return route.edge;
         } else {
             const shells = mode === 'area' ? 3 : 1;
             for (let i = 0; i < shells; i++) {
@@ -396,13 +532,20 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         measure();
         const tile = enemyRects[tileIndex] ?? enemyRects[0];
         if (!tile) { onImpact?.(); return; }
-        const coast = rects.filter(r => !r.building.razed).sort((a, b) => b.rect.y - a.rect.y)[0]?.rect ?? { x: 0, y: 0, w: 0, h: 0 };
+        // they set out from the standing plate on our south coast closest to the tile
+        const standing = rects.filter(r => !r.building.razed);
+        const lowest = Math.max(...standing.map(r => r.rect.y), -Infinity);
+        const tc = c(tile);
+        const coast = standing.filter(r => Math.abs(r.rect.y - lowest) < 1).sort((a, b) => Math.abs(c(a.rect).x - tc.x) - Math.abs(c(b.rect).x - tc.x))[0]?.rect ?? { x: 0, y: 0, w: 0, h: 0 };
         if (mode === 'melee') {
             const dots = [];
+            let route = null;
             for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
-                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: reverse(crossPath(tile, coast, getGap(), gridBox())), seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true });
+                route = reversePath(cross(tile, coast));
+                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: route, seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true, fightFrom: route.crossFrom });
             }
-            scriptLosses(dots, losses);
+            // their defence meets them on their island, never out at sea
+            scriptLosses(dots, losses, route.crossFrom, route.length - 1);
             waves.push({ dots, target: { rect: tile }, onImpact, done: false, kind: 'ours' });
         } else {
             const shells = mode === 'area' ? 3 : 1;
@@ -424,14 +567,21 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             for (const d of w.dots) {
                 if (d.dead) { if (!d.killed) arrived++; continue; }   // the fallen never arrive
                 stepDot(d, dt, d.strike ? SPEED.enemy * 2.2 : SPEED.enemy * 2, (x) => { x.dead = true; x.wait = 0; });
-                if (d.dead) { flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); continue; }
+                // arrived this frame: count it now, or a lone survivor's wave is cleared before it lands
+                if (d.dead) { arrived++; flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); continue; }
                 // scripted losses: this one falls here, to the other side's fire
-                if (d.fallAt !== undefined && d.path && (d.seg + d.t) / Math.max(1, d.path.length - 1) >= d.fallAt) {
+                if (d.fallSeg !== undefined && d.path && d.seg + d.t >= d.fallSeg) {
                     const p = pos(d); d.killed = true; d.dead = true;
-                    if (p) { flash(p, 9, d.strike ? COLORS.enemy : COLORS.person); effects.push({ type: 'tracer', from: jitter(p, 30), to: p, t: 0, dur: 0.15, color: d.strike ? COLORS.enemy : COLORS.person }); }
+                    if (p) {
+                        // the shot comes from the nearest guard when it is ours that fires
+                        const shooter = d.strike ? null : nearestGuard(p, 160);
+                        flash(p, 9, d.strike ? COLORS.enemy : COLORS.person);
+                        effects.push({ type: 'tracer', from: shooter || jitter(p, 30), to: p, t: 0, dur: 0.15, color: d.strike ? COLORS.enemy : COLORS.person });
+                    }
                 }
             }
             const alive = w.dots.filter(d => !d.killed).length;
+            if (w.responders && w.dots.every(d => d.dead)) { w.responders.forEach(g => { g.resp = null; }); w.responders = null; }
             if (!w.done && alive === 0) { w.done = true; w.onImpact?.(0); }
             if (!w.done && arrived >= Math.ceil(alive / 2)) { w.done = true; w.onImpact?.(alive / w.dots.length); flash(c(w.target.rect), 30, w.kind === 'ours' ? COLORS.person : COLORS.enemy); }
         }
@@ -462,7 +612,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             }
         };
         // our landing party on their island: their dots fight ours
-        const ourDots = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.seg >= 1));
+        const ourDots = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.seg >= (d.fightFrom ?? 1)));
         if (ourDots.length) {
             for (const e of enemies) {
                 const p = pos(e); if (!p) continue;
@@ -470,32 +620,127 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             }
         }
         // their wave on our island: the guards at the coast fight it (our people are civilians)
+        stepGuards(dt);
         if (combat) {
             const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead));
-            const guards = guardPositions();
-            for (const g of guards) for (const d of hostiles) fight(g, d, state.ourTier, COLORS.person, false);
+            const posts = guardPositions();
+            for (const g of posts) for (const d of hostiles) fight(g, d, Math.max(2, state.ourTier), COLORS.person, false);
             // and they fire back at the guards
             for (const d of hostiles) {
                 const p = pos(d); if (!p) continue;
-                for (const g of guards) { if (Math.random() < 0.3) fight(p, { at: { x: g.x - 1, y: g.y - 1, w: 2, h: 2 } }, state.enemyTier, COLORS.enemy, false); }
+                for (const g of posts) { if (Math.random() < 0.3) fight(p, { at: { x: g.x - 1, y: g.y - 1, w: 2, h: 2 } }, state.enemyTier, COLORS.enemy, false); }
             }
         }
-        // withdraw: everyone home to the rocket; gather: everyone into the hatch
+        // withdraw: everyone home to the rocket; gather: everyone (guards too) into the hatch
         if (withdrawing && enemies.every(e => e.at === withdrawing.rect && !e.path)) { const cb = withdrawing.onDone; withdrawing = null; enemiesGone = true; enemies.length = 0; cb?.(); }
-        if (gather && ants.every(a => a.at === gather.rect && !a.path)) { const cb = gather.onDone; gather = null; peopleGone = true; ants.length = 0; cb?.(); }
+        if (gather && !guards.length && ants.every(a => a.at === gather.rect && !a.path)) { const cb = gather.onDone; gather = null; peopleGone = true; ants.length = 0; cb?.(); }
     }
 
-    /** Our defence, made visible: one guard per five units along the south coast, facing the water. */
+    // --- Guards: our defence, made visible ---------------------------------
+    // One guard per five defence units, standing on the coast road. Most face
+    // the enemy island (south); once a landing has come ashore on another
+    // coast, a share of them holds that coast too. When a landing party comes,
+    // the nearest walk along the coast to where it lands and fire. They stand
+    // down when the enemy leaves and go down the hatch with everyone else.
+    const guards = [];        // { s, resp: {s}|null, leaving: {path,seg,t}|null, id }
+    let guardSeq = 0;
+    let guardsGone = false;
+    const GUARD_SPEED = 55;   // px/s along the coast
+    const ring = () => coastRing(gridBox(), getGap());
+    /** Home positions (ring coordinates) for n guards, spread over the coasts that have seen a landing. */
+    function guardHomes(n, R) {
+        if (!n) return [];
+        const others = (state.hitEdges || []).filter(e => e !== 's');
+        const edges = ['s', ...others];
+        const share = edges.map(e => (e === 's' ? (others.length ? 0.5 : 1) : 0.5 / others.length));
+        const span = { n: [0, R.w], e: [R.w, R.w + R.h], s: [R.w + R.h, 2 * R.w + R.h], w: [2 * R.w + R.h, 2 * (R.w + R.h)] };
+        const homes = [];
+        let left = n;
+        edges.forEach((e, k) => {
+            const m = k === edges.length - 1 ? left : Math.min(left, Math.round(n * share[k]));
+            left -= m;
+            const [a, b] = span[e], pad = (b - a) * 0.08;
+            for (let i = 0; i < m; i++) homes.push(a + pad + (b - a - 2 * pad) * (m === 1 ? 0.5 : i / (m - 1)));
+        });
+        return homes.sort((x, y) => x - y);
+    }
+    function reconcileGuards() {
+        if (!rects.length) return;
+        if (state.guardsOff && !guardsGone && guards.some(g => !g.leaving)) dismissGuards(null);
+        const want = guardsGone || state.guardsOff ? 0 : Math.min(40, Math.round((state.defence || 0) / 5));
+        const R = ring();
+        const posted = guards.filter(g => !g.leaving);
+        const homeS = R.w + R.h + R.w / 2;             // new guards step out onto the south coast
+        while (posted.length < want) { const g = { s: homeS + (Math.random() - 0.5) * 20, resp: null, leaving: null, id: guardSeq++ }; guards.push(g); posted.push(g); }
+        while (posted.length > want) { const g = posted.pop(); guards.splice(guards.indexOf(g), 1); }
+        // hand out the homes in ring order so nobody crosses anybody
+        const homes = guardHomes(posted.length, R);
+        const P = ringLength(R);
+        posted.sort((a, b) => ((a.s % P) + P) % P - ((b.s % P) + P) % P).forEach((g, i) => { g.home = homes[i]; });
+    }
+    function stepGuards(dt) {
+        if (!rects.length) return;
+        const R = ring();
+        for (let i = guards.length - 1; i >= 0; i--) {
+            const g = guards[i];
+            if (g.leaving) {
+                stepDot(g.leaving, dt, GUARD_SPEED * 0.8, () => {});
+                if (!g.leaving.path) guards.splice(i, 1);
+                continue;
+            }
+            const target = g.resp ? g.resp.s : (g.home ?? g.s);
+            const d = ringDelta(R, g.s, target);
+            const step = GUARD_SPEED * (g.resp ? 1.4 : 1) * dt;
+            g.s += Math.abs(d) <= step ? d : Math.sign(d) * step;
+        }
+    }
+    /** Sends the guards nearest to point `p` (on the coast) to meet a landing there. */
+    function respond(p) {
+        const posted = guards.filter(x => !x.leaving);
+        if (!posted.length || !p) return [];
+        const R = ring(), sL = ringCoord(R, p);
+        const k = Math.max(1, Math.ceil(posted.length * 0.6));
+        const chosen = [...posted].sort((a, b) => Math.abs(ringDelta(R, a.s, sL)) - Math.abs(ringDelta(R, b.s, sL))).slice(0, k);
+        chosen.forEach((g, i) => { g.resp = { s: sL + (i - (k - 1) / 2) * 5 }; });
+        return chosen;
+    }
+    /** The guards leave the coast: into the nearest plate, and on to `hatch` if given. */
+    function dismissGuards(hatch) {
+        if (!rects.length) { guards.length = 0; guardsGone = true; return; }
+        const R = ring();
+        for (const g of guards) {
+            if (g.leaving && !hatch) continue;
+            const p = g.leaving ? pos(g.leaving) || ringPoint(R, g.s) : ringPoint(R, g.s);
+            const near = rects.filter(r => !r.building.razed).sort((a, b) => Math.hypot(c(a.rect).x - p.x, c(a.rect).y - p.y) - Math.hypot(c(b.rect).x - p.x, c(b.rect).y - p.y))[0];
+            if (!near) { g.leaving = { path: null }; continue; }
+            // step straight off the coast onto the street beside that plate, then in
+            const edgeX = Math.max(near.rect.x - 1, Math.min(near.rect.x + near.rect.w + 1, p.x));
+            const edgeY = Math.max(near.rect.y - 1, Math.min(near.rect.y + near.rect.h + 1, p.y));
+            let path = [p, { x: edgeX, y: edgeY }, c(near.rect)];
+            if (hatch && near.rect !== hatch.rect) path = [p, { x: edgeX, y: edgeY }, ...streetPath(near.rect, hatch.rect, getGap())];
+            g.leaving = { path, seg: 0, t: 0, wait: Math.random() * 0.8 };
+            g.resp = null;
+        }
+        guardsGone = true;
+    }
+    /** Where each guard is right now (for drawing and for the fighting). */
     function guardPositions() {
-        const n = Math.min(40, Math.round((state.defence || 0) / 5));
-        if (!n || !rects.length) return [];
-        const box = gridBox(), gap = getGap();
-        const y = box.y + box.h + gap * 0.9, margin = box.w * 0.06;
-        return Array.from({ length: n }, (_, i) => ({ x: box.x + margin + (box.w - 2 * margin) * (n === 1 ? 0.5 : i / (n - 1)), y: y + Math.sin(clock * 2.2 + i * 1.3) * 0.7, i }));
+        if (!rects.length) return [];
+        const R = ring();
+        return guards.map((g, i) => {
+            if (g.leaving) { const p = g.leaving.path ? pos(g.leaving) : null; return p ? { ...p, i, leaving: true, fade: g.leaving.seg >= (g.leaving.path?.length || 2) - 2 ? 1 - g.leaving.t : 1 } : null; }
+            const p = ringPoint(R, g.s);
+            return { x: p.x, y: p.y + Math.sin(clock * 2.2 + g.id * 1.3) * 0.7, i };
+        }).filter(Boolean);
+    }
+    function nearestGuard(p, maxD) {
+        let best = null, bd = maxD * maxD;
+        for (const g of guardPositions()) { if (g.leaving) continue; const d2 = (g.x - p.x) ** 2 + (g.y - p.y) ** 2; if (d2 < bd) { bd = d2; best = { x: g.x, y: g.y }; } }
+        return best;
     }
     function drawWar() {
         for (const g of guardPositions()) {
-            ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.globalAlpha = 0.95;
+            ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.globalAlpha = 0.95 * (g.fade ?? 1);
             ctx.arc(g.x, g.y, RADIUS.person + 0.3, 0, Math.PI * 2); ctx.fill();
         }
         for (const w of waves) for (const d of w.dots) {
@@ -536,5 +781,5 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, _debug: () => ({ ants: ants.length, enemies: enemies.length, attack: !!attack, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, _debug: () => ({ guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, attack: !!attack, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

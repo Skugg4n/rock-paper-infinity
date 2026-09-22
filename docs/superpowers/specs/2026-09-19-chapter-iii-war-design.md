@@ -271,3 +271,63 @@ to 30 plates lost, 18 to 26 minutes, doomsday at 85 %.
   fewer people, less science, a slower answer, and more plates razed. It reads
   well, the war turns and stays turned, but it means a helper that prevents the
   first loss would flatten the whole chapter.
+
+## Playtest 3 (2026-09-22), war-playtest-3 branch: one thing at a time
+
+Ola and a tester played v1.42.0. What worked: the enemy appearing, building,
+gathering and attacking ("SKITBRA"), kept exactly as it is. What did not:
+everything else arriving at once, guards that stood still, troops dying at sea,
+a ◆ button that often did nothing, a quartermaster that spent your arms and
+struck when you did not want it to, two sliders, and a tier button so early
+that the tester bought four or five tiers before knowing what one did.
+
+### Disclosure (war.js `REVEAL_ORDER`, `revealNext`)
+
+At war start only the arms slider, shield, sword and the war room. Then, at
+most one per `REVEAL_GAP_S` (6 s), each greyed until affordable and never
+closed again: strike (force > 0), ◆ (first landing), radar (second landing),
+intel (radar bought), raiding party (first strike), tier (`TIER_REVEAL_S` 180 s
+AND `TIER_REVEAL_LANDINGS` 4), quartermaster (tier II), auto strike (tier III),
+air defence (their first air wave; commit 2). The sim opens controls with the
+same function, so the sim player cannot research before the button exists.
+
+### Rules that changed
+
+1. `TIER_COOLDOWN_S` 45 to 90 and `FIRST_TIER_PREMIUM` 1.5 on tier II: a
+   banked chapter II science pile can no longer buy the ladder in a minute.
+2. `ENEMY_FIRST_TIER_S` 200: their laboratory opens just after ours can. With
+   the old 75 s they were two tiers up before our button existed, and every
+   seed was a rout (behind 93 to 98 %).
+3. **Their clock no longer restarts when we take the lead** (rule 9 of the
+   previous pass is gone). With a 90 s cooldown the restart made any lead of
+   ours permanent: they caught up in about a minute, stood level until our
+   cooldown ended, and fell behind again (behind 0 %, ahead 40 %, one plate
+   lost). Instead their laboratory is a little faster: `ENEMY_TIER_BASE_S` 95
+   to 88.
+4. The quartermaster buys at a stance ratio (`STANCE_RATIO`: shield 3:1, scale
+   1:1, sword 1:3, or off), keeps `QM_KEEP_S` 15 s of arms production in the
+   yard (`quartermasterBudget`), and never strikes. The sim player now keeps
+   that reserve for repairs, strikes by hand when the button shows ✓, and
+   fortifies unhit plates only from surplus above the reserve.
+5. `hpYield`: a damaged plate's people earn, research and move in at its share
+   of HP; stores sell at that share. The sim weights income and science the
+   same way.
+6. Research is fixed at half during the war (the industry/research slider is
+   hidden), which is what the sim always assumed.
+
+### Sim after commit 1 (auto quartermaster on the scale, seeds 1 to 6)
+
+| seed | length | behind | ahead | lead changes | plates lost | their tiles razed | island silent | doomsday | we reach V | behind after V |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 21m51s | 42 % | 14 % | 2 | 18 | 10 | 0 % | 87 % | 7m31s | 64 % |
+| 2 | 21m31s | 44 % | 16 % | 2 | 19 | 11 | 0 % | 87 % | 7m31s | 67 % |
+| 3 | 20m31s | 43 % | 16 % | 2 | 19 | 9 | 0 % | 87 % | 7m31s | 68 % |
+| 4 | 20m31s | 43 % | 18 % | 2 | 17 | 11 | 0 % | 88 % | 7m31s | 68 % |
+| 5 | 20m31s | 40 % | 19 % | 2 | 18 | 11 | 0 % | 85 % | 7m31s | 63 % |
+| 6 | 20m11s | 42 % | 15 % | 2 | 21 | 10 | 0 % | 87 % | 7m31s | 67 % |
+
+With `--raid` all six stay inside the time and behind windows (behind 42 to
+45 %), plates lost 12 to 17. The shape is the same as before: we lead after the
+first tier, they take the lead in the middle and hold it. The window is narrow:
+`ENEMY_TIER_BASE_S` 92 drops two seeds to behind 25 %, 85 lifts them; the war is
+still bistable around who holds the tier when the ladder gets expensive.
