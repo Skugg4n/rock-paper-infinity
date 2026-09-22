@@ -178,3 +178,96 @@ Humans research slower and will sit behind longer, which is the feel Ola asked
 for ("steget efter"). Open: legibility of cause and effect (Ola: "som att
 någon stampat i ett myrbo"), an info panel top right (Spaceplan), repair as a
 separate cheap action, the hatch visual.
+
+## Tuning pass, war-tuning branch (2026-09-22): the enemy stays dangerous
+
+Ola, after playing v1.38: "the player always wins too easily; when we develop a
+weapon the opponent gets it before or around the same time, but that always
+leaves him a bit worse, and he is usually bombed out so he cannot do anything
+at all." The old sim reported the opposite (behind 27 to 43 % of the time, 21
+to 25 plates lost), so the first job was to make the sim tell the truth.
+
+### The sim now plays the game, not a greedy ideal
+
+`scripts/sim-phase3.mjs` ran a greedy player on a loop the game does not have.
+It is now `warTick` step for step: the standing factor on landings and on their
+defence, the push every fifth wave, the four-second warning, the silent island
+and the regroup, with the **auto quartermaster on the balanced stance** as the
+player, which is what most people run. Defence and force kept level, a strike
+the moment the toughest tile still standing can be razed, research as soon as
+science and the cooldown allow, repair the worst plate, fortify the weakest,
+rebuild ruins. `--raid` gives that player the raiding party as well.
+
+It also draws from **three separate random streams** (their research clock,
+their choice of target, our choice of tile). With one shared stream, any rule
+change shifts the enemy's dice too, and then six seeds measure luck instead of
+the change: that is what made the first attempts at this pass swing between a
+walkover and a rout on a one-character edit. With the streams apart, a seed is
+a fixed opponent and two rule sets can actually be compared.
+
+On the old rules the faithful sim agreed with Ola at once: the auto player lost
+only 12 to 15 plates and left their island silent for up to a fifth of the war.
+
+### The rules that changed, one sentence each
+
+1. **Their defence never thins when their buildings fall**
+   (`DEFENCE_STANDING_FLOOR` 1): a half-razed island still defends itself with
+   everything it has, so razing is salvage and quiet, not disarmament.
+2. **Their shield grows with our weapons** (`enemyDefenceCap` × (1 + 0.8 ×
+   our tier), `ENEMY_DEFENCE_REGROW` × (1 + 0.6 × our tier)): a landing on
+   their island takes a real build-up of force or the raiding party, never a
+   strike every few seconds.
+3. **They rebuild fast** (`ENEMY_REBUILD_S` 90 to 40): a razed tile is back
+   before we have the force for the next one.
+4. **A dug-in enemy is back sooner** (`ENEMY_REGROUP_S` 120 to 90): bombing
+   them flat buys a minute and a half, not a third of the war.
+5. **Landings come no faster than one every 20 s** (`waveInterval` floor 15 to
+   20): there is always room to repair a plate between them.
+6. **Research under fire is slow** (`RESEARCH_CATCHUP` 1.9 per tier they hold
+   over us, counted over two, and its inverse while we lead): every tier they
+   are ahead is a hole to climb out of, and a lead is worth keeping.
+7. **The ladder can be climbed inside one war** (our cost growth 1.3 to 1.26):
+   at 1.3 the top rungs were out of reach and the last third was a one-way
+   slide with nothing left to try.
+8. **Their laboratory is steady** (tier jitter from ±40 % to ±15 %): the swings
+   should come from the rules, not from the dice.
+9. **A weapon they have never seen sends them back to the drawing board**
+   (taking the lead restarts their tier clock), **but while they are behind
+   they push twice as hard** (`ENEMY_PUSH_PER_TIER` 1): our lead is real, and
+   it is temporary.
+
+Everything else was tested and left alone. Growing tile HP per raze, a strike
+cooldown, a regroup that returns one tier above us, a softer landing floor and
+a heavier upkeep all moved the six seeds by nothing worth a rule.
+
+### Sim after the pass (auto quartermaster, seeds 1 to 6)
+
+| seed | length | behind | ahead | lead changes | plates lost | their tiles razed | island silent | doomsday |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 21m15s | 42 % | 23 % | 2 | 21 | 16 | 7 % | 86 % |
+| 2 | 20m37s | 40 % | 24 % | 2 | 23 | 17 | 7 % | 86 % |
+| 3 | 20m13s | 42 % | 23 % | 2 | 24 | 15 | 8 % | 87 % |
+| 4 | 21m53s | 42 % | 22 % | 2 | 24 | 15 | 7 % | 87 % |
+| 5 | 20m02s | 43 % | 24 % | 2 | 20 | 14 | 8 % | 85 % |
+| 6 | 21m13s | 40 % | 22 % | 2 | 24 | 15 | 7 % | 86 % |
+
+Before, on the same faithful sim and the old rules: 18 to 20 minutes, behind 25
+to 51 %, ahead 0 to 10 %, 12 to 23 plates lost, 16 to 23 of their tiles razed,
+island silent 0 to 21 %. Every seed is now inside the window asked for: silent
+under 10 %, behind 40 to 60 %, ahead 10 to 25 %, at least two lead changes, 15
+to 30 plates lost, 18 to 26 minutes, doomsday at 85 %.
+
+### What this pass did not solve
+
+- **Lead changes stay at exactly two.** Every run has the same shape: we lead
+  the first third, they take the lead and hold it. More flip-flopping needs a
+  longer war or a weaker research rule, and a weaker research rule takes
+  "behind 40 to 60 %" with it (reverting `RESEARCH_CATCHUP` alone drops behind
+  to 8 to 16 %). Ola's "ups and downs" are one up and one down, not four.
+- **The raiding party is still the strongest button in the chapter.** With
+  `--raid` five of six seeds move by a point or two, but one (seed 6) falls to
+  behind 20 % and 14 plates lost. Its price curve deserves its own pass.
+- **The war is bistable around the first plate we lose.** A plate razed means
+  fewer people, less science, a slower answer, and more plates razed. It reads
+  well, the war turns and stays turned, but it means a helper that prevents the
+  first loss would flatten the whole chapter.
