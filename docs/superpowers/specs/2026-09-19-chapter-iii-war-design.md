@@ -380,3 +380,12 @@ plates lost 15 to 27.
 - **The right-hand column is long** once every control is open (tier, intel,
   radar, raid, quartermaster, auto strike, strike, sword, air, shield, stall):
   on a 900 px high window it reaches the people counter.
+
+## Playtest 4 (2026-09-22), war-playtest-4 branch: nobody fires at a boat
+
+Ola, v1.44.0: very pleased with the war and its levelling; one bug and two wishes.
+
+- **Fighting happens on land only.** A crossing has one water leg, between the point it leaves their coast (`crossFrom`) and the point it reaches ours (`ourCoast`). `onIsland(path, seg, t)` says whether a dot is past the later of the two, in either direction. Our guards meet a landing only when it is ashore on our island; their dots meet our strike only on theirs; the scripted losses (what the rules say falls) fall only there. Enemies that are themselves crossing or standing on our plates do not shoot.
+- **Reach decides the picture.** Fists and swords (reach 0): the clinch, a small burst where the dots touch, never a line. Gunpowder and up: tracers, from a defender on that island (the nearest guard, or the nearest of their dots), else from a point inland.
+- **Pause** is a shell feature (`window.__rpiPaused`, main.js): the loops keep ticking but return early, so game time and the war clock stand still and resuming is instant; saving continues. Chapter cards are not paused.
+- **Debug** is reachable only by `?debug` or five quick clicks on the version label.

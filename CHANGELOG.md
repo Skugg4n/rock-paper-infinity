@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.47.0 - 2026-09-23 (war-playtest-4 merged)
+
+### Chapter III, playtest 4 (Ola, v1.44.0: "very pleased with War, very well levelled"): no fire over water, pause, secret debug menu
+
+- **Nobody fires at a boat.** Our guards shot at landing parties still out on the water, and the landing parties shot back, from the first tier on (the guards were given gunpowder reach even with fists). Now a party counts as ashore only once it is past the water leg of its crossing (`onIsland`, from the path's own markers, tested in both directions): our guards meet a landing only on our island, their dots meet our strike only on theirs, and the scripted losses fall only there too.
+- **Fists and swords never draw a line.** With reach 0 (tiers I and II) the only visual is the clinch, a small burst where the dots touch. Shots (tracers) start at gunpowder, and come from a defender on that island, never from a random point at sea.
+- **Pause.** A small round button beside the ☰ button (and the space bar, when no text field is focused). Chapters I to III stand still: game time, the war clock and the dots stop, saving goes on, resuming is instant. The city dims to 70 % while paused. The chapter cards are not paused. Chapter IV does not read the flag yet.
+- **The debug menu is a secret again.** Gone from the ☰ menu. On with `?debug` in the URL, or five quick clicks (within two seconds) on the version label, which flashes "debug on" / "debug off". Everything it enables is unchanged.
+
 ## v1.46.0 - 2026-09-22 (chapter IV, slice 5)
 
 ### The Watcher: stability, the base softens and snaps, riddles, capacity

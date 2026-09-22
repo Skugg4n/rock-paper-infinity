@@ -1612,8 +1612,11 @@ export function init() {
   // and calls playChapterCard(to-come). Starting ticks in that case would run the
   // game logic behind the WAR card and allow population to keep growing.
   if (savingEnabled) {
-      logicInterval = setInterval(logicTick, 1000);
-      fastUiInterval = setInterval(fastUiTick, 50);
+      // Paused (window.__rpiPaused, main.js): the loops keep running but do
+      // nothing, so resuming is instant; game time (and the war's w.t) stands
+      // still. Saving still happens.
+      logicInterval = setInterval(() => { if (window.__rpiPaused) { saveGameState(); return; } logicTick(); }, 1000);
+      fastUiInterval = setInterval(() => { if (!window.__rpiPaused) fastUiTick(); }, 50);
       _ants?.start();
   }
   updateIslands();

@@ -28,8 +28,41 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Debug menus: on with ?debug in the URL or the "Debug menu" item in the ☰
-// menu (persisted in localStorage). The invisible trigger sits top-left.
+// Pause: one flag for every chapter. The phases' loops keep running but return
+// early while it is set, so resuming is instant and game time stands still.
+// Chapters I-III honour it; a chapter that wants pausing reads the same flag.
+window.__rpiPaused = false;
+function iconSvg(name) {
+  const data = typeof lucide !== 'undefined' ? lucide.icons?.[name] : null;
+  if (!data || typeof lucide.createElement !== 'function') return null;
+  const svg = lucide.createElement(data);
+  svg.setAttribute('width', '18'); svg.setAttribute('height', '18');
+  return svg;
+}
+const pauseBtn = document.createElement('button');
+pauseBtn.id = 'pause-btn';
+pauseBtn.className = 'btn';
+pauseBtn.setAttribute('aria-label', 'Pause');
+function setPaused(on) {
+  window.__rpiPaused = on;
+  document.body.classList.toggle('paused', on);
+  pauseBtn.setAttribute('aria-label', on ? 'Play' : 'Pause');
+  pauseBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  pauseBtn.replaceChildren(iconSvg(on ? 'Play' : 'Pause') || document.createTextNode(on ? '▶' : 'II'));
+}
+pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); setPaused(!window.__rpiPaused); pauseBtn.blur(); });
+document.getElementById('menu-wrapper')?.appendChild(pauseBtn);
+setPaused(false);
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  const el = document.activeElement;
+  if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+  e.preventDefault();
+  setPaused(!window.__rpiPaused);
+});
+
+// Debug menus: on with ?debug in the URL, or five quick clicks on the version
+// label bottom-left (persisted in localStorage). Deliberately not in the ☰ menu.
 function readDebugFlag() {
   try { return localStorage.getItem(DEBUG_KEY) === '1'; } catch { return false; }
 }
@@ -49,8 +82,6 @@ function setDebugVisible(on) {
     if (debugMenu) debugMenu.style.display = '';
     if (p2DebugMenu) p2DebugMenu.style.display = '';
   }
-  const item = document.getElementById('debug-menu-toggle');
-  if (item) item.textContent = on ? 'Debug menu: on' : 'Debug menu';
   document.getElementById('test-menu')?.classList.toggle('hidden', !on);
   if (on) renderTestMenu();
 }
@@ -86,11 +117,23 @@ let debugOn = window.location.search.includes('debug') || readDebugFlag();
 // 2.5D experiment: ?tilt leans the city like a model (Ola, 2026-09-19)
 if (window.location.search.includes('tilt')) document.body.classList.add('tilt');
 setDebugVisible(debugOn);
-document.getElementById('debug-menu-toggle')?.addEventListener('click', () => {
+document.getElementById('debug-menu-toggle')?.remove();
+// The secret way in: five clicks on the version label within two seconds.
+const versionLabel = document.getElementById('version-info');
+let versionClicks = [];
+let flashTimer = null;
+versionLabel?.addEventListener('click', () => {
+  const now = Date.now();
+  versionClicks = [...versionClicks.filter(t => now - t < 2000), now];
+  if (versionClicks.length < 5) return;
+  versionClicks = [];
   debugOn = !debugOn;
   try { localStorage.setItem(DEBUG_KEY, debugOn ? '1' : '0'); } catch { /* ignore */ }
   setDebugVisible(debugOn);
-  document.getElementById('menu-dropdown')?.classList.add('hidden');
+  versionLabel.textContent = debugOn ? 'debug on' : 'debug off';
+  versionLabel.classList.add('debug-flash');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { versionLabel.textContent = VERSION; versionLabel.classList.remove('debug-flash'); }, 1200);
 });
 
 // Files that make up the game. After a deploy, GitHub Pages' 10-minute cache

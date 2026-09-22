@@ -180,6 +180,24 @@ export function crossPath(from, dst, gap, grid, theirs = from) {
     path.theirCoast = 1; path.crossFrom = 2; path.ourCoast = 3; path.land = 4 + walk.length; path.edge = edge;
     return path;
 }
+/**
+ * Whether a dot at (seg, t) on a crossing has reached the island it is
+ * heading for. Every crossPath has exactly one leg over open water: between
+ * the point where it leaves their coast (`crossFrom`) and the point where it
+ * reaches ours (`ourCoast`). Which of the two comes later depends on the
+ * direction (reversePath keeps both on the same places), and everything past
+ * the later one is the destination's coast road and streets. Before the
+ * water leg the dot is still on the island it set out from, which counts as
+ * not there yet. A path without markers is a street walk and never leaves
+ * its island.
+ * @param {Array<{x:number,y:number}>} path
+ * @param {number} seg
+ * @param {number} [t=0]
+ */
+export function onIsland(path, seg, t = 0) {
+    if (!path || path.crossFrom === undefined || path.ourCoast === undefined) return true;
+    return seg + t >= Math.max(path.crossFrom, path.ourCoast) - 1e-9;
+}
 /** Reverses a crossPath, keeping its markers pointing at the same places. */
 export function reversePath(path) {
     const r = [...path].reverse();
@@ -377,7 +395,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
 
     function frame(now) {
         raf = requestAnimationFrame(frame);
-        if (document.hidden) { lastT = 0; return; }
+        // hidden tab or paused game (window.__rpiPaused, main.js): the picture holds still
+        if (document.hidden || window.__rpiPaused) { lastT = 0; return; }
         const dt = Math.min(0.1, (now - (lastT || now)) / 1000); lastT = now;
         step(dt, now);
     }
@@ -565,7 +584,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             let route = null;
             for (let i = 0; i < Math.min(14, Math.max(3, Math.round(count / 3))); i++) {
                 route = reversePath(cross(tile, coast));
-                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: route, seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true, fightFrom: route.crossFrom });
+                dots.push({ kind: 'person', at: { rect: tile }, from: { rect: coast }, path: route, seg: 0, t: 0, wait: Math.random() * 1.2, wave: true, strike: true });
             }
             // their defence meets them on their island, never out at sea
             scriptLosses(dots, losses, route.crossFrom, route.length - 1);
@@ -592,14 +611,21 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 stepDot(d, dt, d.strike ? SPEED.enemy * 2.2 : SPEED.enemy * 2, (x) => { x.dead = true; x.wait = 0; });
                 // arrived this frame: count it now, or a lone survivor's wave is cleared before it lands
                 if (d.dead) { arrived++; flash(c(w.target.rect), 10, d.strike ? COLORS.person : COLORS.enemy); continue; }
-                // scripted losses: this one falls here, to the other side's fire
-                if (d.fallSeg !== undefined && d.path && d.seg + d.t >= d.fallSeg) {
+                // scripted losses: this one falls here, to the other side's fire.
+                // Never at sea (onIsland), and with fists or swords there is no
+                // shot at all: only the clinch, a small burst where they meet.
+                if (d.fallSeg !== undefined && d.path && d.seg + d.t >= d.fallSeg && onIsland(d.path, d.seg, d.t)) {
                     const p = pos(d); d.killed = true; d.dead = true;
                     if (p) {
-                        // the shot comes from the nearest guard when it is ours that fires
-                        const shooter = d.strike ? null : nearestGuard(p, 160);
-                        flash(p, 9, d.strike ? COLORS.enemy : COLORS.person);
-                        effects.push({ type: 'tracer', from: shooter || jitter(p, 30), to: p, t: 0, dur: 0.15, color: d.strike ? COLORS.enemy : COLORS.person });
+                        const color = d.strike ? COLORS.enemy : COLORS.person;
+                        const r = reach(d.strike ? state.enemyTier : state.ourTier);
+                        if (r === 0) flash(p, 7, color);
+                        else {
+                            // the shot comes from the nearest defender on that island, else from inland
+                            const shooter = d.strike ? nearestEnemy(p, r * 1.5) : nearestGuard(p, Math.max(r * 1.5, 160));
+                            flash(p, 9, color);
+                            effects.push({ type: 'tracer', from: shooter || toward(p, c(w.target.rect), 30), to: p, t: 0, dur: 0.15, color });
+                        }
                     }
                 }
             }
@@ -645,10 +671,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 if (canKill && Math.random() < 0.25) { targetDot.killed = true; targetDot.dead = true; flash(h, 8, color); }
             }
         };
-        // our landing party on their island: their dots fight ours
-        const ourDots = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.seg >= (d.fightFrom ?? 1)));
+        // our landing party on their island: their dots fight ours, never over the water
+        const ourDots = waves.filter(w => w.kind === 'ours').flatMap(w => w.dots.filter(d => !d.dead && d.path && onIsland(d.path, d.seg, d.t)));
         if (ourDots.length) {
             for (const e of enemies) {
+                if (!enemyAtHome(e)) continue;
                 const p = pos(e); if (!p) continue;
                 for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, false); }
             }
@@ -656,9 +683,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         // their wave on our island: the guards at the coast fight it (our people are civilians)
         stepGuards(dt);
         if (combat) {
-            const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead));
-            const posts = guardPositions();
-            for (const g of posts) for (const d of hostiles) fight(g, d, Math.max(2, state.ourTier), COLORS.person, false);
+            // only once they are ashore: nobody fires at a boat
+            const hostiles = waves.filter(w => w.kind === 'enemy').flatMap(w => w.dots.filter(d => !d.dead && d.path && onIsland(d.path, d.seg, d.t)));
+            const posts = guardPositions().filter(g => !g.leaving);
+            for (const g of posts) for (const d of hostiles) fight(g, d, state.ourTier, COLORS.person, false);
             // and they fire back at the guards
             for (const d of hostiles) {
                 const p = pos(d); if (!p) continue;
@@ -766,6 +794,28 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             const p = ringPoint(R, g.s);
             return { x: p.x, y: p.y + Math.sin(clock * 2.2 + g.id * 1.3) * 0.7, i };
         }).filter(Boolean);
+    }
+    /** Is this enemy dot on its own island (not crossing, not on our plates)? */
+    function enemyAtHome(e) {
+        if (e.razing || e.at?.building) return false;
+        if (e.path && e.path.crossFrom !== undefined) return onIsland(e.path, e.seg, e.t);
+        return true;
+    }
+    function nearestEnemy(p, maxD) {
+        let best = null, bd = maxD * maxD;
+        for (const e of enemies) {
+            if (!enemyAtHome(e)) continue;
+            const q = pos(e); if (!q) continue;
+            const d2 = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+            if (d2 < bd) { bd = d2; best = q; }
+        }
+        return best;
+    }
+    /** A point `dist` px from p toward q (inland, when q is on the island). */
+    function toward(p, q, dist) {
+        const dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1;
+        const k = Math.min(1, dist / L);
+        return { x: p.x + dx * k, y: p.y + dy * k };
     }
     function nearestGuard(p, maxD) {
         let best = null, bd = maxD * maxD;
