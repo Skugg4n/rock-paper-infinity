@@ -381,3 +381,16 @@ days left. +84 grown, −39 eaten a day." · 10 cryo offered before it is useful
 11 cost and "affordable in N days" on hover always · 12 bars as stores with flows ·
 13 rate per day under the counters · 14 nothing moves, nothing to wait for.
 Ore gets a pickaxe icon, not the gem (read as chapter I's hundred-star diamond).
+
+### Decided (Ola, 2026-09-22): cryo becomes a state. Build it.
+
+Also from Ola:
+- **Rock, paper, scissors must have a flavour in IV.** Perhaps energy is it, or the
+  thing we must produce to build anything (the factory above ground played the game).
+  Proposal: the star machine from I came down the hole; it sits on the lid plate and
+  plays the game with the colony's surplus: the three glyphs cycle at the star rate,
+  and a win is a star. Stars per day = the machine's wins. The counter reads as wins.
+- **Chapter V, two candidates:** out onto the dead surface, wastelands, exploring
+  bases; or everyone in cryo uploads to a digital world (the screen goes dark and V
+  lights up like an old TV switching on: "V · DIGITAL"), and then VI · CLONES, back to
+  the real world from the originals (Bobiverse). Parked until IV holds.
