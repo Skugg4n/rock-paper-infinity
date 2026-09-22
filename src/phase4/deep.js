@@ -1,5 +1,5 @@
 /**
- * Chapter IV · THE DEEP — pure rules. No DOM, no timers. The simulation
+ * Chapter IV · THE DEEP: pure rules. No DOM, no timers. The simulation
  * (scripts/sim-phase4.mjs) and the game share this file.
  * Design: docs/superpowers/specs/2026-09-21-chapter-iv-the-deep-design.md
  *

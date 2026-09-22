@@ -228,3 +228,36 @@ entered on foot through lanes, reset-view button, full bleed, chrome floating on
 Build order: `src/phase4/scene.js` (the scene, fed by `deep.js` state) → chrome (time,
 bars with the bottleneck dot, counters, buttons, ring) → the descent from III into the
 scene → cryo, sleep fast-forward and wake-up replay → probes and the ascent.
+
+## Built: slice 1 (v1.40.0, 2026-09-22)
+
+What exists now, in code, not in a mockup:
+
+- **Phase DEEP.** `src/phase4/index.js` with init/teardown like the other phases,
+  registered in `gamePhase.js` and `main.js`, container `#phase-deep`, styles in
+  `style-deep.css`, body class `in-deep` while the chapter is on screen.
+- **The descent.** Chapter II's ship button gathers everyone at the hatch, then
+  the black IV card plays and the phase switches at its midpoint, so the model is
+  there when the card lifts. The "to come" wall is the fallback for a browser
+  that cannot load the chapter, nothing else.
+- **The model.** `src/phase4/scene.js`, ported from `docs/mockups/deep-3d-8.html`
+  and fed by the state: plates, bridges, the shaft and its stairs, seeded maps
+  with houses and lanes, people on the walking graph, no people on automated
+  plates, level badges and the automation glyph as CSS2D labels, a filling ring
+  where the next chamber will be dug, reset view. three.js 0.160.1 comes from the
+  importmap in `index.html`, the one place the CDN is named.
+- **Where things go.** `src/phase4/layout.js` (pure, with tests):
+  `placeChamber(index)` gives floor and cell, twelve chambers to a floor, the
+  arms first and then the ring outside them.
+- **The chrome.** Time, ore and stars, the advisor line, the four columns with the
+  bottleneck dot, stars per day, and the buttons: dig, the four rooms, level,
+  automate, cryo (greyed, "soon").
+- **The clock and the save.** One real second is one day, at most three days
+  caught up on return, `rpi-deep` holds the schema version, the state and the
+  layout. Checkpoint `iv-start`, `window.debug_deep(...)`, `window.rpiDeep`.
+
+Next, in order: **cryo** (the sleep tiers, the fast-forward and what the counter
+does while the years run), the **wake-up replay** (what ran, what stopped, what
+was eaten), **probes** and the estimate of the surface, and the **ascent** into
+chapter V. The rules for all four are already in `deep.js`; none of them has a
+surface yet.

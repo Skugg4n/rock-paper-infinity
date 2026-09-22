@@ -2,6 +2,7 @@
 
 import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { playChapterCard } from '../chapterCard.js';
+import { phases, setPhase } from '../gamePhase.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
 import { buildingData } from './buildings-config.js';
@@ -26,6 +27,31 @@ let savingEnabled = true;
 let beforeUnloadHandler;
 let abortController;
 let _warCardTriggered = false;
+let _deepStarting = false;
+
+/**
+ * IV · THE DEEP. The black card is the bridge: chapter IV is built during its
+ * hold, so the model is already there when the card lifts. The "to come" wall
+ * is kept for one case only, a browser that cannot load the chapter at all;
+ * the save is never touched either way.
+ */
+async function goDeep() {
+    if (_deepStarting) return;
+    _deepStarting = true;
+    try {
+        await import('../phase4/index.js');
+    } catch (e) {
+        console.error('chapter IV could not be loaded; the wall stands instead', e);
+        playChapterCard({ roman: 'IV', title: 'THE DEEP', mode: 'to-come' });
+        return;
+    }
+    playChapterCard({
+        roman: 'IV', title: 'THE DEEP', dark: true, hold: 4000,
+        onMidpoint: () => {
+            setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
+        },
+    });
+}
 let _ants = null;
 let _islands = null;
 
@@ -1171,7 +1197,7 @@ export function init() {
               hatch?.classList.add('deep-hatch');
               const card = () => {
                   if (fastUiInterval) clearInterval(fastUiInterval);
-                  playChapterCard({ roman: 'IV', title: 'THE DEEP', mode: 'to-come', onMidpoint: () => {} });
+                  goDeep();
               };
               if (_ants && hatch) { _ants.gatherAt(hatch, () => setTimeout(card, 1200)); setTimeout(card, 20000); } else card();
           }, { signal });
@@ -1340,18 +1366,13 @@ export function init() {
                 }
                 if (gameState.warReady) _warCardTriggered = true;
                 if (gameState.war?.active) applyWarPresentation();
-                // Came back after choosing the ship down: straight to the wall.
+                // Came back after choosing the way down: straight on down again.
                 if (gameState.shipChosen) {
                     _warCardTriggered = true;
                     savingEnabled = false;
                     if (logicInterval) clearInterval(logicInterval);
                     if (fastUiInterval) clearInterval(fastUiInterval);
-                    playChapterCard({
-                        roman: 'IV',
-                        title: 'THE DEEP',
-                        mode: 'to-come',
-                        onMidpoint: () => { /* saving already disabled */ },
-                    });
+                    goDeep();
                 }
                 initialLoadDone = true;
                 logicTick(true);
@@ -1397,6 +1418,7 @@ export function teardown() {
   delete window.debug_addResources;
   delete window.debug_addPopulation;
   _warCardTriggered = false;
+  _deepStarting = false;
   savingEnabled = true;
   _displayedStars = 0;
   _displayedScience = 0;

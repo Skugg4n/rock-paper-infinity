@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.40.0 - 2026-09-22
+
+### Chapter IV · THE DEEP, slice 1: the descent, the model, the chrome
+
+- **The hole is no longer a wall.** Choosing the way down at the end of III now ends in the colony instead of "to come": the black IV card plays, the deep is built during its hold, and the model is already there when the card lifts. The wall is kept for one case only, a browser that cannot load the chapter at all. The save is never touched either way.
+- **What came down with us.** The colony starts from `initialDeepState()` with the war's salvage as its ore and the doomsday clock at the end of III as the state of the surface, read out of chapter II's save. Defaults when there is nothing to read.
+- **The model is the board** (`src/phase4/scene.js`, built from the locked reference `docs/mockups/deep-3d-8.html`): two colours, sharp slabs, floors round a shaft, a seeded map of lanes and houses on every plate, people walking a graph and taking the stairs on foot through openings in the shaft wall, one lamp so the light falls off with depth. Left drag turns it, the wheel zooms, right drag pans, and a scan button to come back appears only once the view has been moved. The camera is never clicked: everything is bought in the chrome.
+- **Ring by ring, floor by floor.** `src/phase4/layout.js` (pure, tested) says where chamber number N is dug: the four arms off the landing, then the ring outside them, then the floor below by the stairs. The save stores it, so the colony is laid out the same way it was left.
+- **The chrome floats on the model.** Time top left (year large, month and day small, y m d markers), ore and stars top right with a one-line advisor, the four columns M F E H at the left with the single red dot on the weakest and stars per day under them, and the button column at the right: dig, the four rooms, level, automate, cryo. Rooms are greyed until there is both a chamber standing empty and the ore to fill it; automation is not shown at all until the first level is bought; the snowflake is there from the first second, greyed, tooltip "soon".
+- **Level and automate follow the dot.** Both buy for the room type that fixes the weakest column, so the red dot is a straight instruction and the ladder is read without a word of text. Costs are the ones in `deep.js`; no balance was touched.
+- **One real second is one colony day.** Away from the tab at most three days are caught up on return: no offline progress yet. Saving every day and on unload, under key `rpi-deep` with a schema version and the layout, skipped when a checkpoint is being loaded.
+- **Testing**: a new checkpoint "IV · the deep" in the ☰ test menu, `window.debug_deep('minerals'|'stars'|'day100')` with the debug menu on, and `window.rpiDeep` for poking at the state and the scene.
+- Still to come in this chapter: cryo and the sleep fast-forward, the wake-up replay, probes and the estimate of the surface, and the ascent.
+
 ## v1.39.2 - 2026-09-21
 
 ### Chapter IV retuned to 802,701: one constant sets the calendar, and cryo goes up to a hundred millennia

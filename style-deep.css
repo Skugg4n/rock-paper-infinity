@@ -1,0 +1,227 @@
+/* Chapter IV · THE DEEP.
+   Everything here is scoped to #phase-deep (or to the body while the deep is on
+   screen), so chapters I to III keep their light palette untouched.
+
+   TWO COLOURS, as in the locked reference docs/mockups/deep-3d-8.html:
+     rock   #0f141b   the page, the background of the model, the lanes cut in
+     plate  #1e2733   every slab, and every button
+   The chrome floats straight on the model; nothing is framed. */
+
+body.in-deep {
+    background-color: #0f141b;
+    color: #8fa1b6;
+}
+
+#phase-deep {
+    position: fixed;
+    inset: 0;
+    min-height: 100vh;
+    color: #8fa1b6;
+    overflow: hidden;
+    user-select: none;
+}
+#phase-deep.hidden { display: none; }
+
+#phase-deep .deep-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* the model fills the window */
+#deep-scene { position: absolute; inset: 0; }
+#deep-scene canvas { display: block; }
+#deep-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+#deep-fallback {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #55637a;
+}
+#deep-fallback.is-on { display: flex; }
+
+/* ---- labels anchored to plates ------------------------------------------ */
+.deep-lbl { position: absolute; pointer-events: none; }
+.deep-lbl-in {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9fb0c4;
+    transition: opacity 250ms ease;
+}
+.deep-lbl-in .lvl {
+    position: absolute;
+    left: 2px;
+    bottom: 2px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #3c4a5c;
+    color: #dbe4f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    line-height: 17px;
+    text-align: center;
+}
+.deep-lbl-in .auto { position: absolute; right: 3px; top: 3px; color: #64748b; }
+.deep-lbl-in .ring-base { stroke: #2a3442; }
+.deep-lbl-in .ring-fg {
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 400ms linear;
+}
+
+/* ---- chrome, floating straight on the model ------------------------------ */
+#phase-deep .deep-chrome { position: absolute; z-index: 10; }
+
+#phase-deep .btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    padding: 0.75rem;
+    border-radius: 9999px;
+    background-color: #1e2733;
+    color: #aab8c9;
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    cursor: pointer;
+    border: 0;
+    flex: 0 0 auto;
+}
+#phase-deep .btn:hover:not(.is-locked) { transform: translateY(-2px); }
+#phase-deep .btn.is-locked { opacity: 0.3; cursor: default; }
+#phase-deep .btn.hidden { display: none; }
+#phase-deep .btn > * { pointer-events: none; }
+
+#phase-deep .tooltip {
+    position: absolute;
+    right: 110%;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #2a3442;
+    color: #dbe4f0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 50;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+#phase-deep .btn:hover .tooltip { opacity: 1; }
+#phase-deep .tooltip i { color: #8fa1b6; }
+
+.deep-btn-col {
+    right: 72px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+/* the way back to the view we started from, offered only once it is needed */
+#deep-reset-view {
+    margin-top: 22px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 400ms ease, transform 0.2s ease-in-out;
+}
+#deep-reset-view.is-on { opacity: 0.75; pointer-events: auto; }
+#deep-reset-view.is-on:hover { opacity: 1; }
+
+/* ---- time ---------------------------------------------------------------- */
+#deep-time { left: 72px; top: 56px; }
+.deep-clock {
+    display: grid;
+    grid-template-columns: auto 16px auto 16px auto;
+    align-items: baseline;
+    column-gap: 4px;
+}
+.deep-clock .deep-y { font-size: 48px; font-weight: 700; color: #dbe4f0; line-height: 1; }
+.deep-clock .deep-sep { font-size: 18px; color: #3b4757; text-align: center; }
+.deep-clock .deep-md { font-size: 24px; color: #5f6d80; line-height: 1; }
+.deep-clock .deep-unit { font-size: 9px; color: #3b4757; letter-spacing: 0.18em; text-align: center; }
+
+/* ---- what we hold -------------------------------------------------------- */
+#deep-hold {
+    right: 72px;
+    top: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 14px;
+}
+.deep-hold-row { display: flex; align-items: center; gap: 10px; }
+.deep-hold-row i { color: #5f6d80; }
+.deep-amount { font-size: 22px; font-weight: 700; color: #c3cfdd; }
+#deep-advisor { font-size: 11px; color: #55637a; min-height: 14px; }
+
+/* ---- the four columns ---------------------------------------------------- */
+#deep-columns { left: 80px; top: 50%; transform: translateY(-50%); }
+.deep-col-heads, .deep-col-feet, .deep-bars { display: flex; gap: 20px; }
+.deep-col-heads { margin-bottom: 6px; }
+.deep-col-feet { margin-top: 8px; }
+.deep-col-head { font-size: 12px; color: #93a3b8; width: 24px; text-align: center; }
+.deep-col-foot { font-size: 11px; color: #55637a; width: 24px; text-align: center; letter-spacing: 0.08em; }
+.deep-bar { position: relative; width: 24px; }
+.deep-track {
+    width: 24px;
+    height: 160px;
+    border-radius: 9999px;
+    background: #1e2733;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+}
+.deep-fill {
+    width: 100%;
+    height: 0;
+    border-radius: 9999px;
+    background: #7d8fa5;
+    transition: height 400ms ease;
+}
+.deep-stop-dot {
+    position: absolute;
+    left: 50%;
+    margin-left: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: #dc2626;
+    transition: bottom 400ms ease;
+}
+.deep-stop-dot.hidden { display: none; }
+.deep-per-day { display: flex; align-items: center; gap: 8px; margin-top: 26px; color: #7d8fa5; }
+.deep-per-day .deep-mono { font-size: 20px; font-weight: 700; }
+.deep-per-day-mark { display: flex; align-items: center; }
+.deep-per-day-mark .deep-mono { font-size: 12px; margin: 0 2px; font-weight: 400; }
+
+/* ---- the chapter, quietly ------------------------------------------------ */
+#deep-mark {
+    left: 72px;
+    bottom: 34px;
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    font-size: 22px;
+    color: #394453;
+}
+
+/* the shared menu and version line are light by default; down here they are not */
+body.in-deep #version-info { color: #2f3949; }
+body.in-deep #menu-btn { background-color: #1e2733; box-shadow: none; }
+body.in-deep #menu-btn i { color: #8fa1b6; }

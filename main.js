@@ -1,5 +1,5 @@
 import { phases, setPhase } from './src/gamePhase.js';
-import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, DEBUG_KEY } from './src/constants.js';
+import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from './src/constants.js';
 import { preloadIcons, replaceIcons } from './src/icons.js';
 import { VERSION } from './src/version.js';
 import { playChapterCard } from './src/chapterCard.js';
@@ -107,7 +107,8 @@ async function bootstrap() {
 
   const isFreshPlayer =
     !localStorage.getItem(PHASE1_CONSTANTS.SAVE_KEY) &&
-    !localStorage.getItem(PHASE2_CONSTANTS.SAVE_KEY);
+    !localStorage.getItem(PHASE2_CONSTANTS.SAVE_KEY) &&
+    !localStorage.getItem(PHASE4_CONSTANTS.SAVE_KEY);
 
   if (isFreshPlayer) {
     await playChapterCard({ roman: 'I', title: 'TRIVIAL' });

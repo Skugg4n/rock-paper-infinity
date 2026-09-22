@@ -579,5 +579,6 @@ items:
       Build chapter IV THE DEEP for real from mockup 8 (docs/mockups/deep-3d-8.html)
       and the rules in src/phase4/deep.js: scene.js, chrome, descent from III,
       cryo/sleep/wake-up replay, probes, ascent. Spec: 2026-09-21-chapter-iv-the-deep-design.md
+    progress: "slice 1 (descent, scene, chrome, dig/rooms/levels/automation, save) shipped in v1.40.0"
     status: open
     resolved_in: null

@@ -15,7 +15,7 @@ function walk(dir, out) {
 
 describe('MODULE_PATHS', () => {
     test('lists every source module and stylesheet the game loads', () => {
-        const onDisk = [...walk(join(ROOT, 'src'), []), 'main.js', 'roman.js', 'style.css', 'style-stage2.css', 'index.html'].sort();
+        const onDisk = [...walk(join(ROOT, 'src'), []), 'main.js', 'roman.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'index.html'].sort();
         const listed = [...MODULE_PATHS].sort();
         expect(listed).toEqual(onDisk);
     });

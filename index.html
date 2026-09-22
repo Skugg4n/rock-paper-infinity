@@ -9,9 +9,20 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chapter IV draws a real 3D model. This importmap is THE place the three.js
+         CDN is named; src/phase4/scene.js imports the bare names below. -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+      }
+    }
+    </script>
     <style id="dynamic-styles"></style> <!-- For dynamic animation timings -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="style-stage2.css">
+    <link rel="stylesheet" href="style-deep.css">
 </head>
 <body class="text-slate-800">
 
@@ -390,6 +401,128 @@
 
     </div>
 
+
+    <!-- ==================== PHASE 4: THE DEEP ==================== -->
+    <div id="phase-deep" class="phase-container hidden">
+
+        <!-- the model fills the window; nothing is framed -->
+        <div id="deep-scene"></div>
+        <div id="deep-labels"></div>
+        <div id="deep-fallback" class="deep-mono">this view needs WebGL</div>
+
+        <!-- time: year large, month and day smaller -->
+        <div class="deep-chrome" id="deep-time">
+            <div class="deep-mono deep-clock">
+                <span class="deep-y" id="deep-year">0</span>
+                <span class="deep-sep">·</span>
+                <span class="deep-md" id="deep-month">1</span>
+                <span class="deep-sep">·</span>
+                <span class="deep-md" id="deep-day">1</span>
+                <span class="deep-unit">y</span>
+                <span></span>
+                <span class="deep-unit">m</span>
+                <span></span>
+                <span class="deep-unit">d</span>
+            </div>
+        </div>
+
+        <!-- what we hold -->
+        <div class="deep-chrome" id="deep-hold">
+            <div class="deep-hold-row">
+                <span class="deep-mono deep-amount" id="deep-minerals">0</span>
+                <i data-lucide="gem" class="w-5 h-5"></i>
+            </div>
+            <div class="deep-hold-row">
+                <span class="deep-mono deep-amount" id="deep-stars">0</span>
+                <i data-lucide="star" class="w-5 h-5"></i>
+            </div>
+            <div class="deep-mono" id="deep-advisor"></div>
+        </div>
+
+        <!-- the four columns, the shortest marked -->
+        <div class="deep-chrome" id="deep-columns">
+            <div class="deep-mono deep-col-heads">
+                <span class="deep-col-head" id="deep-head-M">0</span>
+                <span class="deep-col-head" id="deep-head-F">0</span>
+                <span class="deep-col-head" id="deep-head-E">0</span>
+                <span class="deep-col-head" id="deep-head-H">0</span>
+            </div>
+            <div class="deep-bars">
+                <div class="deep-bar">
+                    <div class="deep-track"><div class="deep-fill" id="deep-fill-M"></div></div>
+                    <span class="deep-stop-dot hidden" id="deep-dot-M"></span>
+                </div>
+                <div class="deep-bar">
+                    <div class="deep-track"><div class="deep-fill" id="deep-fill-F"></div></div>
+                    <span class="deep-stop-dot hidden" id="deep-dot-F"></span>
+                </div>
+                <div class="deep-bar">
+                    <div class="deep-track"><div class="deep-fill" id="deep-fill-E"></div></div>
+                    <span class="deep-stop-dot hidden" id="deep-dot-E"></span>
+                </div>
+                <div class="deep-bar">
+                    <div class="deep-track"><div class="deep-fill" id="deep-fill-H"></div></div>
+                    <span class="deep-stop-dot hidden" id="deep-dot-H"></span>
+                </div>
+            </div>
+            <div class="deep-mono deep-col-feet">
+                <span class="deep-col-foot">M</span>
+                <span class="deep-col-foot">F</span>
+                <span class="deep-col-foot">E</span>
+                <span class="deep-col-foot">H</span>
+            </div>
+            <div class="deep-per-day">
+                <span class="deep-mono" id="deep-stars-day">0</span>
+                <span class="deep-per-day-mark">
+                    <i data-lucide="star" class="w-4 h-4"></i>
+                    <span class="deep-mono">/</span>
+                    <i data-lucide="sun" class="w-4 h-4"></i>
+                </span>
+            </div>
+        </div>
+
+        <!-- the buttons -->
+        <div class="deep-chrome deep-btn-col">
+            <button class="btn" id="deep-dig-btn" aria-label="Dig a chamber">
+                <i data-lucide="shovel" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn deep-room-btn" id="deep-room-mine" data-room="mine" aria-label="Mine">
+                <i data-lucide="pickaxe" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn deep-room-btn" id="deep-room-farm" data-room="farm" aria-label="Farm">
+                <i data-lucide="sprout" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn deep-room-btn" id="deep-room-generator" data-room="generator" aria-label="Generator">
+                <i data-lucide="zap" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn deep-room-btn" id="deep-room-dorm" data-room="dorm" aria-label="Dormitory">
+                <i data-lucide="bed" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn" id="deep-level-btn" aria-label="Level the weakest">
+                <i data-lucide="chevrons-up" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn" id="deep-auto-btn" aria-label="Automate the weakest">
+                <i data-lucide="repeat" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn is-locked" id="deep-cryo-btn" aria-label="Cryo" disabled>
+                <i data-lucide="snowflake" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn" id="deep-reset-view" aria-label="Reset the view">
+                <i data-lucide="scan" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <div class="deep-chrome" id="deep-mark">IV &middot; THE DEEP</div>
+    </div>
+
     <!-- ==================== SHARED ELEMENTS ==================== -->
     <div id="menu-wrapper" class="fixed bottom-4 left-4">
         <div class="relative">
@@ -412,7 +545,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.39.2</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.40.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

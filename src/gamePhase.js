@@ -4,6 +4,7 @@ export const phases = {
   INDUSTRY: 'INDUSTRY',
   CITY: 'CITY',
   WAR: 'WAR',
+  DEEP: 'DEEP',
   ESCAPE: 'ESCAPE'
 };
 
@@ -21,6 +22,7 @@ export async function setPhase(phase) {
   const containerMap = {
     [phases.INDUSTRY]: 'phase-industry',
     [phases.CITY]: 'phase-city',
+    [phases.DEEP]: 'phase-deep',
   };
   const containerId = containerMap[phase];
   if (containerId) {
@@ -36,6 +38,9 @@ export async function setPhase(phase) {
       return currentModule.init();
     case phases.CITY:
       currentModule = await import('./phase2/index.js');
+      return currentModule.init();
+    case phases.DEEP:
+      currentModule = await import('./phase4/index.js');
       return currentModule.init();
     case phases.WAR:
     case phases.ESCAPE:

@@ -29,5 +29,16 @@ export const PHASE2_CONSTANTS = {
     DISTRICT_GROWTH_PER_SEC: 500,
 };
 
+// Game Constants for Phase 4 (chapter IV · THE DEEP)
+export const PHASE4_CONSTANTS = {
+    SAVE_KEY: 'rpi-deep',
+    // One real second is one colony day. Away from the tab, at most this many
+    // days are caught up on return: no offline progress, just no lost second.
+    MAX_CATCHUP_DAYS: 3,
+    // The crowd on the plates is the colony, not a census: past this many
+    // people the dots stop multiplying (see scene.js MAX_DOTS).
+    DOT_CAP: 160,
+};
+
 // Debug menus: ?debug in the URL, or the toggle in the ☰ menu (persisted).
 export const DEBUG_KEY = 'rpi-debug';

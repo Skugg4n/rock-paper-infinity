@@ -7,9 +7,13 @@
  * field is added there, add it here too (missing fields fall back to defaults).
  */
 
-import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS } from './constants.js';
+import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
+import { initialDeepState } from './phase4/deep.js';
+import { initialLayout } from './phase4/layout.js';
+import { serializeDeep } from './phase4/persistence.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
+const P4 = PHASE4_CONSTANTS.SAVE_KEY;
 
 function p1Save(over = {}) {
     const upgrades = {
@@ -90,6 +94,14 @@ export const CHECKPOINTS = [
         set(P2, p2Save({ stars: 2e11, science: 8e7, population: pop, supplies: 3e8, buildings: b, ...completeFlags, ...competitor(5, 900), warReady: true, warChosen: true,
             war: { active: true, startedAt: 0, t: 600, arms: 2500, armsShare: 0.5, defence: 70, force: 30, tier: 4, enemyTier: 4, enemyDefence: 60, waveCount: 18, lastWaveAt: 590, nextTierAt: 700, scorchOurs: 500, scorchTheirs: 900, salvage: 4000, enemyLeft: false, shipReady: false, auto: false, scienceRate0: pop * 0.5, lastTierAt: 500, enemyRazedUntil: [0, 0, 0, 0, 0] } }));
         set(PHASE_KEY, 'CITY');
+    } },
+    { id: 'iv-start', label: 'IV · the deep', apply: () => {
+        clearAll();
+        // The day the exit was blown: the salvage the war left, and a surface
+        // scorched to the point where the enemy walked away.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
     } },
 ];
 
