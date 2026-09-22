@@ -7,8 +7,9 @@
 
 import { normalizeLayout } from './layout.js';
 import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
+import { initialWatcher, normalizeWatcher } from './watcher.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -27,6 +28,14 @@ const MIGRATIONS = {
                 : { bias: 0, spread };
         }
         st.probes = (st.probes || []).map((q) => ({ people: 0, ...q }));
+        p.state = st;
+        return p;
+    },
+    /* v1.46.0: the Watcher. A colony that has slept before this version did so unwatched: its
+       Watcher starts fresh (full stability, no years counted) and shows itself at the next sleep. */
+    2: (p) => {
+        const st = p.state || {};
+        st.watcher = normalizeWatcher(st.watcher || initialWatcher());
         p.state = st;
         return p;
     },
@@ -71,6 +80,7 @@ export function deserializeDeep(raw) {
     parsed = migrate(parsed);
     if (!parsed.state || typeof parsed.state !== 'object') return null;
     const state = { ...initialDeepState(), ...parsed.state };
+    state.watcher = normalizeWatcher(state.watcher);
     return { state, layout: normalizeLayout(state, parsed.layout) };
 }
 

@@ -10,6 +10,12 @@
  * a 10 Hz sleep timer runs the colony at the tier's rate (a month to a hundred
  * thousand years a real second) until an alarm wakes it or the player does; the
  * frame loop only rolls the numbers between those ticks.
+ *
+ * Since v1.46.0 something stays awake while the colony sleeps: the Watcher (watcher.js). Its
+ * meter, its riddles and the snap of the base are wired here; the softening is the scene's.
+ *
+ * `window.__rpiPaused` (the shell's pause button) stops the chapter's clocks: no colony days
+ * awake or asleep, no drift, and the scene renders without moving anyone.
  */
 
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from '../constants.js';
@@ -36,12 +42,21 @@ import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
 import { createCrust } from './crust.js';
 import { createReplay } from './replay.js';
 import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js';
+import {
+    normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
+    puzzleDue, openPuzzle, armPuzzles, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays,
+    CAPACITY_MAX, STABILITY_MAX,
+} from './watcher.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
 
 const { SAVE_KEY, MAX_CATCHUP_DAYS } = PHASE4_CONSTANTS;
 const BAR_H = 160;                 // the track's height in CSS pixels
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+/** The shell's pause (main.js owns the flag): the chapter's clocks hold while it is set. */
+const paused = () => typeof window !== 'undefined' && !!window.__rpiPaused;
+/** A click on the base is a click, not the end of a drag that turned the camera. */
+const CLICK_PX = 6, CLICK_MS = 500;
 
 /** The walk into the hall, the odometer spin of falling asleep, the walk out. Seconds. */
 export const SLEEP_TIMING = { gather: 1.5, spin: 1.5, release: 1.2 };
@@ -124,6 +139,7 @@ export function init() {
         layout = initialLayout(state);
     }
     layout = normalizeLayout(state, layout);
+    state.watcher = normalizeWatcher(state.watcher);
 
     const ui = {
         sceneHost: document.getElementById('deep-scene'),
@@ -167,6 +183,15 @@ export function init() {
         crust: document.getElementById('deep-crust'),
         replay: document.getElementById('deep-replay'),
         root: document.getElementById('phase-deep'),
+        watcher: document.getElementById('deep-watcher'),
+        watcherName: document.getElementById('deep-watcher-name'),
+        stabFill: document.getElementById('deep-stab-fill'),
+        stabVal: document.getElementById('deep-stab-val'),
+        capFill: document.getElementById('deep-cap-fill'),
+        puzzle: document.getElementById('deep-puzzle'),
+        puzzleQ: document.getElementById('deep-puzzle-q'),
+        puzzleIn: document.getElementById('deep-puzzle-in'),
+        puzzleSaid: document.getElementById('deep-puzzle-said'),
     };
     replay = createReplay(ui.replay, { onIcons: scheduleIconRefresh, format: formatCount });
 
@@ -489,7 +514,47 @@ export function init() {
         const est = estimateNow(state);
         const year = habitableYear(state);
         crust.update({ est, year: Number.isFinite(year) ? group(year) : '' });
+        updateWatcher();
         scheduleIconRefresh();
+    }
+
+    /* ---- THE WATCHER (v1.46.0) ------------------------------------------------
+       Only in the sleep world: a slow pulse, a name, a meter, a sliver of capacity, and now and
+       then a riddle. No sentence says what it is. */
+    let puzzleShown = null;          // the riddle the card is showing, so it is drawn once
+    let lingerUntil = 0;             // a solved riddle stays on its card this long (performance.now)
+    function updateWatcher() {
+        const w = state.watcher;
+        const asleep = !!state.asleep;
+        if (ui.watcher) {
+            ui.watcher.hidden = !asleep;
+            if (asleep) {
+                const name = watcherName(w);
+                if (ui.watcherName.textContent !== name) ui.watcherName.textContent = name;
+                const stab = Math.round(w.stability);
+                const v = String(stab);
+                if (ui.stabVal.textContent !== v) ui.stabVal.textContent = v;
+                ui.stabFill.style.width = `${(100 * w.stability / STABILITY_MAX).toFixed(1)}%`;
+                ui.capFill.style.width = `${(100 * w.capacity / CAPACITY_MAX).toFixed(1)}%`;
+                ui.watcher.classList.toggle('is-low', w.stability < 35);
+            }
+            const want = asleep ? (w.puzzle || (performance.now() < lingerUntil ? puzzleShown : null)) : null;
+            if (want !== puzzleShown) {
+                puzzleShown = want;
+                ui.puzzle.classList.toggle('is-on', !!want);
+                if (want) {
+                    ui.puzzleQ.textContent = puzzleText(want);
+                    ui.puzzleIn.value = '';
+                    ui.puzzleSaid.textContent = '';
+                    ui.puzzleIn.disabled = false;
+                    try { ui.puzzleIn.focus({ preventScroll: true }); } catch { /* ignore */ }
+                } else if (document.activeElement === ui.puzzleIn) {
+                    ui.puzzleIn.blur();
+                }
+            }
+        }
+        // the base: as soft as the meter says while the colony sleeps, rigid when it wakes
+        scene?.setSoftness(asleep ? softness(w.stability) : 0);
     }
 
     /** The dry runs behind the cryo buttons. Once a colony day, never per frame. */
@@ -685,6 +750,8 @@ export function init() {
         const sum = sleep(state, days, { alarms: true, slots: layout.slots, rng: Math.random, maxSteps: 20000 });
         placeBuilt(sum.built);
         addToSum(sum);
+        // the Watcher counts the years, drifts, and banks what the machines spared
+        sum.watch = watchSleep(state.watcher, { days: sum.days, tier: state.cryo, spare: sum.spare });
         report = dryRun();
         scene?.setState(state, layout);
         return sum;
@@ -701,6 +768,7 @@ export function init() {
         state.asleep = true;
         ui.root.classList.add('is-sleeping');
         sleepSum = freshSum();
+        armPuzzles(state.watcher, state.cryo);
         // falling asleep: the first moment spins like the odometer it always was
         const before = snapshot();
         roll = { from: before, to: before, t0: performance.now(), dur: 0.05, ease: linear };
@@ -708,7 +776,8 @@ export function init() {
         saveGame();
         await rollTo(snapshot(), SLEEP_TIMING.spin, odometer);
         setBusy(false);
-        if (sum.alarm) { await wake(sum.alarm); return; }
+        const woke = alarmOf(sum);
+        if (woke) { await wake(woke); return; }
         runSleep();
     }
 
@@ -723,6 +792,11 @@ export function init() {
         if (sleepInterval) clearInterval(sleepInterval);
         sleepInterval = null;
     }
+    /** What wakes the colony after a chunk of sleep: an alarm, or the Watcher rebooting. */
+    function alarmOf(sum) {
+        if (sum.alarm) return sum.watch?.rebooted ? { ...sum.alarm, rebooted: true } : sum.alarm;
+        return sum.watch?.rebooted ? { kind: 'reboot' } : null;
+    }
     function sleepTick() {
         if (busy || !state.asleep) return;
         const now = performance.now();
@@ -730,13 +804,19 @@ export function init() {
         const dt = Math.min(0.25, Math.max(0, (now - lastSleepAt) / 1000));
         lastSleepAt = now;
         if (!(dt > 0)) return;
+        // paused: no colony days, no drift; the odometer holds where it stands
+        const days = sleepDays(dt, CRYO[state.cryo].days, paused());
+        if (!(days > 0)) return;
         // draw where the roll stands before starting the next one: a tab that gets no frames
         // (hidden, or a pane in the background) still sees the years move ten times a second
         drawCounters(rollingValue(now));
-        const sum = sleepChunk(CRYO[state.cryo].days * dt);
+        const sum = sleepChunk(days);
         rollTo(snapshot(), SLEEP_TICK_MS / 1000 + 0.02);
         sleepTicks++;
-        if (sum.alarm) { wake(sum.alarm).catch((e) => console.error('the deep: the wake broke', e)); return; }
+        const woke = alarmOf(sum);
+        if (woke) { wake(woke).catch((e) => console.error('the deep: the wake broke', e)); return; }
+        // a riddle, now and then, never over an alarm
+        if (puzzleDue(state.watcher, { asleep: true, alarmPending: busy })) openPuzzle(state.watcher, state);
         updateChrome();
         if (sleepTicks % 10 === 0) saveGame();
     }
@@ -751,9 +831,14 @@ export function init() {
         stopSleep();
         setBusy(true);
         state.asleep = false;
-        const line = alarmLine(alarm);
-        const extra = alarm.kind === 'scouts' ? (alarm.landed || []).slice(1).map(scoutLine) : [];
-        feed = pushFeed(feed, [line, ...extra]);
+        // the alarm is a jolt to the Watcher; a low one says it slightly wrong, never the reboot
+        const w = state.watcher;
+        const rebooted = alarm.kind !== 'reboot' && (alarmHit(w, alarm.kind) || !!alarm.rebooted);
+        const said = alarm.kind === 'reboot' ? [alarmLine(alarm)]
+            : watcherLines(w, [alarmLine(alarm), ...(alarm.kind === 'scouts' ? (alarm.landed || []).slice(1).map(scoutLine) : [])]);
+        if (rebooted) said.push(alarmLine({ kind: 'reboot' }));
+        const line = said[0];
+        feed = pushFeed(feed, said);
         advisorLine = `Year ${group(calendar(state.day).year)}. ${line}`;
         const t = sleepSum || freshSum();
         const ran = {};
@@ -843,6 +928,71 @@ export function init() {
     /** Nothing is clickable while the years are running, but the sun. */
     const guarded = (fn) => () => { if (!busy && !state.asleep) fn(); };
 
+    // ---- the Watcher's two hands: the snap and the riddle ----------------------
+    /** A click on the base while the colony sleeps: it snaps rigid, and holds a little. */
+    function snapBase() {
+        if (!state.asleep || busy) return;
+        scene?.snap();
+        if (paused()) return;            // the base snaps; nothing is earned while time holds
+        if (snapWatcher(state.watcher, Date.now()) > 0) {
+            ui.watcher?.classList.remove('is-held');
+            void ui.watcher?.offsetWidth;          // restart the one-shot
+            ui.watcher?.classList.add('is-held');
+        }
+        updateChrome();
+    }
+    let press = null;
+    ui.sceneHost.addEventListener('pointerdown', (e) => {
+        press = e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+    }, { signal });
+    ui.sceneHost.addEventListener('pointerup', (e) => {
+        const p = press;
+        press = null;
+        if (!p || e.button !== 0) return;
+        if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > CLICK_PX || performance.now() - p.t > CLICK_MS) return;
+        snapBase();
+    }, { signal });
+
+    /** The riddle's answer, typed. Enter answers, Escape lets it go. */
+    function sayOnCard(text, cls) {
+        ui.puzzleSaid.textContent = text;
+        ui.puzzle.classList.remove('is-right', 'is-wrong');
+        void ui.puzzle.offsetWidth;
+        ui.puzzle.classList.add(cls);
+    }
+    function answer() {
+        const w = state.watcher;
+        if (!state.asleep || busy || paused() || !w.puzzle) return;
+        const out = answerPuzzle(w, ui.puzzleIn.value, state.cryo);
+        if (!out) { sayOnCard('?', 'is-wrong'); return; }
+        if (out.ok) {
+            state.stars += puzzleStars(report.stars);
+            ui.puzzleIn.disabled = true;
+            sayOnCard(`+${Math.round(out.gained)}`, 'is-right');
+            // the card lingers a moment on its answer, then goes
+            lingerUntil = performance.now() + 900;
+            setTimeout(() => updateWatcher(), 950);
+            updateChrome();
+            saveGame();
+            return;
+        }
+        ui.puzzleIn.value = '';
+        sayOnCard(`${Math.round(out.gained)}`, 'is-wrong');
+        if (out.rebooted) { wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e)); return; }
+        updateChrome();
+        saveGame();
+    }
+    ui.puzzleIn?.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); answer(); }
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            dismissPuzzle(state.watcher, state.cryo);
+            updateChrome();
+            saveGame();
+        }
+    }, { signal });
+
     ui.digBtn.addEventListener('click', guarded(dig), { signal });
     for (const { type, el } of ui.roomBtns) el.addEventListener('click', guarded(() => buildRoom(type)), { signal });
     ui.levelBtn.addEventListener('click', guarded(levelWeakest), { signal });
@@ -892,6 +1042,8 @@ export function init() {
     function dayTick() {
         if (busy || state.asleep) return;
         const now = performance.now();
+        // paused: the day does not come, and nothing is owed for it afterwards
+        if (paused()) { lastDayAt = now; return; }
         const elapsed = Math.round((now - lastDayAt) / 1000);
         // Away from the tab the timer is throttled. Catch up a little, never a
         // whole night: there is no offline progress in the deep yet.
@@ -936,7 +1088,9 @@ export function init() {
         const dt = Math.min(0.05, (now - lastFrame) / 1000);
         lastFrame = now;
         if (roll) drawCounters(rollingValue(now));
-        scene?.step(dt);
+        // paused, the scene still draws (and the camera still turns by hand), but nobody walks
+        // and the base's jitter holds still
+        scene?.step(paused() ? 0 : dt);
         rafId = requestAnimationFrame(frame);
     }
     rafId = requestAnimationFrame(frame);
@@ -971,8 +1125,17 @@ export function init() {
     let debugOn = false;
     try { debugOn = window.location.search.includes('debug') || localStorage.getItem(DEBUG_KEY) === '1'; } catch { /* ignore */ }
     if (debugOn) {
-        window.debug_deep = (what) => {
+        window.debug_deep = (what, n) => {
             if (what === 'minerals') state.minerals += 1e6;
+            else if (what === 'stability') {
+                // the Watcher's meter, set by hand: 0 reboots at the next sleeping tick
+                state.watcher.stability = Math.max(0, Math.min(STABILITY_MAX, Number(n) || 0));
+            } else if (what === 'capacity') state.watcher.capacity = Math.max(0, Math.min(CAPACITY_MAX, Number(n ?? CAPACITY_MAX)));
+            else if (what === 'puzzle') {
+                // a riddle now, whatever the gap and the capacity say
+                state.watcher.capacity = Math.max(state.watcher.capacity, CAPACITY_MAX);
+                if (!state.watcher.puzzle) openPuzzle(state.watcher, state);
+            }
             else if (what === 'stars') state.stars += 1e8;
             else if (what === 'day100') { for (let i = 0; i < 100; i++) report = tickDay(state, state.asleep); }
             else if (what === 'sleep') { pressCryo(); return; }

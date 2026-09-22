@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.46.0 - 2026-09-22 (chapter IV, slice 5)
+
+### The Watcher: stability, the base softens and snaps, riddles, capacity
+
+- **Something stays awake.** From the first sleep, while the colony is under the ice, a slow pulse and a mono label sit at the bottom of the window: SYSTEM AWAKE. After a century of slept years the label reads THE WATCHER, once, quietly. Under it a STABILITY meter (100 at the start, a mono number, no explanation) and a thin sliver of capacity. It is the brightest thing in the sleep world besides the lamps, and it is gone when the colony wakes. Nothing says what it is.
+- **Stability drifts** with slept years, scaled by the tier so a real second of sleep costs about the same at every rate: 1.0 a second at Cryo I, up to 2.2 at Cryo VII. Alarms are steps down (6 for food, energy, a stall or too few; 2 for good news; nothing for the hand). At zero the system reboots: "Woke: the system rebooted." and the meter comes back at 40.
+- **The base softens.** Below 80 the plates, the lanes cut into them and the shaft lose their rigidity: a slow swell, a sag and a fine jitter in the vertex shader, growing as the meter falls, still two colours. Below 35 the wake lines go slightly wrong (a word left out or said twice, at most one line in five; the reboot line never).
+- **Snap.** Asleep, the cursor over the model is a crosshair. A click on the base snaps it rigid with a short ease and a soft flash, and gives +5 stability, at most once every 4 real seconds.
+- **Riddles.** Now and then a small card under the Watcher: the next term of a seeded sequence ("2, 5, 11, 23, 47, ?"). Enter answers, Escape lets it go. Right: +15 stability, a month of the machine's wins, and 50 of the 100 capacity. Wrong: -5, and it stays. At most one per 20 real seconds of sleep, never over an alarm, and only when the capacity is there.
+- **Capacity from the machines.** Per slept day, the spare energy times 0.001, at most 4 a real second, into a pool of 100. No spare energy, no riddles: the Watcher is fed by the M F E H game.
+- **Pause.** The chapter honours the shell's pause (`window.__rpiPaused`): no colony days awake or asleep, no drift, and the scene renders without moving anyone or the jitter.
+- The save goes to schema 3 with a migration (a colony that slept before gets a fresh Watcher at its next sleep). Checkpoint "IV · the Watcher" (asleep at a century a second, stability 55, capacity full, a riddle seconds away); `debug_deep('stability', n)`, `debug_deep('capacity', n)`, `debug_deep('puzzle')`.
+- Sim unchanged: 28m40s to year 802 701, 85 wake-ups. It now reports the Watcher, unattended (no snaps, no riddles, reboots do not wake): stability 25 at the end, 2 reboots, named at 17m50s (year 104), capacity first full at 15m01s.
+
 ## v1.45.0 - 2026-09-22 (chapter IV, after Ola's playtest of v1.44.0)
 
 ### Survival in one word, scouts with odds, the shaft up, you can always try to go up

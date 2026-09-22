@@ -629,3 +629,114 @@ body.in-deep #version-info { z-index: 1400; }
 }
 #phase-deep .btn.is-captioned .deep-caption { display: block; }
 #phase-deep .btn.is-captioned:hover .deep-caption { opacity: 0; }
+
+/* ---- v1.46.0: THE WATCHER ------------------------------------------------
+   The one bright thing in the sleep world besides the lamps on the plates: a slow pulse, a
+   name in mono, a meter, a sliver of capacity, and now and then a riddle under it. It is only
+   there while the colony sleeps. No sentence says what it is. */
+#deep-watcher {
+    left: 50%;
+    bottom: 34px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #f4efe2;
+    animation: deep-watcher-in 1200ms ease;
+}
+#deep-watcher[hidden] { display: none; }
+@keyframes deep-watcher-in { from { opacity: 0; } }
+.deep-watcher-head { display: flex; align-items: center; gap: 10px; }
+/* the pulse: slow, and only while the Watcher watches (the whole block is gone awake) */
+.deep-watcher-pulse {
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #f4efe2;
+    box-shadow: 0 0 10px rgba(244, 239, 226, 0.55);
+    animation: deep-watch-pulse 3.6s ease-in-out infinite;
+}
+@keyframes deep-watch-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+.deep-watcher-name { font-size: 11px; letter-spacing: 0.32em; color: #f4efe2; }
+.deep-watcher-meter { display: flex; align-items: center; gap: 8px; }
+.deep-watcher-word { font-size: 9px; letter-spacing: 0.24em; color: #b9b3a5; }
+.deep-watcher-track {
+    position: relative;
+    width: 140px;
+    height: 4px;
+    border-radius: 9999px;
+    background: #2a2f36;
+    overflow: hidden;
+}
+.deep-watcher-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    border-radius: 9999px;
+    background: #f4efe2;
+    transition: width 300ms linear;
+}
+.deep-watcher-val { font-size: 12px; color: #f4efe2; min-width: 24px; text-align: right; }
+#deep-watcher.is-low .deep-watcher-fill { background: #d9a25f; }
+#deep-watcher.is-low .deep-watcher-val { color: #d9a25f; }
+/* a snap that held: the meter brightens once */
+#deep-watcher.is-held .deep-watcher-fill { animation: deep-held 600ms ease; }
+@keyframes deep-held { 0% { filter: brightness(1.8); } 100% { filter: none; } }
+/* capacity: what the machines spare, a sliver under the meter */
+.deep-watcher-cap {
+    position: relative;
+    width: 140px;
+    height: 2px;
+    margin-left: 44px;
+    border-radius: 9999px;
+    background: #1f242b;
+    overflow: hidden;
+}
+.deep-watcher-cap-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: #8fa1b6;
+    transition: width 300ms linear;
+}
+/* the riddle: its slot is kept, so the Watcher never jumps when one comes */
+.deep-puzzle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 34px;
+    margin-top: 4px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: rgba(20, 24, 30, 0.86);
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 400ms ease;
+}
+.deep-puzzle.is-on { visibility: visible; opacity: 1; }
+.deep-puzzle-q { font-size: 13px; color: #f4efe2; white-space: nowrap; }
+.deep-puzzle-in {
+    width: 64px;
+    padding: 2px 6px;
+    border: 0;
+    border-radius: 6px;
+    outline: none;
+    background: #2a2f36;
+    color: #f4efe2;
+    font-size: 13px;
+    text-align: right;
+    user-select: text;
+}
+.deep-puzzle-in:focus { background: #343a43; }
+.deep-puzzle-said { font-size: 12px; min-width: 26px; color: #b9b3a5; }
+.deep-puzzle.is-right .deep-puzzle-said { color: #b9d4a8; }
+.deep-puzzle.is-wrong .deep-puzzle-said { color: #d9a25f; }
+.deep-puzzle.is-wrong { animation: deep-shake 320ms ease; }
+@keyframes deep-shake { 20% { transform: translateX(-4px); } 60% { transform: translateX(4px); } 100% { transform: none; } }
+/* asleep, the base answers to a click: the cursor says so, nothing else does */
+#phase-deep.is-sleeping #deep-scene canvas { cursor: crosshair; }

@@ -593,6 +593,27 @@
             </button>
         </div>
 
+        <!-- v1.46.0: what stays awake while the colony sleeps. Only in the sleep world: a slow
+             pulse, a name, a meter, the machines' spare capacity, and now and then a riddle -->
+        <div class="deep-chrome" id="deep-watcher" hidden>
+            <div class="deep-watcher-head">
+                <span class="deep-watcher-pulse"></span>
+                <span class="deep-mono deep-watcher-name" id="deep-watcher-name">SYSTEM AWAKE</span>
+            </div>
+            <div class="deep-watcher-meter">
+                <span class="deep-mono deep-watcher-word">STABILITY</span>
+                <span class="deep-watcher-track"><span class="deep-watcher-fill" id="deep-stab-fill"></span></span>
+                <span class="deep-mono deep-watcher-val" id="deep-stab-val">100</span>
+            </div>
+            <div class="deep-watcher-cap"><span class="deep-watcher-cap-fill" id="deep-cap-fill"></span></div>
+            <div class="deep-puzzle" id="deep-puzzle">
+                <span class="deep-mono deep-puzzle-q" id="deep-puzzle-q"></span>
+                <input class="deep-mono deep-puzzle-in" id="deep-puzzle-in" type="text" inputmode="numeric"
+                    autocomplete="off" spellcheck="false" aria-label="Answer">
+                <span class="deep-mono deep-puzzle-said" id="deep-puzzle-said"></span>
+            </div>
+        </div>
+
         <div class="deep-chrome" id="deep-mark">IV &middot; THE DEEP</div>
     </div>
 
@@ -618,7 +639,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.45.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.46.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

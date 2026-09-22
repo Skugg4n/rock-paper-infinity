@@ -570,3 +570,60 @@ which Ola loves, is the sleep world).
   upgrades, stability as a currency for longer sleeps.
 - Slice 7: Biological upgrades, confinement, plates turning organic, colonists as cost.
 - Slice 8: the last wake-up, the Watcher's ascent, hand-over to V.
+
+## Built: slice 5 (v1.46.0)
+
+The Watcher, first slice. The rules are in `src/phase4/watcher.js` (pure, tested in
+`watcher.test.js`); the phase wires them, the scene softens.
+
+- **The entity.** Only while the colony sleeps, bottom centre: a slow pulse, a mono label, a
+  STABILITY meter with its number, a sliver of capacity, and a slot for a riddle (kept, so the
+  Watcher never jumps). The label reads SYSTEM AWAKE and becomes THE WATCHER at
+  `NAME_AT_YEARS` = 100 slept years (a century: longer than anyone who came down would have
+  lived awake; minute 18 of the simulated run, halfway through the sleeps). It changes once.
+- **Stability** starts at 100. `watchSleep()` takes one point per `driftYears(tier)` slept years,
+  which is `DRIFT_PER_SECOND` (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2) per real second at each tier.
+  `alarmHit()`: 6 for a bad alarm (food, energy, stall, few), 2 for good news, 0 for the hand,
+  a test or the reboot. At zero the system reboots (`REBOOT_TO` = 40) and the colony wakes:
+  "Woke: the system rebooted." (glyph: power). An alarm that takes the last of it wakes with its
+  own line and the reboot line after it.
+- **The base softens** (`softness(stability)`: 0 above 80, 1 at 0). In `scene.js` the plate, lane
+  and house materials share a vertex shader hook: a swell, a sag and a fine jitter, functions of
+  world position and time, amplitude up to 0.42 world units; the slabs, bridges, lanes and the
+  shaft are subdivided so they bend in the middle. Awake the target is 0 and it firms up.
+- **Snap.** A click on the canvas while asleep (under 6 px and 500 ms, so a drag of the camera is
+  not a click) eases the softness to zero in 0.28 s with a soft flash on the plates, holds it for
+  1.6 s, then lets it give again. `snap()` gives +5, at most once per 4 s of wall clock. The
+  cursor over the canvas is a crosshair while asleep; no text.
+- **The feed goes slightly wrong** below 35: `shouldGarble()` (probability rising as the meter
+  falls, never twice within five lines) and `garble()` (one word left out or said twice, never the
+  first word, never a line under four words). Applied to the lines written at a wake; the reboot
+  line is never garbled.
+- **Riddles.** One type: the next term of a seeded sequence (`makePuzzle(seed, colony)`: add a
+  step, double plus a step, times two or three, growing steps, squares, Fibonacci-like), started
+  from the colony's chamber count. `puzzleDue()`: asleep, no riddle open, no alarm pending,
+  capacity at least 50, and `puzzleGapYears(tier)` (20 real seconds at the tier's rate) since
+  the last. Right: -50 capacity, +15 stability, `puzzleStars()` (30 days of the machine's wins,
+  at least 100). Wrong: -5, the card stays and shakes. A non-number costs nothing. Escape lets it
+  go and starts the gap again. An open riddle is saved and comes back at the next sleep.
+- **Capacity.** Per slept day, `sum.spare` (the energy the generators made beyond what the rooms
+  drew, now summed by `sleep()`) times 0.001, at most 4 per real second, into a pool of 100. The
+  per-second cap is there because spare energy grows 10^8-fold over the chapter: without it the
+  pool refilled within one tick from Cryo II on and a riddle's price meant nothing.
+- **Pause.** `window.__rpiPaused` (set by the shell): the day tick and the sleep tick do nothing
+  (`sleepDays(dt, rate, paused)` is 0), so no drift; a snap still snaps but earns nothing; the
+  scene steps with dt 0, so it renders without moving walkers or the jitter clock.
+- **Save**: schema 3, `state.watcher` (`stage`, `stability`, `capacity`, `sleptYears`, `seed`,
+  `nextPuzzleYears`, `puzzle`, `sinceGarble`, `lastSnapAt`, `reboots`, `solved`); migration 2 gives
+  an older colony a fresh Watcher; `normalizeWatcher()` mends a broken one. Checkpoint
+  `iv-watcher`; `debug_deep('stability', n)`, `('capacity', n)`, `('puzzle')`.
+
+**Simulation**: the loop is unchanged (28m40s to year 802 701, 85 wake-ups, byte for byte in its
+first line). A second line reports the Watcher unattended (the greedy player never clicks or
+solves, and a reboot does not wake it): stability 25 at the end, lowest 1, 2 reboots, named at
+17m50s (year 104), capacity first full at 15m01s. The sim's player sleeps under a second per
+sleep on average (1m19s asleep over 85 sleeps), so the Watcher's balance needs a real playtest
+(B118).
+
+Left for later: B111 Surface as an entity, B112 RPS exchanges, B113 system and hardware
+upgrades, B114 biological upgrades, B115 confinement, B116 the ending, B117 more riddle types.

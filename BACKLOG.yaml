@@ -1014,3 +1014,85 @@ items:
       an advisor line when a tier opens ("Cryo IV is ready: a century a second.").
     status: done
     resolved_in: "v1.45.0"
+
+  - id: B110
+    added: 2026-09-22
+    source: "the Watcher (Ola's design, docs/superpowers/specs/2026-09-21-chapter-iv-the-deep-design.md), slice 5"
+    request: |
+      The game inside the sleep, first slice: the Watcher appears at the first
+      sleep (SYSTEM AWAKE, later THE WATCHER), a STABILITY meter that drifts with
+      slept years and drops on alarms, the base softens as it falls and snaps
+      back on a click, a riddle that costs capacity from the generators, a
+      reboot at zero that wakes the colony.
+    status: done
+    resolved_in: "v1.46.0"
+
+  - id: B111
+    added: 2026-09-22
+    source: "the Watcher, slice 6"
+    request: |
+      Surface as an entity during cryo: it appears in the dark, a short
+      conversation, and vanishes with everything about it when the sleep ends.
+    status: open
+
+  - id: B112
+    added: 2026-09-22
+    source: "the Watcher, slice 6 (Ola: RPS must have a flavour in IV)"
+    request: |
+      Rock, paper, scissors exchanges with Surface during the sleep.
+    status: open
+
+  - id: B113
+    added: 2026-09-22
+    source: "the Watcher, slice 6"
+    request: |
+      Upgrades to the Watcher: system, then hardware, paid in power during cryo
+      and minerals. Stability as a currency for longer sleeps.
+    status: open
+
+  - id: B114
+    added: 2026-09-22
+    source: "the Watcher, slice 7"
+    request: |
+      Biological upgrades: human grade brain tissue, nervous system, spinal
+      cooling fluid, skin receptors. Paid first in power and minerals, then in
+      beds and dormitories, then in the colonists themselves.
+    status: open
+
+  - id: B115
+    added: 2026-09-22
+    source: "the Watcher, slice 7"
+    request: |
+      Confinement: colonists confined to areas so they do not understand; the
+      areas change graphically as the biological body takes them over (plates
+      turning organic).
+    status: open
+
+  - id: B116
+    added: 2026-09-22
+    source: "the Watcher, slice 8"
+    request: |
+      The ending: the last wake-up where no one wakes, the Watcher's ascent with
+      the biomass, the hand-over to V (and VI · CLONES from the originals).
+    status: open
+
+  - id: B117
+    added: 2026-09-22
+    source: "the Watcher, slice 5 (what was left out)"
+    request: |
+      More riddle types (scientific, arithmetic with the colony's own numbers,
+      logic), and riddles that grow harder with the slept years. Slice 5 has one
+      type: the next term of a seeded sequence.
+    status: open
+
+  - id: B118
+    added: 2026-09-22
+    source: "the Watcher, slice 5 (balance)"
+    request: |
+      Tune the Watcher on a real playtest: drift per real second (1.0 to 2.2 by
+      tier), the snap (+5, 4 s cooldown), riddles (+15, one per 20 s of sleep,
+      50 of 100 capacity), capacity (spare energy x 0.001 a day, at most 4 a real
+      second). The simulated greedy player sleeps under a second per sleep, so
+      the sim cannot say how it feels; unattended it reboots twice a chapter.
+      Open question: should stability recover while the colony is awake?
+    status: open

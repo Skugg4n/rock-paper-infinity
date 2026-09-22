@@ -11,6 +11,7 @@ import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from 
 import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
+import { initialWatcher, puzzleGapYears } from './phase4/watcher.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
 const P4 = PHASE4_CONSTANTS.SAVE_KEY;
@@ -137,9 +138,33 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-watcher', label: 'IV · the Watcher', apply: () => {
+        clearAll();
+        // Deep into the sleeps (v1.46.0): asleep at a century a second, the Watcher named, its
+        // stability at 55 (the base has begun to soften), the machines' capacity full, and a
+        // riddle a few seconds away. Left alone, the meter reaches zero in about half a minute
+        // and the system reboots.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        const day = 5000 * DAYS_PER_YEAR;
+        const slept = 4800;
+        Object.assign(deep, {
+            day, minerals: 4.0e6, food: 2.0e6, stars: 6.0e14, humans: 900,
+            chambers: 26, rooms: { mine: 8, farm: 6, generator: 6, dorm: 4, cryo: 1 },
+            level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
+            auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
+            cryo: 3, asleep: true,
+            est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
+            watcher: {
+                ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: slept, seed: 3,
+                nextPuzzleYears: slept + puzzleGapYears(3) / 4,
+            },
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
-export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4] };
+export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3] };
 
 const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 

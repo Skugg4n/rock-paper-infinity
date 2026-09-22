@@ -115,7 +115,7 @@ export const DESCENT_LINE = 'The surface will heal. Not in our lifetimes. We dig
 /** The glyph each alarm puts on the wake-up strip. */
 export const ALARM_GLYPH = {
     food: 'wheat', energy: 'zap', stall: 'triangle-alert', few: 'user-minus', scouts: 'radar',
-    estimate: 'sunrise', surface: 'sunrise', act: 'check', manual: 'sun', debug: 'bell',
+    estimate: 'sunrise', surface: 'sunrise', act: 'check', manual: 'sun', debug: 'bell', reboot: 'power',
 };
 /** A stalled room shows its own glyph instead: the mine that stopped, not a warning sign. */
 export const alarmGlyph = (alarm, roomIcon = {}) => (alarm?.kind === 'stall' && roomIcon[alarm.type])
@@ -198,6 +198,9 @@ export function alarmLine(alarm) {
     }
     case 'debug':
         return 'Woke: a test alarm.';
+    case 'reboot':
+        // v1.46.0: the Watcher's stability ran out. Said plainly, and never said wrong.
+        return 'Woke: the system rebooted.';
     default:
         return 'Woke: the hall was opened by hand.';
     }

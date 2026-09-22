@@ -15,6 +15,7 @@ import {
   startBuild, completeBuilds, buildPending, BUILD_DAYS, sleepTrouble, launchProbe, resolveDueProbes,
   probeCost, scoutParty, MIN_SLEEPERS, PROBE_ENERGY, repairTick,
 } from '../src/phase4/deep.js';
+import { initialWatcher, watchSleep, alarmHit, NAME_AT_YEARS } from '../src/phase4/watcher.js';
 
 const WAIT_DAYS = 30;        // a human waits this long awake for a purchase; longer than that, they sleep
 const SLEEP_SECONDS = 3;     // real seconds a sleep costs around it: the walk in, the walk out, reading the wake line
@@ -29,6 +30,11 @@ let seed = seedArg > 0 ? Number(process.argv[seedArg + 1]) || 1 : 1;
 const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 const s = initialDeepState();
+// v1.46.0: the Watcher, REPORTED only. The greedy player never clicks the base and never
+// solves a riddle, and a reboot does not wake this colony: the loop is the one the balance was
+// measured on. What it says is how an unattended Watcher would fare over the whole chapter.
+const w = initialWatcher();
+let named = null, lowest = 100, capFullAt = null;
 let real = 0, wakeUps = 0, buysThisWake = 0;
 const alarmsSeen = {};
 let scoutsSent = 0, scoutsLost = 0, monsters = 0, diedInIce = 0, handWakes = 0, sleepReal = 0;
@@ -153,6 +159,10 @@ while (real < REAL_CAP && !canAscend(s)) {
       const sum = sleep(s, rate, { alarms: true, slots: slots(), rng });
       const spent = sum.days / rate;
       real += spent; sleepReal += spent;
+      if (watchSleep(w, { days: sum.days, tier: s.cryo, spare: sum.spare }).named) named = { real, year: s.day / DAYS_PER_YEAR };
+      if (sum.alarm) alarmHit(w, sum.alarm.kind);
+      lowest = Math.min(lowest, w.stability);
+      if (capFullAt === null && w.capacity >= 100) capFullAt = real;
       diedInIce += sum.died;
       for (const k of COLUMN) { hist[k] += sum.weakest[k] || 0; weakAsleep[k] += sum.weakest[k] || 0; }
       for (const l of sum.landed) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
@@ -184,6 +194,7 @@ const share = (o) => COLUMN.map((k) => { const tot = COLUMN.reduce((a, c) => a +
 const avgBuys = buysPerWake.length ? (buysPerWake.reduce((a, b) => a + b, 0) / buysPerWake.length).toFixed(1) : '0';
 const alarmText = Object.entries(alarmsSeen).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ');
 console.log(`ended at ${fmt(real)}  year ${yr(s.day)}  survival ${survival(surface(s.doom0, s.day)).toFixed(1)} %  wake-ups ${wakeUps} (${alarmText}; ${avgBuys} buys each, sleeps per tier ${pressesPerTier.join('/')}, ${fmt(sleepReal)} asleep)  scouts ${scoutsSent} (lost ${scoutsLost}, monsters ${monsters})  died in the ice ${Math.round(diedInIce)}  humans ${Math.round(s.humans)} (low ${Math.round(minHumans)}, hungry ${starved} d)  longest stall ${worstStall} s  chambers ${s.chambers}  cryo ${s.cryo + 1}/${CRYO.length}  stars/day ${starsDay0.toPrecision(3)} → ${starsDayEnd.toPrecision(3)} (×${(starsDayEnd / (starsDay0 || 1)).toPrecision(2)})  weakest awake ${share(weakAwake)} | asleep ${share(weakAsleep)}  ascent ${canAscend(s)} (ring ${canResurface(s)})`);
+console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (${NAME_AT_YEARS} slept y)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

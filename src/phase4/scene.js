@@ -75,6 +75,32 @@ const MACHINE_HTML = '<span class="deep-machine">'
     + '<span class="rps"><i data-lucide="scissors" class="w-3.5 h-3.5"></i></span>'
     + '<span class="win"><i data-lucide="star" class="w-3.5 h-3.5"></i></span></span>';
 
+/* THE BASE SOFTENS (v1.46.0). While the colony sleeps the Watcher keeps the structure, and as
+   its stability falls the plates, the lanes cut into them and the shaft lose their rigidity:
+   every vertex is moved by a slow swell, a sag and a fine jitter, all functions of where it
+   stands in the world and of the time, so neighbouring slabs bend together. Done in the vertex
+   shader (one uniform for the amplitude), so it costs nothing per frame on the CPU and the
+   two colours stay two colours. A click snaps it rigid again, with a soft flash. */
+const SOFT_AMP = 0.42;          // world units of movement at full softness (a slab is 0.26 thick)
+const SOFT_FOLLOW = 0.8;        // how fast the softness follows the stability, per second
+const SNAP_EASE = 0.28;         // seconds the snap takes
+const SNAP_HOLD = 1.6;          // seconds it stays rigid before it starts to give again
+const SNAP_RETURN = 0.22;       // and how slowly it gives, per second
+const SOFT_GLSL = `
+uniform float uSoft;
+uniform float uTime;
+vec3 deepSoft(vec3 p) {
+    if (uSoft <= 0.0) return vec3(0.0);
+    float swell = sin(p.x * 1.3 + uTime * 0.9) * sin(p.z * 1.1 - uTime * 0.7);
+    float sag = sin(p.x * 0.55 + p.z * 0.4 + uTime * 0.45);
+    float jit = sin(p.x * 9.0 + uTime * 17.0) * sin(p.z * 8.0 - uTime * 13.0);
+    return uSoft * vec3(
+        0.22 * sin(p.y * 0.9 + p.z * 0.8 + uTime * 0.6) + 0.04 * jit,
+        0.55 * swell + 0.35 * sag + 0.06 * jit,
+        0.22 * sin(p.y * 0.8 + p.x * 0.9 - uTime * 0.5) + 0.04 * jit);
+}
+`;
+
 /** Which glyph stands for which room. */
 export const ROOM_ICON = { mine: 'pickaxe', farm: 'sprout', generator: 'zap', dorm: 'bed', cryo: 'snowflake' };
 
@@ -185,15 +211,39 @@ export function createScene(container, opts = {}) {
     lamp.position.set(1.2, 8, 1.6);
     scene.add(lamp);
 
-    const plateMat = new THREE.MeshLambertMaterial({ color: PLATE });
+    // the softening: one amplitude and one clock, shared by every material the base is made of
+    const softU = { uSoft: { value: 0 }, uTime: { value: 0 } };
+    function soften(mat) {
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uSoft = softU.uSoft;
+            shader.uniforms.uTime = softU.uTime;
+            shader.vertexShader = SOFT_GLSL + shader.vertexShader.replace('#include <project_vertex>', [
+                'vec4 mvPosition = modelMatrix * vec4( transformed, 1.0 );',
+                'mvPosition.xyz += deepSoft( mvPosition.xyz );',
+                'mvPosition = viewMatrix * mvPosition;',
+                'gl_Position = projectionMatrix * mvPosition;',
+            ].join('\n'));
+        };
+        mat.customProgramCacheKey = () => 'deep-soft';
+        return mat;
+    }
+    let softTarget = 0;             // 0..1, from the Watcher's stability
+    let softNow = 0;                // where it stands this frame
+    let snapping = null;            // { k, from } while the snap eases the base rigid
+    let snapHold = 0;               // seconds left of rigid after a snap
+    let flash = 0;                  // the soft flash of a snap, 1 to 0
+    let softClock = 0;
+
+    const plateMat = soften(new THREE.MeshLambertMaterial({ color: PLATE }));
     const crustMat = new THREE.MeshLambertMaterial({ color: CRUST });
     const rubbleMat = new THREE.MeshLambertMaterial({ color: RUBBLE });
     const holeMat = new THREE.MeshBasicMaterial({ color: ROCK });
-    const rockMat = new THREE.MeshLambertMaterial({ color: ROCK });
-    const laneMat = new THREE.MeshBasicMaterial({ color: LANE });
-    const unitBox = new THREE.BoxGeometry(1, 1, 1);
-    const plateGeo = new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_W);
-    const bridgeGeo = new THREE.BoxGeometry(PITCH - PLATE_W + 0.04, PLATE_H, 0.84);
+    const rockMat = soften(new THREE.MeshLambertMaterial({ color: ROCK }));
+    const laneMat = soften(new THREE.MeshBasicMaterial({ color: LANE }));
+    // subdivided, so a slab can swell and sag in its middle and a long lane bends with it
+    const unitBox = new THREE.BoxGeometry(1, 1, 1, 6, 1, 6);
+    const plateGeo = new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_W, 10, 1, 10);
+    const bridgeGeo = new THREE.BoxGeometry(PITCH - PLATE_W + 0.04, PLATE_H, 0.84, 3, 1, 3);
     const LANE_Y = PLATE_H / 2 + 0.012;
 
     // ---- the people: tiny points that keep to the lanes ----
@@ -213,7 +263,7 @@ export function createScene(container, opts = {}) {
     crustSlab.position.set(0, CRUST_Y + CRUST_T / 2, 0);
     above.add(crustSlab);
     const shaftUpH = CRUST_Y - LID_TOP + 0.02;
-    const shaftUp = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R, SHAFT_UP_R, shaftUpH, 28), plateMat);
+    const shaftUp = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R, SHAFT_UP_R, shaftUpH, 28, 10), plateMat);
     shaftUp.position.set(0, LID_TOP + shaftUpH / 2, 0);
     above.add(shaftUp);
     // the rubble the boom left on top of the pipe, and the opening under it once it is cleared
@@ -312,7 +362,7 @@ export function createScene(container, opts = {}) {
         world.add(m);
     }
     function addCylinder(r, h, x, y, z, mat) {
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 32), mat);
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 32, Math.max(1, Math.ceil(h / 0.5))), mat);
         m.position.set(x, y, z);
         world.add(m); solids.push(m);
         return m;
@@ -879,6 +929,30 @@ export function createScene(container, opts = {}) {
 
     const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
     let tween = null;
+
+    /** One frame of the softening: follow the stability, or the snap, and the flash. */
+    function stepSoft(dt) {
+        softClock += dt;
+        if (snapping) {
+            snapping.k = Math.min(1, snapping.k + dt / SNAP_EASE);
+            softNow = snapping.from * (1 - ease(snapping.k));
+            if (snapping.k >= 1) { snapping = null; snapHold = SNAP_HOLD; softNow = 0; }
+        } else if (snapHold > 0) {
+            snapHold -= dt;
+            softNow = 0;
+        } else {
+            // it gives slowly after a snap, and follows the meter a little faster otherwise
+            const rate = softNow < softTarget ? SNAP_RETURN : SOFT_FOLLOW;
+            softNow += (softTarget - softNow) * Math.min(1, dt * rate * 3);
+            if (Math.abs(softTarget - softNow) < 1e-4) softNow = softTarget;
+        }
+        softU.uSoft.value = softNow * SOFT_AMP;
+        softU.uTime.value = softClock;
+        if (flash > 0) {
+            flash = Math.max(0, flash - dt / 0.5);
+            plateMat.emissive.setScalar(0.3 * flash);
+        }
+    }
     const p3 = new THREE.Vector3();
 
     /* ---- everyone at once: into the cryo hall, back out of it, or up and away ----
@@ -1084,6 +1158,7 @@ export function createScene(container, opts = {}) {
             }
             stepMachine(dt);
             stepOutings(dt);
+            stepSoft(dt);
             controls.update();
             updateLabels();
             renderer.render(scene, camera);
@@ -1116,6 +1191,14 @@ export function createScene(container, opts = {}) {
         scoutsUp(n) { return startOuting('up', n); },
         /** A party comes home: dots climb down out of the crust and walk off into the colony. */
         scoutsDown(n) { return startOuting('down', n); },
+        /** How soft the base should be, 0 (rigid) to 1: the Watcher's stability, read by watcher.js's
+         *  softness(). Awake it is 0 and the base firms up again. */
+        setSoftness(k) { softTarget = Math.max(0, Math.min(1, k || 0)); },
+        /** A click on the base while the colony sleeps: rigid again, with a soft flash. */
+        snap() {
+            snapping = { k: 0, from: softNow };
+            flash = 1;
+        },
         /** Where the crust's ring is drawn: an element on the slab, for crust.js to fill. */
         crustHost,
         /** The crust the day they go up: burnt ground with a sky over it. */
@@ -1146,6 +1229,7 @@ export function createScene(container, opts = {}) {
             return {
                 floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march,
                 throws: machineThrow, machineRate, shaftOpen,
+                soft: softNow, softTarget, softAmp: softU.uSoft.value, snapping: !!snapping || snapHold > 0, flash,
                 scouts: outings.map((o) => ({ dir: o.dir, dots: o.dots.length, k: o.k })),
             };
         },

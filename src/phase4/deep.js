@@ -763,14 +763,16 @@ export function troubleIn(s, r) {
  */
 export function sleep(s, days, opts = {}) {
     const { alarms = false, benign = true, slots = [], rng = Math.random, maxSteps = Infinity } = opts;
-    const sum = { days: 0, minerals: 0, food: 0, stars: 0, born: 0, died: 0, weakest: {}, ran: {}, wokenEarly: false, built: [], alarm: null, landed: [] };
+    // `spare`: the energy the generators made beyond what the rooms drew, summed over the days
+    // slept. Nothing in the colony uses it; the Watcher does (v1.46.0, watcher.js).
+    const sum = { days: 0, minerals: 0, food: 0, stars: 0, born: 0, died: 0, spare: 0, weakest: {}, ran: {}, wokenEarly: false, built: [], alarm: null, landed: [] };
     for (const t of ROOMS) sum.ran[t] = 0;
     const opens = resurfaceDay(s.doom0);
     /** How much of a room type actually turned over that day: crew and power, whichever is shorter. */
     const worked = (r, t) => Math.min(r.staff[t], r.power[t]);
     const add = (r, n) => {
         sum.minerals += n * r.minerals; sum.food += n * r.food; sum.stars += n * r.stars;
-        sum.born += n * r.born; sum.died += n * r.died;
+        sum.born += n * r.born; sum.died += n * r.died; sum.spare += n * r.energySpare;
         sum.weakest[r.weakest] = (sum.weakest[r.weakest] || 0) + n;
         for (const t of ROOMS) sum.ran[t] += n * worked(r, t);
     };
