@@ -476,3 +476,97 @@ Still open: while awake, nothing on screen counts down to the next decision unas
 (the tooltips do); early purchases often read "No change to the stars until the
 weakest column moves", which is true but thin; the people's visibility on the light
 plates wants a look on a real screen.
+
+## Built: slice 4 (v1.45.0, 2026-09-22)
+
+Ola after playing v1.44.0: "Scout party returned surface 93 %... what? Whole? Broken?
+You should get some info about how small their chance of survival is. And that ring
+that gets smaller... you understand nothing. Plus we mention a shaft up to the earth
+but there is nothing graphic. And they come back and report something but you still
+cannot act on the information. Could you be allowed to try and then lose people? A bit
+of AI-logic: things that seem to have a function but do not." Also: "wow, much better
+overall". Then, on a later look: say "survival", not "habitable"; the numbers over the
+bars overlap; a greyed "100 y/s" does not say how to unlock it; keep the dark colony
+and the lamps during sleep exactly as they are.
+
+- **Survival, one word.** The rules keep counting doomsday (`surface()`, 85 to 15). The
+  screen only shows `survival(doom) = 100 - doom`, the chance of surviving up there if the
+  colony went now: `SURVIVAL_AT` (85), `survivalNow(s)` (the truth), `believedSurvival(s)`
+  (what the colony believes). The ring on the crust fills as the surface heals, a tick
+  marks 85, the estimate is a lighter band round the reading ("15 ± 40 %", caption
+  "survival if we go up now", tooltip "What the scouts believe. More parties, smaller
+  doubt."), and under it "survival 85 % ~ year 802 701". Readings say what they mean:
+  "Not yet." under 50, "Getting there." under 85, "We could go up." (`verdict()`).
+- **Scouts with odds.** `scoutOdds(s)`: people, days away, price, the four outcomes as
+  whole per cents that add up to 100 (`wholePercents`, largest remainder) for the day the
+  party would come home, and the scatter of a good reading (`probeScatter`). One party at
+  a time (`scoutsOut`); the button shows the time left as a badge and the trip as its ring.
+- **The shaft up.** In `scene.js`, built once outside the rebuilt world: a pipe from the
+  lid's hatch to the crust (a slab at y 4.4 over the lid, in the home view's framing), the
+  ring as a CSS2D label standing over the hatch (a point above the pipe projects above it
+  from every azimuth), rubble on the pipe until `shaftOpen` (set by the first party or the
+  first try; old saves read `probesSent > 0`), then a dark opening. Parties are amber
+  dots (`scoutsUp(n)`, `scoutsDown(n)`, at most 14 drawn): a breadth-first walk on the
+  lanes to an opening on the lid, a turn and a half round the pipe, into the crust.
+- **You can always try.** `canTryAscent(s)` (awake, not gone, at least 3 people) is the
+  only gate. `attemptAscent`: at the ring it is the ending; below it `ascentParty(s)` (a
+  quarter of the colony) dies, the rest wait, and the belief becomes the truth ± 3
+  (`ASCENT_TAUGHT_SPREAD`). A failed try costs people only. The climb's price (`ASCENT`)
+  is gone: at the ring the simulated colony holds it 10^11-fold, so it gated nothing, and
+  `canAscend` is now `canResurface`. `ascentOdds(s)` gives the button the ring's own number.
+- **Numbers.** `short()` in `readout.js` is the one formatter of the chapter (whole under a
+  thousand, then k, M, B, T with one decimal only below ten, then 4.8e15); `formatCount`
+  in the phase is `short`. Bar heads and flows are a size smaller, columns 58 px.
+- **Cryo captions.** `cryoGateShort()` puts the reason beside a locked cryo button
+  ("needs food for 100 y"); `cryoReadyLine()` goes to the feed once when a tier opens.
+- **Audit, fixed:** locked buttons never took a hover (style.css's global `.is-locked`),
+  so every "needs"/"affordable in" note on them was invisible, and their tooltips were
+  drawn at 30 %; `seedFromWar` threw on an unimported constant and the war's salvage and
+  scorch never reached the deep; the scout's energy was shown as a price but never spent;
+  the crust's party glyphs said nothing; level and automation sold upgrades for a room
+  type with no rooms; waits past a millennium are no longer counted out in years; build
+  rings that were never lit are gone from the cryo and ascent buttons.
+
+**Simulation** unchanged, byte for byte: 28m40s to year 802 701, 85 wake-ups, 6 scout
+parties (the greedy player already sent one at a time and never tried the ascent early).
+
+## The Watcher (Ola, 2026-09-22): the game inside the sleep
+
+"Something is missing: it has to be more than pressing fast-forward." Ola's design:
+- **We are the unsleeping system.** When the colony sleeps, the player is THE WATCHER
+  (working names: The Unsleeping System, System Awake), the thing that must keep
+  watch. It appears as an entity in the HUD when the first sleep begins. Two worlds:
+  one when everyone sleeps, one when they wake. Things happen in the sleep that must
+  be dealt with.
+- **Mental stability.** The real game of the deep is the Watcher's sanity, drifting
+  over millennia. The base itself swells, melts, loses rigidity as time rolls; a click
+  on it and snap, it regains its structure. Stability falls with slept years; clicks
+  and puzzles hold it up.
+- **Puzzles as entertainment.** Scientific or mathematical riddles the Watcher solves
+  (text is allowed in IV). They cost capacity/energy that the machines must supply.
+- **Surface as an entity.** During cryo, Surface appears in the dark: a short
+  conversation, a game of rock, paper, scissors (the flavour Ola wants in IV). When the
+  cryo ends, Surface and everything about it vanishes.
+- **Upgrades to the Watcher:** system upgrades, then hardware, then BIOLOGICAL: human
+  grade brain tissue, nervous system, spinal cooling fluid, skin receptors. First they
+  cost power and minerals (power during cryo), then beds and dormitories, then the
+  colonists themselves as fuel. Colonists get confined to areas so they do not
+  understand; areas change graphically as the biological body takes them over.
+- **Ending:** the last wake-up where no one wakes. It will end with having to kill
+  everyone in the colony. Then V (and VI · CLONES from the originals fits: the Watcher
+  goes up with the biomass and clones the people it consumed).
+
+### Claude's read and slice plan
+It is the twist that keeps IV out of Fallout Shelter: the player is the machine and
+the horror is the player's own drift. It gives the sleep a game, the people a role
+(protected first, consumed last) and the chapter an ending. Tone must slide slowly,
+like the doomsday clock in III: the player discovers what they are doing. The sleep
+world and the awake world must look different (the dark colony with indicator lamps,
+which Ola loves, is the sleep world).
+- Slice 5: the Watcher appears at the first sleep (HUD entity, stability meter),
+  the base wobbles and softens with slept years (vertex jitter in three.js), click =
+  snap, one puzzle type costing machine capacity, capacity from generators.
+- Slice 6: Surface as an entity during sleep, RPS exchanges, system and hardware
+  upgrades, stability as a currency for longer sleeps.
+- Slice 7: Biological upgrades, confinement, plates turning organic, colonists as cost.
+- Slice 8: the last wake-up, the Watcher's ascent, hand-over to V.
