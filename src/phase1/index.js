@@ -273,6 +273,8 @@ function scheduleUIUpdate() {
         }
 
         function passiveTick() {
+            // Paused (window.__rpiPaused, main.js): time stands still, the save does not.
+            if (window.__rpiPaused) { saveGame(); return; }
             timed('p1:logicTick', () => {
                 const energyGen = upgrades.energyGenerator.level * ENERGY_PER_GENERATOR_LEVEL;
                 if (energyGen > 0) {
@@ -743,6 +745,8 @@ const uiState = {
             lastTick = performance.now();
             lastUIRender = performance.now();
             const step = (now) => {
+                // Paused: hold still, and keep the clock current so resuming plays no backlog
+                if (window.__rpiPaused) { lastTick = now; autoPlayInterval = requestAnimationFrame(step); return; }
                 if (!autoPlayWantsToRun || (!isMetaBoardActive && !hasEnergy())) {
                     stopAutoPlayInterval();
                     return;

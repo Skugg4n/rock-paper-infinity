@@ -542,3 +542,23 @@ input[type=range]:focus-visible {
     pointer-events: none;
     overflow: hidden;
 }
+
+/* Pause (main.js): a small round button beside the ☰ button. While paused
+   the city sits back a little; nothing is blurred. */
+#pause-btn {
+    position: absolute;
+    left: 56px;
+    bottom: 6px;
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background: #fff;
+    color: #475569;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+#pause-btn:hover { transform: scale(1.1); }
+body.paused #city-area,
+body.paused #phase-industry { opacity: 0.7; transition: opacity 0.2s; }
+/* The version label is also the secret debug switch (five quick clicks). */
+#version-info { z-index: 1501; cursor: default; }
+#version-info.debug-flash { color: #475569; }

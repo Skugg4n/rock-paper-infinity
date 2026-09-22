@@ -938,3 +938,38 @@ items:
       push was not required; it went in anyway (every 3rd wave while we lead)
       because it only bites where the tester found the war easy. It moves the
       sim by at most a plate.
+
+  - id: B084
+    added: 2026-09-22
+    source: "playtest of III (v1.44.0), Ola"
+    request: |
+      We get shot at in the middle of the water long before weapons are
+      invented.
+    status: done
+    resolved_in: "war-playtest-4 (unreleased)"
+    notes: |
+      Guards fought every landing dot, on the water too, with reach forced to
+      gunpowder (Math.max(2, ourTier)); the dots fired back from the water.
+      Now onIsland(path, seg, t) gates all fighting and scripted losses, and
+      reach 0 (fists, swords) only ever shows the clinch burst.
+
+  - id: B085
+    added: 2026-09-22
+    source: "playtest of III (v1.44.0), Ola"
+    request: |
+      A pause button (space bar too).
+    status: done
+    resolved_in: "war-playtest-4 (unreleased)"
+    notes: |
+      window.__rpiPaused, set from main.js. Chapters I to III honour it.
+      Chapter IV must add its own check (phase4 owned by another session).
+
+  - id: B086
+    added: 2026-09-22
+    source: "playtest of III (v1.44.0), Ola"
+    request: |
+      The debug menu should not be in the ☰ menu; a secret way in instead.
+    status: done
+    resolved_in: "war-playtest-4 (unreleased)"
+    notes: |
+      ?debug in the URL, or five clicks within 2 s on the version label.

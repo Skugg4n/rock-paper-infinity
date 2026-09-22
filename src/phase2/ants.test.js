@@ -1,5 +1,5 @@
 /* eslint-env jest */
-import { antCount, streetPath, crossPath, reversePath, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge } from './ants.js';
+import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge } from './ants.js';
 
 describe('ants', () => {
     test('antCount grows with the square root and is capped', () => {
@@ -74,6 +74,31 @@ describe('ants', () => {
         expect(back[back.crossFrom]).toEqual(south[south.crossFrom]);
         expect(back[back.land]).toEqual(south[south.land]);
         expect(back.crossFrom).toBeGreaterThan(back.land);              // ours first, theirs later
+    });
+
+    test('onIsland: nothing on the water leg counts as ashore, in either direction', () => {
+        const ring = coastRing(grid, 10);
+        const theirCoastY = theirs.y - 10 * 0.8;
+        const at = (p, x) => { const i = Math.floor(x), k = x - i, a = p[i], b = p[Math.min(i + 1, p.length - 1)]; return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }; };
+        for (let col = 0; col < 5; col++) for (let row = 0; row < 4; row++) {
+            const there = crossPath(tile, plate(col, row), 10, grid, theirs);
+            const back = reversePath(there);
+            for (const p of [there, back]) {
+                const toUs = p === there;
+                for (let x = 0; x <= p.length - 1; x += 0.05) {
+                    const q = at(p, x);
+                    const ashore = onIsland(p, Math.floor(x), x - Math.floor(x));
+                    // strictly between the two coasts is open water
+                    const water = q.y > ring.y + ring.h + 0.5 && q.y < theirCoastY - 0.5;
+                    if (water) expect(ashore).toBe(false);
+                    // ashore means on the destination's side of the water
+                    if (ashore) expect(toUs ? q.y <= ring.y + ring.h + 0.01 : q.y >= theirCoastY - 0.01).toBe(true);
+                }
+                expect(onIsland(p, p.length - 2, 1)).toBe(true);   // arriving is ashore
+            }
+        }
+        // a street walk never leaves its island
+        expect(onIsland(streetPath(plate(0, 0), plate(1, 1), 10), 0, 0)).toBe(true);
     });
 
     test('the coast ring: coordinates round-trip and walks turn at corners', () => {
