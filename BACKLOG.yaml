@@ -649,3 +649,115 @@ items:
       black stone."
     status: open
     resolved_in: null
+
+  - id: B054
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Things made while asleep must tick up visibly during the sleep (numbers spin with the years).
+    status: open
+    resolved_in: null
+
+  - id: B055
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Cryo as a state, not a click: sleep runs until an alarm wakes you (food, energy, fault, scouts back); tiers raise years per second. Core loop change, Ola to confirm.
+    status: open
+    resolved_in: null
+
+  - id: B056
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Bars must explain why you build; show them as stores with flows in and out, absolute, not relative to each other.
+    status: open
+    resolved_in: null
+
+  - id: B057
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      People need a purpose: they wake and repair, go out as scout parties, die in cryo and out there; fewer people stops manual rooms.
+    status: open
+    resolved_in: null
+
+  - id: B058
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Probes renamed scout parties, made of people, with plain-text lines: sent, returned, lost, wrong, monster.
+    status: open
+    resolved_in: null
+
+  - id: B059
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Lighter lanes and bright people; today dark grey on black is invisible.
+    status: open
+    resolved_in: null
+
+  - id: B060
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      The bottleneck dot alone is not a reason to buy; every purchase must connect to the goal (sleep longer safely, reach the surface).
+    status: open
+    resolved_in: null
+
+  - id: B061
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      A month of sleep must take at most one second, or sleep runs continuously (see B055).
+    status: open
+    resolved_in: null
+
+  - id: B062
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Food tooltip and the other ledgers rewritten in one clear line: 'Food: 45 days left. +84 grown, -39 eaten a day.'
+    status: open
+    resolved_in: null
+
+  - id: B063
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Cryo must not be offered before it is useful; tease it when the colony can survive a sleep.
+    status: open
+    resolved_in: null
+
+  - id: B064
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Cost and 'affordable in N days' on hover always, also when unaffordable.
+    status: open
+    resolved_in: null
+
+  - id: B065
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      Rate per day under the ore and star counters; ore gets a pickaxe icon instead of the gem.
+    status: open
+    resolved_in: null
+
+  - id: B066
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      The surface ring visible from the start (no fog of war); scouts refine the reading and reveal hazards.
+    status: open
+    resolved_in: null
+
+  - id: B067
+    added: 2026-09-22
+    source: "first outside playtest of IV (v1.42.0)"
+    request: |
+      When nothing moves nothing happens: people visible, machines visibly working, something always ticking toward the next decision.
+    status: open
+    resolved_in: null

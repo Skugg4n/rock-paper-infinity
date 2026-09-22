@@ -348,3 +348,36 @@ minute target. The shipped ladder is 8 / 5 / 6 / 12, which gives **27m58s to res
 in year 802701, 80 wake-ups with 3.6 buys each, 33,436 people, no hungry days, longest
 stall 58 s** (shorter than the 68 s of the run before orders existed). Run
 `scripts/sim-phase4.mjs` before touching them again. The sim still ignores probes.
+
+## First outside playtest (2026-09-22, v1.42.0): IV has no goal
+
+Ola's first playtester: loved I to III, played IV for 40 minutes to cryo III and year
+178, gave up. "Why build things? What is the goal?" Click, wait, buy buy buy, cryo,
+wait. People felt pointless (tempted to let them starve). Bars pretty but strange and
+relative. Probes unexplained. Stars vs. "diamonds" unclear. People invisible on black
+lanes. No cost on hover when unaffordable, no rate per second, nothing ticks during
+sleep, a month per click too slow.
+
+### Diagnosis (Claude): three decisions to reverse
+1. **The goal was hidden.** Fog of war on the crust hid the one thing the chapter is
+   about. The healing ring must be visible from second one, counting down in years,
+   with the end year as the reason time must be compressed.
+2. **Cryo was a click, not the game.** Proposal: cryo is a STATE. You fall asleep and
+   the colony runs while years roll like the odometer and ore and stars tick up in the
+   same spin, until something breaks and wakes you: food out, energy short, a chamber
+   fault, a scout party back. Fix, sleep again. Cryo tiers raise years per second.
+   Building becomes preparation for the next sleep, which answers "why build".
+3. **People had no role.** In that loop they do: they wake and repair, they go out as
+   scout parties (probes renamed, with plain lines "Scout party sent", "Scout party
+   returned: surface 41 %"), they die in cryo, out there and to what comes back. Fewer
+   people means manual rooms stop; automation is how you live with fewer.
+
+### The fourteen points (backlog B054 to B067)
+1 tick during sleep · 2 cryo as a state · 3 bars explained · 4 people's purpose ·
+4.1 scout parties in plain words · 5 lighter lanes, bright people · 6 the bottleneck
+alone is not a reason · 7 a month must take a second at most, or sleep runs · 8 bars
+relative to each other mislead · 9 the food tooltip is a mess, rewrite as "Food: 45
+days left. +84 grown, −39 eaten a day." · 10 cryo offered before it is useful ·
+11 cost and "affordable in N days" on hover always · 12 bars as stores with flows ·
+13 rate per day under the counters · 14 nothing moves, nothing to wait for.
+Ore gets a pickaxe icon, not the gem (read as chapter I's hundred-star diamond).
