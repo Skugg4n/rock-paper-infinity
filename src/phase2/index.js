@@ -14,7 +14,7 @@ import {
 import { createAnts } from './ants.js';
 import { createIsland } from './islands.js';
 import {
-    TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap,
+    TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap, waveStandingK, defenceStandingK,
     SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
     initialWarState, rng as warRng, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget,
     resolveLanding, resolveOurStrike, canRazeTile, relativePower, ENEMY_TILE_HP, MAX_ABSORB, plateMaxHp, tierScienceCost, armsPerSecond,
@@ -258,13 +258,13 @@ export function init() {
               if (!w?.active) return;
               w.t = (w.t || 0) + 1;
               w.arms += armsPerSecond(w.tier) * w.armsShare;
-              // The enemy's strength follows what still stands on its island.
-              // Bombed out (nothing standing): no landings, but they dig in,
-              // research twice as fast, and come back all at once after
-              // ENEMY_REGROUP_S, rebuilt, with full defence and at least our
-              // tier. Razing their island buys two minutes, not the war.
+              // Only a completely silent island stops them: bombed out they send
+              // nothing, but they dig in, research twice as fast and come back all at
+              // once after ENEMY_REGROUP_S, rebuilt, with full defence and at least our
+              // tier. Short of that, knocking their buildings down barely thins their
+              // landings and does not thin their defence at all. Razing their island is
+              // salvage and a minute and a half of quiet, never the war.
               const standing = 5 - (w.enemyRazedUntil || []).filter(x => x > 0).length;
-              const standingK = Math.max(0.3, standing / 5);
               const silent = standing === 0 && !w.enemyLeft;
               if (silent) {
                   if (!w.regroupAt) {
@@ -274,18 +274,18 @@ export function init() {
                   }
                   w.nextTierAt -= 1; w.lastWaveAt = w.t;
               } else if (w.regroupAt && w.t >= w.regroupAt) {
-                  w.regroupAt = 0; w.enemyDefence = enemyDefenceCap(w.waveCount);
+                  w.regroupAt = 0; w.enemyDefence = enemyDefenceCap(w.waveCount, w.tier);
                   if (w.enemyTier < w.tier) { w.enemyTier = w.tier; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier); }
                   logWar(`Status: they are back. Rebuilt, dug in, and they field ${TIERS[w.enemyTier].id}.`, true);
               }
               // the enemy escalates on its own jittered clock
               if (w.t >= w.nextTierAt && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
-                  w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier);
+                  w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier, w.tier - w.enemyTier);
                   logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
               }
               const raided = (w.raidUntil || 0) > w.t;          // our raiding party holds their defence down
               if (raided) w.enemyDefence = 0;
-              else if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW * standingK, enemyDefenceCap(w.waveCount) * standingK);
+              else if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW(w.tier) * defenceStandingK(standing), enemyDefenceCap(w.waveCount, w.tier) * defenceStandingK(standing));
               if (!raided && w.raidUntil && !w.saidRaidOver) { w.saidRaidOver = true; logWar('Interior: the raiding party is back. Their defence is regrouping.'); }
               // waves, as long as the enemy is still here; every fifth is a push
               if (!silent && !w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
@@ -293,7 +293,7 @@ export function init() {
                   const target = pickTarget(warPlates(), warRand);
                   if (target) {
                       const push = w.waveCount % 5 === 0;
-                      const size = Math.round(waveSize(w.waveCount) * standingK * (push ? 2 : 1));
+                      const size = Math.round(waveSize(w.waveCount) * waveStandingK(standing) * (push ? 2 : 1));
                       w.pendingWave = { targetId: target.id, size, launchAt: w.t + WAVE_WARNING_S, push };
                       const ti = gameState.buildings.findIndex(b => b && b.id === target.id);
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
@@ -347,7 +347,13 @@ export function init() {
                   const stance = w.stance || 'balanced';
                   const buy = autoBuy(w.arms, w.defence, w.force, UNIT_COST, stance);
                   w.arms -= (buy.defence + buy.force) * UNIT_COST; w.defence += buy.defence; w.force += buy.force;
-                  if (stance !== 'defend' && canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence)) tryStrike();
+                  // Strike only when the force can take the toughest tile still
+                  // standing, so the quartermaster never throws units at a wall.
+                  if (stance !== 'defend') {
+                      const up = (w.enemyRazedUntil || []).map((until, i) => ({ until, i })).filter(t => !(t.until > 0));
+                      const hardest = up.length ? Math.max(...up.map(({ i }) => w.enemyTileHp?.[i] ?? ENEMY_TILE_HP)) : 0;
+                      if (hardest > 0 && canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence, hardest)) tryStrike();
+                  }
               }
           }
 
@@ -453,7 +459,7 @@ export function init() {
               ui.buyForceBtn.disabled = w.arms < UNIT_COST;
               const targets = strikeTargets();
               ui.strikeBtn.disabled = w.force <= 0 || w.enemyLeft || !targets.length;
-              const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0) : null;
+              const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0, w.enemyTier - w.tier) : null;
               const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
               ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
               ui.autoBtn.classList.toggle('hidden', !active);
@@ -1155,13 +1161,16 @@ export function init() {
           ui.strikeBtn.addEventListener('click', () => { tryStrike(); }, { signal });
           ui.tierBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.tier >= TIERS.length - 1) return;
-              const cost = tierScienceCost(w.tier + 1, w.scienceRate0);
+              const cost = tierScienceCost(w.tier + 1, w.scienceRate0, w.enemyTier - w.tier);
               if ((w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S) return;
               if (gameState.science >= cost) {
                   gameState.science -= cost; w.tier++; w.lastTierAt = w.t || 0;
                   logWar(`Interior: ${TIERS[w.tier].id} developed. Units are stronger.`);
                   const pulled = enemyCatchUp(w.tier, w.enemyTier);
-                  if (pulled > w.enemyTier) { w.enemyTier = pulled; w.nextTierAt = (w.t || 0) + 120; logWar(`Intel: enemy has stolen blueprints for ${TIERS[w.enemyTier].id}.`, true); }
+                  if (pulled > w.enemyTier) { w.enemyTier = pulled; logWar(`Intel: enemy has stolen blueprints for ${TIERS[w.enemyTier].id}.`, true); }
+                  // A weapon they have never seen sends their laboratory back to the
+                  // drawing board; while they are behind they push twice as hard.
+                  if (w.tier > w.enemyTier) { w.nextTierAt = nextEnemyTierAt(w.t || 0, warRand, w.enemyTier, w.tier - w.enemyTier); logWar('Intel: their laboratory has gone quiet. They have nothing like this.'); }
                   updateAllUI();
               }
           }, { signal });

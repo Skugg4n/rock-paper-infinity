@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.42.0 - 2026-09-22
+
+### The enemy stays dangerous (war-tuning branch, merged)
+
+### Chapter III: the enemy stays dangerous, and the sim finally plays the game
+
+- **The simulation is the game now.** `scripts/sim-phase3.mjs` used to run a greedy ideal player on a loop the game does not have. It now follows `warTick` step for step (the standing factor on landings and on their defence, the push every fifth wave, the warning delay, the silent island, the regroup) with the **auto quartermaster on the balanced stance** as the player, which is what most people actually run. `--raid` gives it the raiding party. It also draws from three separate random streams, so a balance change no longer reshuffles the enemy's dice along with the rules. On the old rules it agreed with Ola at once: only 12 to 15 plates lost and their island silent for up to a fifth of the war.
+- **Bombing their island no longer switches the war off.** Their defence does not thin at all when their buildings fall, they rebuild a razed tile in 40 s instead of 90, and a dug-in enemy is back after 90 s instead of 120. Razing buys salvage and a little quiet, nothing more.
+- **Their shield is worth what our force is worth.** Their defence regrowth and its cap now climb with our own tier, so a landing on their island takes a real build-up of force or the raiding party, not a strike every few seconds from the quartermaster.
+- **Research under fire is slow.** Every tier they hold over us multiplies the price of the next one (1.9 per tier, counted over at most two) and a tier we hold over them divides it. Falling behind is a hole to climb out of; a lead is worth keeping. To keep the top of the ladder reachable inside one war, our cost growth per tier went from 1.3 to 1.26.
+- **A weapon they have never seen sends their laboratory back to the drawing board**, and while they are behind they push twice as hard. Their own clock is steadier too (jitter from 40 % to 15 %), so the swings come from the rules and not from the dice.
+- **Landings come no faster than one every 20 s** (was 15), so there is always room to repair a plate between them.
+- Sim, seeds 1 to 6: 20 to 22 minutes, behind 40 to 43 % of the time, ahead 22 to 24 %, 20 to 24 plates lost, their island silent 7 to 8 % of the war, doomsday 85 to 87 %. Every one of those is inside the window we set, and the spread between seeds is now a couple of points instead of a coin flip. Full before and after, and the three things this pass did not solve, in `docs/superpowers/specs/2026-09-19-chapter-iii-war-design.md`.
 ## v1.41.1 - 2026-09-22
 
 ### Chapter IV, Ola's notes on slice 1: the menu works, the colony explains itself, and the light is where the people are

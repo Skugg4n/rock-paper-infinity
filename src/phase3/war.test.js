@@ -2,6 +2,7 @@
 import {
     TIERS, doomsday, waveInterval, waveSize, nextEnemyTierAt, pickTarget, resolveHit, resolveStrike, plateMaxHp, rng,
     enemyCatchUp, autoBuy, tierScienceCost, DOOMSDAY_SCALE, relativePower, resolveLanding, resolveOurStrike, canRazeTile, ENEMY_TILE_HP,
+    waveStandingK, defenceStandingK, ENEMY_DEFENCE_REGROW, enemyDefenceCap, RESEARCH_CATCHUP,
 } from './war.js';
 
 describe('war rules', () => {
@@ -23,7 +24,7 @@ describe('war rules', () => {
 
     test('waves come faster and bigger', () => {
         expect(waveInterval(0)).toBe(40);
-        expect(waveInterval(100)).toBe(15);
+        expect(waveInterval(100)).toBe(20);       // never faster than one landing per 20 s
         expect(waveSize(0)).toBe(10);
         expect(waveSize(10)).toBeGreaterThan(waveSize(0));
     });
@@ -32,10 +33,34 @@ describe('war rules', () => {
         const rand = rng(1);
         for (let i = 0; i < 20; i++) {
             const t = nextEnemyTierAt(1000, rand, 0);
-            expect(t).toBeGreaterThanOrEqual(1000 + 66);
-            expect(t).toBeLessThanOrEqual(1000 + 124);
+            expect(t).toBeGreaterThanOrEqual(1000 + 80);
+            expect(t).toBeLessThanOrEqual(1000 + 110);
             expect(nextEnemyTierAt(0, () => 0.5, 4)).toBeGreaterThan(nextEnemyTierAt(0, () => 0.5, 0));
         }
+    });
+
+    test('while they are behind they push their laboratory harder', () => {
+        const even = nextEnemyTierAt(0, () => 0.5, 2, 0);
+        const chasing = nextEnemyTierAt(0, () => 0.5, 2, 1);
+        expect(chasing).toBeCloseTo(even / 2, 5);
+        expect(nextEnemyTierAt(0, () => 0.5, 2, -1)).toBeCloseTo(even, 5);   // a lead of ours does not slow them further
+    });
+
+    test('razing their island thins their landings but never their defence', () => {
+        expect(waveStandingK(5)).toBe(1);
+        expect(waveStandingK(2)).toBe(0.4);
+        expect(waveStandingK(0)).toBe(0);          // silent: nothing sails
+        expect(defenceStandingK(1)).toBe(1);       // one building left, full shield
+        expect(defenceStandingK(5)).toBe(1);
+        expect(defenceStandingK(0)).toBe(0);
+    });
+
+    test('their shield grows with our weapons, so a raze needs a build-up', () => {
+        expect(ENEMY_DEFENCE_REGROW(4)).toBeGreaterThan(ENEMY_DEFENCE_REGROW(0));
+        expect(enemyDefenceCap(20, 4)).toBeGreaterThan(enemyDefenceCap(20, 0));
+        expect(enemyDefenceCap(0, 0)).toBe(40);
+        // at an equal tier their shield is worth roughly a serious build-up of force
+        expect(canRazeTile(120, 4, 4, enemyDefenceCap(30, 4))).toBe(false);
     });
 
     test('pickTarget prefers weak, valuable, coastal plates but stays random', () => {
@@ -96,6 +121,15 @@ describe('war rules', () => {
         expect(tierScienceCost(1, 1000)).toBe(70000);
         expect(tierScienceCost(2, 1000)).toBeGreaterThan(tierScienceCost(1, 1000));
         expect(tierScienceCost(1, 0)).toBe(35000);
+    });
+
+    test('research under fire is dear, a lead is cheap to keep', () => {
+        const level = tierScienceCost(3, 1000, 0);
+        expect(tierScienceCost(3, 1000, 1)).toBeCloseTo(level * RESEARCH_CATCHUP, -1);
+        expect(tierScienceCost(3, 1000, -1)).toBeCloseTo(level / RESEARCH_CATCHUP, -1);
+        // the hole never gets deeper than two tiers
+        expect(tierScienceCost(3, 1000, 5)).toBe(tierScienceCost(3, 1000, 2));
+        expect(tierScienceCost(3, 1000, -5)).toBe(tierScienceCost(3, 1000, -1));
     });
 
     test('weapons are relative: equal tiers fight at 1, a tier ahead roughly doubles', () => {

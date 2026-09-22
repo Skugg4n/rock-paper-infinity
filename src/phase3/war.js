@@ -41,19 +41,35 @@ export const FOOD_PER_UNIT = 1;
 export const PLATE_HP = { home: 10, apartment: 20, skyscraper: 40, district: 90, store: 15, superStore: 30, factory: 60, bank: 30 };
 export const FORT_HP = 12;
 export const FORT_COST = (level) => Math.round(40 * Math.pow(1.6, level));
-/** Enemy tiles: HP per tile (in units of an equal strike), rebuild time. */
+/** Enemy tiles: HP per tile (in units of an equal strike). */
 export const ENEMY_TILE_HP = 120;
-/** Enemy defence: starting units, regrowth per second, cap per wave. */
+/**
+ * Enemy defence: starting units, regrowth per second, cap per wave. Both climb
+ * with OUR tier, so their shield is always worth about what our force is worth:
+ * a landing on their island takes a real build-up or the raiding party, never
+ * a strike every few seconds.
+ */
 export const ENEMY_DEFENCE_START = 45;
-export const ENEMY_DEFENCE_REGROW = 0.3;
-export const enemyDefenceCap = (waveCount) => 40 + waveCount * 0.8;
-export const ENEMY_REBUILD_S = 90;
+export const ENEMY_DEFENCE_REGROW = (tier = 0) => 0.3 * (1 + 0.6 * tier);
+export const enemyDefenceCap = (waveCount, tier = 0) => (40 + waveCount * 0.8) * (1 + 0.8 * tier);
+/** Seconds a razed enemy tile stays down. They rebuild quickly. */
+export const ENEMY_REBUILD_S = 40;
+/**
+ * How much of their island still stands, as a factor 0-1. Landings thin with
+ * it, their defence does not thin at all (floor 1): knocking their buildings
+ * down is not a way to disarm them, only to take salvage and buy a little
+ * quiet until they have rebuilt.
+ */
+export const WAVE_STANDING_FLOOR = 0.3;
+export const DEFENCE_STANDING_FLOOR = 1;
+export const waveStandingK = (standing) => (standing > 0 ? Math.max(WAVE_STANDING_FLOOR, standing / 5) : 0);
+export const defenceStandingK = (standing) => (standing > 0 ? Math.max(DEFENCE_STANDING_FLOOR, standing / 5) : 0);
 /** Salvage per razed enemy tile (× tier power of the strike). */
 export const SALVAGE_PER_TILE = 120;
 /** The enemy leaves when the doomsday clock (both islands' scorch) passes this percent. */
 export const DOOMSDAY_LEAVE = 85;
 /** Bombed out (nothing standing), the enemy digs in and returns all at once after this many seconds, rebuilt, with full defence and at least our tier. */
-export const ENEMY_REGROUP_S = 120;
+export const ENEMY_REGROUP_S = 90;
 /** What scorch does to yield: stars and food per second are multiplied by this. */
 export const scorchYield = (doomPercent) => 1 - 0.6 * Math.max(0, Math.min(100, doomPercent)) / 100;
 /** Seconds of development between our tier purchases. */
@@ -108,11 +124,12 @@ export function doomsday(scorchTotal) {
 }
 
 /**
- * Seconds between waves: 40 s at the start, down to 12 s.
+ * Seconds between waves: 40 s at the start, down to 20 s. The floor is what
+ * gives us time to repair a plate between landings.
  * @param {number} waveCount
  */
 export function waveInterval(waveCount) {
-    return Math.max(15, 40 - waveCount * 1.5);
+    return Math.max(20, 40 - waveCount * 1.5);
 }
 
 /** Units in the next wave: grows for twenty waves, then holds at 50. */
@@ -120,15 +137,23 @@ export function waveSize(waveCount) {
     return 10 + Math.min(waveCount, 20) * 2;
 }
 
+/** How much harder they push their laboratory per tier they are behind us. */
+export const ENEMY_PUSH_PER_TIER = 1;
 /**
- * When the enemy takes its next tier: 120 s for the first, 15 % longer for
- * each after, with ±40 % jitter so sometimes we are first, sometimes they are.
+ * When the enemy takes its next tier: 95 s for the first, 15 % longer for each
+ * after, with a small jitter (±15 %) so the clock is steady and the swings in
+ * the war come from the rules rather than from luck. A weapon they have never
+ * seen sends them back to the drawing board (the caller restarts this clock
+ * whenever we take the lead), but while they are behind they push twice as
+ * hard: one tier behind halves the wait.
  * @param {number} now - seconds
  * @param {function} rand
  * @param {number} [tierReached=0] - the tier they just reached
+ * @param {number} [behindBy=0] - tiers they are behind us right now
  */
-export function nextEnemyTierAt(now, rand, tierReached = 0) {
-    return now + 95 * Math.pow(1.15, tierReached) * (0.7 + rand() * 0.6);
+export function nextEnemyTierAt(now, rand, tierReached = 0, behindBy = 0) {
+    const push = 1 + ENEMY_PUSH_PER_TIER * Math.max(0, behindBy);
+    return now + 95 * Math.pow(1.15, tierReached) * (0.85 + rand() * 0.3) / push;
 }
 
 /**
@@ -227,18 +252,26 @@ export function canRazeTile(force, ourTier, enemyTier, enemyDefence, tileHp = EN
     return force > 0 && force * relativePower(ourTier, enemyTier) > enemyDefence + tileHp;
 }
 
+/** Cost multiplier per tier the enemy holds over us; its inverse while we lead. */
+export const RESEARCH_CATCHUP = 1.9;
 /**
  * Science cost of tier k, scaled to the science the city COULD make per second
  * (population × 0.5, i.e. everyone researching) when the war began, so a small
  * city and a huge one both take ~90 s of full research for tier II and more
  * for each after. Using potential, not the current slider, means a banked
  * science pile from chapter II cannot buy the whole ladder at once.
+ * Research under fire is slow. Every tier they hold over us multiplies the
+ * price by RESEARCH_CATCHUP (their better weapon is landing on our labs), and
+ * a tier we hold over them divides it: a lead is worth keeping, and being
+ * behind is a hole to climb out of. Counted over at most two tiers either way.
  * @param {number} k - tier index (1..)
  * @param {number} sciencePotential0 - population × 0.5 at war start
+ * @param {number} [behindBy=0] - tiers we are behind the enemy
  */
-export function tierScienceCost(k, sciencePotential0) {
+export function tierScienceCost(k, sciencePotential0, behindBy = 0) {
     const base = Math.max(500, sciencePotential0) * 70;
-    return Math.round(base * Math.pow(1.3, k - 1));
+    const pressure = Math.pow(RESEARCH_CATCHUP, Math.max(-1, Math.min(2, behindBy)));
+    return Math.round(base * Math.pow(1.26, k - 1) * pressure);
 }
 
 /**
