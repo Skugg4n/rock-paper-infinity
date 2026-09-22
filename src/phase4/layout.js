@@ -44,7 +44,7 @@ export function floorCount(chambers) {
  * @param {string[]} order - room types, in the order they take chambers
  * @returns {{slots: (string|null)[]}}
  */
-export function initialLayout(state, order = ['mine', 'farm', 'generator', 'dorm']) {
+export function initialLayout(state, order = ['mine', 'farm', 'generator', 'dorm', 'cryo']) {
     const slots = [];
     for (const type of order) {
         for (let i = 0; i < (state.rooms?.[type] || 0); i++) slots.push(type);

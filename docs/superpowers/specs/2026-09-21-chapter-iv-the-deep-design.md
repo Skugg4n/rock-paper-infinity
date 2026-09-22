@@ -261,3 +261,53 @@ does while the years run), the **wake-up replay** (what ran, what stopped, what
 was eaten), **probes** and the estimate of the surface, and the **ascent** into
 chapter V. The rules for all four are already in `deep.js`; none of them has a
 surface yet.
+
+## Built: slice 2 (v1.41.0, 2026-09-22)
+
+What exists now, on top of slice 1:
+
+- **Cryo.** The snowflake's first press digs a cryo hall (a room type with its own
+  plate and glyph) and buys cryo I; every press after it sleeps that tier. The badge
+  says the length (1 m up to 100 000 y). The next tier appears under it as a teased
+  purchase only once it is affordable. Thousands are grouped with a space
+  (`group()` in `deep.js`), so the badge and the year counter read alike.
+- **What a press looks like.** The crowd walks the existing graph into the shaft and
+  down to the hall (1.5 s) and is gone; the scene dims; the counter runs up like an
+  odometer over 2.5 s, slow then flying then a long stop; they pour back out (1.2 s).
+  The day timer is stopped for the whole press, so no day is lived twice, and a wall
+  clock sits behind the frame loop so a hidden tab cannot freeze the colony mid-press.
+- **The wake-up replay.** A strip over the scene, icons and numbers only: which room
+  types ran and which stalled (dimmed, amber dot), what was made, and the weakest
+  column as four bars from the sleep report's histogram. `sleep()` now returns `ran`
+  per room type, and `stalledRooms()` reads it. A stalled room keeps the amber dot on
+  its own plate until something is bought for it.
+- **The crust.** `src/phase4/crust.js`: a thin black band at the top with nothing on
+  it until the first probe comes back. Then the ring, drawn as the colony's ESTIMATE,
+  with the spread as the stroke width: wide and grey at "40 ± 40 %", a hairline once
+  the sky has been read often. Probes in flight show as small radar glyphs.
+- **Probes.** Pure and tested in `deep.js`: `PROBE_COST_MINERALS`, `PROBE_ENERGY`,
+  `PROBE_DAYS` and `probeDays(sent)` (two years for the first, shorter as the colony
+  learns), `probeOdds(day)` walking the design's outcome table from the early row to
+  the late one, `resolveProbe(rng, day, surfaceTrue)`, `updateEstimate`,
+  `launchProbe`, `resolveDueProbes`, `darkenChamber`, `clearChamber`,
+  `clearDarkType`. Results land at a wake-up and never while the player watches.
+- **The ascent.** `ascentOffered()` opens the door on the ESTIMATE, `canAscend()`
+  stays the truth, and `attemptAscent()` decides. A wrong guess costs the ore, a
+  quarter of the colony, and widens the ring while correcting its mean. A true
+  success walks everyone up the shaft, lightens the crust and plays the
+  `CHAPTER_V` card (`{ roman: 'V', title: 'RETURN' }`, one constant) as the wall;
+  `ascended` is saved so a reload lands on the wall again.
+- **Hooks.** Checkpoints `iv-cryo` and `iv-late`, and
+  `window.debug_deep('sleep'|'probe'|'ascend')`.
+
+**The simulation ignores probes.** `scripts/sim-phase4.mjs` neither builds nor sends
+them, so the balance targets are the ones slice 1 was tuned against and the run is
+byte for byte the recorded one (21m44s, year 802701, 76 wake-ups, 50,679 people).
+Probes cost ore a greedy player would otherwise spend on rooms; folding them into the
+sim means retuning the whole ladder, and that is a balance pass of its own, not part
+of this slice. Dark chambers are threaded through `tickDay` in a way that is exactly
+the old arithmetic when nothing is dark.
+
+Still open: the fault budget of step 4 beyond the monster (flood, mutiny, animals),
+the sleep-as-a-program idea from the critique, and everything Ola asked for after
+playing v1.40.0 (see the v1.41.1 entry in CHANGELOG.md).

@@ -176,6 +176,10 @@ export function createScene(container, opts = {}) {
     let folk = [];
     let structure = '';
     let digLabel = null;
+    let lastState = null;
+    let dead = false;                       // disposed: a late timer must not touch the buffers
+    let march = null;                       // everyone walking somewhere at once: cryo, or the way up
+    const cryoAt = new THREE.Vector3(0, 0, 0);
     const rnd = mulberry32(20260921);
 
     function clearWorld() {
@@ -186,6 +190,8 @@ export function createScene(container, opts = {}) {
         world = new THREE.Group();
         scene.add(world);
         solids = []; nodes = []; floors = []; folk = []; digLabel = null;
+        march = null;
+        cryoAt.set(0, 0, 0);
         dots.setDrawRange(0, 0);
     }
 
@@ -262,7 +268,7 @@ export function createScene(container, opts = {}) {
         slots.forEach((type, i) => {
             const p = placeChamber(i);
             plan[p.floor].cells.push({
-                x: p.x, z: p.z, room: type || null,
+                x: p.x, z: p.z, room: type || null, slot: i,
                 lvl: type ? (state.level[type] || 0) : 0,
                 auto: type ? (state.auto[type] || 0) > 0 : false,
             });
@@ -430,11 +436,19 @@ export function createScene(container, opts = {}) {
                     world.add(bar); solids.push(bar);
                 } else if (c.room) {
                     let html = `<i data-lucide="${ROOM_ICON[c.room] || 'square'}" class="w-7 h-7"></i>`;
-                    html += `<span class="lvl mono">${c.lvl}</span>`;
+                    // the cryo hall has no ladder of its own: its level is which tier is bought
+                    if (c.room !== 'cryo') html += `<span class="lvl mono">${c.lvl}</span>`;
                     if (c.auto) html += '<i data-lucide="repeat" class="auto w-3.5 h-3.5"></i>';
+                    // a room that stopped while the colony slept, and a chamber something took
+                    html += '<span class="stall hidden"></span>';
+                    html += '<span class="dark hidden"></span>';
                     const rec = makeLabel(html, cx, y + 0.45, cz, 'room');
                     rec.cell = c;
                     rec.lvlEl = rec.inner.querySelector('.lvl');
+                    rec.stallEl = rec.inner.querySelector('.stall');
+                    rec.darkEl = rec.inner.querySelector('.dark');
+                    rec.darkEl.addEventListener('click', () => opts.onClearDark?.(c.slot));
+                    if (c.room === 'cryo') cryoAt.set(cx, y + WALK_Y, cz);
                 }
 
                 /* the way into the shaft: on a landing, two or three lanes run from
@@ -573,17 +587,23 @@ export function createScene(container, opts = {}) {
     }
 
     function refresh(state) {
+        lastState = state;
+        const darkSlots = state.darkSlots || [];
         for (const l of labels) {
-            if (l.kind !== 'room' || !l.cell?.room || !l.lvlEl) continue;
-            const want = String(state.level[l.cell.room] || 0);
-            if (l.lvlEl.textContent !== want) l.lvlEl.textContent = want;
+            if (l.kind !== 'room' || !l.cell?.room) continue;
+            if (l.lvlEl) {
+                const want = String(state.level[l.cell.room] || 0);
+                if (l.lvlEl.textContent !== want) l.lvlEl.textContent = want;
+            }
+            l.stallEl?.classList.toggle('hidden', !state.stalled?.[l.cell.room]);
+            l.darkEl?.classList.toggle('hidden', darkSlots.indexOf(l.cell.slot) < 0);
         }
         if (digLabel?.ring) {
             const cost = digCost(state.chambers);
             const frac = Math.max(0, Math.min(1, cost > 0 ? (state.minerals || 0) / cost : 0));
             digLabel.ring.setAttribute('stroke-dashoffset', (RING_LEN * (1 - frac)).toFixed(1));
         }
-        setPeople(state);
+        if (!march) setPeople(state);
     }
 
     function chooseNext(p) {
@@ -672,6 +692,104 @@ export function createScene(container, opts = {}) {
     let tween = null;
     const p3 = new THREE.Vector3();
 
+    /* ---- everyone at once: into the cryo hall, back out of it, or up and away ----
+       The walking graph is not thrown away. Each person keeps the node they were standing
+       on, so when they pour out again they carry on exactly where they left off. The route
+       is the one they would walk anyway: out to the shaft on their own floor, down or up
+       the shaft, and out onto the plate at the other end. */
+    const here3 = new THREE.Vector3();
+    function shaftPoint(floorIndex) {
+        const y = floors[floorIndex] ? floors[floorIndex].y : 0;
+        return new THREE.Vector3(0, y - 0.2, 0);
+    }
+    function cryoPoint() {
+        if (cryoAt.lengthSq() > 0) return cryoAt.clone();
+        return new THREE.Vector3(0, (floors[0] ? floors[0].y : 0) + WALK_Y, 0);
+    }
+    /** Cumulative lengths along a person's route, so everyone moves at one pace. */
+    function measure(p) {
+        p.pathAt = [0];
+        for (let i = 1; i < p.path.length; i++) p.pathAt.push(p.pathAt[i - 1] + p.path[i - 1].distanceTo(p.path[i]));
+    }
+    function pathPoint(p, u, out) {
+        const total = p.pathAt[p.pathAt.length - 1];
+        if (!(total > 0)) return out.copy(p.path[p.path.length - 1]);
+        const d = u * total;
+        let i = 1;
+        while (i < p.pathAt.length - 1 && p.pathAt[i] < d) i++;
+        const span = p.pathAt[i] - p.pathAt[i - 1] || 1;
+        return out.lerpVectors(p.path[i - 1], p.path[i], Math.max(0, Math.min(1, (d - p.pathAt[i - 1]) / span)));
+    }
+    /**
+     * @param {'gather'|'release'|'ascend'} mode
+     * @param {number} seconds - how long the whole crowd takes, stagger included
+     * @returns {Promise<void>} resolves when the last of them is through
+     */
+    function startMarch(mode, seconds) {
+        if (mode === 'release' && lastState) setPeople(lastState);
+        if (!folk.length) {
+            if (mode !== 'release') dots.setDrawRange(0, 0);
+            return Promise.resolve();
+        }
+        const cryo = cryoPoint();
+        const cryoShaft = new THREE.Vector3(0, cryo.y - WALK_Y - 0.2, 0);
+        const sky = new THREE.Vector3(0, (floors[0] ? floors[0].y : 0) + 7, 0);
+        for (const p of folk) {
+            const mine = shaftPoint(p.floor);
+            if (mode === 'release') {
+                p.path = [cryo.clone(), cryoShaft.clone(), mine, nodes[p.at] ? nodes[p.at].p.clone() : cryo.clone()];
+            } else if (mode === 'ascend') {
+                personPosition(p, here3);
+                p.path = [here3.clone(), mine, sky.clone()];
+            } else {
+                personPosition(p, here3);
+                p.path = [here3.clone(), mine, cryoShaft.clone(), cryo.clone()];
+            }
+            measure(p);
+            p.delay = rnd() * 0.32;
+        }
+        dots.setDrawRange(0, folk.length);
+        // The march is driven by the frame loop, and a browser stops handing out frames to a
+        // tab nobody is looking at. Without a wall clock behind it, a player who switches tabs
+        // mid-press would come back to a colony frozen halfway into the ice, for good. So the
+        // timer finishes what the frames did not, and the sequence always ends.
+        return new Promise((resolve) => {
+            let done = false;
+            const finish = () => {
+                if (done) return;
+                done = true;
+                clearTimeout(guard);
+                resolve();
+            };
+            const guard = setTimeout(() => {
+                if (dead) { finish(); return; }
+                if (march && march.resolve === finish) { march.k = 1; stepMarch(0); return; }
+                finish();
+            }, Math.ceil(Math.max(0.1, seconds) * 1000) + 400);
+            march = { mode, k: 0, dur: Math.max(0.1, seconds), resolve: finish };
+        });
+    }
+    function stepMarch(dt) {
+        march.k = Math.min(1, march.k + dt / march.dur);
+        for (let i = 0; i < folk.length; i++) {
+            const p = folk[i];
+            const u = Math.max(0, Math.min(1, (march.k - p.delay) / (1 - p.delay)));
+            pathPoint(p, march.mode === 'release' ? u : ease(u), p3);
+            pos[i * 3] = p3.x; pos[i * 3 + 1] = p3.y; pos[i * 3 + 2] = p3.z;
+        }
+        dots.attributes.position.needsUpdate = true;
+        if (march.k < 1) return;
+        const { mode, resolve } = march;
+        march = null;
+        if (mode === 'release') {
+            for (const p of folk) { p.state = 'walk'; p.prev = p.at; p.to = p.at; p.t = 1; p.len = 1; chooseNext(p); }
+            if (lastState) setPeople(lastState);
+        } else {
+            dots.setDrawRange(0, 0);       // the plates are empty: everyone is under the ice, or gone up
+        }
+        resolve();
+    }
+
     return {
         /** Draws this state. Rebuilds only when the colony's shape changed. */
         setState(state, layout) {
@@ -681,12 +799,16 @@ export function createScene(container, opts = {}) {
         },
         /** One frame. Moves the people and renders; never touches game time. */
         step(dt) {
-            for (let i = 0; i < folk.length; i++) {
-                stepPerson(folk[i], dt);
-                personPosition(folk[i], p3);
-                pos[i * 3] = p3.x; pos[i * 3 + 1] = p3.y; pos[i * 3 + 2] = p3.z;
+            if (march) {
+                stepMarch(dt);
+            } else {
+                for (let i = 0; i < folk.length; i++) {
+                    stepPerson(folk[i], dt);
+                    personPosition(folk[i], p3);
+                    pos[i * 3] = p3.x; pos[i * 3 + 1] = p3.y; pos[i * 3 + 2] = p3.z;
+                }
+                dots.attributes.position.needsUpdate = true;
             }
-            dots.attributes.position.needsUpdate = true;
             if (tween) {
                 tween.k = Math.min(1, tween.k + dt / 1.2);
                 const k = ease(tween.k);
@@ -707,11 +829,18 @@ export function createScene(container, opts = {}) {
             renderer.setSize(W, H);
             labelRenderer.setSize(W, H);
         },
+        /** Everyone walks to the cryo hall and is gone. Resolves when the last one is in. */
+        gather(seconds = 1.5) { return startMarch('gather', seconds); },
+        /** And out again, back to the lanes they were walking. */
+        release(seconds = 1.2) { return startMarch('release', seconds); },
+        /** Up the shaft and out: the last thing this chapter's model does. */
+        ascend(seconds = 2.0) { return startMarch('ascend', seconds); },
         /** Back to the view we started from. */
         resetView() {
             tween = { p: camera.position.clone(), t: controls.target.clone(), k: 0 };
         },
         dispose() {
+            dead = true;
             clearWorld();
             controls.dispose();
             dots.dispose();
@@ -723,6 +852,6 @@ export function createScene(container, opts = {}) {
             labelHost.innerHTML = '';
         },
         /** Test hook: what the scene believes it is drawing. */
-        get stats() { return { floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length }; },
+        get stats() { return { floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march }; },
     };
 }

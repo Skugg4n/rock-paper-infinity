@@ -91,6 +91,19 @@ export const CRYO = [
     { id: 'cryo-vi',  days: 3650000,  cost: 2.0e16 },
     { id: 'cryo-vii', days: 36500000, cost: 2.0e18 },
 ];
+/** Thousands are grouped with a space, never a comma: the counter reads the same in every locale. */
+export const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+/**
+ * The badge on the snowflake: how long one press sleeps. Months until a press is worth a year,
+ * years after that. The ladder reads 1 m, 1 y, 10 y, 100 y, 1 000 y, 10 000 y, 100 000 y.
+ * @param {number} days
+ * @returns {string}
+ */
+export function cryoLabel(days) {
+    const d = Math.max(0, Math.round(days));
+    if (d < DAYS_PER_YEAR) return `${Math.max(1, Math.round(d / 30))} m`;
+    return `${group(Math.round(d / DAYS_PER_YEAR))} y`;
+}
 /**
  * THE ONE NUMBER THAT SETS THE LENGTH OF THE CHAPTER. The surface heals only with time:
  * doomsday × e^(−years/SURFACE_DECAY_YEARS), and the decay is derived so that a colony that went
@@ -108,6 +121,195 @@ export const surface = (doom0, days) => doom0 * Math.exp(-(days / DAYS_PER_YEAR)
 export const resurfaceDay = (doom0) => DAYS_PER_YEAR * SURFACE_DECAY_YEARS * Math.log(doom0 / RESURFACE_AT);
 /** The way up is built, not waited for: the ring opens the door, this pays for it. */
 export const ASCENT = { minerals: 2e6, stars: 2e9, humans: 200 };
+/** The working title of what waits at the top. One constant, so it is renamed in one place. */
+export const CHAPTER_V = { roman: 'V', title: 'RETURN' };
+export const ASCENT_FAIL_LOSS = 0.25;         // the share of the colony a bad guess costs
+export const ASCENT_FAIL_SPREAD = 20;         // and how wide the ring is again afterwards
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/* ---------------------------------------------------------------------------
+ * PROBES, AND WHAT THE COLONY BELIEVES ABOUT THE SURFACE
+ *
+ * Nobody can see up. The ring on the crust is not `surface()`, it is the
+ * colony's ESTIMATE of it: a mean and a spread, wide and grey at first
+ * ("40 ± 40 %"), narrowed by every probe that comes back with a reading. A
+ * probe costs ore to build and spare power to launch, and it is away for years
+ * of colony time, so its answer arrives at a wake-up and never while you watch.
+ * Some come back wrong, some do not come back, and one in twenty comes back as
+ * something that takes a chamber.
+ * ------------------------------------------------------------------------ */
+
+export const PROBE_COST_MINERALS = 3000;      // the first one; each one after costs more to build
+export const PROBE_COST_GROWTH = 1.6;
+export const PROBE_ENERGY = 40;               // spare power the day it is launched: the E column must carry it
+export const PROBE_DAYS = 2 * DAYS_PER_YEAR;  // the first probe is away two years
+export const PROBE_DAYS_FLOOR = 90;           // a later one, better aimed, is back in a season
+export const PROBE_DAYS_DECAY = 0.8;
+export const probeCost = (sent) => Math.round(PROBE_COST_MINERALS * Math.pow(PROBE_COST_GROWTH, Math.max(0, sent)));
+export const probeDays = (sent) => Math.max(PROBE_DAYS_FLOOR, Math.round(PROBE_DAYS * Math.pow(PROBE_DAYS_DECAY, Math.max(0, sent))));
+
+/** The outcome table from the design sketch, read in this order. Both rows sum to 1. */
+export const PROBE_OUTCOMES = ['reading', 'lost', 'wrong', 'monster'];
+export const PROBE_ODDS_EARLY = { reading: 0.40, lost: 0.40, wrong: 0.15, monster: 0.05 };
+export const PROBE_ODDS_LATE = { reading: 0.80, lost: 0.10, wrong: 0.05, monster: 0.05 };
+export const PROBE_NOISE = 14;                // points of scatter on a good reading the day of the boom
+export const PROBE_WRONG_SHIFT = 25;          // how far out a lying instrument is
+
+/** How good the colony's instruments are: 0 the day the exit was blown, 1 at END_YEAR. The
+ *  calendar is logarithmic, so the skill is too, or every probe past the first millennium
+ *  would be perfect. */
+export function probeSkill(day) {
+    const end = END_YEAR * DAYS_PER_YEAR;
+    return clamp(Math.log10(1 + Math.max(0, day)) / Math.log10(1 + end), 0, 1);
+}
+/** @returns {{reading:number, lost:number, wrong:number, monster:number}} the odds on this day */
+export function probeOdds(day) {
+    const k = probeSkill(day);
+    const o = {};
+    for (const key of PROBE_OUTCOMES) o[key] = PROBE_ODDS_EARLY[key] + k * (PROBE_ODDS_LATE[key] - PROBE_ODDS_EARLY[key]);
+    return o;
+}
+
+/**
+ * What one probe comes back with, or does not. Pure: hand it the randomness.
+ *
+ * @param {Function} rng - returns a number in [0, 1)
+ * @param {number} day - the day it comes back; the instruments improve with the calendar
+ * @param {number} surfaceTrue - what the surface really is that day, in per cent
+ * @returns {{outcome:'reading'|'lost'|'wrong'|'monster', reading:number|null, spread:number}}
+ *          `spread` is how much to trust the reading; 0 when there is none.
+ */
+export function resolveProbe(rng, day, surfaceTrue) {
+    const odds = probeOdds(day);
+    let roll = rng();
+    let outcome = PROBE_OUTCOMES[PROBE_OUTCOMES.length - 1];
+    for (const key of PROBE_OUTCOMES) {
+        if (roll < odds[key]) { outcome = key; break; }
+        roll -= odds[key];
+    }
+    const scatter = Math.max(2, PROBE_NOISE * (1 - 0.7 * probeSkill(day)));
+    if (outcome === 'reading') {
+        return { outcome, reading: clamp(surfaceTrue + (rng() * 2 - 1) * scatter, 0, 100), spread: scatter };
+    }
+    if (outcome === 'wrong') {
+        // A mad probe is not noise, it is a number in the wrong place. Half of them say the
+        // surface is worse than it is, half say it is safe: that one is how a colony dies.
+        const sign = rng() < 0.5 ? -1 : 1;
+        return { outcome, reading: clamp(surfaceTrue + sign * PROBE_WRONG_SHIFT, 0, 100), spread: scatter };
+    }
+    return { outcome, reading: null, spread: 0 };
+}
+
+/** Before any probe: a shrug. The ring is drawn from this until the first one returns. */
+export const ESTIMATE_START = { mean: 40, spread: 40 };
+export const ESTIMATE_FLOOR = 2;              // the colony is never certain, however many it sends
+
+/**
+ * Two beliefs into one: the old estimate and a new reading, each weighted by how tight it is.
+ * A good reading pulls the mean toward the truth and always narrows the spread; a wrong one
+ * narrows it just the same, which is why a lying probe is worse than a lost one.
+ *
+ * @param {{mean:number, spread:number}} est
+ * @param {number|null} reading - per cent, or null for a probe that told us nothing
+ * @param {number} spread - how much to trust the reading
+ * @returns {{mean:number, spread:number}} a new estimate; the old one is not touched
+ */
+export function updateEstimate(est, reading, spread) {
+    const base = est || ESTIMATE_START;
+    if (reading == null || !(spread > 0)) return { mean: base.mean, spread: base.spread };
+    const w0 = 1 / (base.spread * base.spread), w1 = 1 / (spread * spread);
+    return {
+        mean: clamp((base.mean * w0 + reading * w1) / (w0 + w1), 0, 100),
+        spread: Math.max(ESTIMATE_FLOOR, Math.sqrt(1 / (w0 + w1))),
+    };
+}
+
+/** What the ring says the colony believes, as the crust prints it: "40 ± 40 %". */
+export const estimateText = (est) => `${Math.round((est || ESTIMATE_START).mean)} ± ${Math.round((est || ESTIMATE_START).spread)} %`;
+
+/**
+ * Build one and launch it. The ore is gone the day it goes up; the answer is years away.
+ * @param {object} s - state, mutated
+ * @returns {{sentDay:number, dueDay:number}|null} null when the ore was not there
+ */
+export function launchProbe(s) {
+    const price = probeCost(s.probesSent || 0);
+    if (s.minerals < price) return null;
+    s.minerals -= price;
+    const p = { sentDay: s.day, dueDay: s.day + probeDays(s.probesSent || 0) };
+    s.probesSent = (s.probesSent || 0) + 1;
+    s.probes = (s.probes || []).concat([p]);
+    return p;
+}
+
+/**
+ * A monster takes a chamber: it stands dark and makes nothing until it is cleared. Pure, so the
+ * scene can be told which plate to mark and the tests can name the slot.
+ *
+ * @param {object} s - state, mutated
+ * @param {(string|null)[]} slots - the layout's slots: which chamber holds which room
+ * @param {Function} rng - returns a number in [0, 1)
+ * @returns {number} the slot it took, or -1 when there was nothing left to take
+ */
+export function darkenChamber(s, slots, rng) {
+    const taken = s.darkSlots || [];
+    const open = [];
+    (slots || []).forEach((type, i) => { if (type && ROOMS.includes(type) && taken.indexOf(i) < 0) open.push(i); });
+    if (!open.length) return -1;
+    const slot = open[Math.min(open.length - 1, Math.floor(rng() * open.length))];
+    s.dark = s.dark || {};
+    s.dark[slots[slot]] = (s.dark[slots[slot]] || 0) + 1;
+    s.darkSlots = taken.concat([slot]);
+    return slot;
+}
+
+/** Light one chamber again: somebody went in and cleared it. */
+export function clearChamber(s, slots, slot) {
+    if ((s.darkSlots || []).indexOf(slot) < 0) return false;
+    const type = (slots || [])[slot];
+    s.darkSlots = s.darkSlots.filter((i) => i !== slot);
+    if (type && s.dark?.[type] > 0) s.dark[type] -= 1;
+    return true;
+}
+
+/** Buying anything for a room type clears its dark chambers: the crew walk in with the order. */
+export function clearDarkType(s, slots, type) {
+    let n = 0;
+    for (const slot of (s.darkSlots || []).slice()) {
+        if ((slots || [])[slot] === type && clearChamber(s, slots, slot)) n++;
+    }
+    return n;
+}
+
+/** The loudest column of a sleep: what the wake-up strip marks as the weakest. */
+export function weakestOf(hist) {
+    return COLUMN.reduce((a, k) => ((hist?.[k] || 0) > (hist?.[a] || 0) ? k : a), 'M');
+}
+
+/**
+ * Every probe that was due home by today. Called at a wake-up and nowhere else: a probe is away
+ * for years of colony time, so its answer never arrives while the player is watching.
+ *
+ * @param {object} s - state, mutated
+ * @param {(string|null)[]} slots - the layout's slots, for the one that comes back as a monster
+ * @param {Function} rng - returns a number in [0, 1)
+ * @returns {Array<{outcome:string, reading:number|null, slot:number}>} one entry per probe home
+ */
+export function resolveDueProbes(s, slots, rng) {
+    const landed = [], still = [];
+    for (const p of (s.probes || [])) {
+        if (p.dueDay > s.day) { still.push(p); continue; }
+        const r = resolveProbe(rng, p.dueDay, surface(s.doom0, p.dueDay));
+        let slot = -1;
+        if (r.outcome === 'monster') slot = darkenChamber(s, slots, rng);
+        else if (r.outcome !== 'lost') s.est = updateEstimate(s.est, r.reading, r.spread);
+        // A probe that came back at all is a probe that looked up: the ring is drawn from here on.
+        if (r.outcome !== 'lost') s.estRevealed = true;
+        landed.push({ outcome: r.outcome, reading: r.reading, slot });
+    }
+    s.probes = still;
+    return landed;
+}
 /** Output multipliers: ×2 per level, ×3 per automation past the first, ×100 per advanced (after the third). */
 export function roomMultiplier(level, auto) {
     const adv = Math.max(0, Math.min(auto, MAX_AUTO) - 3);
@@ -128,9 +330,17 @@ export function upkeepMultiplier(level, auto) {
 export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people = 10 } = {}) {
     return {
         day: 0, minerals: salvage, food: 500, stars: 0, humans: people, asleep: false,
-        chambers: 3, rooms: { mine: 0, farm: 1, generator: 1, dorm: 1 },
+        chambers: 3, rooms: { mine: 0, farm: 1, generator: 1, dorm: 1, cryo: 0 },
         level: { mine: 0, farm: 0, generator: 0, dorm: 0 },
         auto: { mine: 0, farm: 0, generator: 0, dorm: 0 },
+        // What a monster took: rooms of this type that stand dark and make nothing until they
+        // are cleared. Empty, and every number below is exactly what it was before probes existed.
+        dark: { mine: 0, farm: 0, generator: 0, dorm: 0 },
+        darkSlots: [],                      // which chambers those are; the scene's business, not the rules'
+        stalled: {},                        // room types that stopped during the last sleep
+        probes: [], probesSent: 0,          // in flight: { sentDay, dueDay }
+        est: { ...ESTIMATE_START }, estRevealed: false,
+        ascended: false,
         cryo: -1, doom0,
     };
 }
@@ -145,19 +355,22 @@ export function tickDay(s, asleep = false) {
     const awake = asleep ? 0 : s.humans;
     const mult = (t) => roomMultiplier(s.level[t], s.auto[t]);
     const upkeep = (t) => upkeepMultiplier(s.level[t], s.auto[t]);
+    // Rooms a monster has taken make nothing and need nothing until they are cleared. With
+    // none taken this is s.rooms[t] exactly, so the whole economy is the one the sim balanced.
+    const live = (t) => Math.max(0, (s.rooms[t] || 0) - ((s.dark && s.dark[t]) || 0));
     // Hands. A manual room type needs crew × rooms × its own multiplier; automation needs none.
     // Short of hands a room type runs at a fraction, never all-or-nothing: half the crew, half the ore.
     const staff = {}; let crewLeft = awake;
     for (const t of CREW_ORDER) {
-        const need = s.auto[t] > 0 ? 0 : s.rooms[t] * ROOM[t].crew * upkeep(t);
+        const need = s.auto[t] > 0 ? 0 : live(t) * ROOM[t].crew * upkeep(t);
         if (need <= 0) { staff[t] = 1; continue; }
         const got = Math.min(need, crewLeft);
         staff[t] = got / need; crewLeft -= got;
     }
     const hands = crewLeft;
-    const running = (t) => s.rooms[t] * staff[t] * mult(t);
+    const running = (t) => live(t) * staff[t] * mult(t);
     // Energy: the generators burn minerals, every room draws power, a shortfall scales output.
-    const drawing = (t) => s.rooms[t] * staff[t] * upkeep(t);   // upkeep side of a running room
+    const drawing = (t) => live(t) * staff[t] * upkeep(t);      // upkeep side of a running room
     const fuelWanted = drawing('generator') * ROOM.generator.fuel * (asleep ? SLEEP_FUEL : 1);
     const fuel = Math.min(s.minerals, fuelWanted);
     const fuelK = fuelWanted > 0 ? fuel / fuelWanted : 1;
@@ -179,7 +392,7 @@ export function tickDay(s, asleep = false) {
     s.minerals += mined; s.food += grown;
     // People eat, and grow toward the beds as long as the larder holds. Asleep nobody eats,
     // but the creches keep running, slower, on the food the automated farms bring in.
-    const capacity = s.rooms.dorm * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
+    const capacity = live('dorm') * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
     const demand = s.humans * FOOD_PER_HUMAN;        // what the colony eats, or will eat when it wakes
     const eat = asleep ? 0 : demand;
     let born = 0, starving = false;
@@ -217,13 +430,17 @@ export function tickDay(s, asleep = false) {
  * century. Returns the summed report (the wake-up summary).
  */
 export function sleep(s, days) {
-    const sum = { days: 0, minerals: 0, food: 0, stars: 0, born: 0, weakest: {}, wokenEarly: false };
+    const sum = { days: 0, minerals: 0, food: 0, stars: 0, born: 0, weakest: {}, ran: {}, wokenEarly: false };
+    for (const t of ROOMS) sum.ran[t] = 0;
     const opens = resurfaceDay(s.doom0);
+    /** How much of a room type actually turned over that day: crew and power, whichever is shorter. */
+    const worked = (r, t) => Math.min(r.staff[t], r.power[t]);
     for (let i = 0; i < days;) {
         const r = tickDay(s, true);
         i++; sum.days++;
         sum.minerals += r.minerals; sum.food += r.food; sum.stars += r.stars; sum.born += r.born;
         sum.weakest[r.weakest] = (sum.weakest[r.weakest] || 0) + 1;
+        for (const t of ROOMS) sum.ran[t] += worked(r, t);
         if (canResurface(s)) { sum.wokenEarly = i < days; break; }
         // Fast forward. When a sleeping day leaves nothing that could make the next day different
         // (nobody was born, the larder held, the generators got all the ore they asked for and the
@@ -236,13 +453,58 @@ export function sleep(s, days) {
                 s.minerals += n * r.parts.M; s.food += n * r.food; s.stars += n * r.stars; s.day += n;
                 i += n; sum.days += n; sum.minerals += n * r.minerals; sum.food += n * r.food; sum.stars += n * r.stars;
                 sum.weakest[r.weakest] += n;
+                for (const t of ROOMS) sum.ran[t] += n * worked(r, t);
             }
             if (canResurface(s)) { sum.wokenEarly = i < days; break; }
         }
     }
+    // The wake-up replay reads `ran` as a share of the sleep, not a count of days.
+    if (sum.days > 0) for (const t of ROOMS) sum.ran[t] /= sum.days;
     return sum;
 }
 
+/** Under this share of the sleep, a room type is read as STALLED and gets the amber dot. */
+export const STALL_AT = 0.5;
+/** Which room types the colony owns and which of those stopped while it slept. */
+export function stalledRooms(s, sum) {
+    const out = {};
+    for (const t of ROOMS) if ((s.rooms[t] || 0) > 0 && (sum.ran?.[t] ?? 1) < STALL_AT) out[t] = true;
+    return out;
+}
+
 export const canResurface = (s) => surface(s.doom0, s.day) <= RESURFACE_AT;
-/** The ending: the ring is open AND the colony can pay for the climb. */
-export const canAscend = (s) => canResurface(s) && s.minerals >= ASCENT.minerals && s.stars >= ASCENT.stars && s.humans >= ASCENT.humans;
+/** Can the colony pay for the climb? Ore, stars and enough people to make the party. */
+export const canAffordAscent = (s) => s.minerals >= ASCENT.minerals && s.stars >= ASCENT.stars && s.humans >= ASCENT.humans;
+/** The ending: the ring is open AND the colony can pay for the climb. THE TRUTH, used by the
+ *  simulation and by what actually happens when the hatch opens. */
+export const canAscend = (s) => canResurface(s) && canAffordAscent(s);
+/** What the player is OFFERED, which is the colony's belief and not the truth: the estimate says
+ *  the surface is under the line, and the climb is paid for. Sending people up on a bad estimate
+ *  is a decision the game lets you make. */
+export const ascentOffered = (s) => (s.est?.mean ?? ESTIMATE_START.mean) <= RESURFACE_AT && canAffordAscent(s);
+
+/**
+ * Open the hatch. The cost is paid either way: a party that does not come back took the ore and
+ * the years with it. On a bad estimate a share of the colony is lost, and what the survivors saw
+ * both corrects the mean and widens the spread, so the next try is a decision again and not a
+ * retry.
+ *
+ * @param {object} s - state, mutated
+ * @returns {{tried:boolean, success:boolean, lost:number}}
+ */
+export function attemptAscent(s) {
+    if (!canAffordAscent(s)) return { tried: false, success: false, lost: 0 };
+    s.minerals -= ASCENT.minerals;
+    s.stars -= ASCENT.stars;
+    if (canResurface(s)) {
+        s.ascended = true;
+        return { tried: true, success: true, lost: 0 };
+    }
+    const lost = s.humans * ASCENT_FAIL_LOSS;
+    s.humans = Math.max(2, s.humans - lost);
+    const truth = surface(s.doom0, s.day);
+    const est = s.est || ESTIMATE_START;
+    s.est = { mean: clamp((est.mean + truth) / 2, 0, 100), spread: Math.max(est.spread, ASCENT_FAIL_SPREAD) };
+    s.estRevealed = true;
+    return { tried: true, success: false, lost };
+}

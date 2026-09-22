@@ -225,3 +225,131 @@ body.in-deep {
 body.in-deep #version-info { color: #2f3949; }
 body.in-deep #menu-btn { background-color: #1e2733; box-shadow: none; }
 body.in-deep #menu-btn i { color: #8fa1b6; }
+
+/* ---- slice 2: the crust, the sleep, the wake-up strip --------------------- */
+
+/* THE CRUST. The burnt ground over our heads: a thin black band, full width, and
+   for a long while there is nothing on it at all. The ring only appears once a
+   probe has come back, and what it draws is a belief, not a fact. */
+#deep-crust {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 46px;
+    z-index: 12;
+    background: #05080b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: background-color 2400ms ease;
+}
+/* the one time it is not black: the party came back up and there is a sky */
+#deep-crust.is-lit { background: #6d7a8c; }
+.deep-crust-in { display: flex; align-items: center; gap: 12px; }
+.deep-crust-in[hidden] { display: none; }
+.deep-crust-ring { width: 34px; height: 34px; }
+.deep-crust-ring svg { width: 100%; height: 100%; }
+.deep-crust-ring .ring-base { stroke: #161d26; }
+/* the doubt IS the stroke: wide and grey at 40 ± 40 %, a hairline once it is known */
+.deep-crust-ring .ring-fg {
+    stroke: #7d8fa5;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 700ms ease, stroke-width 700ms ease;
+}
+.deep-crust-read { font-size: 12px; color: #6b7a8d; }
+.deep-crust-pending { display: flex; align-items: center; gap: 5px; color: #3f4b5c; }
+
+/* ---- the badge on a button (the length of one cryo press) ---------------- */
+#phase-deep .deep-badge {
+    position: absolute;
+    left: 50%;
+    bottom: -3px;
+    transform: translateX(-50%);
+    padding: 0 6px;
+    height: 16px;
+    border-radius: 8px;
+    background: #3c4a5c;
+    color: #dbe4f0;
+    font-size: 10px;
+    line-height: 16px;
+    white-space: nowrap;
+}
+#phase-deep .deep-badge.hidden { display: none; }
+.deep-btn-col { gap: clamp(6px, 1.2vh, 16px); }
+
+/* ---- while the years run: the scene dims and nothing is clickable -------- */
+#phase-deep.is-sleeping #deep-scene,
+#phase-deep.is-sleeping #deep-labels {
+    filter: brightness(0.55);
+    transition: filter 900ms ease;
+}
+#phase-deep #deep-scene, #phase-deep #deep-labels { transition: filter 900ms ease; }
+#phase-deep.is-busy .deep-btn-col { pointer-events: none; }
+#phase-deep.is-busy .btn:not(.is-locked) { opacity: 0.45; }
+
+/* ---- the faults, marked on the plate itself ------------------------------ */
+.deep-lbl-in .stall {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: #d97706;
+}
+.deep-lbl-in .stall.hidden, .deep-lbl-in .dark.hidden { display: none; }
+/* a chamber something took: the plate goes out, and clicking it is how you go in */
+.deep-lbl-in .dark {
+    position: absolute;
+    inset: -6px;
+    border-radius: 10px;
+    background: #05080b;
+    opacity: 0.86;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* ---- the wake-up replay: icons and numbers, never a sentence ------------- */
+#deep-replay {
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: flex-end;
+    gap: 26px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: #141b24;
+    animation: deep-replay-in 400ms ease;
+}
+#deep-replay[hidden] { display: none; }
+@keyframes deep-replay-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+.deep-replay-group { display: flex; align-items: flex-end; gap: 14px; }
+.deep-replay-room { position: relative; display: flex; color: #aab8c9; }
+.deep-replay-room.is-stalled { color: #46525f; }
+.deep-replay-dot {
+    position: absolute;
+    right: -3px;
+    top: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: #d97706;
+}
+.deep-replay-made { display: flex; align-items: center; gap: 5px; color: #8fa1b6; font-size: 13px; }
+.deep-replay-made i { color: #5f6d80; }
+.deep-replay-hist { align-items: flex-end; gap: 7px; }
+.deep-replay-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 9px;
+    color: #46525f;
+}
+.deep-replay-bar { width: 4px; border-radius: 2px; background: #3c4a5c; }
+.deep-replay-col.is-top .deep-replay-bar { background: #dc2626; }
+.deep-replay-col.is-top { color: #8fa1b6; }

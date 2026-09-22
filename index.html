@@ -410,6 +410,13 @@
         <div id="deep-labels"></div>
         <div id="deep-fallback" class="deep-mono">this view needs WebGL</div>
 
+        <!-- the burnt ground over our heads. Black and empty until a probe comes back;
+             then the ring, which is what the colony believes and not what is true -->
+        <div id="deep-crust"></div>
+
+        <!-- the wake-up replay: what ran, what stopped, what came of it -->
+        <div class="deep-chrome" id="deep-replay" hidden></div>
+
         <!-- time: year large, month and day smaller -->
         <div class="deep-chrome" id="deep-time">
             <div class="deep-mono deep-clock">
@@ -511,8 +518,22 @@
                 <i data-lucide="repeat" class="w-7 h-7"></i>
                 <div class="tooltip"></div>
             </button>
-            <button class="btn is-locked" id="deep-cryo-btn" aria-label="Cryo" disabled>
+            <button class="btn is-locked" id="deep-cryo-btn" aria-label="Cryo">
                 <i data-lucide="snowflake" class="w-7 h-7"></i>
+                <span class="deep-badge deep-mono hidden" id="deep-cryo-badge"></span>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn hidden" id="deep-cryo-up" aria-label="A longer sleep">
+                <i data-lucide="chevrons-up" class="w-7 h-7"></i>
+                <span class="deep-badge deep-mono" id="deep-cryo-up-badge"></span>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn hidden" id="deep-probe-btn" aria-label="Send a probe">
+                <i data-lucide="radar" class="w-7 h-7"></i>
+                <div class="tooltip"></div>
+            </button>
+            <button class="btn is-locked" id="deep-ascend-btn" aria-label="The way up">
+                <i data-lucide="arrow-up-from-line" class="w-7 h-7"></i>
                 <div class="tooltip"></div>
             </button>
             <button class="btn" id="deep-reset-view" aria-label="Reset the view">
@@ -545,7 +566,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.40.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.41.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

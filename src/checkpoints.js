@@ -8,7 +8,7 @@
  */
 
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
-import { initialDeepState } from './phase4/deep.js';
+import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
 
@@ -103,7 +103,42 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-cryo', label: 'IV · cryo I', apply: () => {
+        clearAll();
+        // A colony that runs itself: the rooms are automated, the hall is dug, and the
+        // snowflake is live. One press is a month. Day ~400, which is year 1.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        Object.assign(deep, {
+            day: 400, minerals: 26000, food: 9000, stars: 9.0e4, humans: 16,
+            chambers: 9, rooms: { mine: 3, farm: 2, generator: 2, dorm: 1, cryo: 1 },
+            level: { mine: 1, farm: 1, generator: 1, dorm: 0 },
+            auto: { mine: 1, farm: 1, generator: 1, dorm: 0 },
+            cryo: 0,
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
+    { id: 'iv-late', label: 'IV · cryo V, y5000', apply: () => {
+        clearAll();
+        // Deep into the calendar: a millennium a press, one probe already home so the
+        // ring is on the crust, and another still out there.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        const day = 5000 * DAYS_PER_YEAR;
+        Object.assign(deep, {
+            day, minerals: 4.0e6, food: 2.0e6, stars: 6.0e14, humans: 900,
+            chambers: 26, rooms: { mine: 8, farm: 6, generator: 6, dorm: 4, cryo: 1 },
+            level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
+            auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
+            cryo: 4,
+            est: { mean: 30, spread: 20 }, estRevealed: true, probesSent: 1,
+            probes: [{ sentDay: day, dueDay: day + probeDays(1) }],
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
 ];
+/** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
+export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4] };
 
 const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 
