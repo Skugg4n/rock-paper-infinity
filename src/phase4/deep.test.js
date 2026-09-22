@@ -44,10 +44,15 @@ describe('the deep', () => {
         const food0 = s.food, people0 = s.humans;
         const r = tickDay(s);
         expect(r.food).toBeGreaterThan(0);
-        expect(r.minerals).toBe(0);                      // no mine yet, but the generator burns fuel
-        expect(r.parts.M).toBeLessThan(0);
-        expect(r.weakest).toBe('M');                     // so minerals is the column with the dot
-        expect(r.stars).toBe(0);                         // a column in the red pays nothing
+        expect(r.minerals).toBe(12);                     // v1.48.0: a mine came down with the colony
+        expect(r.parts.M).toBeCloseTo(r.minerals - r.fuel, 9);
+        expect(r.parts.M).toBeGreaterThan(0);            // so the ore does not burn away from day one
+        expect(r.stars).toBe(10 * r.parts[r.weakest]);   // ten for every unit of the weakest column
+        const noMine = initialDeepState(); noMine.rooms.mine = 0;
+        const n = tickDay(noMine);
+        expect(n.parts.M).toBeLessThan(0);
+        expect(n.weakest).toBe('M');
+        expect(n.stars).toBe(0);                         // a column in the red pays nothing
         expect(r.parts.F).toBeCloseTo(r.food - people0 * 1, 6);
         expect(r.parts.E).toBeCloseTo(r.energyMade - r.energyNeed, 6);
         expect(r.parts.H).toBeGreaterThan(0);            // hands not on duty
@@ -290,10 +295,11 @@ describe('the ascent is a decision, not a countdown', () => {
         const wrong = initialDeepState({ people: 40 });
         believe(wrong, 12, 5);                     // the colony believes the surface is clear
         expect(canAscend(wrong)).toBe(false);      // on day 0 it very much is not
-        const out = attemptAscent(wrong);
-        expect(out).toEqual({ tried: true, success: false, lost: 10, survival: 15 });
-        expect(wrong.humans).toBe(40 - 40 * ASCENT_FAIL_LOSS);
-        expect(wrong.est).toEqual({ bias: 0, spread: ASCENT_TAUGHT_SPREAD });   // the dead taught us
+        const out = attemptAscent(wrong, () => 0.5);   // the dead's reading lands on the truth
+        expect(out).toEqual({ tried: true, success: false, lost: 13, survival: 15 });
+        expect(wrong.humans).toBe(40 - Math.round(40 * ASCENT_FAIL_LOSS));   // a third of the colony
+        expect(wrong.est).toEqual({ bias: 0, spread: ASCENT_TAUGHT_SPREAD });   // the dead taught us, roughly
+        expect(ASCENT_TAUGHT_SPREAD).toBe(15);
         expect(wrong.ascended).toBeFalsy();
         expect(wrong.minerals).toBe(1500);         // a failed try costs people, not ore
 

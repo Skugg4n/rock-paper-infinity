@@ -14,9 +14,9 @@
 import {
     COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, roomMultiplier, upkeepMultiplier, BIRTH_FOOD,
     FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, cryoLabel, group, digCost, roomCost,
-    freeChambers, sleepTrouble, BAD_ALARMS,
+    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending,
 } from './deep.js';
-import { ROOM_WORD, ROOM_WORDS } from './advisor.js';
+import { ROOM_WORD, ROOM_WORDS, foodDaysLeft } from './advisor.js';
 
 /**
  * EVERY NUMBER IN CHAPTER IV (v1.45.0). Ola, after v1.44.0: the numbers over the bars ran into
@@ -153,8 +153,11 @@ export function span(days) {
 /** How long until a party is home, the way the scout button says it: "1 y 3 m", "4 m", "12 d". */
 export function backIn(days) {
     const d = Math.max(0, Math.ceil(days));
-    const y = Math.floor(d / DAYS_PER_YEAR);
-    const m = Math.floor((d - y * DAYS_PER_YEAR) / 30);
+    let y = Math.floor(d / DAYS_PER_YEAR);
+    let m = Math.floor((d - y * DAYS_PER_YEAR) / 30);
+    // a year is twelve months of thirty days and five over: days 360 to 364 of a year are its
+    // last month, and read as the next whole year, never "1 y 12 m" (v1.48.0)
+    if (m >= 12) { y += 1; m = 0; }
     if (y && m) return `${group(y)} y ${m} m`;
     if (y) return `${group(y)} y`;
     if (m) return `${m} m`;
@@ -235,6 +238,158 @@ export function cryoGateShort(tier, trouble, { stars = Infinity } = {}) {
     const price = CRYO[tier]?.cost ?? 0;
     return stars < price ? `needs ${short(price)} stars` : '';
 }
+/**
+ * THE ONE REASON a cryo tier cannot be had yet (v1.48.0). The overnight playtest: the caption
+ * beside the snowflake said "needs a free chamber" while its tooltip said "Cryo I needs the
+ * generators to run without hands". Now both are read off this one answer: the caption is its
+ * `short`, the tooltip its `long`, which begins with the same words.
+ *
+ * In order: too few people; what a dry run of the sleep still meets once every order on the
+ * books is built (`planned`: that is what the player still has to BUY, and `button` says which
+ * button sells it); orders that are still being built; the tier's price.
+ *
+ * @param {number} tier - index into CRYO
+ * @param {object} o
+ * @param {object} o.state
+ * @param {object|null} o.trouble - sleepTrouble() on the colony as it is today
+ * @param {object|null} o.planned - sleepTrouble() on ordersDone(state)
+ * @param {number} [o.starsPerDay]
+ * @returns {{kind:string, button?:'auto'|'level', type?:string, short:string, long:string}|null}
+ */
+export function cryoNeed(tier, { state, trouble = null, planned = null, starsPerDay = 0 }) {
+    const name = cryoName(tier);
+    const say = (kind, shortText, detail, extra = {}) => ({ kind, ...extra, short: shortText, long: `${name} ${shortText}${detail ? `: ${detail}` : ''}.` });
+    if ((state.humans || 0) < MIN_SLEEPERS) return say('few', `needs ${MIN_SLEEPERS} people`, `${Math.floor(state.humans || 0)} today`);
+    const t = planned;
+    if (t) {
+        if (t.kind === 'few') return say('few', `needs ${MIN_SLEEPERS} people`, `${Math.floor(state.humans || 0)} today`);
+        if (t.kind === 'stall' && t.why !== 'fuel') {
+            const words = ROOM_WORDS[t.type] || t.type;
+            return say('stall', `needs ${words} automated`, 'asleep, nobody runs them', { button: 'auto', type: t.type });
+        }
+        if (t.kind === 'stall') return say('fuel', 'needs more ore', 'asleep, the generators would burn it all', { button: 'level', type: 'mine' });
+        if (t.kind === 'energy') return say('energy', 'needs spare power', `asleep, the rooms would run at ${t.pct} %`, { button: 'level', type: 'generator' });
+        if (t.kind === 'food') return say('food', `needs food for ${cryoLabel(CRYO[tier].days)}`, `${group(Math.floor((t.day || 0) + (t.days || 0)))} days today`, { button: 'level', type: 'farm' });
+        return say('other', 'is not safe yet', '');
+    }
+    if (trouble) {
+        const left = (state.builds || []).reduce((a, j) => Math.max(a, j.doneDay - state.day), 0);
+        return { kind: 'wait', short: `ready in ${backIn(left)}`, long: `${name} is ready in ${backIn(left)}: it waits for the orders being built.` };
+    }
+    const price = CRYO[tier]?.cost ?? 0;
+    if ((state.stars || 0) < price) {
+        return say('stars', `needs ${short(price)} stars`, affordText({ price, have: state.stars || 0, perDay: starsPerDay }).replace(/\.$/, '').toLowerCase());
+    }
+    return null;
+}
+
+/** The room type a column is fixed by, and the column's name in a "why". */
+const COLUMN_NOUN = { M: 'ore', F: 'food', E: 'energy', H: 'free hands' };
+
+/**
+ * Which room type the level or the automate button offers, and why (v1.48.0). The overnight
+ * playtest: cryo said "needs the generators automated" and the automate button only ever sold
+ * the weakest column's room, so a player who followed the game never got to sleep. Now:
+ *   1. the NEXT GOAL: what the next cryo tier needs, when this button sells it;
+ *   2. for the level button, what runs low (the dot, when a store is falling);
+ *   3. the weakest column, which is what makes the stars.
+ * A type is only offered when there is a room of it to improve and no order of this kind for it
+ * on the books; a goal that cannot be offered falls through to the next rule.
+ *
+ * @param {'level'|'auto'} kind
+ * @param {object} state
+ * @param {object} report - today's report
+ * @param {object|null} need - cryoNeed() for the next tier
+ * @param {object|null} [low] - lowPoint(), for the level button
+ * @returns {{type:string, why:string, goal:boolean, head:string}}
+ */
+export function offerFor(kind, state, report, need, low = null) {
+    const has = (t) => (state.rooms[t] || 0) > 0 || buildPending(state, 'room', t);
+    const open = (t) => has(t) && !buildPending(state, kind, t) && (kind !== 'auto' || (state.auto[t] || 0) < MAX_AUTO);
+    const verb = kind === 'auto' ? 'Automate' : 'Level';
+    const pick = (type, why, goal) => ({ type, why, goal, head: `${verb} ${ROOM_WORDS[type]} (${why}).` });
+    if (need && need.button === kind && need.type && open(need.type)) return pick(need.type, 'so the colony can sleep', true);
+    if (kind === 'level' && low && low.falling && low.column) {
+        const t = ROOM_FOR_COLUMN[low.column];
+        if (open(t)) return pick(t, low.why, false);
+    }
+    const t = ROOM_FOR_COLUMN[report.weakest];
+    const noun = COLUMN_NOUN[report.weakest];
+    return pick(t, `${noun} ${report.weakest === 'H' ? 'limit' : 'limits'} the stars`, false);
+}
+
+/** How each column is named when it grows slowest. */
+const GROWS = { M: 'Ore grows', F: 'Food grows', E: 'Spare energy grows', H: 'Free hands grow' };
+/** A bar this full reads as full on screen, and never carries the dot. */
+export const FULL_AT = 0.995;
+/** Ties at zero days of cover are broken in this order: power reaches every room. */
+const TIE = ['E', 'H', 'F', 'M'];
+
+/**
+ * THE DOT MARKS WHAT IS RUNNING LOW (v1.48.0). The overnight playtest: a full bar, "96 M d" of
+ * food, carried the red dot and the advisor said "the farm is the bottleneck"; a human reads that
+ * as "we are short of food". The dot is now scarcity:
+ *   - when any store is falling (and its bar is not full), the one with the fewest DAYS OF COVER (stock divided by net
+ *     outflow): ore mined less than burned, food grown less than eaten; energy short or a room
+ *     short of hands is a shortage today, zero days;
+ *   - when nothing falls, the slowest-growing column (the smallest surplus in the rules' one
+ *     unit) among the bars that are not full;
+ *   - a full bar never carries it, and when every bar is full there is no dot.
+ * deep.js's own `weakest` still sets the stars; this is only what the screen marks.
+ *
+ * @param {object} state
+ * @param {object} report - a day's report from tickDay
+ * @param {object} [st] - stocks(state, report), for which bars are full
+ * @returns {{column:string|null, falling:boolean, days:number, line:string, why:string}}
+ */
+export function lowPoint(state, report, st = stocks(state, report)) {
+    // full as the bar draws it: 160 px rounds up from 99.7 %, and a full bar is not running low,
+    // even when it is falling (1.5 k ore burning for three years is a full bar)
+    const full = (c) => !!(st[c] && st[c].frac >= FULL_AT);
+    const cover = [];
+    if (report.parts.M < 0) cover.push({ c: 'M', days: Math.max(0, state.minerals / -report.parts.M) });
+    const food = foodDaysLeft(state, report);
+    if (Number.isFinite(food)) cover.push({ c: 'F', days: food });
+    const powered = report.energyNeed > 0 ? Math.min(1, report.energyMade / report.energyNeed) : 1;
+    if (powered < 0.995) cover.push({ c: 'E', days: 0, pct: Math.floor(powered * 100) });
+    const shortRoom = crewShort(report);
+    if (shortRoom) cover.push({ c: 'H', days: 0, room: shortRoom, pct: Math.floor(report.staff[shortRoom] * 100) });
+    const falling = cover.filter((x) => !full(x.c));
+    if (falling.length) {
+        const cover = falling;
+        cover.sort((a, b) => a.days - b.days || TIE.indexOf(a.c) - TIE.indexOf(b.c));
+        const x = cover[0];
+        let why;
+        if (x.c === 'E') why = `energy is short, rooms run at ${x.pct} %`;
+        else if (x.c === 'H') why = `hands are short, the ${ROOM_WORD[x.room]} runs at ${x.pct} %`;
+        else {
+            const what = x.c === 'M' ? 'ore' : 'food';
+            why = x.days < 1 ? `the ${what} has run out` : `${what} runs out in ${span(x.days)}`;
+        }
+        return { column: x.c, falling: true, days: x.days, why, line: `${why[0].toUpperCase()}${why.slice(1)}.` };
+    }
+    const open = COLUMN.filter((c) => !full(c));
+    if (!open.length) return { column: null, falling: false, days: Infinity, why: 'every store is full', line: 'Nothing is falling. Every store is full.' };
+    const c = open.reduce((a, k) => (report.parts[k] < report.parts[a] ? k : a), open[0]);
+    const grows = GROWS[c];
+    return { column: c, falling: false, days: Infinity, why: `${grows.toLowerCase()} slowest`, line: `Nothing is falling. ${grows} slowest.` };
+}
+/** The first room type that stands short of hands today, or null. */
+function crewShort(report) {
+    for (const t of ROOMS) if ((report.live?.[t] || 0) > 0 && report.staff[t] < 0.999) return t;
+    return null;
+}
+
+/**
+ * Does a reward show on the counter it lands on? (v1.48.0) "+46 B" on a counter that reads
+ * "600 T" before and after changes nothing anyone can see. Formatted with the counter's own
+ * short form: the number is only worth putting on screen when the counter moves.
+ * @param {number} counter - what the counter holds before
+ * @param {number} reward
+ * @returns {boolean}
+ */
+export const rewardShows = (counter, reward) => reward > 0 && short((counter || 0) + reward) !== short(counter || 0);
+
 /** What the advisor says the day a longer sleep is there to be had. */
 export const cryoReadyLine = (tier) => `${cryoName(tier)} is ready: ${rateWords(CRYO[tier].days)} a second.`;
 

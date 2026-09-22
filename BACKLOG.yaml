@@ -1096,6 +1096,63 @@ items:
       the sim cannot say how it feels; unattended it reboots twice a chapter.
       Open question: should stability recover while the colony is awake?
     status: open
+    notes: |
+      v1.48.0 (overnight playtest): the first sleep no longer drifts, jolts or
+      asks a riddle and ends on a plain alarm after a year; Cryo I drifts 0.5 a
+      second (was 1.0); no sleep opens on a riddle. Still open: at Cryo IV the
+      meter drains 1.6/s and the snap gives at most 1.25/s; garbled lines are
+      rarely reached (playtest B17, B18).
+
+  - id: B119
+    added: 2026-09-23
+    source: "overnight playtest of IV (v1.47.0), docs/playtests/2026-09-23-chapter-iv-overnight.md"
+    request: |
+      Fix the overnight findings: Cryo I reachable by following the game (one
+      reason in caption and tooltip; the automate and level buttons sell what
+      the next goal needs, and say why); the first sleep teaches instead of
+      punishing; snap only on the model, with a visible cooldown; the dot marks
+      what runs low (days of cover), never a full bar; weight to people
+      (mourning, a costlier and vaguer failed ascent) and rewards that show;
+      bugs (backIn "1 y 12 m", stuck tooltip, pause over "IV ·", changelog).
+    status: done
+    resolved_in: "v1.48.0"
+
+  - id: B120
+    added: 2026-09-23
+    source: "overnight playtest of IV (v1.47.0), B1 and B5"
+    request: |
+      A room and its chamber as one purchase (the dot says "mine", the mine
+      button says "dig first"; the dig is the real price), and say so when the
+      star counter stands still because the weakest column waits for a dig.
+    status: open
+
+  - id: B121
+    added: 2026-09-23
+    source: "overnight playtest of IV (v1.47.0), B8, B9, B10, B16"
+    request: |
+      Unexplained marks (level numbers on rooms, rings on buttons, the hollow
+      circle at the crust, "+822 hands", the hatched H fill, "28 ☆/☼"), tooltips
+      that cover what they explain, button text against tooltip ("Level the
+      weakest" reads like a new room, "⛏ 60 k ☆", "makes 12 ore" without "a
+      day"), and the wake strip's room glyphs without numbers.
+    status: open
+
+  - id: B122
+    added: 2026-09-23
+    source: "overnight playtest of IV (v1.47.0), B11"
+    request: |
+      The scene outgrows the window: at year 1 the bottom room is cut off at
+      1440x900. The camera should reframe as floors are dug.
+    status: open
+
+  - id: B123
+    added: 2026-09-23
+    source: "overnight playtest of IV (v1.47.0), B13"
+    request: |
+      "A longer sleep" (the chevron, "1 y/s") is a purchase of Cryo II, not a
+      longer sleep: rename it ("Faster sleep") or put the upgrade inside the
+      snowflake, and write a feed line when a tier is bought.
+    status: open
   - id: B084
     added: 2026-09-22
     source: "playtest of III (v1.44.0), Ola"

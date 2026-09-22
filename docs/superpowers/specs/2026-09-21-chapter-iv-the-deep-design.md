@@ -627,3 +627,45 @@ sleep on average (1m19s asleep over 85 sleeps), so the Watcher's balance needs a
 
 Left for later: B111 Surface as an entity, B112 RPS exchanges, B113 system and hardware
 upgrades, B114 biological upgrades, B115 confinement, B116 the ending, B117 more riddle types.
+
+## Built: slice 5b (v1.48.0)
+
+The overnight playtest of v1.47.0 (docs/playtests/2026-09-23-chapter-iv-overnight.md) followed
+the dot for ten minutes and never slept. What changed:
+
+- **One reason for a locked cryo tier** (`cryoNeed()`, readout.js): too few people; what a dry run
+  of the colony with every order built still meets (that is what the player must buy, and which
+  button sells it); "ready in N d" while orders are built; the price. The caption is `short`, the
+  tooltip `long`, which starts with the same words. The hall is dug with its own chamber.
+- **The buttons sell the next goal** (`offerFor()`): the automate and level buttons offer the room
+  type the next cryo tier needs ("Automate generators (so the colony can sleep)."), then, for the
+  level button, what runs low, then the weakest column ("(food limits the stars)").
+- **Prices**: Automation I 10 k (was 60 k), the Cryo I hall 15 k (was 40 k). The colony comes
+  down with a mine (4 chambers): without one the salvage burned from day one, and a player who
+  followed the dot could be left with no ore, no power and no way back.
+- **The first sleep teaches** (watcher.js: `sleeps`, `beginSleep()`, `firstSleep()`): no drift, no
+  jolts, no riddle; the advisor line WATCHER_HELLO; it ends after FIRST_SLEEP_DAYS (a year) on
+  "Woke: a year under the ice. Everyone is well." DRIFT_PER_SECOND[0] is 0.5. Every later sleep
+  holds its first riddle back half a gap.
+- **The dot marks scarcity** (`lowPoint()`): fewest days of cover among falling stores whose bar is
+  not full (energy or hands short count as zero days), else the slowest-growing bar that is not
+  full; never a full bar (`FULL_AT` 0.995, as the bar draws it).
+  deep.js's `weakest` still sets the stars. No more "bottleneck moved" feed lines.
+- **Mourning** (`mourn()`, `MOURN_DAYS` = 365): no births for a colony year after deaths (a party
+  lost or half-lost, a failed ascent, lives lost in the ice over a sleep, mourned at the wake).
+  The failed ascent: a third of the colony (was a quarter), and the belief becomes a poor reading
+  ± 15 (was the truth ± 3).
+- **Snap**: `scene.hitsBase()` raycasts plates, lanes, bridges and shafts; the crosshair only over
+  them; a thin ring round the cursor counts the cooldown down (`snapWait()`); a click in the
+  cooldown does not move the base.
+- **Rewards** (`rewardShows()`): a number goes on the wake strip or the riddle card only when the
+  counter it lands on visibly moves.
+- `src/phase4/policy.js`: the player who follows the dot (ore) and the captions (stars), shared by
+  `overnight.test.js`, which holds the chapter to "Cryo I inside eight minutes" (it lands at 286 s;
+  in the browser, clicking the real buttons, at 278 s).
+
+**Simulation** (the sim now counts sleeps for the Watcher, ends the first sleep after a year, and
+mourns ice deaths at the wake): **26m26s to year 802 701** (was 28m40s), 88 wake-ups, no hungry
+days, longest stall 76 s, Cryo I at 6m36s (was 11m32s); seeds 1 to 5 between 25m57s and 26m34s.
+Unattended Watcher: stability 38 at the end, lowest 1, 2 reboots, named at 15m55s.
+

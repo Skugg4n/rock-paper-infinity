@@ -10,6 +10,7 @@ import {
     STABILITY_MAX, NAME_AT_YEARS, DRIFT_PER_SECOND, ALARM_DROP, ALARM_DROP_BAD, REBOOT_TO,
     SNAP_GAIN, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST, PUZZLE_GAIN, PUZZLE_WRONG,
     GARBLE_BELOW, GARBLE_EVERY, WATCHER_NAMES, PUZZLE_STARS_MIN,
+    beginSleep, firstSleep, snapWait, FIRST_SLEEP_DAYS, WATCHER_HELLO,
 } from './watcher.js';
 import { CRYO, DAYS_PER_YEAR, initialDeepState, sleep, tickDay } from './deep.js';
 import { deserializeDeep, serializeDeep, SCHEMA_VERSION } from './persistence.js';
@@ -19,7 +20,7 @@ const seq = (vals) => { let i = 0; return () => vals[i++ % vals.length]; };
 describe('the drift', () => {
     test('a real second of sleep costs DRIFT_PER_SECOND at every tier, whatever the years', () => {
         CRYO.forEach((c, tier) => {
-            const w = initialWatcher();
+            const w = { ...initialWatcher(), sleeps: 2 };      // past the first sleep, which does not drift
             watchSleep(w, { days: c.days, tier });
             expect(STABILITY_MAX - w.stability).toBeCloseTo(DRIFT_PER_SECOND[tier], 9);
             expect(w.sleptYears).toBeCloseTo(c.days / DAYS_PER_YEAR, 9);
@@ -31,7 +32,7 @@ describe('the drift', () => {
     });
 
     test('never below zero: at zero the system reboots to REBOOT_TO, once', () => {
-        const w = initialWatcher();
+        const w = { ...initialWatcher(), sleeps: 2 };
         w.stability = 1;
         const out = watchSleep(w, { days: CRYO[0].days * 10, tier: 0 });
         expect(out.rebooted).toBe(true);
@@ -52,7 +53,7 @@ describe('the drift', () => {
     });
 
     test('alarms are steps down: a bad one more than good news, the hand nothing', () => {
-        const w = initialWatcher();
+        const w = { ...initialWatcher(), sleeps: 2 };
         alarmHit(w, 'food');
         expect(w.stability).toBe(STABILITY_MAX - ALARM_DROP_BAD);
         alarmHit(w, 'scouts');
@@ -65,7 +66,60 @@ describe('the drift', () => {
     });
 });
 
+describe('the first sleep teaches, it does not punish (v1.48.0)', () => {
+    test('no drift, no jolt, no riddle in the first sleep; the second drifts, gently at Cryo I', () => {
+        const w = initialWatcher();
+        w.capacity = CAPACITY_MAX;
+        expect(beginSleep(w, 0)).toBe(true);               // the first sleep
+        expect(firstSleep(w)).toBe(true);
+        watchSleep(w, { days: CRYO[0].days * 600, tier: 0 });   // ten real minutes of it
+        expect(w.stability).toBe(STABILITY_MAX);
+        expect(alarmHit(w, 'food')).toBe(false);
+        expect(w.stability).toBe(STABILITY_MAX);
+        w.sleptYears = 1e6;
+        expect(puzzleDue(w, { asleep: true })).toBe(false);
+        expect(beginSleep(w, 0)).toBe(false);              // the second
+        watchSleep(w, { days: CRYO[0].days, tier: 0 });
+        expect(STABILITY_MAX - w.stability).toBeCloseTo(DRIFT_PER_SECOND[0], 9);
+        expect(DRIFT_PER_SECOND[0]).toBeLessThan(1);       // gently
+        expect(alarmHit(w, 'food')).toBe(false);
+        expect(w.stability).toBeLessThan(STABILITY_MAX - ALARM_DROP_BAD);
+    });
+
+    test('a sleep never opens on a riddle: half a gap at least from its start', () => {
+        const w = { ...initialWatcher(), sleeps: 3, capacity: CAPACITY_MAX, sleptYears: 500, nextPuzzleYears: 10 };
+        beginSleep(w, 2);
+        expect(w.nextPuzzleYears).toBeCloseTo(500 + puzzleGapYears(2) / 2, 9);
+        expect(puzzleDue(w, { asleep: true })).toBe(false);
+    });
+
+    test('the first wake is never a reboot, however low the meter was left', () => {
+        const w = { ...initialWatcher(), stability: 1 };
+        beginSleep(w, 3);
+        expect(watchSleep(w, { days: CRYO[3].days * 100, tier: 3 }).rebooted).toBe(false);
+        expect(alarmHit(w, 'stall')).toBe(false);
+        expect(w.reboots).toBe(0);
+        expect(FIRST_SLEEP_DAYS).toBe(DAYS_PER_YEAR);
+        expect(WATCHER_HELLO).toBe('Something stayed awake while they slept.');
+    });
+
+    test('an old save that already kept a watch is past its first sleep', () => {
+        expect(normalizeWatcher({ sleptYears: 40 }).sleeps).toBe(2);
+        expect(normalizeWatcher({}).sleeps).toBe(0);
+        expect(normalizeWatcher({ sleeps: 1, sleptYears: 40 }).sleeps).toBe(1);
+    });
+});
+
 describe('the snap', () => {
+    test('the cooldown can be read: how long until the base answers again', () => {
+        const w = initialWatcher();
+        expect(snapWait(w, 1e6)).toBe(0);
+        snap(w, 1e6);
+        expect(snapWait(w, 1e6 + 1000)).toBe(SNAP_COOLDOWN_MS - 1000);
+        expect(snapWait(w, 1e6 + SNAP_COOLDOWN_MS)).toBe(0);
+        expect(snapWait(w, 1e6 - 5)).toBe(0);              // a clock that went backwards owes nothing
+    });
+
     test('+SNAP_GAIN, at most once per cooldown of real time, capped at the top', () => {
         const w = initialWatcher();
         w.stability = 50;
@@ -154,7 +208,7 @@ describe('riddles', () => {
     });
 
     test('a riddle comes asleep, with the capacity for it, a gap of slept years apart, never over an alarm', () => {
-        const w = initialWatcher();
+        const w = { ...initialWatcher(), sleeps: 2 };
         w.capacity = CAPACITY_MAX;
         expect(puzzleDue(w, { asleep: true })).toBe(false);          // the clock is not armed yet
         armPuzzles(w, 0);

@@ -13,12 +13,13 @@
  * phase only has to print what it is handed.
  */
 
-import { ROOMS, ROOM_FOR_COLUMN, FOOD_PER_HUMAN, survival, SURVIVAL_AT } from './deep.js';
+import { ROOMS, FOOD_PER_HUMAN, survival, SURVIVAL_AT } from './deep.js';
 
 /** What the advisor calls each room and each column, in a sentence. */
 export const ROOM_WORD = { mine: 'mine', farm: 'farm', generator: 'generator', dorm: 'dormitory' };
 export const ROOM_WORDS = { mine: 'mines', farm: 'farms', generator: 'generators', dorm: 'dormitories' };
-export const COLUMN_WORD = { M: 'minerals', F: 'food', E: 'energy', H: 'people' };
+/** One word per column, everywhere (v1.48.0: the feed said "minerals" where the bar says ore). */
+export const COLUMN_WORD = { M: 'ore', F: 'food', E: 'energy', H: 'people' };
 
 export const FEED_MAX = 5;             // the feed holds this many lines
 export const FOOD_WARN_DAYS = 40;      // "running low" starts here
@@ -49,7 +50,6 @@ export function conditions(state, report) {
     const short = ROOMS.filter((t) => (state.rooms[t] || 0) > 0 && report.staff[t] < 0.999);
     const powered = report.energyNeed > 0 ? Math.min(1, report.energyMade / report.energyNeed) : 1;
     return {
-        bottleneck: report.weakest,
         foodWarn: days <= FOOD_WARN_DAYS ? bucket(days, 10) : -1,
         hungry: !!report.starving,
         shortRoom: short.length ? short[0] : null,
@@ -82,11 +82,9 @@ export function advisorLines(was, now) {
         out.push(`The ${ROOM_WORD[now.shortRoom]} needs ${now.shortHands} more `
             + `${now.shortHands === 1 ? 'hand' : 'hands'}; the ${ROOM_WORD[idle[idle.length - 1]]} is idle.`);
     }
-    if (!first && was.bottleneck !== now.bottleneck) {
-        out.push(`The bottleneck moved from ${COLUMN_WORD[was.bottleneck]} to ${COLUMN_WORD[now.bottleneck]}.`);
-    } else if (first) {
-        out.push(`The ${ROOM_WORD[ROOM_FOR_COLUMN[now.bottleneck]]} is the bottleneck.`);
-    }
+    // v1.48.0: no line when the dot moves. The advisor's own line says where it stands and why
+    // ("Food runs out in 21 days."), and five "the bottleneck moved" lines in a row pushed out
+    // everything that mattered (the overnight playtest).
     return out;
 }
 
@@ -116,6 +114,7 @@ export const DESCENT_LINE = 'The surface will heal. Not in our lifetimes. We dig
 export const ALARM_GLYPH = {
     food: 'wheat', energy: 'zap', stall: 'triangle-alert', few: 'user-minus', scouts: 'radar',
     estimate: 'sunrise', surface: 'sunrise', act: 'check', manual: 'sun', debug: 'bell', reboot: 'power',
+    first: 'sunrise',
 };
 /** A stalled room shows its own glyph instead: the mine that stopped, not a warning sign. */
 export const alarmGlyph = (alarm, roomIcon = {}) => (alarm?.kind === 'stall' && roomIcon[alarm.type])
@@ -198,6 +197,9 @@ export function alarmLine(alarm) {
     }
     case 'debug':
         return 'Woke: a test alarm.';
+    case 'first':
+        // v1.48.0: the first sleep ends on this, a year in, and never on a reboot
+        return 'Woke: a year under the ice. Everyone is well.';
     case 'reboot':
         // v1.46.0: the Watcher's stability ran out. Said plainly, and never said wrong.
         return 'Woke: the system rebooted.';

@@ -46,9 +46,9 @@ describe('the deep, laid out', () => {
         const layout = initialLayout(s);
         expect(layout.slots.length).toBe(s.chambers);
         expect(layout.slots.filter((x) => x === 'generator').length).toBe(1);
-        expect(freeChamber(layout)).toBe(-1);           // three rooms in three chambers
+        expect(freeChamber(layout)).toBe(-1);           // four rooms in four chambers
         s.chambers += 1;
-        expect(freeChamber(initialLayout(s))).toBe(3);
+        expect(freeChamber(initialLayout(s))).toBe(4);
     });
 
     test('a saved layout is made to fit the state it comes back with', () => {

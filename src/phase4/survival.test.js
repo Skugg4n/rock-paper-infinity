@@ -8,7 +8,7 @@ import {
     DOOM_AT_BOOM, END_YEAR, DAYS_PER_YEAR, ESTIMATE_START, scoutOdds, wholePercents, probeOdds,
     probeScatter, probeDays, probeCost, scoutParty, PROBE_OUTCOMES, launchProbe, scoutsOut,
     attemptAscent, ascentOdds, ascentParty, canTryAscent, ASCENT_MIN_PEOPLE, ASCENT_FAIL_LOSS,
-    ASCENT_TAUGHT_SPREAD, estimateNow, CRYO,
+    ASCENT_TAUGHT_SPREAD, estimateNow, CRYO, MOURN_DAYS,
 } from './deep.js';
 import { short, backIn, cryoGateShort, cryoReadyLine } from './readout.js';
 import { verdict, readingText, ascentFailLine, GETTING_THERE_AT } from './advisor.js';
@@ -99,6 +99,11 @@ describe('scout parties tell their odds before they go', () => {
         expect(backIn(120)).toBe('4 m');
         expect(backIn(12.2)).toBe('13 d');
         expect(backIn(0)).toBe('1 d');
+        // the last five days of a year are its last month, never "1 y 12 m" (v1.48.0)
+        for (let d = 360; d < 365; d++) expect(backIn(365 + d)).toBe('2 y');
+        expect(backIn(725)).toBe('2 y');
+        expect(backIn(362)).toBe('1 y');
+        expect(backIn(359)).toBe('11 m');
     });
 });
 
@@ -108,22 +113,39 @@ describe('you can always try to go up', () => {
         const o = ascentOdds(s);
         expect(o.survival).toBe(believedSurvival(s).mean);
         expect(o.spread).toBe(believedSurvival(s).spread);
-        expect(o.party).toBe(10);
+        expect(o.party).toBe(13);                        // a third of 40
         expect(ascentParty({ humans: 2 })).toBe(1);
     });
 
-    test('below the line the first party dies, the rest wait, and the estimate is the truth', () => {
+    test('below the line a third dies, the rest wait and mourn, and the estimate is a poor reading', () => {
         const s = initialDeepState({ people: 40 });
         s.day = 200000 * DAYS_PER_YEAR;
         s.est = { bias: 20, spread: 30 };                // hopeless and unsure
         const truth = survivalNow(s);
-        const out = attemptAscent(s);
-        expect(out).toEqual({ tried: true, success: false, lost: 40 * ASCENT_FAIL_LOSS, survival: truth });
-        expect(s.humans).toBe(30);
+        const out = attemptAscent(s, () => 0.5);         // a reading that happens to land on the truth
+        expect(out).toEqual({ tried: true, success: false, lost: Math.round(40 * ASCENT_FAIL_LOSS), survival: truth });
+        expect(s.humans).toBe(27);
         expect(believedSurvival(s).mean).toBeCloseTo(truth, 9);
         expect(believedSurvival(s).spread).toBe(ASCENT_TAUGHT_SPREAD);
+        expect(s.mournUntil).toBe(s.day + MOURN_DAYS);   // and nobody is born for a year
         expect(s.shaftOpen).toBe(true);
-        expect(ascentFailLine(out)).toBe(`10 went up and did not come back. Survival up there is ${Math.round(truth)} %; we need 85.`);
+        expect(ascentFailLine(out)).toBe(`13 went up and did not come back. Survival up there is ${Math.round(truth)} %; we need 85.`);
+    });
+
+    test('a failed try is a worse instrument than a scout party: a third of the colony for ± 15', () => {
+        const s = initialDeepState({ people: 120 });
+        s.day = 200000 * DAYS_PER_YEAR;
+        const scouts = scoutOdds(s);
+        expect(scouts.people).toBeLessThan(ascentParty(s) / 4);
+        expect(scouts.scatter).toBeLessThan(ASCENT_TAUGHT_SPREAD);
+        // the lesson is never better than ± 15, whatever the dice say
+        for (const r of [0, 0.25, 0.99]) {
+            const c = initialDeepState({ people: 120 });
+            c.day = s.day;
+            attemptAscent(c, () => r);
+            expect(believedSurvival(c).spread).toBe(ASCENT_TAUGHT_SPREAD);
+            expect(Math.abs(believedSurvival(c).mean - survivalNow(c))).toBeLessThanOrEqual(ASCENT_TAUGHT_SPREAD + 1e-9);
+        }
     });
 
     test('a tiny colony still tries, down to the last few; below that it cannot', () => {

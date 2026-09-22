@@ -81,19 +81,18 @@ describe('the advisor speaks when something changes, not on a timer', () => {
         const s = colony();
         const r = tickDay(cloneState(s));
         const c1 = conditions(s, r);
-        const first = advisorLines(null, c1);
-        expect(first.length).toBeGreaterThan(0);          // the first day always says where we stand
-        expect(advisorLines(c1, c1)).toEqual([]);         // and then holds its tongue
+        expect(Array.isArray(advisorLines(null, c1))).toBe(true);
+        expect(advisorLines(c1, c1)).toEqual([]);         // the second time it holds its tongue
     });
 
-    test('a moved bottleneck is named from and to', () => {
-        const a = { bottleneck: 'M', foodWarn: -1, hungry: false, shortRoom: null, shortHands: 0, powerShort: -1 };
-        const b = { ...a, bottleneck: 'F' };
-        expect(advisorLines(a, b)).toEqual(['The bottleneck moved from minerals to food.']);
+    test('the dot moving writes no line: the advisor line says where it stands (v1.48.0)', () => {
+        const a = { foodWarn: -1, hungry: false, shortRoom: null, shortHands: 0, powerShort: -1 };
+        expect(advisorLines(null, a)).toEqual([]);
+        expect(advisorLines(a, { ...a })).toEqual([]);
     });
 
     test('food, hunger and power each have their own line', () => {
-        const base = { bottleneck: 'M', foodWarn: -1, hungry: false, shortRoom: null, shortHands: 0, powerShort: -1 };
+        const base = { foodWarn: -1, hungry: false, shortRoom: null, shortHands: 0, powerShort: -1 };
         expect(advisorLines(base, { ...base, foodWarn: 20 })).toEqual(['We are running low on food: 20 days left.']);
         expect(advisorLines(base, { ...base, hungry: true })).toEqual(['People are hungry; the colony is shrinking.']);
         expect(advisorLines(base, { ...base, powerShort: 60 })).toEqual(['Energy is short: rooms run at 60 %.']);

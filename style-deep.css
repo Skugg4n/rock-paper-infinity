@@ -123,6 +123,9 @@ body.in-deep {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 #phase-deep .btn:hover .tooltip { opacity: 1; }
+/* a click puts the tooltip away until the cursor leaves the button (v1.48.0) */
+#phase-deep .btn.tip-off .tooltip,
+#phase-deep .btn.tip-off:hover .tooltip { opacity: 0; transition: none; }
 #phase-deep .tooltip i { color: #8fa1b6; }
 
 .deep-btn-col {
@@ -221,7 +224,8 @@ body.in-deep {
 
 /* ---- the chapter, quietly ------------------------------------------------ */
 #deep-mark {
-    left: 72px;
+    /* right of the ☰ and pause buttons (the pause button sat on "IV ·", v1.48.0) */
+    left: 120px;
     bottom: 34px;
     font-family: 'Bebas Neue', system-ui, sans-serif;
     letter-spacing: 0.06em;
@@ -739,4 +743,26 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-puzzle.is-wrong { animation: deep-shake 320ms ease; }
 @keyframes deep-shake { 20% { transform: translateX(-4px); } 60% { transform: translateX(4px); } 100% { transform: none; } }
 /* asleep, the base answers to a click: the cursor says so, nothing else does */
-#phase-deep.is-sleeping #deep-scene canvas { cursor: crosshair; }
+/* v1.48.0: the crosshair only over the model itself (a plate, a lane, the shaft), never over the
+   black around it, and not while the base will not answer: then the thin ring round the cursor
+   counts down the snap's cooldown instead */
+#phase-deep.is-sleeping #deep-scene.is-over-base canvas { cursor: crosshair; }
+#deep-snap-ring {
+    position: fixed;
+    left: -18px;
+    top: -18px;
+    width: 36px;
+    height: 36px;
+    pointer-events: none;
+    z-index: 60;
+}
+#deep-snap-ring[hidden] { display: none; }
+#deep-snap-ring circle { fill: none; stroke-width: 1.2; }
+#deep-snap-ring .track { stroke: rgba(143, 161, 182, 0.18); }
+#deep-snap-ring .arc { stroke: #8fa1b6; transform: rotate(-90deg); transform-origin: 18px 18px; }
+#deep-snap-ring.is-nudged svg { animation: deep-ring-nudge 0.3s ease-out; }
+@keyframes deep-ring-nudge {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}

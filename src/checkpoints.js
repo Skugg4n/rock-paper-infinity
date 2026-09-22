@@ -155,7 +155,7 @@ export const CHECKPOINTS = [
             cryo: 3, asleep: true,
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             watcher: {
-                ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: slept, seed: 3,
+                ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: slept, seed: 3, sleeps: 40,
                 nextPuzzleYears: slept + puzzleGapYears(3) / 4,
             },
         });

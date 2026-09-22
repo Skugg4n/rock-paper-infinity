@@ -27,7 +27,19 @@ export const NAME_AT_YEARS = 100;
  * second as at a hundred thousand years a second, a little more the deeper the sleep:
  * DRIFT_PER_SECOND points per real second at each tier.
  */
-export const DRIFT_PER_SECOND = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2];
+export const DRIFT_PER_SECOND = [0.5, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2];
+/**
+ * THE FIRST SLEEP TEACHES, IT DOES NOT PUNISH (v1.48.0). The overnight playtest: the first sleep
+ * opened on a riddle nobody had been told about, a meter nobody had seen drained, and the first
+ * wake a new player got was "Woke: the system rebooted." Now, in the first sleep, the meter does
+ * not drift, alarms do not jolt it and no riddle comes; the advisor says one line,
+ * WATCHER_HELLO, and the sleep ends on a plain alarm at the latest after FIRST_SLEEP_DAYS.
+ * The drift starts with the second sleep, gently at Cryo I (half a point a second).
+ */
+export const WATCHER_HELLO = 'Something stayed awake while they slept.';
+export const FIRST_SLEEP_DAYS = DAYS_PER_YEAR;
+/** Is this the first sleep the Watcher has kept? */
+export const firstSleep = (w) => ((w && w.sleeps) || 0) <= 1;
 const tierOf = (tier) => Math.max(0, Math.min(CRYO.length - 1, tier | 0));
 /** Slept years a point of stability lasts at this tier. */
 export const driftYears = (tier) => CRYO[tierOf(tier)].days / DAYS_PER_YEAR / DRIFT_PER_SECOND[tierOf(tier)];
@@ -35,7 +47,7 @@ export const driftYears = (tier) => CRYO[tierOf(tier)].days / DAYS_PER_YEAR / DR
 /** An alarm is a jolt: a bad one costs more than good news. The hand and the reboot cost nothing. */
 export const ALARM_DROP_BAD = 6;
 export const ALARM_DROP = 2;
-const NO_DROP = ['manual', 'debug', 'reboot'];
+const NO_DROP = ['manual', 'debug', 'reboot', 'first'];
 
 /** At zero the system reboots: the colony wakes, and the meter comes back at this. */
 export const REBOOT_TO = 40;
@@ -88,12 +100,16 @@ export function initialWatcher() {
         sinceGarble: GARBLE_EVERY,
         lastSnapAt: 0,          // wall clock (ms): survives a reload, unlike the page's own clock
         reboots: 0, solved: 0,
+        sleeps: 0,              // sleeps begun: the first one only teaches (v1.48.0)
     };
 }
 
 /** Whatever a save held, as a whole Watcher: missing fields filled, numbers kept in range. */
 export function normalizeWatcher(w) {
-    const out = { ...initialWatcher(), ...(w && typeof w === 'object' ? w : {}) };
+    const had = w && typeof w === 'object' ? w : {};
+    const out = { ...initialWatcher(), ...had };
+    // a Watcher saved before v1.48.0 that has already kept a watch is past its first sleep
+    if (!Number.isFinite(had.sleeps)) out.sleeps = (Number(had.sleptYears) > 0) ? 2 : 0;
     out.stability = clamp(Number.isFinite(out.stability) ? out.stability : STABILITY_MAX, 0, STABILITY_MAX);
     out.capacity = clamp(Number.isFinite(out.capacity) ? out.capacity : 0, 0, CAPACITY_MAX);
     out.sleptYears = Math.max(0, Number.isFinite(out.sleptYears) ? out.sleptYears : 0);
@@ -125,7 +141,7 @@ export function watchSleep(w, { days, tier, spare = 0 }) {
     const d = Math.max(0, days || 0);
     const years = d / DAYS_PER_YEAR;
     w.sleptYears += years;
-    w.stability = Math.max(0, w.stability - years / driftYears(tier));
+    if (!firstSleep(w)) w.stability = Math.max(0, w.stability - years / driftYears(tier));
     const cap = CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
     w.capacity = Math.min(CAPACITY_MAX, w.capacity + Math.min(cap, Math.max(0, spare) * CAPACITY_K));
     let named = false;
@@ -148,9 +164,22 @@ function rebootIfSpent(w) {
  * @returns {boolean} the step took the last of it, and the system rebooted
  */
 export function alarmHit(w, kind) {
-    if (NO_DROP.includes(kind)) return false;
+    if (NO_DROP.includes(kind) || firstSleep(w)) return false;
     w.stability = Math.max(0, w.stability - (BAD_ALARMS.includes(kind) ? ALARM_DROP_BAD : ALARM_DROP));
     return rebootIfSpent(w);
+}
+
+/**
+ * How long until the base will answer a snap again, in ms of wall clock (0: now). The phase draws
+ * this as the thin ring round the cursor (v1.48.0).
+ * @param {object} w
+ * @param {number} now - wall clock, ms
+ * @returns {number}
+ */
+export function snapWait(w, now) {
+    const last = w.lastSnapAt || 0;
+    if (now < last) return 0;                       // a clock that went backwards owes nothing
+    return Math.max(0, SNAP_COOLDOWN_MS - (now - last));
 }
 
 /**
@@ -269,7 +298,7 @@ export const puzzleText = (p) => `${p.terms.join(', ')}, ?`;
  * @param {{asleep:boolean, alarmPending?:boolean}} ctx
  */
 export function puzzleDue(w, { asleep, alarmPending = false }) {
-    if (!asleep || alarmPending || w.puzzle) return false;
+    if (!asleep || alarmPending || w.puzzle || firstSleep(w)) return false;
     if (w.capacity < PUZZLE_COST) return false;
     return w.nextPuzzleYears != null && w.sleptYears >= w.nextPuzzleYears;
 }
@@ -284,6 +313,20 @@ export function openPuzzle(w, colony) {
 /** The first sleep sets the clock for the first riddle. */
 export function armPuzzles(w, tier) {
     if (w.nextPuzzleYears == null) w.nextPuzzleYears = w.sleptYears + puzzleGapYears(tier);
+}
+
+/**
+ * A sleep begins (v1.48.0): counted, and the riddle clock set so that no riddle opens in the first
+ * seconds of any sleep (half a gap at least). The first sleep has none at all (`puzzleDue`).
+ * @param {object} w - mutated
+ * @param {number} tier
+ * @returns {boolean} true when this is the first sleep, the one that teaches
+ */
+export function beginSleep(w, tier) {
+    w.sleeps = (w.sleeps || 0) + 1;
+    armPuzzles(w, tier);
+    if (!firstSleep(w)) w.nextPuzzleYears = Math.max(w.nextPuzzleYears, w.sleptYears + puzzleGapYears(tier) / 2);
+    return firstSleep(w);
 }
 
 /** Escape: the riddle goes, and the next one is a gap away. */

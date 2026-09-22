@@ -915,6 +915,7 @@ export function createScene(container, opts = {}) {
     // ---- labels: crisp, sized with the zoom, hidden when something is in front ----
     const ray = new THREE.Raycaster();
     const tmp = new THREE.Vector3();
+    const pick = new THREE.Vector2();         // a point on the screen, for hitsBase()
     function updateLabels() {
         for (const l of labels) {
             l.obj.getWorldPosition(tmp);
@@ -1194,6 +1195,20 @@ export function createScene(container, opts = {}) {
         /** How soft the base should be, 0 (rigid) to 1: the Watcher's stability, read by watcher.js's
          *  softness(). Awake it is 0 and the base firms up again. */
         setSoftness(k) { softTarget = Math.max(0, Math.min(1, k || 0)); },
+        /**
+         * Does a point on the screen land on the model: a plate, a bridge, a lane, a shaft? The
+         * snap and the crosshair answer only to the base, never to the black around it (v1.48.0).
+         * @param {number} clientX
+         * @param {number} clientY
+         * @returns {boolean}
+         */
+        hitsBase(clientX, clientY) {
+            const r = renderer.domElement.getBoundingClientRect();
+            if (!(r.width > 0 && r.height > 0)) return false;
+            pick.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+            ray.setFromCamera(pick, camera);
+            return ray.intersectObjects(solids, false).length > 0 || ray.intersectObject(shaftUp, false).length > 0;
+        },
         /** A click on the base while the colony sleeps: rigid again, with a soft flash. */
         snap() {
             snapping = { k: 0, from: softNow };

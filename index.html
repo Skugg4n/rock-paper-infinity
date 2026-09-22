@@ -552,12 +552,12 @@
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
             </button>
-            <button class="btn" id="deep-level-btn" aria-label="Level the weakest">
+            <button class="btn" id="deep-level-btn" aria-label="Level a room type">
                 <i data-lucide="chevrons-up" class="w-7 h-7"></i>
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
             </button>
-            <button class="btn" id="deep-auto-btn" aria-label="Automate the weakest">
+            <button class="btn" id="deep-auto-btn" aria-label="Automate a room type">
                 <i data-lucide="repeat" class="w-7 h-7"></i>
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
@@ -614,6 +614,14 @@
             </div>
         </div>
 
+        <!-- v1.48.0: the snap's cooldown, a thin ring round the cursor while the base will not answer -->
+        <div id="deep-snap-ring" hidden>
+            <svg viewBox="0 0 36 36" width="36" height="36" aria-hidden="true">
+                <circle class="track" cx="18" cy="18" r="15"></circle>
+                <circle class="arc" cx="18" cy="18" r="15" stroke-dasharray="94.2" stroke-dashoffset="0"></circle>
+            </svg>
+        </div>
+
         <div class="deep-chrome" id="deep-mark">IV &middot; THE DEEP</div>
     </div>
 
@@ -639,7 +647,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.47.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.48.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

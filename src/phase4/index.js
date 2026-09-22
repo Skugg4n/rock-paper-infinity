@@ -21,12 +21,12 @@
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from '../constants.js';
 import {
     initialDeepState, tickDay, sleep, digCost, roomCost, levelCost, automationCost,
-    ROOM_FOR_COLUMN, COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V, MAX_AUTO,
+    COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V, MAX_AUTO,
     cryoLabel, cryoName, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
     clearChamber, clearDarkType, stalledRooms, attemptAscent, canTryAscent, ascentOdds, SURVIVAL_AT,
     startBuild, completeBuilds, buildProgress, buildPending, estimateNow, habitableYear,
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
-    ASCENT_MIN_PEOPLE,
+    ASCENT_MIN_PEOPLE, ordersDone, mourn,
 } from './deep.js';
 import {
     conditions, advisorLines, pushFeed, ROOM_WORD, DESCENT_LINE, alarmLine, alarmGlyph,
@@ -34,8 +34,8 @@ import {
 } from './advisor.js';
 import {
     ledger, buySentence, preview, deltaText, stocks, flows, flowText, previewStocks,
-    nextOrePrice, affordText, cryoGateText, cryoGateShort, cryoReadyLine, consequence, span, rateWords,
-    short, backIn,
+    nextOrePrice, affordText, cryoReadyLine, consequence, span, rateWords,
+    short, backIn, cryoNeed, offerFor, lowPoint, rewardShows,
 } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout } from './layout.js';
 import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
@@ -44,8 +44,8 @@ import { createReplay } from './replay.js';
 import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js';
 import {
     normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
-    puzzleDue, openPuzzle, armPuzzles, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays,
-    CAPACITY_MAX, STABILITY_MAX,
+    puzzleDue, openPuzzle, beginSleep, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays,
+    CAPACITY_MAX, STABILITY_MAX, firstSleep, FIRST_SLEEP_DAYS, WATCHER_HELLO, snapWait, SNAP_COOLDOWN_MS,
 } from './watcher.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
@@ -192,6 +192,8 @@ export function init() {
         puzzleQ: document.getElementById('deep-puzzle-q'),
         puzzleIn: document.getElementById('deep-puzzle-in'),
         puzzleSaid: document.getElementById('deep-puzzle-said'),
+        snapRing: document.getElementById('deep-snap-ring'),
+        snapArc: document.querySelector('#deep-snap-ring .arc'),
     };
     replay = createReplay(ui.replay, { onIcons: scheduleIconRefresh, format: formatCount });
 
@@ -225,7 +227,10 @@ export function init() {
     let sleepSum = null;            // the whole sleep, added up chunk by chunk, for the wake-up strip
     let lastSleepAt = 0;
     let sleepTicks = 0;
-    let gates = { hall: null, current: null, next: null };   // what a dry run says would wake a sleep
+    // what a dry run says would wake a sleep: today (`hall`, `current`, `next`), and once every
+    // order on the books is built (`plannedHall`, `plannedNext`), which is what the player still has to buy
+    let gates = { hall: null, current: null, next: null, plannedHall: null, plannedNext: null };
+    let sleepFrom = null;           // the counters when the sleep began: does a reward show on them?
     let said = { key: '', text: '' };                         // the hovered button's consequence, per day
 
     // --- the day's report, for the bars and the advisor ---
@@ -293,6 +298,28 @@ export function init() {
     const tierDays = () => CRYO[Math.max(0, state.cryo)].days;
 
     /**
+     * THE ONE REASON the next cryo tier is not there (v1.48.0): the caption beside the button, its
+     * tooltip, and the room type the level and automate buttons offer are all read off this.
+     * @param {number} [tier] - index into CRYO; the next one by default
+     */
+    function needFor(tier = state.cryo + 1) {
+        if (!CRYO[tier]) return null;
+        const hall = tier === 0;
+        return cryoNeed(tier, {
+            state,
+            trouble: hall ? gates.hall : gates.next,
+            planned: hall ? gates.plannedHall : gates.plannedNext,
+            starsPerDay: report.stars,
+        });
+    }
+    /** What the dot marks, and why: the store running low (v1.48.0). */
+    const lowNow = () => lowPoint(state, report, stocks(state, report, nextOrePrice(state, report)));
+    /** The room type the level and automate buttons sell today, and why. */
+    function offers(need = needFor(), low = lowNow()) {
+        return { level: offerFor('level', state, report, need, low), auto: offerFor('auto', state, report, need) };
+    }
+
+    /**
      * The tooltip of a purchase: the price, what it does, and then either what is still
      * missing (B064) or, for the button under the cursor, what it does for the goal (B060).
      */
@@ -333,6 +360,9 @@ export function init() {
         const orePrice = nextOrePrice(state, report);
         const st = stocks(state, report, orePrice);
         const fl = flows(state, report);
+        // v1.48.0: the dot marks what runs LOW (days of cover), never a full bar
+        const low = lowPoint(state, report, st);
+        const need = needFor();
         const ahead = hovering ? preview(state, hovering.kind, hovering.type, report) : null;
         const ghost = hovering ? previewStocks(state, hovering.kind, hovering.type, hovering.price || 0, hovering.currency || 'minerals', orePrice) : null;
         for (const c of COLUMN) {
@@ -341,9 +371,9 @@ export function init() {
             ui.heads[c].textContent = st[c].head;
             ui.flowIn[c].textContent = flowText(fl[c].in, '+');
             ui.flowOut[c].textContent = flowText(fl[c].out, '-');
-            const weakest = c === report.weakest;
-            ui.dots[c].classList.toggle('hidden', !weakest);
-            if (weakest) ui.dots[c].style.bottom = `${Math.min(BAR_H - 4, h + 10)}px`;
+            const marked = c === low.column;
+            ui.dots[c].classList.toggle('hidden', !marked);
+            if (marked) ui.dots[c].style.bottom = `${Math.min(BAR_H - 4, h + 10)}px`;
             const g = ui.ghosts[c], d = ui.deltas[c];
             if (ghost) {
                 g.style.height = `${Math.round(BAR_H * ghost[c].frac)}px`;
@@ -363,8 +393,10 @@ export function init() {
         }
         ui.advisor.textContent = advisorLine
             || (state.asleep
-                ? `Asleep: ${rateWords(CRYO[state.cryo].days)} a second. The hall wakes us if anything goes wrong.`
-                : `Year ${group(cal.year)}: the ${ROOM_WORD[ROOM_FOR_COLUMN[report.weakest]]} is the bottleneck.`);
+                // the first sleep says one thing, once: what the label under the scene is
+                ? (firstSleep(state.watcher) ? WATCHER_HELLO
+                    : `Asleep: ${rateWords(CRYO[state.cryo].days)} a second. The hall wakes us if anything goes wrong.`)
+                : `Year ${group(cal.year)}. ${low.line}`);
         // the feed: the last five things worth saying, newest at the bottom
         if (ui.feed.childElementCount !== feed.length
             || (feed.length && ui.feed.lastElementChild.textContent !== feed[feed.length - 1])) {
@@ -398,29 +430,33 @@ export function init() {
             showBuild(el, 'room', type);
         }
 
-        const weakType = ROOM_FOR_COLUMN[report.weakest];
-        const levelPrice = levelCost(weakType, state.level[weakType] || 0);
-        const lvPending = buildPending(state, 'level', weakType);
+        // v1.48.0: the level and automate buttons sell what the NEXT GOAL needs (the next cryo tier),
+        // then what runs low, then the weakest column, and their tooltips say which and why
+        const offer = offers(need, low);
+        const lvType = offer.level.type;
+        const levelPrice = levelCost(lvType, state.level[lvType] || 0);
+        const lvPending = buildPending(state, 'level', lvType);
         // levelling or automating a room type the colony has none of would buy nothing at all
-        const noneYet = !(state.rooms[weakType] > 0) && !buildPending(state, 'room', weakType);
-        const noneText = `Build a ${ROOM_WORD[weakType]} first: there is none to improve.`;
-        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || lvPending || noneYet);
-        buyTip(ui.levelBtn, { kind: 'level', type: weakType, price: levelPrice, currency: 'stars', sentence: noneYet ? noneText : buySentence('level', weakType, state), blocked: lvPending ? 'pending' : '', mark: roomMark(weakType) });
-        showBuild(ui.levelBtn, 'level', weakType);
+        const noneOf = (t) => !(state.rooms[t] > 0) && !buildPending(state, 'room', t);
+        const noneText = (t) => `Build a ${ROOM_WORD[t]} first: there is none to improve.`;
+        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || lvPending || noneOf(lvType));
+        buyTip(ui.levelBtn, { kind: 'level', type: lvType, price: levelPrice, currency: 'stars', sentence: noneOf(lvType) ? noneText(lvType) : `${offer.level.head} ${buySentence('level', lvType, state)}`, blocked: lvPending ? 'pending' : '', mark: roomMark(lvType) });
+        showBuild(ui.levelBtn, 'level', lvType);
 
-        // automation is teased only once the first level is bought
-        const anyLevel = Object.values(state.level).some((l) => l > 0);
-        ui.autoBtn.classList.toggle('hidden', !anyLevel);
-        if (anyLevel) {
-            const autoPrice = automationCost(weakType, state.auto[weakType] || 0);
-            const auPending = buildPending(state, 'auto', weakType);
-            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || auPending || noneYet);
+        // automation is teased once the first level is bought, or the moment cryo needs it
+        const auType = offer.auto.type;
+        const autoShown = Object.values(state.level).some((l) => l > 0) || need?.button === 'auto';
+        ui.autoBtn.classList.toggle('hidden', !autoShown);
+        if (autoShown) {
+            const autoPrice = automationCost(auType, state.auto[auType] || 0);
+            const auPending = buildPending(state, 'auto', auType);
+            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || auPending || noneOf(auType));
             buyTip(ui.autoBtn, {
-                kind: 'auto', type: weakType, price: autoPrice, currency: 'stars', mark: roomMark(weakType),
-                sentence: noneYet ? noneText : (Number.isFinite(autoPrice) ? buySentence('auto', weakType, state) : ''),
-                blocked: (state.auto[weakType] || 0) >= MAX_AUTO ? 'top' : (auPending ? 'pending' : ''),
+                kind: 'auto', type: auType, price: autoPrice, currency: 'stars', mark: roomMark(auType),
+                sentence: noneOf(auType) ? noneText(auType) : (Number.isFinite(autoPrice) ? `${offer.auto.head} ${buySentence('auto', auType, state)}` : ''),
+                blocked: (state.auto[auType] || 0) >= MAX_AUTO ? 'top' : (auPending ? 'pending' : ''),
             });
-            showBuild(ui.autoBtn, 'auto', weakType);
+            showBuild(ui.autoBtn, 'auto', auType);
         }
 
         // ---- cryo: the hall, then the sleep; asleep, the sun that wakes the colony ----
@@ -444,27 +480,25 @@ export function init() {
                 + says(`Sleep: ${rateWords(CRYO[tier].days)} a second. The colony runs until something wakes it.`)
                 + note(warn, 'is-missing'));
         } else {
-            const gate = cryoGateText(0, gates.hall, state);
-            const hallLocked = !free || state.stars < CRYO[0].cost || !!gates.hall;
-            setCaption(ui.cryoCaption, hallLocked ? (free ? cryoGateShort(0, gates.hall, { stars: state.stars }) : 'needs a free chamber') : '');
-            ui.cryoBtn.classList.toggle('is-locked', busy || hallLocked);
+            // one reason, from one function, in the caption and the tooltip alike (v1.48.0); the hall
+            // is dug with its own chamber, so it never waits for a free one
+            setCaption(ui.cryoCaption, need ? need.short : '');
+            ui.cryoBtn.classList.toggle('is-locked', busy || !!need);
             setTooltip(ui.cryoBtn, priceRow(roomMark('cryo') + starCost(CRYO[0].cost))
-                + says(`${cryoName(0)}: a cryo hall. Asleep, a month passes every second and the machines keep working.`)
-                + note(gate || affordText({ price: CRYO[0].cost, have: state.stars, perDay: report.stars, blocked: free ? '' : 'chamber' }), 'is-missing'));
+                + says(`${cryoName(0)}: a cryo hall, dug with its own chamber. Asleep, a month passes every second and the machines keep working.`)
+                + note(need ? need.long : '', 'is-missing'));
         }
         // the next tier: on screen once the hall is dug, offered once a sleep at its rate is safe
         const nextTier = owns ? CRYO[tier + 1] : null;
         ui.cryoUpBtn.classList.toggle('hidden', !nextTier || asleep);
         if (nextTier && !asleep) {
             ui.cryoUpBadge.textContent = rateLabel(tier + 1);
-            const gate = cryoGateText(tier + 1, gates.next, state);
-            const upLocked = state.stars < nextTier.cost || !!gates.next;
-            // the reason is on screen, not only under the cursor: "needs food for 100 y"
-            setCaption(ui.cryoUpCaption, upLocked ? cryoGateShort(tier + 1, gates.next, { stars: state.stars }) : '');
-            ui.cryoUpBtn.classList.toggle('is-locked', busy || upLocked);
+            // the reason is on screen, not only under the cursor, and it is the tooltip's reason too
+            setCaption(ui.cryoUpCaption, need ? need.short : '');
+            ui.cryoUpBtn.classList.toggle('is-locked', busy || !!need);
             setTooltip(ui.cryoUpBtn, priceRow(roomMark('cryo') + starCost(nextTier.cost))
                 + says(`${cryoName(tier + 1)}: sleep ${rateWords(nextTier.days)} a second.`)
-                + note(gate || affordText({ price: nextTier.cost, have: state.stars, perDay: report.stars }), 'is-missing'));
+                + note(need ? need.long : '', 'is-missing'));
         }
 
         // ---- scout parties: people up the shaft, for a reading of the sky ----
@@ -562,16 +596,18 @@ export function init() {
     function recomputeGates() {
         if (state.asleep) return;
         const owns = state.cryo >= 0;
+        const nextDays = CRYO[state.cryo + 1]?.days;
+        const planned = (owns && !nextDays) ? null : ordersDone(state);
         gates = {
             hall: owns ? null : sleepTrouble(state, CRYO[0].days),
             current: owns ? sleepTrouble(state, CRYO[state.cryo].days) : null,
-            next: owns && CRYO[state.cryo + 1] ? sleepTrouble(state, CRYO[state.cryo + 1].days) : null,
+            next: owns && nextDays ? sleepTrouble(state, nextDays) : null,
+            plannedHall: owns ? null : sleepTrouble(planned, CRYO[0].days),
+            plannedNext: owns && nextDays ? sleepTrouble(planned, nextDays) : null,
         };
         // the day a longer sleep can be had, the advisor says so once: "Cryo IV is ready: a century a second."
         const want = state.cryo + 1;
-        const gate = owns ? gates.next : gates.hall;
-        if (CRYO[want] && want > readyTold && !gate && state.stars >= CRYO[want].cost
-            && (owns || freeChamber(layout) >= 0)) {
+        if (CRYO[want] && want > readyTold && !needFor(want)) {
             readyTold = want;
             feed = pushFeed(feed, [cryoReadyLine(want)]);
         }
@@ -636,9 +672,9 @@ export function init() {
         bought();
         afterChange();
     }
-    /** Levels the room type that fixes the weakest column: the dot is the instruction. */
+    /** Levels the room type the button offers (the next goal, what runs low, the weakest). */
     function levelWeakest() {
-        const type = ROOM_FOR_COLUMN[report.weakest];
+        const type = offers().level.type;
         if (buildPending(state, 'level', type) || !(state.rooms[type] > 0)) return;
         const price = levelCost(type, state.level[type] || 0);
         if (state.stars < price) return;
@@ -649,7 +685,7 @@ export function init() {
         afterChange();
     }
     function automateWeakest() {
-        const type = ROOM_FOR_COLUMN[report.weakest];
+        const type = offers().auto.type;
         if (buildPending(state, 'auto', type) || !(state.rooms[type] > 0)) return;
         const price = automationCost(type, state.auto[type] || 0);
         if (!Number.isFinite(price) || state.stars < price) return;
@@ -677,19 +713,22 @@ export function init() {
     const landBuilds = () => placeBuilt(completeBuilds(state));
 
     // --- cryo: the hall, the ladder ---------------------------------------------
+    /** The hall is dug with its own chamber (v1.48.0): a free one was a second, hidden price, and
+     *  the rooms the dot asked for always took it first. */
     function buyCryoHall() {
-        const slot = freeChamber(layout);
-        if (slot < 0 || state.stars < CRYO[0].cost || gates.hall) return;
+        if (state.stars < CRYO[0].cost || needFor(0)) return;
         state.stars -= CRYO[0].cost;
         state.cryo = 0;
+        state.chambers += 1;
         state.rooms.cryo = (state.rooms.cryo || 0) + 1;
-        layout.slots[slot] = 'cryo';
+        layout.slots.push('cryo');
+        layout = normalizeLayout(state, layout);
         bought();
         afterChange();
     }
     function buyCryoTier() {
         const next = CRYO[state.cryo + 1];
-        if (!next || state.stars < next.cost || gates.next) return;
+        if (!next || state.stars < next.cost || needFor(state.cryo + 1)) return;
         state.stars -= next.cost;
         state.cryo += 1;
         bought();
@@ -767,8 +806,10 @@ export function init() {
         await (scene ? scene.gather(SLEEP_TIMING.gather) : Promise.resolve());
         state.asleep = true;
         ui.root.classList.add('is-sleeping');
+        updateChrome();                 // the sleep world at once: the Watcher, and its one line
         sleepSum = freshSum();
-        armPuzzles(state.watcher, state.cryo);
+        sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
+        beginSleep(state.watcher, state.cryo);
         // falling asleep: the first moment spins like the odometer it always was
         const before = snapshot();
         roll = { from: before, to: before, t0: performance.now(), dur: 0.05, ease: linear };
@@ -813,7 +854,9 @@ export function init() {
         const sum = sleepChunk(days);
         rollTo(snapshot(), SLEEP_TICK_MS / 1000 + 0.02);
         sleepTicks++;
-        const woke = alarmOf(sum);
+        // the first sleep ends on a plain alarm after a year, never on a reboot (v1.48.0)
+        const woke = alarmOf(sum)
+            || (firstSleep(state.watcher) && sleepSum && sleepSum.days >= FIRST_SLEEP_DAYS ? { kind: 'first' } : null);
         if (woke) { wake(woke).catch((e) => console.error('the deep: the wake broke', e)); return; }
         // a riddle, now and then, never over an alarm
         if (puzzleDue(state.watcher, { asleep: true, alarmPending: busy })) openPuzzle(state.watcher, state);
@@ -839,8 +882,11 @@ export function init() {
         if (rebooted) said.push(alarmLine({ kind: 'reboot' }));
         const line = said[0];
         feed = pushFeed(feed, said);
-        advisorLine = `Year ${group(calendar(state.day).year)}. ${line}`;
+        // the reboot line is said once, in the feed; the advisor's line keeps saying where we stand
+        advisorLine = alarm.kind === 'reboot' ? '' : `Year ${group(calendar(state.day).year)}. ${line}`;
         const t = sleepSum || freshSum();
+        // lives lost in the ice are mourned: no one is born for a year after the wake (v1.48.0)
+        if (t.died >= 0.5) mourn(state);
         const ran = {};
         for (const r of ROOMS) ran[r] = t.days > 0 ? (t.ranDays[r] || 0) / t.days : 1;
         state.stalled = stalledRooms(state, { ran });
@@ -855,11 +901,15 @@ export function init() {
         if (alarm.kind === 'scouts') for (const l of alarm.landed || []) if (l.back > 0) scene?.scoutsDown(l.back);
         report = dryRun();
         recomputeGates();
+        // a "+46 B" that leaves the counter at "600 T" is not shown at all (v1.48.0)
+        const from = sleepFrom || { ore: state.minerals, food: state.food, stars: state.stars };
         replay.show({
             rooms: state.rooms, stalled: state.stalled, alarm: alarmGlyph(alarm, ROOM_ICON),
             minerals: t.minerals, food: t.food, stars: t.stars, weakest: t.weakest, died: t.died,
+            shows: { minerals: rewardShows(from.ore, t.minerals), food: rewardShows(from.food, t.food), stars: rewardShows(from.stars, t.stars) },
         });
         sleepSum = null;
+        sleepFrom = null;
         toldAbout = null;               // a new day for the advisor: say where we stand again
         setBusy(false);
         startClock();
@@ -929,9 +979,18 @@ export function init() {
     const guarded = (fn) => () => { if (!busy && !state.asleep) fn(); };
 
     // ---- the Watcher's two hands: the snap and the riddle ----------------------
-    /** A click on the base while the colony sleeps: it snaps rigid, and holds a little. */
+    /** A click on the base while the colony sleeps: it snaps rigid, and holds a little. Since
+     *  v1.48.0 only a click that lands ON the model counts (a plate, a lane, the shaft), never the
+     *  black around it; inside the cooldown the base does not move and the ring round the cursor
+     *  says how long is left. */
     function snapBase() {
         if (!state.asleep || busy) return;
+        if (snapWait(state.watcher, Date.now()) > 0) {
+            ui.snapRing?.classList.remove('is-nudged');
+            void ui.snapRing?.offsetWidth;
+            ui.snapRing?.classList.add('is-nudged');
+            return;
+        }
         scene?.snap();
         if (paused()) return;            // the base snaps; nothing is earned while time holds
         if (snapWatcher(state.watcher, Date.now()) > 0) {
@@ -942,6 +1001,7 @@ export function init() {
         updateChrome();
     }
     let press = null;
+    let pointer = null;              // where the cursor is over the scene, for the crosshair and the ring
     ui.sceneHost.addEventListener('pointerdown', (e) => {
         press = e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
     }, { signal });
@@ -950,8 +1010,25 @@ export function init() {
         press = null;
         if (!p || e.button !== 0) return;
         if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > CLICK_PX || performance.now() - p.t > CLICK_MS) return;
+        if (!scene || !scene.hitsBase(e.clientX, e.clientY)) return;
         snapBase();
     }, { signal });
+    ui.sceneHost.addEventListener('pointermove', (e) => { pointer = { x: e.clientX, y: e.clientY }; }, { signal });
+    ui.sceneHost.addEventListener('pointerleave', () => { pointer = null; }, { signal });
+    /** Once a frame, asleep: the crosshair only over the model, and the cooldown ring round the cursor. */
+    const RING_LEN = 2 * Math.PI * 15;
+    function stepCursor() {
+        const asleep = !!state.asleep;
+        const over = asleep && !!pointer && !!scene && scene.hitsBase(pointer.x, pointer.y);
+        const wait = asleep ? snapWait(state.watcher, Date.now()) : 0;
+        ui.sceneHost.classList.toggle('is-over-base', over && wait <= 0);
+        if (!ui.snapRing) return;
+        const on = asleep && !!pointer && wait > 0;
+        ui.snapRing.hidden = !on;
+        if (!on) return;
+        ui.snapRing.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
+        ui.snapArc?.setAttribute('stroke-dashoffset', (RING_LEN * wait / SNAP_COOLDOWN_MS).toFixed(1));
+    }
 
     /** The riddle's answer, typed. Enter answers, Escape lets it go. */
     function sayOnCard(text, cls) {
@@ -966,9 +1043,12 @@ export function init() {
         const out = answerPuzzle(w, ui.puzzleIn.value, state.cryo);
         if (!out) { sayOnCard('?', 'is-wrong'); return; }
         if (out.ok) {
-            state.stars += puzzleStars(report.stars);
+            // the stars only get a number on the card when the counter visibly moves (v1.48.0)
+            const gain = puzzleStars(report.stars);
+            const shows = rewardShows(state.stars, gain);
+            state.stars += gain;
             ui.puzzleIn.disabled = true;
-            sayOnCard(`+${Math.round(out.gained)}`, 'is-right');
+            sayOnCard(shows ? `+${Math.round(out.gained)} · +${formatCount(gain)} stars` : `+${Math.round(out.gained)}`, 'is-right');
             // the card lingers a moment on its answer, then goes
             lingerUntil = performance.now() + 900;
             setTimeout(() => updateWatcher(), 950);
@@ -993,6 +1073,13 @@ export function init() {
         }
     }, { signal });
 
+    // a click puts a button's tooltip away until the cursor leaves it (v1.48.0: the snowflake's
+    // tooltip stayed over the scene after the click that started the sleep)
+    for (const b of ui.root.querySelectorAll('.deep-btn-col .btn')) {
+        b.addEventListener('click', () => b.classList.add('tip-off'), { signal, capture: true });
+        b.addEventListener('pointerleave', () => b.classList.remove('tip-off'), { signal });
+        b.addEventListener('pointerenter', () => b.classList.remove('tip-off'), { signal });
+    }
     ui.digBtn.addEventListener('click', guarded(dig), { signal });
     for (const { type, el } of ui.roomBtns) el.addEventListener('click', guarded(() => buildRoom(type)), { signal });
     ui.levelBtn.addEventListener('click', guarded(levelWeakest), { signal });
@@ -1003,11 +1090,11 @@ export function init() {
         watchHover(el, () => ({ kind: 'room', type, price: roomCost(type, state.rooms[type] || 0), currency: 'minerals' }));
     }
     watchHover(ui.levelBtn, () => {
-        const type = ROOM_FOR_COLUMN[report.weakest];
+        const type = offers().level.type;
         return { kind: 'level', type, price: levelCost(type, state.level[type] || 0), currency: 'stars' };
     });
     watchHover(ui.autoBtn, () => {
-        const type = ROOM_FOR_COLUMN[report.weakest];
+        const type = offers().auto.type;
         const price = automationCost(type, state.auto[type] || 0);
         return { kind: 'auto', type, price: Number.isFinite(price) ? price : 0, currency: 'stars' };
     });
@@ -1088,6 +1175,7 @@ export function init() {
         const dt = Math.min(0.05, (now - lastFrame) / 1000);
         lastFrame = now;
         if (roll) drawCounters(rollingValue(now));
+        stepCursor();
         // paused, the scene still draws (and the camera still turns by hand), but nobody walks
         // and the base's jitter holds still
         scene?.step(paused() ? 0 : dt);
@@ -1104,6 +1192,7 @@ export function init() {
     if (state.asleep && state.cryo >= 0) {
         ui.root.classList.add('is-sleeping');
         sleepSum = freshSum();
+        sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
         runSleep();
     } else {
         state.asleep = false;

@@ -13,9 +13,9 @@ import {
   ROOMS, COLUMN, ROOM_FOR_COLUMN, ROOM, initialDeepState, tickDay, sleep, surface, canResurface, canAscend,
   roomMultiplier, digCost, roomCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, survival,
   startBuild, completeBuilds, buildPending, BUILD_DAYS, sleepTrouble, launchProbe, resolveDueProbes,
-  probeCost, scoutParty, MIN_SLEEPERS, PROBE_ENERGY, repairTick,
+  probeCost, scoutParty, MIN_SLEEPERS, PROBE_ENERGY, repairTick, mourn,
 } from '../src/phase4/deep.js';
-import { initialWatcher, watchSleep, alarmHit, NAME_AT_YEARS } from '../src/phase4/watcher.js';
+import { initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, NAME_AT_YEARS } from '../src/phase4/watcher.js';
 
 const WAIT_DAYS = 30;        // a human waits this long awake for a purchase; longer than that, they sleep
 const SLEEP_SECONDS = 3;     // real seconds a sleep costs around it: the walk in, the walk out, reading the wake line
@@ -30,7 +30,7 @@ let seed = seedArg > 0 ? Number(process.argv[seedArg + 1]) || 1 : 1;
 const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 const s = initialDeepState();
-// v1.46.0: the Watcher, REPORTED only. The greedy player never clicks the base and never
+// v1.46.0: the Watcher, REPORTED only (v1.48.0: its first sleep does not drift and ends after a year). The greedy player never clicks the base and never
 // solves a riddle, and a reboot does not wake this colony: the loop is the one the balance was
 // measured on. What it says is how an unattended Watcher would fare over the whole chapter.
 const w = initialWatcher();
@@ -152,7 +152,8 @@ while (real < REAL_CAP && !canAscend(s)) {
   if (n === 0 && s.cryo >= 0 && waitDays(r) > WAIT_DAYS && s.humans >= MIN_SLEEPERS && !sleepTrouble(s, CRYO[s.cryo].days)) {
     real += SLEEP_SECONDS;
     const hist = { M: 0, F: 0, E: 0, H: 0 };
-    let alarm = null;
+    let alarm = null, slept = 0, died = 0;
+    beginSleep(w, s.cryo);
     // one real second of sleep at a time, until something wakes the colony
     while (real < REAL_CAP) {
       const rate = CRYO[s.cryo].days;
@@ -163,12 +164,16 @@ while (real < REAL_CAP && !canAscend(s)) {
       if (sum.alarm) alarmHit(w, sum.alarm.kind);
       lowest = Math.min(lowest, w.stability);
       if (capFullAt === null && w.capacity >= 100) capFullAt = real;
-      diedInIce += sum.died;
+      diedInIce += sum.died; died += sum.died; slept += sum.days;
       for (const k of COLUMN) { hist[k] += sum.weakest[k] || 0; weakAsleep[k] += sum.weakest[k] || 0; }
       for (const l of sum.landed) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
       if (sum.alarm) { alarm = sum.alarm.kind; break; }
+      // v1.48.0: the first sleep ends on a plain alarm after a year, whatever else happens
+      if (firstSleep(w) && slept >= FIRST_SLEEP_DAYS) { alarm = 'first'; break; }
       if (wantsToWake()) { alarm = 'hand'; handWakes++; break; }
     }
+    // v1.48.0: a sleep that cost lives in the ice is mourned for a year after the wake
+    if (died >= 0.5) mourn(s);
     alarmsSeen[alarm] = (alarmsSeen[alarm] || 0) + 1;
     summaryWeakest = COLUMN.reduce((a, k) => (hist[k] > hist[a] ? k : a), 'M');
     wakeUps++; pressesPerTier[s.cryo]++;

@@ -83,7 +83,11 @@ export const levelCost = (type, level) => Math.round(4400 * Math.pow(9, level));
 /** Automation I, II, III, then ADVANCED automation (×100), which is the last thing a colony
  *  can afford and the top of that ladder. Past it, only levels are left to buy. */
 export const MAX_AUTO = 4;
-export const AUTOMATION_COST = [6.0e4, 2.4e6, 1.2e8, 2.0e10];
+/* v1.48.0: Automation I 60 k -> 10 k and the cryo hall 40 k -> 15 k. Cryo I needs every manual room
+ * type automated; at 60 k a type a player who followed the screen never got to sleep in ten minutes
+ * (the overnight playtest). Now the policy in policy.js buys Cryo I at 286 s and the simulated run
+ * is 26m26s to year 802 701 (was 28m40s). */
+export const AUTOMATION_COST = [1.0e4, 2.4e6, 1.2e8, 2.0e10];
 export const automationCost = (type, auto) => (auto < MAX_AUTO ? AUTOMATION_COST[auto] : Infinity);
 /**
  * Cryo tiers. Since v1.43.0 a sleep is a STATE, not a press: `days` is how many colony days
@@ -93,7 +97,7 @@ export const automationCost = (type, auto) => (auto < MAX_AUTO ? AUTOMATION_COST
  * the only way the calendar ever gets there.
  */
 export const CRYO = [
-    { id: 'cryo-i',   days: 30,       cost: 4.0e4 },
+    { id: 'cryo-i',   days: 30,       cost: 1.5e4 },
     { id: 'cryo-ii',  days: 365,      cost: 5.0e5 },
     { id: 'cryo-iii', days: 3650,     cost: 1.2e8 },
     { id: 'cryo-iv',  days: 36500,    cost: 2.0e12 },
@@ -135,13 +139,34 @@ export const resurfaceDay = (doom0) => DAYS_PER_YEAR * SURFACE_DECAY_YEARS * Mat
 /** The working title of what waits at the top. One constant, so it is renamed in one place. */
 export const CHAPTER_V = { roman: 'V', title: 'RETURN' };
 /** The first ones through the hatch: this share of the colony. On a surface that is not ready
- *  they are the price of trying; on one that is, everyone follows them up. */
-export const ASCENT_FAIL_LOSS = 0.25;
+ *  they are the price of trying; on one that is, everyone follows them up. A third since v1.48.0
+ *  (the overnight playtest: at a quarter, a failed try was the best scout there was). */
+export const ASCENT_FAIL_LOSS = 1 / 3;
 /** A colony this small cannot send anyone up and still be a colony. */
 export const ASCENT_MIN_PEOPLE = 3;
-/** What the dead taught us: after a failed try the colony knows the surface this well. */
-export const ASCENT_TAUGHT_SPREAD = 3;
+/** What the dead taught us: after a failed try the colony knows the surface this well, and no
+ *  better. Since v1.48.0 ± 15, not ± 3: a scout party reads to a few points for a twentieth of the
+ *  colony, a failed try to fifteen for a third of it, so the scouts stay the better instrument. */
+export const ASCENT_TAUGHT_SPREAD = 15;
+/** MOURNING (v1.48.0). After deaths the creches stand still for a colony year: a party lost, a
+ *  chamber taken, a failed try, a sleep that cost lives in the ice. The colony does not refill
+ *  itself in the seconds after it loses people (the overnight playtest: "Scout party lost." and
+ *  the count back at 16 within seconds). */
+export const MOURN_DAYS = 365;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * The colony has lost people: no one is born for MOURN_DAYS from today. A second loss inside
+ * the year starts the year again; it never shortens one already running.
+ * @param {object} s - state, mutated
+ * @returns {number} the day the mourning ends
+ */
+export function mourn(s) {
+    s.mournUntil = Math.max(s.mournUntil ?? -Infinity, (s.day || 0) + MOURN_DAYS);
+    return s.mournUntil;
+}
+/** Is the colony mourning today? */
+export const mourning = (s) => (s.mournUntil ?? -Infinity) > (s.day || 0);
 
 /* ---------------------------------------------------------------------------
  * SURVIVAL, ONE WORD EVERYWHERE (v1.45.0). Ola, after playing v1.44.0:
@@ -443,6 +468,7 @@ export function resolveDueProbes(s, slots, rng) {
             back = people;
         }
         s.humans += back;
+        if (back < people) mourn(s);        // a party lost, or half of one: the colony grieves
         if (r.outcome !== 'lost') s.estRevealed = true;
         landed.push({ outcome: r.outcome, reading: r.reading, slot, people, back });
     }
@@ -557,11 +583,25 @@ export function completeBuilds(s) {
     return done;
 }
 
+/**
+ * The colony as it will stand once every order on the books is built: a copy, the real state
+ * untouched. What a cryo tier still NEEDS is read off this one (v1.48.0): an automation already
+ * ordered is not something the player has to buy again.
+ * @param {object} s
+ * @returns {object}
+ */
+export function ordersDone(s) {
+    const c = JSON.parse(JSON.stringify(s));
+    for (const job of c.builds || []) job.doneDay = c.day;
+    completeBuilds(c);
+    return c;
+}
+
 /** Fresh colony: what came down the hole. */
 export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people = 10 } = {}) {
     return {
         day: 0, minerals: salvage, food: 500, stars: 0, humans: people, asleep: false,
-        chambers: 3, rooms: { mine: 0, farm: 1, generator: 1, dorm: 1, cryo: 0 },
+        chambers: 4, rooms: { mine: 1, farm: 1, generator: 1, dorm: 1, cryo: 0 },   // v1.48.0: a mine came down too
         level: { mine: 0, farm: 0, generator: 0, dorm: 0 },
         auto: { mine: 0, farm: 0, generator: 0, dorm: 0 },
         // What a monster took: rooms of this type that stand dark and make nothing until they
@@ -576,6 +616,7 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         repair: 0,                          // awake days spent clearing the first dark chamber
         actWokeDay: null,                   // the last "you can act" wake, so it comes at most once a decade
         ascended: false,
+        mournUntil: null,                   // no one is born until this day (a year after deaths)
         shaftOpen: false,                   // the rubble at the top of the shaft up, cleared by the first party
         cryo: -1, doom0,
     };
@@ -643,7 +684,7 @@ export function tickDay(s, asleep = false) {
         // larder, never from the day's harvest, which keeps the F column readable as "grown minus eaten".
         const rate = (asleep ? SLEEP_GROWTH : 1) * GROWTH_PER_YEAR / DAYS_PER_YEAR;
         const mouthsToSpare = grown / FOOD_MARGIN - demand;
-        if (mouthsToSpare > 0) born = Math.max(0, Math.min(s.humans * rate, capacity - s.humans, mouthsToSpare, s.food * BIRTH_SHARE / BIRTH_FOOD));
+        if (mouthsToSpare > 0 && !mourning(s)) born = Math.max(0, Math.min(s.humans * rate, capacity - s.humans, mouthsToSpare, s.food * BIRTH_SHARE / BIRTH_FOOD));
         s.food -= born * BIRTH_FOOD; s.humans += born;
     } else {
         s.food = 0; starving = true;
@@ -892,14 +933,15 @@ export function ascentOdds(s) {
 /**
  * Open the hatch. You can always try (Ola, after v1.44.0: "Could you be allowed to try and then
  * lose people? Better than now anyway."). On a surface that is ready, everyone goes up. On one
- * that is not, the first party (ASCENT_FAIL_LOSS of the colony) dies up there, the rest wait, and
- * what the dead taught the colony sets its belief straight: the estimate is the truth, give or
- * take ASCENT_TAUGHT_SPREAD.
+ * that is not, the first party (ASCENT_FAIL_LOSS of the colony) dies up there, the rest wait and
+ * mourn, and what the dead taught becomes the belief: a poor reading, give or take
+ * ASCENT_TAUGHT_SPREAD.
  *
  * @param {object} s - state, mutated
+ * @param {Function} [rng] - for the scatter of what the dead taught
  * @returns {{tried:boolean, success:boolean, lost:number, survival:number}} survival: the truth, in per cent
  */
-export function attemptAscent(s) {
+export function attemptAscent(s, rng = Math.random) {
     const truth = survivalNow(s);
     if (!canTryAscent(s)) return { tried: false, success: false, lost: 0, survival: truth };
     s.shaftOpen = true;
@@ -909,7 +951,12 @@ export function attemptAscent(s) {
     }
     const lost = Math.min(ascentParty(s), s.humans - 2);
     s.humans -= lost;
-    s.est = { bias: 0, spread: Math.min(s.est?.spread ?? ESTIMATE_START.spread, ASCENT_TAUGHT_SPREAD) };
+    mourn(s);
+    // what the dead taught is a poor reading, and it replaces what the colony believed: whatever
+    // the belief was, it sent them up to die (v1.48.0: was the truth ± 3, a perfect instrument)
+    const doom = surface(s.doom0, s.day);
+    const reading = clamp(doom + (rng() * 2 - 1) * ASCENT_TAUGHT_SPREAD, 0, 100);
+    s.est = { bias: reading - doom, spread: ASCENT_TAUGHT_SPREAD };
     s.estRevealed = true;
     return { tried: true, success: false, lost, survival: truth };
 }
