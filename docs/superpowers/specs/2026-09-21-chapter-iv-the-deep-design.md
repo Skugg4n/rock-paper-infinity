@@ -394,3 +394,85 @@ Also from Ola:
   bases; or everyone in cryo uploads to a digital world (the screen goes dark and V
   lights up like an old TV switching on: "V · DIGITAL"), and then VI · CLONES, back to
   the real world from the originals (Bobiverse). Parked until IV holds.
+
+## Built: slice 3 (v1.43.0, 2026-09-22): sleep is a state
+
+What the playtest diagnosis decided, in code:
+
+- **Cryo is a state.** The snowflake starts a sleep. Asleep, a 10 Hz timer runs the
+  colony at the tier's rate, `CRYO[tier].days` colony days per real second (a month,
+  a year, ten years, a century, a thousand, ten thousand, a hundred thousand), and the
+  frames roll the year, the ore and the stars between the ticks. The first moment keeps
+  the odometer spin of falling asleep (1.5 s), then the roll is continuous. The scene
+  darkens a little, the people are in the hall, automated rooms pulse. A sun button
+  wakes the colony at will. A save made asleep reloads asleep.
+- **Alarms** (`sleep(s, days, { alarms: true })` and `troubleIn()` in `deep.js`): a
+  room that stalls (no hands, or no ore for the generators), energy short, food for
+  under 30 sleeping days, too few people, a scout party home, an order finished with
+  the next purchase for the weakest column paid for (at most once a decade), the
+  estimate crossing the line, and the sensor on the shaft (the truth, which also sets
+  the belief straight). Each has one sentence (`alarmLine()` in `advisor.js`): "Woke:
+  food will run out in 21 days.", "Woke: the mine stalled, no hands.", "Woke: scout
+  party returned. Surface 41 %.", "Woke: the surface may be habitable. Estimate 14 ± 6 %."
+  and a glyph that opens the wake-up strip.
+- **Fast forward survives.** A sleeping day that leaves the people steady (the ice took
+  some and the creches refilled them), the larder not shrinking, the generators fed and
+  nothing on order is repeated in one step up to the next thing that can happen (a party
+  due, the estimate at the line, the ring). The top tier is a handful of loops.
+- **Tiers are gated on a dry run** (`sleepTrouble()`): the hall and every next tier are
+  offered once one second of sleep at that rate meets none of the bad alarms. The
+  tooltip says why not: "Cryo II needs food for 365 days: 210 today.", "Cryo II needs the
+  farms to run without hands." So that food can run out under the ice at all, **sleepers
+  now eat a tenth of a ration** (`SLEEP_FOOD`).
+- **People.** The ice takes 0.3 % of the sleepers a year, three quarters of that per
+  dormitory level; a fed colony refills its pods, so the cost is food and a number on
+  the strip. Scout parties are 5 % of the colony (4 to 60 people) and come home on their
+  own day, awake or asleep: "Scout party sent (6 people).", "Scout party returned:
+  surface 41 %.", "Scout party lost.", "Scout party returned raving: reading unreliable.",
+  "Something came back with the scouts: chamber 7 dark." (half the party comes back). Awake
+  free hands clear a dark chamber in 10 days. Under 10 people the colony cannot sleep.
+- **The goal on screen.** The ring is on the crust from the first second. The belief is
+  now `{ bias, spread }`: the true healing curve, shifted by what the colony has got
+  wrong, with a band of doubt (85 ± 40 % at the descent). Under it, once, in mono:
+  "habitable ~ year 802 701". Scouts narrow the band and can bend the curve. The save
+  went to schema 2 with a migration; no save is dropped. The advisor's first line at the
+  descent: "The surface will heal. Not in our lifetimes. We dig, we build, we sleep."
+- **Stores and flows.** The four bars are stores, each on its own scale: ore against the
+  next thing ore buys, food in days of eating (full at a year), energy spare as a share
+  of what is made, free hands as a share of those awake (asleep: filled pods). Under
+  each, +in and -out a day in mono; the red dot stays on the weakest flow. One sentence
+  per bar: "Food: 45 days left. +84 grown, -39 eaten a day."
+- **Every purchase says what it does for the goal**, from a dry run (`consequence()` in
+  `readout.js`): "Lets the colony sleep 3 more years without an alarm", "Food for 12 more
+  days of sleep", or "+120 stars a day toward Cryo II". And its cost, always, with
+  "Affordable in N days" at today's flow or what else it needs.
+- **Counters** carry their rate a day in mono; ore is a pickaxe, never the gem.
+- **Lighter lanes, bright people**: lanes mid grey, houses rock, people white and a
+  size step larger.
+- **Rock, paper, scissors in the deep.** Chapter I's star machine sits on the lid: a
+  small label with chapter I's own three glyphs (gem, file-text, scissors; the brief
+  said hand, file, scissors, but chapter I's rock is the gem) throwing at a speed set by
+  the stars a day, on a log scale, and a star flashes on every third throw. The stars
+  counter says: "Wins. The machine plays with the colony's surplus."
+- **Hooks.** Checkpoints `iv-cryo` and `iv-late` are on the new model (belief as a bias,
+  parties with people); `window.debug_deep('alarm')` wakes a sleeping colony,
+  `debug_deep('home')` brings every party home tomorrow.
+- A pre-existing calendar bug is gone: month 12 holds 35 days and its day number used to
+  wrap back to 1, so the clock ran backwards for five days at the end of every year.
+
+**Simulation** (`scripts/sim-phase4.mjs`, now the state model: the greedy player sleeps
+when a dry run says it is safe, sleeps a real second at a time until an alarm or until
+its next purchase is paid for, and sends a scout party when one costs under 5 % of the
+ore and the ring is still wider than ±6): **28m40s to year 802 701**, 85 wake-ups (64 by
+hand when the next purchase lit up, 14 on a finished order, 6 scout parties, 1 sensor),
+3.4 buys a wake, 1m19s of the run asleep, 22 290 people, no hungry days, longest stall
+58 s, bottleneck spread awake M 29 % F 31 % E 30 % H 10 %, asleep M 58 % F 16 % E 14 %
+H 12 %. Seeds 1 to 5 land between 28m40s and 29m51s: inside the window, but near its
+top, because a monster or a lost party costs a minute. No cost, rate or build time was
+changed; the new rules that touch the economy are the sleepers' tenth of a ration and
+the losses in the ice, and neither moved the run out of the window.
+
+Still open: while awake, nothing on screen counts down to the next decision unasked
+(the tooltips do); early purchases often read "No change to the stars until the
+weakest column moves", which is true but thin; the people's visibility on the light
+plates wants a look on a real screen.

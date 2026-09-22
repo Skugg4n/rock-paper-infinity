@@ -46,6 +46,8 @@ export const ROOM = {
 };
 export const FOOD_PER_HUMAN = 1;            // per day
 export const SLEEP_HANDS = 0.5;             // asleep the machines stand in for the hands, but only this well
+export const SLEEP_FOOD = 0.1;              // asleep a body burns this share of a ration: slowly, but it does,
+                                            // so a larder without farms behind it runs out under the ice too
 export const SLEEP_FUEL = 0.5;              // asleep a generator burns this share of its ore for the same
                                             // power: the lifts are still and nothing moves but the machines
 export const WORK_PER_HAND = 25;            // what one pair of spare hands is worth to the colony in a day
@@ -67,6 +69,12 @@ export const SLEEP_GROWTH = 0.3;            // the creches run slower while the 
 export const STARS_PER_UNIT = 10;           // stars/day = 10 × the smallest surplus
 export const DAYS_PER_YEAR = 365;
 export const HUNGER_PER_DAY = 0.002;        // people lost per day with an empty larder
+/** The ice is not kind: this share of the sleepers is lost per sleeping year, and every
+ *  dormitory level keeps CRYO_DEATH_DORM of it (better beds, better pods). The creches
+ *  refill a fed colony, so the cost is food and the count on the wake-up strip. */
+export const CRYO_DEATH_PER_YEAR = 0.003;
+export const CRYO_DEATH_DORM = 0.75;
+export const cryoDeathRate = (s) => CRYO_DEATH_PER_YEAR * Math.pow(CRYO_DEATH_DORM, (s.level && s.level.dorm) || 0) / 365;
 
 /** Costs. Minerals dig and build; stars buy levels, automation and cryo. */
 export const digCost = (chambers) => Math.round(100 * Math.pow(1.45, chambers));
@@ -78,9 +86,11 @@ export const MAX_AUTO = 4;
 export const AUTOMATION_COST = [6.0e4, 2.4e6, 1.2e8, 2.0e10];
 export const automationCost = (type, auto) => (auto < MAX_AUTO ? AUTOMATION_COST[auto] : Infinity);
 /**
- * Cryo tiers: sleep length in days per press, and the tier's price in stars. A month, a year, a
- * decade, a century, a millennium, ten millennia. The chapter is 50000 years long, so the top
- * tiers are not a convenience, they are the only way the calendar ever gets there.
+ * Cryo tiers. Since v1.43.0 a sleep is a STATE, not a press: `days` is how many colony days
+ * pass per real second while the colony is under the ice, and `cost` is the tier's price in
+ * stars. A month, a year, a decade, a century, a millennium, ten and a hundred millennia a
+ * second. The chapter is 802 701 years long, so the top tiers are not a convenience, they are
+ * the only way the calendar ever gets there.
  */
 export const CRYO = [
     { id: 'cryo-i',   days: 30,       cost: 4.0e4 },
@@ -91,6 +101,9 @@ export const CRYO = [
     { id: 'cryo-vi',  days: 3650000,  cost: 2.0e16 },
     { id: 'cryo-vii', days: 36500000, cost: 2.0e18 },
 ];
+/** "Cryo I" to "Cryo VII": what a sentence calls a tier. */
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+export const cryoName = (tier) => `Cryo ${ROMAN[tier] || tier + 1}`;
 /** Thousands are grouped with a space, never a comma: the counter reads the same in every locale. */
 export const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 /**
@@ -227,16 +240,63 @@ export function updateEstimate(est, reading, spread) {
 /** What the ring says the colony believes, as the crust prints it: "40 ± 40 %". */
 export const estimateText = (est) => `${Math.round((est || ESTIMATE_START).mean)} ± ${Math.round((est || ESTIMATE_START).spread)} %`;
 
+/* ---------------------------------------------------------------------------
+ * THE GOAL ON SCREEN (v1.43.0, B066). The first outside playtest: "why build
+ * things? what is the goal?" The fog of war had hidden the one thing the chapter
+ * is about. Now the ring is there from the first second: the colony knows the
+ * physics, so its belief FOLLOWS THE TRUE HEALING CURVE, with a wide band of
+ * doubt round it. What it does not know is how far off its own instruments are:
+ * that is `bias`, zero until a scout party comes back and moves it. Scouts narrow
+ * the band; a raving one can bend the curve. The state keeps { bias, spread };
+ * `estimateNow()` turns it into today's { mean, spread }.
+ * ------------------------------------------------------------------------ */
+
+/** Today's belief: the healing curve, shifted by what the colony got wrong, with its doubt. */
+export function estimateNow(s) {
+    const truth = surface(s.doom0, s.day);
+    const e = s.est || {};
+    return { mean: clamp(truth + (e.bias || 0), 0, 100), spread: e.spread ?? ESTIMATE_START.spread };
+}
+/** The day the colony BELIEVES the ring reaches the line, or Infinity when it never will. */
+export function estimateOpensDay(s) {
+    const target = RESURFACE_AT - ((s.est && s.est.bias) || 0);
+    if (!(target > 0)) return Infinity;
+    if (target >= s.doom0) return 0;
+    return DAYS_PER_YEAR * SURFACE_DECAY_YEARS * Math.log(s.doom0 / target);
+}
+/** The year printed under the ring: "habitable ~ year 802 701". */
+export const habitableYear = (s) => {
+    const d = estimateOpensDay(s);
+    return Number.isFinite(d) ? Math.round(d / DAYS_PER_YEAR) : Infinity;
+};
+
+/* ---------------------------------------------------------------------------
+ * SCOUT PARTIES (v1.43.0, B058): the probes, made of people. A party leaves with
+ * a share of the colony, costs ore and spare power, and is away for years. It
+ * comes back with a reading, or raving, or not at all, or with something behind
+ * it. The functions keep their old names (launchProbe, resolveDueProbes) so the
+ * save and the tests read the same; the words on screen are "scout party".
+ * ------------------------------------------------------------------------ */
+export const SCOUT_SHARE = 0.05;              // a party is this share of the colony
+export const SCOUT_MIN = 4;
+export const SCOUT_MAX = 60;
+export const scoutParty = (humans) => clamp(Math.round((humans || 0) * SCOUT_SHARE), SCOUT_MIN, SCOUT_MAX);
+/** A colony under this many people cannot go under the ice: someone has to run the hall. */
+export const MIN_SLEEPERS = 10;
+
 /**
- * Build one and launch it. The ore is gone the day it goes up; the answer is years away.
+ * Send a party. The ore and the people are gone the day it leaves; the answer is years away.
  * @param {object} s - state, mutated
- * @returns {{sentDay:number, dueDay:number}|null} null when the ore was not there
+ * @returns {{sentDay:number, dueDay:number, people:number}|null} null when the ore or the
+ *          people were not there (the colony keeps MIN_SLEEPERS at home)
  */
 export function launchProbe(s) {
     const price = probeCost(s.probesSent || 0);
-    if (s.minerals < price) return null;
+    const party = scoutParty(s.humans);
+    if (s.minerals < price || s.humans - party < MIN_SLEEPERS) return null;
     s.minerals -= price;
-    const p = { sentDay: s.day, dueDay: s.day + probeDays(s.probesSent || 0) };
+    s.humans -= party;
+    const p = { sentDay: s.day, dueDay: s.day + probeDays(s.probesSent || 0), people: party };
     s.probesSent = (s.probesSent || 0) + 1;
     s.probes = (s.probes || []).concat([p]);
     return p;
@@ -287,28 +347,68 @@ export function weakestOf(hist) {
 }
 
 /**
- * Every probe that was due home by today. Called at a wake-up and nowhere else: a probe is away
- * for years of colony time, so its answer never arrives while the player is watching.
+ * Every party that was due home by today. Since v1.43.0 they come home on their own day, awake
+ * or asleep: asleep, the return is an alarm that wakes the colony.
+ *
+ * A reading or a raving party comes back whole and moves the belief; a lost one is gone with
+ * everyone in it; a monster comes back with half the party and takes a chamber.
  *
  * @param {object} s - state, mutated
  * @param {(string|null)[]} slots - the layout's slots, for the one that comes back as a monster
  * @param {Function} rng - returns a number in [0, 1)
- * @returns {Array<{outcome:string, reading:number|null, slot:number}>} one entry per probe home
+ * @returns {Array<{outcome:string, reading:number|null, slot:number, people:number, back:number}>}
  */
 export function resolveDueProbes(s, slots, rng) {
     const landed = [], still = [];
     for (const p of (s.probes || [])) {
         if (p.dueDay > s.day) { still.push(p); continue; }
-        const r = resolveProbe(rng, p.dueDay, surface(s.doom0, p.dueDay));
-        let slot = -1;
-        if (r.outcome === 'monster') slot = darkenChamber(s, slots, rng);
-        else if (r.outcome !== 'lost') s.est = updateEstimate(s.est, r.reading, r.spread);
-        // A probe that came back at all is a probe that looked up: the ring is drawn from here on.
+        const truth = surface(s.doom0, p.dueDay);
+        const r = resolveProbe(rng, p.dueDay, truth);
+        const people = p.people || 0;
+        let slot = -1, back = 0;
+        if (r.outcome === 'monster') {
+            slot = darkenChamber(s, slots, rng);
+            back = Math.floor(people / 2);
+        } else if (r.outcome !== 'lost') {
+            // the reading is of the day they looked, so the belief is compared on that day
+            const bias = (s.est && s.est.bias) || 0;
+            const then = { mean: clamp(truth + bias, 0, 100), spread: s.est?.spread ?? ESTIMATE_START.spread };
+            const next = updateEstimate(then, r.reading, r.spread);
+            s.est = { bias: next.mean - truth, spread: next.spread };
+            back = people;
+        }
+        s.humans += back;
         if (r.outcome !== 'lost') s.estRevealed = true;
-        landed.push({ outcome: r.outcome, reading: r.reading, slot });
+        landed.push({ outcome: r.outcome, reading: r.reading, slot, people, back });
     }
     s.probes = still;
     return landed;
+}
+
+/** The next day a party is due home, or Infinity. */
+export const nextScoutDue = (s) => (s.probes || []).reduce((a, p) => Math.min(a, p.dueDay), Infinity);
+
+/* Awake people mend what the scouts let in: a dark chamber clears after REPAIR_DAYS awake days
+   with at least REPAIR_HANDS free. Clicking the plate or buying for its kind still clears it at
+   once; this is the colony doing it on its own. */
+export const REPAIR_DAYS = 10;
+export const REPAIR_HANDS = 3;
+/**
+ * One awake day of repair work. Pure.
+ * @param {object} s - state, mutated
+ * @param {(string|null)[]} slots
+ * @param {number} hands - free hands today (tickDay's `hands`)
+ * @returns {number} the slot that was cleared today, or -1
+ */
+export function repairTick(s, slots, hands) {
+    if (!(s.darkSlots || []).length) { s.repair = 0; return -1; }
+    if (!(hands >= REPAIR_HANDS)) return -1;
+    s.repair = (s.repair || 0) + 1;
+    if (s.repair < REPAIR_DAYS) return -1;
+    s.repair = 0;
+    const slot = s.darkSlots[0];
+    clearChamber(s, slots, slot);
+    return slot;
 }
 /** Output multipliers: ×2 per level, ×3 per automation past the first, ×100 per advanced (after the third). */
 export function roomMultiplier(level, auto) {
@@ -406,7 +506,10 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         stalled: {},                        // room types that stopped during the last sleep
         probes: [], probesSent: 0,          // in flight: { sentDay, dueDay }
         builds: [],                         // ordered, not yet finished: { kind, type, slot, startDay, doneDay }
-        est: { ...ESTIMATE_START }, estRevealed: false,
+        // the belief about the surface: the healing curve, off by `bias`, give or take `spread`
+        est: { bias: 0, spread: ESTIMATE_START.spread }, estRevealed: false,
+        repair: 0,                          // awake days spent clearing the first dark chamber
+        actWokeDay: null,                   // the last "you can act" wake, so it comes at most once a decade
         ascended: false,
         cryo: -1, doom0,
     };
@@ -460,8 +563,11 @@ export function tickDay(s, asleep = false) {
     // People eat, and grow toward the beds as long as the larder holds. Asleep nobody eats,
     // but the creches keep running, slower, on the food the automated farms bring in.
     const capacity = live('dorm') * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
+    // the ice takes its share first, and the creches then fill the beds it emptied
+    const died = asleep ? s.humans * cryoDeathRate(s) : 0;
+    s.humans -= died;
     const demand = s.humans * FOOD_PER_HUMAN;        // what the colony eats, or will eat when it wakes
-    const eat = asleep ? 0 : demand;
+    const eat = asleep ? demand * SLEEP_FOOD : demand;
     let born = 0, starving = false;
     if (s.food >= eat) {
         s.food -= eat;
@@ -491,55 +597,196 @@ export function tickDay(s, asleep = false) {
     // What each room actually drew and who actually stood in it. The bars are hovered and have
     // to say where their number came from (Ola: "I buy electricity and BOOM all humans drop"),
     // and a sentence cannot be written from a fraction alone.
-    const draw = {}, crew = {};
+    const draw = {}, crew = {}, rooms = {};
     for (const t of ROOMS) {
         draw[t] = drawing(t) * ROOM[t].energy * power[t];
         crew[t] = s.auto[t] > 0 ? 0 : live(t) * ROOM[t].crew * upkeep(t) * staff[t];
+        rooms[t] = live(t);
     }
-    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, hands, born, starving, stars, weakest, parts, capacity, staff, power, draw, crew, eaten: eat, awake };
+    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, hands, born, died, starving, stars, weakest, parts, capacity, staff, power, draw, crew, eaten: eat, awake, live: rooms };
+}
+
+/* ---------------------------------------------------------------------------
+ * SLEEP IS A STATE (v1.43.0, B055). The playtest: "click, wait, buy buy buy,
+ * cryo, wait". Now the snowflake starts a sleep and the colony runs, years rolling,
+ * until something WAKES it. An alarm is a condition the player must see to, in a
+ * plain sentence. The bad ones (the colony would come to harm if it slept on) are
+ * what a dry run checks before a tier is offered; the benign ones (a party home, an
+ * order finished with the next one paid for, the ring at the line) only wake.
+ * ------------------------------------------------------------------------ */
+
+/** Food this close to running out wakes the colony. */
+export const FOOD_ALARM_DAYS = 30;
+/** "You can act" wakes come at most once in this many sleeping days. */
+export const ACT_WAKE_GAP_DAYS = 10 * DAYS_PER_YEAR;
+/** The alarms that mean harm. A tier is only offered when a dry run meets none of them. */
+export const BAD_ALARMS = ['food', 'energy', 'stall', 'few'];
+
+/** A free chamber, counted the way the rules can count it: every room, the hall, and every
+ *  room already ordered take one. */
+export function freeChambers(s) {
+    const used = ROOMS.reduce((a, t) => a + (s.rooms[t] || 0), 0) + (s.rooms.cryo || 0)
+        + (s.builds || []).filter((j) => j.kind === 'room').length;
+    return Math.max(0, s.chambers - used);
+}
+
+/** Can the colony pay for the next purchase that fixes this column: a room, a level or an automation? */
+export function canActOn(s, column) {
+    const t = ROOM_FOR_COLUMN[column];
+    if (!t) return false;
+    if (freeChambers(s) > 0 && !buildPending(s, 'room', t) && s.minerals >= roomCost(t, s.rooms[t] || 0)) return true;
+    if (!buildPending(s, 'level', t) && s.stars >= levelCost(t, s.level[t] || 0)) return true;
+    return !buildPending(s, 'auto', t) && s.stars >= automationCost(t, s.auto[t] || 0);
 }
 
 /**
- * Sleep `days` days in cryo: same rules, nobody awake. The sensor on the shaft wakes the colony
- * early the day the surface ring opens, so the last sleep never overshoots the ending by a
- * century. Returns the summed report (the wake-up summary).
+ * What is wrong today, if anything, in the order the colony would want to hear it. Read off a
+ * SLEEPING day's report: nobody is on a shift, so a manual room is a stalled room.
+ *
+ * @param {object} s - state after the day
+ * @param {object} r - that day's report from tickDay(s, true)
+ * @returns {object|null} { kind:'stall', type, why:'hands'|'fuel' } | { kind:'energy', pct }
+ *          | { kind:'food', days } | { kind:'few' } | null
  */
-export function sleep(s, days) {
-    const sum = { days: 0, minerals: 0, food: 0, stars: 0, born: 0, weakest: {}, ran: {}, wokenEarly: false };
+export function troubleIn(s, r) {
+    for (const t of CREW_ORDER) {
+        if ((r.live?.[t] || 0) > 0 && r.staff[t] < 0.999) return { kind: 'stall', type: t, why: 'hands' };
+    }
+    if (r.fuelWanted > 0 && r.fuel < r.fuelWanted * 0.999) return { kind: 'stall', type: 'generator', why: 'fuel' };
+    if (ROOMS.some((t) => (r.live?.[t] || 0) > 0 && r.power[t] < 0.999)) {
+        const pct = r.energyNeed > 0 ? Math.floor(100 * Math.min(1, r.energyMade / r.energyNeed)) : 0;
+        return { kind: 'energy', pct };
+    }
+    // what the sleepers eat beyond what the farms bring in while everyone is under
+    const need = s.humans * FOOD_PER_HUMAN * SLEEP_FOOD - r.food;
+    if (need > 0) {
+        const days = s.food / need;
+        if (days < FOOD_ALARM_DAYS) return { kind: 'food', days: Math.floor(days) };
+    }
+    if (s.humans < MIN_SLEEPERS) return { kind: 'few' };
+    return null;
+}
+
+/**
+ * Sleep up to `days` days in cryo: the same rules, nobody awake. Returns the summed report
+ * (the wake-up summary).
+ *
+ * Without options this is the plain sleep of slices 1 and 2: it runs its days, finishes what
+ * was being built, and only the sensor on the shaft stops it early, the day the surface has
+ * truly healed. With `alarms`, it stops the day anything in `troubleIn` happens, the day a
+ * scout party comes home, the day the colony's own estimate crosses the line, and on a
+ * finished order when the next purchase is already paid for (at most once a decade). The
+ * reason is `sum.alarm`.
+ *
+ * Fast forward. When a sleeping day leaves nothing that could make the next day different
+ * (the people held steady, the larder did not shrink, the generators got all the ore they
+ * asked for and the mines bring in at least as much as they burn, nothing is on order),
+ * every day up to the next thing that can happen is that same day, and they are run in one
+ * step: the same numbers exactly, not an estimate. That is how the top tier, a hundred
+ * thousand years a second, stays a handful of loops in the browser.
+ *
+ * @param {object} s - state, mutated
+ * @param {number} days - the most it may sleep
+ * @param {object} [opts]
+ * @param {boolean} [opts.alarms=false] - stop on alarms
+ * @param {boolean} [opts.benign=true] - with alarms: also stop for the good news (scouts, a paid
+ *        next purchase, the estimate at the line). A dry run turns this off.
+ * @param {(string|null)[]} [opts.slots] - the layout, for a monster to take a chamber
+ * @param {Function} [opts.rng] - for the scouts
+ * @param {number} [opts.maxSteps] - loop budget; the caller carries on next frame if it runs out
+ */
+export function sleep(s, days, opts = {}) {
+    const { alarms = false, benign = true, slots = [], rng = Math.random, maxSteps = Infinity } = opts;
+    const sum = { days: 0, minerals: 0, food: 0, stars: 0, born: 0, died: 0, weakest: {}, ran: {}, wokenEarly: false, built: [], alarm: null, landed: [] };
     for (const t of ROOMS) sum.ran[t] = 0;
     const opens = resurfaceDay(s.doom0);
     /** How much of a room type actually turned over that day: crew and power, whichever is shorter. */
     const worked = (r, t) => Math.min(r.staff[t], r.power[t]);
-    for (let i = 0; i < days;) {
+    const add = (r, n) => {
+        sum.minerals += n * r.minerals; sum.food += n * r.food; sum.stars += n * r.stars;
+        sum.born += n * r.born; sum.died += n * r.died;
+        sum.weakest[r.weakest] = (sum.weakest[r.weakest] || 0) + n;
+        for (const t of ROOMS) sum.ran[t] += n * worked(r, t);
+    };
+    let steps = 0;
+    let wasAbove = estimateNow(s).mean > RESURFACE_AT;
+    const surfaced = () => {
+        sum.wokenEarly = sum.days < days;
+        sum.alarm = { kind: 'surface', reading: surface(s.doom0, s.day) };
+        // the sensor on the shaft is a reading like any other, and the best one there is
+        if (alarms) s.est = { bias: 0, spread: Math.min(s.est?.spread ?? ESTIMATE_START.spread, 4) };
+    };
+    while (sum.days < days && steps < maxSteps) {
+        steps++;
         // the machines do not stop when the people lie down: orders land on their day
-        if ((s.builds || []).length) sum.built = (sum.built || []).concat(completeBuilds(s));
+        const built = (s.builds || []).length ? completeBuilds(s) : [];
+        if (built.length) sum.built = sum.built.concat(built);
+        const h0 = s.humans, food0 = s.food;
         const r = tickDay(s, true);
-        i++; sum.days++;
-        sum.minerals += r.minerals; sum.food += r.food; sum.stars += r.stars; sum.born += r.born;
-        sum.weakest[r.weakest] = (sum.weakest[r.weakest] || 0) + 1;
-        for (const t of ROOMS) sum.ran[t] += worked(r, t);
-        if (canResurface(s)) { sum.wokenEarly = i < days; break; }
-        // Fast forward. When a sleeping day leaves nothing that could make the next day different
-        // (nobody was born, the larder held, the generators got all the ore they asked for and the
-        // mines bring in at least as much as they burn), every remaining day is that same day. Run
-        // them in one step: the same numbers exactly, not an estimate. Without this, one press of
-        // the top cryo tier would be tens of millions of loops, in the browser as well as here.
-        // ... and while something is still being built, tomorrow is NOT today, so the days
-        // have to be lived one at a time until the queue is empty.
-        if (r.born === 0 && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).length) {
-            const n = Math.max(0, Math.min(days - i, Math.ceil(opens - s.day)));
-            if (n > 0) {
-                s.minerals += n * r.parts.M; s.food += n * r.food; s.stars += n * r.stars; s.day += n;
-                i += n; sum.days += n; sum.minerals += n * r.minerals; sum.food += n * r.food; sum.stars += n * r.stars;
-                sum.weakest[r.weakest] += n;
-                for (const t of ROOMS) sum.ran[t] += n * worked(r, t);
+        sum.days++;
+        add(r, 1);
+        if (canResurface(s)) { surfaced(); break; }
+        if (alarms) {
+            const bad = troubleIn(s, r);
+            if (bad) { sum.alarm = bad; break; }
+            if (benign) {
+                if ((s.probes || []).some((p) => p.dueDay <= s.day)) {
+                    sum.landed = resolveDueProbes(s, slots, rng);
+                    sum.alarm = { kind: 'scouts', landed: sum.landed };
+                    break;
+                }
+                const above = estimateNow(s).mean > RESURFACE_AT;
+                if (wasAbove && !above) { sum.alarm = { kind: 'estimate', est: estimateNow(s) }; break; }
+                wasAbove = above;
+                if (built.length && canActOn(s, r.weakest)
+                    && s.day - (s.actWokeDay ?? -Infinity) >= ACT_WAKE_GAP_DAYS) {
+                    s.actWokeDay = s.day;
+                    sum.alarm = { kind: 'act', job: built[built.length - 1], column: r.weakest };
+                    break;
+                }
             }
-            if (canResurface(s)) { sum.wokenEarly = i < days; break; }
         }
+        const steady = Math.abs(s.humans - h0) <= 1e-9 * Math.max(1, h0) && s.food >= food0
+            && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).length;
+        if (!steady) continue;
+        let n = Math.min(days - sum.days, Math.ceil(opens - s.day));
+        if (alarms && benign) {
+            // stop the day before anything can happen, so the next lived day is the day it does
+            const due = nextScoutDue(s);
+            if (due < Infinity) n = Math.min(n, due - s.day - 1);
+            if (wasAbove) n = Math.min(n, Math.ceil(estimateOpensDay(s)) - s.day - 1);
+        }
+        n = Math.max(0, Math.floor(n));
+        if (n > 0) {
+            const foodPerDay = s.food - food0;        // grown, less what the creches took
+            s.minerals += n * r.parts.M; s.food += n * foodPerDay; s.stars += n * r.stars; s.day += n;
+            sum.days += n;
+            add(r, n);
+        }
+        if (canResurface(s)) { surfaced(); break; }
     }
     // The wake-up replay reads `ran` as a share of the sleep, not a count of days.
     if (sum.days > 0) for (const t of ROOMS) sum.ran[t] /= sum.days;
     return sum;
+}
+
+/**
+ * Would a sleep of `days` come to harm? A dry run on a copy, with the good news switched off:
+ * only the alarms in BAD_ALARMS count. This is what a cryo tier is gated on (B063): a tier is
+ * offered once the colony could sleep one second of it without being woken to trouble.
+ *
+ * @param {object} s - state, untouched
+ * @param {number} days
+ * @param {number} [maxSteps] - a budget; running out of it is read as surviving
+ * @returns {object|null} the alarm with `day` (sleeping days until it), or null
+ */
+export function sleepTrouble(s, days, maxSteps = 4000) {
+    const c = JSON.parse(JSON.stringify(s));
+    c.probes = [];
+    if (c.humans < MIN_SLEEPERS) return { kind: 'few', day: 0 };
+    const sum = sleep(c, days, { alarms: true, benign: false, maxSteps });
+    if (sum.alarm && BAD_ALARMS.includes(sum.alarm.kind)) return { ...sum.alarm, day: sum.days };
+    return null;
 }
 
 /** Under this share of the sleep, a room type is read as STALLED and gets the amber dot. */
@@ -560,7 +807,7 @@ export const canAscend = (s) => canResurface(s) && canAffordAscent(s);
 /** What the player is OFFERED, which is the colony's belief and not the truth: the estimate says
  *  the surface is under the line, and the climb is paid for. Sending people up on a bad estimate
  *  is a decision the game lets you make. */
-export const ascentOffered = (s) => (s.est?.mean ?? ESTIMATE_START.mean) <= RESURFACE_AT && canAffordAscent(s);
+export const ascentOffered = (s) => estimateNow(s).mean <= RESURFACE_AT && canAffordAscent(s);
 
 /**
  * Open the hatch. The cost is paid either way: a party that does not come back took the ore and
@@ -581,9 +828,9 @@ export function attemptAscent(s) {
     }
     const lost = s.humans * ASCENT_FAIL_LOSS;
     s.humans = Math.max(2, s.humans - lost);
-    const truth = surface(s.doom0, s.day);
-    const est = s.est || ESTIMATE_START;
-    s.est = { mean: clamp((est.mean + truth) / 2, 0, 100), spread: Math.max(est.spread, ASCENT_FAIL_SPREAD) };
+    // what the survivors saw pulls the belief halfway back to the truth, and the doubt returns
+    const est = s.est || {};
+    s.est = { bias: (est.bias || 0) / 2, spread: Math.max(est.spread ?? ESTIMATE_START.spread, ASCENT_FAIL_SPREAD) };
     s.estRevealed = true;
     return { tried: true, success: false, lost };
 }

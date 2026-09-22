@@ -123,22 +123,28 @@ describe('the advisor speaks when something changes, not on a timer', () => {
 });
 
 describe('the bars explain themselves, and a purchase says what it will do', () => {
-    test('every column writes a sentence out of the day it just had', () => {
+    test('every column writes one sentence: the store, then what comes in and goes out (B062)', () => {
         const s = colony();
         const r = tickDay(cloneState(s));
         const lines = { M: ledger('M', s, r), F: ledger('F', s, r), E: ledger('E', s, r), H: ledger('H', s, r) };
-        expect(lines.M).toMatch(/^Minerals -?\d/);
-        expect(lines.M).toContain('mines bring up');
-        expect(lines.F).toContain('people eat');
-        expect(lines.E).toContain('generators make');
-        expect(lines.E).toContain('spare');
-        expect(lines.H).toContain('on duty in');
-        expect(lines.H).toContain('capacity');
+        expect(lines.M).toMatch(/^Ore: [\d.k]+ in store\. \+\d+ mined, -\d+ burned a day\.$/);
+        expect(lines.F).toMatch(/^Food: \d+ days left\. \+\d+ grown, -\d+ eaten a day\.$/);
+        expect(lines.E).toMatch(/^Energy: \d+ spare\. \+\d+ made, -\d+ used a day\.$/);
+        expect(lines.H).toContain('free of');
+        expect(lines.H).toContain('on duty in the');
+        expect(lines.H).toContain('Beds for');
+        // the food line is exactly the playtest's example, from the numbers themselves
+        const f = { ...s, food: 45 * s.humans };
+        expect(ledger('F', f, { ...r, food: 84, eaten: 39, born: 0 })).toBe('Food: 45 days left. +84 grown, -39 eaten a day.');
         // a colony that runs itself has nobody on a shift, and must still read as English
         const idle = { ...s, auto: { mine: 1, farm: 1, generator: 1, dorm: 1 } };
         const ir = tickDay(cloneState(idle));
-        expect(ledger('H', idle, ir)).toContain('nobody on duty');
-        expect(ledger('H', idle, ir)).not.toContain('in nothing');
+        expect(ledger('H', idle, ir)).toContain('Nobody on duty');
+        expect(ledger('H', idle, ir)).not.toContain('in the nothing');
+        // asleep the people are in the ice, and nobody eats
+        const sl = { ...idle, asleep: true };
+        expect(ledger('H', sl, tickDay(cloneState(sl), true))).toContain('asleep in the ice');
+        expect(ledger('F', sl, tickDay(cloneState(sl), true))).toContain('eaten a day in the ice');
         for (const k of Object.keys(lines)) {
             expect(lines[k].endsWith('.')).toBe(true);
             expect(lines[k]).not.toMatch(/NaN|undefined/);

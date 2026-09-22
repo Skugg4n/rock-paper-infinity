@@ -26,7 +26,13 @@ import { digCost } from './deep.js';
    than the sides. The people are dark dots on that light ground. */
 const ROCK = 0x0a0d12;
 const PLATE = 0xd5dbe3;
-const PEOPLE = 0x333c4a;
+/* v1.43.0 (B059): the playtest could not see anyone. Dark dots on black lanes were
+   invisible, so the lanes are now a mid grey cut into the light slab (the houses stay
+   rock), and the people are bright white and one step larger: white on grey reads,
+   and white on the light slab still reads as a spark where they cross it. */
+const LANE = 0x7b8595;
+const PEOPLE = 0xffffff;
+const PEOPLE_SIZE = 0.085;
 
 const PITCH = 2.6;        // cell to cell
 const PLATE_W = 2.0;      // a slab is this wide, so the street between two is 0.6
@@ -41,6 +47,12 @@ const R_ROOM = 0.55;      // the ring runs at this radius around a room
 const R_HUB = 0.80;       // wider on a landing, so it clears the shaft and the hatch
 const EDGE = 0.97;        // nothing is cut closer than this to the slab's edge
 const MAX_DOTS = 160;     // the colony grows past counting; the crowd does not
+/* Chapter I's own three glyphs (rock is the gem there), and the star a win makes. */
+const MACHINE_HTML = '<span class="deep-machine">'
+    + '<span class="rps is-on"><i data-lucide="gem" class="w-3.5 h-3.5"></i></span>'
+    + '<span class="rps"><i data-lucide="file-text" class="w-3.5 h-3.5"></i></span>'
+    + '<span class="rps"><i data-lucide="scissors" class="w-3.5 h-3.5"></i></span>'
+    + '<span class="win"><i data-lucide="star" class="w-3.5 h-3.5"></i></span></span>';
 
 /** Which glyph stands for which room. */
 export const ROOM_ICON = { mine: 'pickaxe', farm: 'sprout', generator: 'zap', dorm: 'bed', cryo: 'snowflake' };
@@ -154,6 +166,7 @@ export function createScene(container, opts = {}) {
 
     const plateMat = new THREE.MeshLambertMaterial({ color: PLATE });
     const rockMat = new THREE.MeshLambertMaterial({ color: ROCK });
+    const laneMat = new THREE.MeshBasicMaterial({ color: LANE });
     const unitBox = new THREE.BoxGeometry(1, 1, 1);
     const plateGeo = new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_W);
     const bridgeGeo = new THREE.BoxGeometry(PITCH - PLATE_W + 0.04, PLATE_H, 0.84);
@@ -164,7 +177,7 @@ export function createScene(container, opts = {}) {
     const dots = new THREE.BufferGeometry();
     dots.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     dots.setDrawRange(0, 0);
-    const peopleMesh = new THREE.Points(dots, new THREE.PointsMaterial({ color: PEOPLE, size: 0.06 }));
+    const peopleMesh = new THREE.Points(dots, new THREE.PointsMaterial({ color: PEOPLE, size: PEOPLE_SIZE }));
     peopleMesh.frustumCulled = false;
     scene.add(peopleMesh);
 
@@ -182,6 +195,9 @@ export function createScene(container, opts = {}) {
     let lastPlan = null;                    // what the home view was last fitted to
     let dead = false;                       // disposed: a late timer must not touch the buffers
     let march = null;                       // everyone walking somewhere at once: cryo, or the way up
+    let machine = null;                     // the rock, paper, scissors machine on the lid
+    let machineRate = 0;                    // its throws a second
+    let machinePhase = 0, machineThrow = 0, machineWin = 0;
     const cryoAt = new THREE.Vector3(0, 0, 0);
     const rnd = mulberry32(20260921);
 
@@ -192,7 +208,7 @@ export function createScene(container, opts = {}) {
         world.removeFromParent();
         world = new THREE.Group();
         scene.add(world);
-        solids = []; nodes = []; floors = []; folk = []; digLabel = null;
+        solids = []; nodes = []; floors = []; folk = []; digLabel = null; machine = null;
         march = null;
         cryoAt.set(0, 0, 0);
         dots.setDrawRange(0, 0);
@@ -211,10 +227,10 @@ export function createScene(container, opts = {}) {
         if (az !== bz) m.rotation.y = Math.PI / 2;
         world.add(m); solids.push(m);
     }
-    /** Lanes and houses are cut in rock: the same rock as the background, seen
-     *  through the slab, so the map costs no new colour. */
-    function cut(cx, y, cz, w, d) {
-        const m = new THREE.Mesh(unitBox, rockMat);
+    /** Lanes are cut in a mid grey, houses in rock: the same rock as the background,
+     *  seen through the slab. */
+    function cut(cx, y, cz, w, d, mat = laneMat) {
+        const m = new THREE.Mesh(unitBox, mat);
         m.scale.set(w, 0.02, d);
         m.position.set(cx, y + LANE_Y, cz);
         world.add(m);
@@ -405,7 +421,7 @@ export function createScene(container, opts = {}) {
                         if (overlaps(box, blocked)) continue;
                         blocked.push(box);
                         // the house, and the stub from the lane to its door
-                        cut(cx + px, y, cz + pz, 2 * ex, 2 * ez);
+                        cut(cx + px, y, cz + pz, 2 * ex, 2 * ez, rockMat);
                         cut(cx + bx + dir[0] * gap / 2, y, cz + bz + dir[1] * gap / 2,
                             dir[0] ? gap : STUB_W, dir[0] ? STUB_W : gap);
                         const dn = addNode(cx + px - dir[0] * hd, y + WALK_Y, cz + pz - dir[1] * hd, 'spot', fi);
@@ -437,16 +453,21 @@ export function createScene(container, opts = {}) {
                     bar.scale.set(1.34, 0.14, 0.24);
                     bar.position.set(0, y + PLATE_H / 2 + 0.14, 0);
                     world.add(bar); solids.push(bar);
+                    // the star machine from chapter I came down the hole with them: it sits on
+                    // the lid and plays rock, paper, scissors with the colony's surplus
+                    machine = makeLabel(MACHINE_HTML, 0.9, y + 0.55, -0.9, 'machine');
+                    machine.glyphs = [...machine.inner.querySelectorAll('.rps')];
                 } else if (c.room) {
                     let html = `<i data-lucide="${ROOM_ICON[c.room] || 'square'}" class="w-7 h-7"></i>`;
                     // the cryo hall has no ladder of its own: its level is which tier is bought
                     if (c.room !== 'cryo') html += `<span class="lvl mono">${c.lvl}</span>`;
-                    if (c.auto) html += '<i data-lucide="repeat" class="auto w-3.5 h-3.5"></i>';
+                    if (c.auto) html += '<i data-lucide="repeat" class="auto w-3.5 h-3.5"></i><span class="pulse"></span>';
                     // a room that stopped while the colony slept, and a chamber something took
                     html += '<span class="stall hidden"></span>';
                     html += '<span class="dark hidden"></span>';
                     html += '<span class="building"></span>';
                     const rec = makeLabel(html, cx, y + 0.45, cz, 'room');
+                    if (c.auto) rec.inner.classList.add('is-auto');
                     rec.cell = c;
                     rec.lvlEl = rec.inner.querySelector('.lvl');
                     rec.stallEl = rec.inner.querySelector('.stall');
@@ -667,7 +688,27 @@ export function createScene(container, opts = {}) {
                 l.buildEl.style.setProperty('--p', `${Math.round(p * 100)}%`);
             }
         }
-        if (!march) setPeople(state);
+        // asleep, everyone is in the hall and the plates are empty
+        if (!march) {
+            if (state.asleep) { folk = []; dots.setDrawRange(0, 0); } else setPeople(state);
+        }
+    }
+
+    /** One frame of the machine: a throw every 1/rate seconds, and every third throw a win. */
+    function stepMachine(dt) {
+        if (!machine?.glyphs?.length) return;
+        if (machineWin > 0) {
+            machineWin -= dt;
+            if (machineWin <= 0) machine.inner.classList.remove('is-win');
+        }
+        if (!(machineRate > 0)) return;
+        machinePhase += dt * machineRate;
+        if (machinePhase < 1) return;
+        machinePhase %= 1;
+        machine.glyphs[machineThrow % 3].classList.remove('is-on');
+        machineThrow++;
+        machine.glyphs[machineThrow % 3].classList.add('is-on');
+        if (machineThrow % 3 === 0) { machine.inner.classList.add('is-win'); machineWin = 0.35; }
     }
 
     function chooseNext(p) {
@@ -880,6 +921,7 @@ export function createScene(container, opts = {}) {
                 controls.target.lerpVectors(tween.t, defTgt, k);
                 if (tween.k >= 1) tween = null;
             }
+            stepMachine(dt);
             controls.update();
             updateLabels();
             renderer.render(scene, camera);
@@ -893,6 +935,14 @@ export function createScene(container, opts = {}) {
             renderer.setSize(W, H);
             labelRenderer.setSize(W, H);
             framing(lastPlan);              // a narrower window needs a longer lens
+        },
+        /**
+         * How fast the machine on the lid plays: in proportion to the stars a day, on a log
+         * scale (the rate climbs ten orders of magnitude over the chapter), and still at none.
+         */
+        setMachine(starsPerDay) {
+            const v = Math.max(0, starsPerDay || 0);
+            machineRate = v > 0 ? Math.min(8, 0.4 + 0.8 * Math.log10(1 + v)) : 0;
         },
         /** Everyone walks to the cryo hall and is gone. Resolves when the last one is in. */
         gather(seconds = 1.5) { return startMarch('gather', seconds); },
@@ -911,12 +961,12 @@ export function createScene(container, opts = {}) {
             dots.dispose();
             peopleMesh.material.dispose();
             unitBox.dispose(); plateGeo.dispose(); bridgeGeo.dispose();
-            plateMat.dispose(); rockMat.dispose();
+            plateMat.dispose(); rockMat.dispose(); laneMat.dispose();
             renderer.dispose();
             renderer.domElement.remove();
             labelHost.innerHTML = '';
         },
         /** Test hook: what the scene believes it is drawing. */
-        get stats() { return { floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march }; },
+        get stats() { return { floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march, throws: machineThrow, machineRate }; },
     };
 }

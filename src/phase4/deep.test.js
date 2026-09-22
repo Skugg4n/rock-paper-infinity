@@ -7,7 +7,7 @@ import {
     ESTIMATE_FLOOR, PROBE_OUTCOMES, PROBE_ODDS_EARLY, PROBE_ODDS_LATE, PROBE_WRONG_SHIFT,
     stalledRooms, STALL_AT, ascentOffered, attemptAscent, ASCENT_FAIL_LOSS, ASCENT_FAIL_SPREAD,
     ROOMS, cryoLabel, group, launchProbe, resolveDueProbes, darkenChamber, clearChamber,
-    clearDarkType, weakestOf, estimateText,
+    clearDarkType, weakestOf, estimateText, estimateNow, scoutParty, MIN_SLEEPERS, SLEEP_FOOD,
 } from './deep.js';
 
 /** A rng that hands out exactly the numbers a test wants, then zeroes. */
@@ -54,12 +54,16 @@ describe('the deep', () => {
         expect(s.food).toBeCloseTo(food0 + r.food - people0 - r.born * 20, 6);   // grown, minus eaten, minus the creches
     });
 
-    test('asleep: nobody eats, manual rooms stop, automated ones run', () => {
+    test('asleep: a tenth of a ration, manual rooms stop, automated ones run', () => {
         const s = initialDeepState(); s.rooms.mine = 2; s.auto.mine = 1; s.auto.generator = 1;
         const food0 = s.food, people0 = s.humans, sum = sleep(s, 10);
-        expect(s.food).toBe(food0);            // manual farm stopped, nobody ate, no beds to grow into
+        // manual farm stopped, the sleepers ate a tenth of what they would awake, no beds to grow into
+        expect(s.food).toBeCloseTo(food0 - 10 * people0 * SLEEP_FOOD, 1);
         expect(sum.minerals).toBeGreaterThan(0);
-        expect(s.humans).toBe(people0);
+        // the ice takes a few, and with the farm stopped the creches cannot refill the pods
+        expect(s.humans).toBeLessThan(people0);
+        expect(s.humans).toBeGreaterThan(people0 * 0.999);
+        expect(sum.died).toBeCloseTo(people0 - s.humans, 9);
     });
 
     test('hands and power are shared out in order, a fraction at a time', () => {
@@ -287,8 +291,10 @@ describe('the ascent is a decision, not a countdown', () => {
             s.minerals = ASCENT.minerals * 2; s.stars = ASCENT.stars * 2; s.humans = ASCENT.humans * 2;
             return s;
         };
+        // the belief is the healing curve shifted by `bias`: this colony is 73 points too hopeful
+        const believe = (s, mean, spread) => { s.est = { bias: mean - surface(s.doom0, s.day), spread }; };
         const wrong = rich();
-        wrong.est = { mean: 12, spread: 5 };       // the colony believes the surface is clear
+        believe(wrong, 12, 5);                     // the colony believes the surface is clear
         expect(ascentOffered(wrong)).toBe(true);
         expect(canAscend(wrong)).toBe(false);      // on day 0 it very much is not
         const people = wrong.humans;
@@ -298,19 +304,19 @@ describe('the ascent is a decision, not a countdown', () => {
         expect(out.lost).toBeCloseTo(people * ASCENT_FAIL_LOSS, 6);
         expect(wrong.humans).toBeCloseTo(people * (1 - ASCENT_FAIL_LOSS), 6);
         expect(wrong.est.spread).toBeGreaterThanOrEqual(ASCENT_FAIL_SPREAD);   // wide again
-        expect(wrong.est.mean).toBeGreaterThan(12);                            // and pointing the right way
+        expect(estimateNow(wrong).mean).toBeGreaterThan(12);                   // and pointing the right way
         expect(wrong.ascended).toBeFalsy();
         expect(wrong.minerals).toBeLessThan(ASCENT.minerals * 2);              // the party took the ore with it
 
         const right = rich();
         right.day = 1.1 * END_YEAR * DAYS_PER_YEAR;
-        right.est = { mean: 14, spread: 4 };
+        believe(right, 14, 4);
         expect(canAscend(right)).toBe(true);
         expect(attemptAscent(right)).toEqual({ tried: true, success: true, lost: 0 });
         expect(right.ascended).toBe(true);
 
         const poor = initialDeepState();
-        poor.est = { mean: 5, spread: 2 };
+        believe(poor, 5, 2);
         expect(ascentOffered(poor)).toBe(false);
         expect(attemptAscent(poor)).toEqual({ tried: false, success: false, lost: 0 });
     });
@@ -329,24 +335,31 @@ describe('cryo: the badge, and what a press is worth', () => {
 describe('probes in flight, and what they do on the way home', () => {
     const slots = () => ['mine', 'farm', 'generator', 'dorm', null];
 
-    test('launching one costs the ore that day and sets the day it is due', () => {
-        const s = initialDeepState();
+    test('launching one costs the ore and the people that day and sets the day it is due', () => {
+        const s = initialDeepState({ people: 40 });
         s.minerals = probeCost(0) * 3;
         const before = s.minerals;
         const p = launchProbe(s);
         expect(p.sentDay).toBe(s.day);
         expect(p.dueDay).toBe(s.day + probeDays(0));
         expect(s.minerals).toBe(before - probeCost(0));
+        expect(p.people).toBe(scoutParty(40));
+        expect(s.humans).toBe(40 - p.people);
         expect(s.probesSent).toBe(1);
         expect(s.probes).toHaveLength(1);
         // the second one costs more, and an empty pocket launches nothing
         s.minerals = 0;
         expect(launchProbe(s)).toBeNull();
         expect(s.probes).toHaveLength(1);
+        // and a colony that would drop under the ten who run the hall sends nobody
+        const small = initialDeepState({ people: MIN_SLEEPERS + 2 });
+        small.minerals = 1e9;
+        expect(launchProbe(small)).toBeNull();
+        expect(small.humans).toBe(MIN_SLEEPERS + 2);
     });
 
-    test('only what is due comes home, and the ring is drawn from the first one that did', () => {
-        const s = initialDeepState();
+    test('only what is due comes home, and a reading narrows the ring', () => {
+        const s = initialDeepState({ people: 200 });
         s.minerals = 1e9;
         launchProbe(s);                                  // due in probeDays(0)
         launchProbe(s);
@@ -359,16 +372,20 @@ describe('probes in flight, and what they do on the way home', () => {
         expect(s.probes).toHaveLength(1);                // the far one is untouched
         expect(s.estRevealed).toBe(true);
         expect(s.est.spread).toBeLessThan(ESTIMATE_START.spread);
+        expect(landed[0].back).toBe(landed[0].people);   // a party with a reading comes home whole
     });
 
-    test('a lost probe moves nothing, and a monster takes a chamber instead of a reading', () => {
-        const s = initialDeepState();
+    test('a lost party moves nothing, and a monster takes a chamber instead of a reading', () => {
+        const s = initialDeepState({ people: 200 });
         s.minerals = 1e9;
         launchProbe(s); s.day += probeDays(0);
         const est = { ...s.est };
-        resolveDueProbes(s, slots(), feed(rollFor(s.day, 'lost')));      // lost: nothing came home
+        const people = s.humans;
+        const lost = resolveDueProbes(s, slots(), feed(rollFor(s.day, 'lost')));      // lost: nobody came home
         expect(s.est).toEqual(est);
         expect(s.estRevealed).toBe(false);
+        expect(lost[0].back).toBe(0);
+        expect(s.humans).toBe(people);
 
         launchProbe(s); s.day += probeDays(1);
         const out = resolveDueProbes(s, slots(), feed(rollFor(s.day, 'monster'), 0));   // monster, first chamber
@@ -377,6 +394,7 @@ describe('probes in flight, and what they do on the way home', () => {
         expect(s.dark.mine).toBe(1);
         expect(s.darkSlots).toEqual([0]);
         expect(s.est).toEqual(est);                      // it brought no news, only teeth
+        expect(out[0].back).toBe(Math.floor(out[0].people / 2));
     });
 
     test('a dark chamber is cleared by going in, or by buying anything for its kind', () => {

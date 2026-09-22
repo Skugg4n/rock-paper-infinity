@@ -410,8 +410,8 @@
         <div id="deep-labels"></div>
         <div id="deep-fallback" class="deep-mono">this view needs WebGL</div>
 
-        <!-- the burnt ground over our heads. Black and empty until a probe comes back;
-             then the ring, which is what the colony believes and not what is true -->
+        <!-- the burnt ground over our heads, and the goal: the ring is the colony's estimate
+             of the surface, from the first second, and under it the year we can go up -->
         <div id="deep-crust"></div>
 
         <!-- the wake-up replay: what ran, what stopped, what came of it -->
@@ -435,13 +435,21 @@
 
         <!-- what we hold -->
         <div class="deep-chrome" id="deep-hold">
-            <div class="deep-hold-row">
-                <span class="deep-mono deep-amount" id="deep-minerals">0</span>
-                <i data-lucide="gem" class="w-5 h-5"></i>
+            <div class="deep-hold-row" id="deep-ore-row">
+                <span class="deep-hold-num">
+                    <span class="deep-mono deep-amount" id="deep-minerals">0</span>
+                    <span class="deep-mono deep-rate" id="deep-minerals-rate"></span>
+                </span>
+                <i data-lucide="pickaxe" class="w-5 h-5"></i>
+                <div class="tooltip deep-tip-wide"></div>
             </div>
-            <div class="deep-hold-row">
-                <span class="deep-mono deep-amount" id="deep-stars">0</span>
+            <div class="deep-hold-row" id="deep-stars-row">
+                <span class="deep-hold-num">
+                    <span class="deep-mono deep-amount" id="deep-stars">0</span>
+                    <span class="deep-mono deep-rate" id="deep-stars-rate"></span>
+                </span>
                 <i data-lucide="star" class="w-5 h-5"></i>
+                <div class="tooltip deep-tip-wide"></div>
             </div>
             <div class="deep-mono" id="deep-advisor"></div>
             <div class="deep-mono" id="deep-feed"></div>
@@ -499,6 +507,13 @@
                 <span class="deep-col-foot">E</span>
                 <span class="deep-col-foot">H</span>
             </div>
+            <!-- what comes in and what goes out of each store in a day -->
+            <div class="deep-mono deep-col-flows">
+                <span class="deep-col-flow"><span class="in" id="deep-in-M"></span><span class="out" id="deep-out-M"></span></span>
+                <span class="deep-col-flow"><span class="in" id="deep-in-F"></span><span class="out" id="deep-out-F"></span></span>
+                <span class="deep-col-flow"><span class="in" id="deep-in-E"></span><span class="out" id="deep-out-E"></span></span>
+                <span class="deep-col-flow"><span class="in" id="deep-in-H"></span><span class="out" id="deep-out-H"></span></span>
+            </div>
             <div class="deep-per-day">
                 <span class="deep-mono" id="deep-stars-day">0</span>
                 <span class="deep-per-day-mark">
@@ -552,14 +567,18 @@
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
             </button>
+            <button class="btn hidden" id="deep-wake-btn" aria-label="Wake the colony">
+                <i data-lucide="sun" class="w-7 h-7"></i>
+                <div class="tooltip deep-tip-wide"></div>
+            </button>
             <button class="btn hidden" id="deep-cryo-up" aria-label="A longer sleep">
                 <i data-lucide="chevrons-up" class="w-7 h-7"></i>
                 <span class="deep-badge deep-mono" id="deep-cryo-up-badge"></span>
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
             </button>
-            <button class="btn hidden" id="deep-probe-btn" aria-label="Send a probe">
-                <i data-lucide="radar" class="w-7 h-7"></i>
+            <button class="btn hidden" id="deep-probe-btn" aria-label="Send a scout party">
+                <i data-lucide="footprints" class="w-7 h-7"></i>
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
             </button>
@@ -598,7 +617,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.42.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.43.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

@@ -2,12 +2,13 @@
  * Chapter IV · THE DEEP: the crust. A thin black band across the top of the
  * screen, which is the burnt ground over the colony's head.
  *
- * Fog of war. Nothing is drawn on it until the first probe comes back: no ring,
- * no number, nothing to read. Then chapter III's ring appears, and it is not the
- * truth. It is what the colony BELIEVES about the surface: a mean and a spread,
- * drawn as an arc whose STROKE is the doubt. Wide and grey at "40 ± 40 %",
- * narrowing to a sharp line as the readings come in. The rules are in deep.js;
- * this file only draws them.
+ * NO FOG ANY MORE (v1.43.0, B066). The first outside playtest asked "what is the
+ * goal?", and the answer had been hidden up here. Now chapter III's ring is on the
+ * crust from the first second: the colony's ESTIMATE of the surface, which follows
+ * the true healing curve with a band of doubt round it. The STROKE is the doubt:
+ * wide at first, narrowing to a sharp line as scout parties come home. Under it,
+ * once, the year the colony believes it can go up: "habitable ~ year 802 701".
+ * The rules are in deep.js; this file only draws them.
  */
 
 import { ESTIMATE_START } from './deep.js';
@@ -35,28 +36,30 @@ export function createCrust(host, opts = {}) {
                             stroke-dasharray="${RING_LEN}" stroke-dashoffset="${RING_LEN}"></circle>
                 </svg>
             </div>
-            <span class="deep-crust-read deep-mono"></span>
+            <span class="deep-crust-text">
+                <span class="deep-crust-read deep-mono"></span>
+                <span class="deep-crust-year deep-mono"></span>
+            </span>
             <span class="deep-crust-pending"></span>
         </div>`;
     const inner = host.querySelector('.deep-crust-in');
     const ring = host.querySelector('.ring-fg');
     const read = host.querySelector('.deep-crust-read');
+    const yearEl = host.querySelector('.deep-crust-year');
     const pendingEl = host.querySelector('.deep-crust-pending');
     let pendingShown = -1;
 
     return {
         /**
          * @param {object} view
-         * @param {{mean:number, spread:number}} [view.est] - what the colony believes
-         * @param {boolean} [view.revealed] - has anything ever come back?
-         * @param {number} [view.pending] - probes in flight
+         * @param {{mean:number, spread:number}} [view.est] - what the colony believes TODAY
+         * @param {string} [view.year] - the year it believes the ring reaches the line, grouped
+         * @param {number} [view.pending] - scout parties out there
          */
-        update({ est, revealed, pending = 0 } = {}) {
-            if (!revealed) {
-                if (!inner.hidden) inner.hidden = true;
-                return;
-            }
+        update({ est, year = '', pending = 0 } = {}) {
             if (inner.hidden) inner.hidden = false;
+            const yl = year ? `habitable ~ year ${year}` : '';
+            if (yearEl.textContent !== yl) yearEl.textContent = yl;
             const e = est || ESTIMATE_START;
             const mean = Math.max(0, Math.min(100, e.mean));
             const spread = Math.max(0, e.spread);
@@ -69,7 +72,7 @@ export function createCrust(host, opts = {}) {
             const n = Math.min(PENDING_MAX, Math.max(0, Math.round(pending)));
             if (n !== pendingShown) {
                 pendingShown = n;
-                pendingEl.innerHTML = new Array(n).fill('<i data-lucide="radar" class="w-3 h-3"></i>').join('');
+                pendingEl.innerHTML = new Array(n).fill('<i data-lucide="users" class="w-3 h-3"></i>').join('');
                 opts.onIcons?.();
             }
         },

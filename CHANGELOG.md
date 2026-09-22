@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.43.0 - 2026-09-22
+
+### Chapter IV: sleep is a state. Alarms, scout parties, stores and flows, the goal on screen
+
+The first outside playtest of IV asked "why build things? what is the goal?", and gave up at year 178. This release reverses the three decisions behind that (spec: "First outside playtest" and "Built: slice 3").
+
+- **The goal is on screen from the first second.** No fog of war: the ring on the crust is the colony's estimate of the surface, centred on the true healing curve with a wide band of doubt (85 ± 40 % at the descent), and under it, once, in mono: "habitable ~ year 802 701". Scout parties narrow the band and can bend the curve. The advisor's first line at the descent: "The surface will heal. Not in our lifetimes. We dig, we build, we sleep."
+- **Cryo is a state, not a click.** The snowflake starts a sleep: everyone walks into the hall, the counter spins like the odometer for the first moment, and then the years ROLL, ore and stars ticking up with them, at the tier's rate: a month a second for Cryo I, up to a hundred thousand years a second for Cryo VII. The scene dims a little, the lanes are empty, automated rooms pulse. A sun button wakes the colony at will, and a colony saved asleep reloads asleep.
+- **Alarms wake you, in plain words.** "Woke: food will run out in 21 days.", "Woke: the mine stalled, no hands.", "Woke: the generators stalled, no ore to burn.", "Woke: energy is short, rooms run at 60 %.", "Woke: scout party returned. Surface 41 %.", "Woke: the new farm is running, and the next one is paid for." (at most once a decade), "Woke: the surface may be habitable. Estimate 14 ± 6 %." Each sentence goes to the feed and its glyph opens the wake-up strip.
+- **Cryo tiers are offered when they are useful.** A dry run of one second of sleep at the tier's rate must meet no bad alarm first, and the tooltip says what is missing: "Cryo II needs food for 365 days: 210 today.", "Cryo II needs the farms to run without hands." Sleepers now eat a tenth of a ration, so a larder with no farm behind it runs out under the ice too.
+- **People matter.** The ice takes 0.3 % of the sleepers a year (less with every dormitory level; a fed colony refills its pods), probes are now **scout parties** of 4 to 60 people ("Scout party sent (6 people).", "Scout party lost.", "Scout party returned raving: reading unreliable.", "Something came back with the scouts: chamber 7 dark."), they come home on their own day awake or asleep, awake free hands clear a dark chamber in ten days, and a colony under ten people cannot sleep.
+- **The bars are stores with flows.** Each on its own scale: ore against the next thing ore buys, food in days of eating, energy spare, free hands. Under each, "+in -out" a day in mono; the red dot stays on the weakest flow; hovering says it in one line: "Food: 45 days left. +84 grown, -39 eaten a day."
+- **Every purchase says what it does for the goal**, from a dry run: "Lets the colony sleep 3 more years without an alarm", "Food for 12 more days of sleep", "+120 stars a day toward Cryo II". Cost is always on hover, with "Affordable in N days" at today's flow, or "Needs a free chamber", or "Already being built".
+- **Counters show their rate a day**, and ore is a pickaxe everywhere, never the gem. Big counters got a trillion step so they still visibly tick at the top tiers.
+- **You can see the people.** Lanes are a mid grey, the people are white and a size larger.
+- **Rock, paper, scissors in the deep.** Chapter I's star machine sits on the lid and throws its three glyphs at a speed set by the stars a day; a win flashes a star. The stars counter: "Wins. The machine plays with the colony's surplus."
+- **Fixed**: the calendar ran backwards for five days at the end of every year (month 12 holds 35 days and its day number wrapped).
+- **Save**: schema 2, with a migration; old colonies keep what they believed about the surface.
+- **Simulation**, now on the state model (sleep until an alarm or until the next purchase is paid for, scout parties while the ring is wide): **28m40s to year 802 701**, 85 wake-ups, 3.4 buys each, no hungry days, longest stall 58 s, bottleneck spread over all four columns awake and asleep. Seeds 1 to 5: 28m40s to 29m51s. No cost, rate or build time changed.
+
 ## v1.42.0 - 2026-09-22
 
 ### The enemy stays dangerous (war-tuning branch, merged)

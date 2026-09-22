@@ -1,23 +1,39 @@
-// Chapter IV simulation: greedy player, one real second = one day awake. A cryo
-// sleep costs SLEEP_SECONDS of real time (the zoom, the wake-up summary, the
-// clicking) and passes the whole tier's days. Same rules as the game
-// (src/phase4/deep.js).
-//   node scripts/sim-phase4.mjs [--quiet] [--all] [--table] [--why]
+// Chapter IV simulation: greedy player, one real second = one day awake. Since v1.43.0
+// SLEEP IS A STATE: the player falls asleep (SLEEP_SECONDS of walking in, the spin and
+// walking out, plus reading the wake line) and the colony then runs at the tier's rate,
+// CRYO[tier].days colony days per real second, until an ALARM wakes it (deep.js decides:
+// food, energy, a stalled room, a party home, an order done with the next one paid for,
+// the ring at the line) or until the player sees the next purchase light up and wakes it
+// by hand. Scout parties are sent when they are cheap, and come home as alarms. Same rules
+// as the game (src/phase4/deep.js).
+//   node scripts/sim-phase4.mjs [--quiet] [--all] [--table] [--why] [--seed N]
 //   --quiet  only the summary line   --all  every purchase, not the first 30
 //   --table  a row a minute          --why  where the colony stood when the run ended (for tuning)
 import {
   ROOMS, COLUMN, ROOM_FOR_COLUMN, ROOM, initialDeepState, tickDay, sleep, surface, canResurface, canAscend,
   roomMultiplier, digCost, roomCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, ASCENT,
-  startBuild, completeBuilds, buildPending, BUILD_DAYS,
+  startBuild, completeBuilds, buildPending, BUILD_DAYS, sleepTrouble, launchProbe, resolveDueProbes,
+  probeCost, scoutParty, MIN_SLEEPERS, PROBE_ENERGY, repairTick,
 } from '../src/phase4/deep.js';
 
 const WAIT_DAYS = 30;        // a human waits this long awake for a purchase; longer than that, they sleep
-const SLEEP_SECONDS = 3;     // real seconds a cryo press costs: zoom, wake-up summary, the buying after it
+const SLEEP_SECONDS = 3;     // real seconds a sleep costs around it: the walk in, the walk out, reading the wake line
 const REAL_CAP = 3600;
 const FUEL_DAYS = 30;        // minerals kept back so the generators do not go dark while we shop
+const SCOUT_SHARE_OF_ORE = 0.05;   // a party is sent when it costs less than this share of the ore in store
+const SCOUT_UNTIL_SPREAD = 6;      // ... and only while the ring is wider than this: a narrow ring needs no more
+
+// the dice for the scouts: seeded, so a run is a run
+const seedArg = process.argv.indexOf('--seed');
+let seed = seedArg > 0 ? Number(process.argv[seedArg + 1]) || 1 : 1;
+const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 const s = initialDeepState();
 let real = 0, wakeUps = 0, buysThisWake = 0;
+const alarmsSeen = {};
+let scoutsSent = 0, scoutsLost = 0, monsters = 0, diedInIce = 0, handWakes = 0, sleepReal = 0;
+/** The chambers as the layout would hold them, for a monster to take one. */
+const slots = () => ROOMS.flatMap((t) => new Array(s.rooms[t] || 0).fill(t));
 const weakAwake = { M: 0, F: 0, E: 0, H: 0 }, weakAsleep = { M: 0, F: 0, E: 0, H: 0 };
 const events = [], log = [], buysPerWake = [], pressesPerTier = CRYO.map(() => 0);
 let starved = 0, minHumans = s.humans, starsDay0 = 0, starsDayEnd = 0, stall = 0, worstStall = 0;
@@ -66,9 +82,13 @@ function buy(report) {
   if (canLv && lv <= au && s.stars >= lv) { s.stars -= lv; startBuild(s, 'level', { type: t }); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
   if (canAu && s.stars >= au) { s.stars -= au; startBuild(s, 'auto', { type: t }); return `auto ${t} ${s.auto[t] + 1} ordered (${BUILD_DAYS.auto} d)`; }
   if (canLv && s.stars >= lv) { s.stars -= lv; startBuild(s, 'level', { type: t }); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
-  // 4. a longer sleep (stars)
+  // 4. a faster sleep (stars), once a dry run says the colony could sleep a second of it safely
   const next = CRYO[s.cryo + 1];
-  if (next && s.stars >= next.cost) { s.stars -= next.cost; s.cryo++; return `${next.id} (${next.days} d)`; }
+  if (next && s.stars >= next.cost && (s.cryo < 0 ? true : !sleepTrouble(s, next.days))) {
+    if (s.cryo < 0 && sleepTrouble(s, next.days)) return null;
+    s.stars -= next.cost; s.cryo++; if (s.cryo === 0) s.rooms.cryo = 1;
+    return `${next.id} (${next.days} d a second)`;
+  }
   return null;
 }
 
@@ -84,10 +104,28 @@ function waitDays(report) {
   return Math.max(0, Math.min(mineralWait, starWait));
 }
 
+/** Would the player wake now? When the next thing it wants is paid for. */
+function wantsToWake() {
+  const r = tickDay(JSON.parse(JSON.stringify(s)), false);
+  if (waitDays(r) <= 0) return true;
+  const next = CRYO[s.cryo + 1];
+  return !!next && s.stars >= next.cost && !sleepTrouble(s, next.days);
+}
+
+/** A party when it is cheap: the ring is the goal, and every reading narrows it. */
+function maybeScout(r) {
+  if ((s.probes || []).length || s.cryo < 0 || (s.est?.spread ?? 40) <= SCOUT_UNTIL_SPREAD) return;
+  if (r.parts.E < PROBE_ENERGY || s.humans - scoutParty(s.humans) < MIN_SLEEPERS) return;
+  if (probeCost(s.probesSent) > s.minerals * SCOUT_SHARE_OF_ORE) return;
+  if (launchProbe(s)) { scoutsSent++; events.push({ real, day: s.day, e: `scout party sent (${s.probes[s.probes.length - 1].people})` }); }
+}
+
 let summaryWeakest = null;   // what the wake-up summary said stalled while the colony slept
 while (real < REAL_CAP && !canAscend(s)) {
   completeBuilds(s);                    // nothing is instant: orders land on their day
   const r = tickDay(s, false);
+  for (const l of resolveDueProbes(s, slots(), rng)) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
+  repairTick(s, slots(), r.hands);
   if (summaryWeakest) { r.weakest = summaryWeakest; summaryWeakest = null; }
   real += 1;
   if (!starsDay0 && r.stars > 0) starsDay0 = r.stars;   // the first day the colony makes stars at all
@@ -101,19 +139,30 @@ while (real < REAL_CAP && !canAscend(s)) {
   // a human at a wake-up clicks several buttons, not one
   let bought, n = 0;
   while ((bought = buy(r)) && n < 25) { events.push({ real, day: s.day, e: bought }); n++; buysThisWake++; }
-  // Nothing affordable and the wait is long: press cryo. Only when the colony runs itself,
-  // which is the lesson the chapter teaches: a manual room stops the moment everyone lies down.
-  // Orders in flight are no reason to stay awake: a sleep finishes them, which is the
-  // whole point of automating first and then lying down.
-  if (n === 0 && s.cryo >= 0 && waitDays(r) > WAIT_DAYS) {
-    const safe = s.auto.mine > 0 && s.auto.farm > 0 && s.auto.generator > 0;
-    if (safe) {
-      const sum = sleep(s, CRYO[s.cryo].days);
-      for (const k of COLUMN) weakAsleep[k] += sum.weakest[k] || 0;
-      summaryWeakest = COLUMN.reduce((a, k) => ((sum.weakest[k] || 0) > (sum.weakest[a] || 0) ? k : a), 'M');
-      wakeUps++; pressesPerTier[s.cryo]++; real += SLEEP_SECONDS;
-      buysPerWake.push(buysThisWake); buysThisWake = 0;
+  maybeScout(r);
+  // Nothing affordable and the wait is long: go to sleep, if a dry run says the colony would
+  // not be woken to trouble at once. That is the lesson the chapter teaches: a manual room
+  // stops the moment everyone lies down, and the alarm says so.
+  if (n === 0 && s.cryo >= 0 && waitDays(r) > WAIT_DAYS && s.humans >= MIN_SLEEPERS && !sleepTrouble(s, CRYO[s.cryo].days)) {
+    real += SLEEP_SECONDS;
+    const hist = { M: 0, F: 0, E: 0, H: 0 };
+    let alarm = null;
+    // one real second of sleep at a time, until something wakes the colony
+    while (real < REAL_CAP) {
+      const rate = CRYO[s.cryo].days;
+      const sum = sleep(s, rate, { alarms: true, slots: slots(), rng });
+      const spent = sum.days / rate;
+      real += spent; sleepReal += spent;
+      diedInIce += sum.died;
+      for (const k of COLUMN) { hist[k] += sum.weakest[k] || 0; weakAsleep[k] += sum.weakest[k] || 0; }
+      for (const l of sum.landed) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
+      if (sum.alarm) { alarm = sum.alarm.kind; break; }
+      if (wantsToWake()) { alarm = 'hand'; handWakes++; break; }
     }
+    alarmsSeen[alarm] = (alarmsSeen[alarm] || 0) + 1;
+    summaryWeakest = COLUMN.reduce((a, k) => (hist[k] > hist[a] ? k : a), 'M');
+    wakeUps++; pressesPerTier[s.cryo]++;
+    buysPerWake.push(buysThisWake); buysThisWake = 0;
   }
   if (real % 60 < 1 && (!log.length || log[log.length - 1].min !== Math.round(real / 60))) {
     log.push({ min: Math.round(real / 60), year: +yr(s.day), surface: +surface(s.doom0, s.day).toFixed(1), humans: Math.round(s.humans),
@@ -133,7 +182,8 @@ if (process.argv.includes('--why')) {
 }
 const share = (o) => COLUMN.map((k) => { const tot = COLUMN.reduce((a, c) => a + o[c], 0) || 1; return `${k} ${Math.round(100 * o[k] / tot)} %`; }).join(' ');
 const avgBuys = buysPerWake.length ? (buysPerWake.reduce((a, b) => a + b, 0) / buysPerWake.length).toFixed(1) : '0';
-console.log(`ended at ${fmt(real)}  year ${yr(s.day)}  surface ${surface(s.doom0, s.day).toFixed(1)} %  wake-ups ${wakeUps} (${avgBuys} buys each, presses ${pressesPerTier.join('/')})  humans ${Math.round(s.humans)} (low ${Math.round(minHumans)}, hungry ${starved} d)  longest stall ${worstStall} s  chambers ${s.chambers}  cryo ${s.cryo + 1}/${CRYO.length}  stars/day ${starsDay0.toPrecision(3)} → ${starsDayEnd.toPrecision(3)} (×${(starsDayEnd / (starsDay0 || 1)).toPrecision(2)})  weakest awake ${share(weakAwake)} | asleep ${share(weakAsleep)}  ascent ${canAscend(s)} (ring ${canResurface(s)}, ${Math.round(s.minerals / ASCENT.minerals * 100)} % ore, ${Math.round(s.stars / ASCENT.stars * 100)} % stars)`);
+const alarmText = Object.entries(alarmsSeen).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ');
+console.log(`ended at ${fmt(real)}  year ${yr(s.day)}  surface ${surface(s.doom0, s.day).toFixed(1)} %  wake-ups ${wakeUps} (${alarmText}; ${avgBuys} buys each, sleeps per tier ${pressesPerTier.join('/')}, ${fmt(sleepReal)} asleep)  scouts ${scoutsSent} (lost ${scoutsLost}, monsters ${monsters})  died in the ice ${Math.round(diedInIce)}  humans ${Math.round(s.humans)} (low ${Math.round(minHumans)}, hungry ${starved} d)  longest stall ${worstStall} s  chambers ${s.chambers}  cryo ${s.cryo + 1}/${CRYO.length}  stars/day ${starsDay0.toPrecision(3)} → ${starsDayEnd.toPrecision(3)} (×${(starsDayEnd / (starsDay0 || 1)).toPrecision(2)})  weakest awake ${share(weakAwake)} | asleep ${share(weakAsleep)}  ascent ${canAscend(s)} (ring ${canResurface(s)}, ${Math.round(s.minerals / ASCENT.minerals * 100)} % ore, ${Math.round(s.stars / ASCENT.stars * 100)} % stars)`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

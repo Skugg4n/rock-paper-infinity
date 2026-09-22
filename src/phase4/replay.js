@@ -2,6 +2,9 @@
  * Chapter IV · THE DEEP: the wake-up replay. A strip over the scene that says
  * what the hundred years did, in glyphs and numbers only, never in a sentence.
  *
+ * Since v1.43.0 it opens with the glyph of what woke the colony (the sentence is
+ * in the feed), and counts the people the ice took.
+ *
  * Three groups, left to right:
  *   1. one glyph per room type the colony owns: lit if it RAN, dimmed with a
  *      small amber dot if it STALLED while everyone was under the ice;
@@ -43,8 +46,10 @@ export function createReplay(host, opts = {}) {
          * @param {number} data.food - food grown over the sleep
          * @param {number} data.stars - stars earned over the sleep
          * @param {object} data.weakest - column letter → days it was the weakest
+         * @param {string} [data.alarm] - the glyph of what woke the colony (v1.43.0)
+         * @param {number} [data.died] - lost in the ice over the sleep
          */
-        show({ rooms = {}, stalled = {}, minerals = 0, food = 0, stars = 0, weakest = {} } = {}) {
+        show({ rooms = {}, stalled = {}, minerals = 0, food = 0, stars = 0, weakest = {}, alarm = '', died = 0 } = {}) {
             const glyphs = ROOMS.filter((t) => (rooms[t] || 0) > 0).map((t) => {
                 const bad = !!stalled[t];
                 return `<span class="deep-replay-room${bad ? ' is-stalled' : ''}">`
@@ -60,8 +65,12 @@ export function createReplay(host, opts = {}) {
                     + `<span class="deep-replay-bar" style="height:${h}px"></span>`
                     + `<span class="deep-mono">${c}</span></span>`;
             }).join('');
-            host.innerHTML = `<span class="deep-replay-group">${glyphs}</span>`
-                + `<span class="deep-replay-group">${madeRow('gem', minerals)}${madeRow('wheat', food)}${madeRow('star', stars)}</span>`
+            const woke = alarm ? `<span class="deep-replay-group deep-replay-alarm"><i data-lucide="${alarm}" class="w-5 h-5"></i></span>` : '';
+            const lost = died >= 0.5
+                ? `<span class="deep-replay-made is-lost"><span class="deep-mono">-${fmt(died)}</span><i data-lucide="user-minus" class="w-4 h-4"></i></span>`
+                : '';
+            host.innerHTML = woke + `<span class="deep-replay-group">${glyphs}</span>`
+                + `<span class="deep-replay-group">${madeRow('pickaxe', minerals)}${madeRow('wheat', food)}${madeRow('star', stars)}${lost}</span>`
                 + `<span class="deep-replay-group deep-replay-hist">${bars}</span>`;
             host.hidden = false;
             opts.onIcons?.();

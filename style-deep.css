@@ -171,16 +171,22 @@ body.in-deep {
 .deep-hold-row { display: flex; align-items: center; gap: 10px; }
 .deep-hold-row i { color: #5f6d80; }
 .deep-amount { font-size: 22px; font-weight: 700; color: #c3cfdd; }
+/* the rate under each counter, per colony day (B065) */
+.deep-hold-num { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.deep-rate { font-size: 10px; color: #6b7a8d; }
+#phase-deep .deep-hold-row { position: relative; cursor: help; }
+#phase-deep .deep-hold-row:hover .tooltip { opacity: 1; }
 #deep-advisor { font-size: 11px; color: #55637a; min-height: 14px; max-width: 280px; text-align: right; white-space: normal; line-height: 1.45; }
 
 /* ---- the four columns ---------------------------------------------------- */
 #deep-columns { left: 80px; top: 50%; transform: translateY(-50%); }
-.deep-col-heads, .deep-col-feet, .deep-bars { display: flex; gap: 20px; }
+.deep-col-heads, .deep-col-feet, .deep-bars, .deep-col-flows { display: flex; gap: 6px; }
 .deep-col-heads { margin-bottom: 6px; }
 .deep-col-feet { margin-top: 8px; }
-.deep-col-head { font-size: 12px; color: #93a3b8; width: 24px; text-align: center; }
-.deep-col-foot { font-size: 11px; color: #55637a; width: 24px; text-align: center; letter-spacing: 0.08em; }
-.deep-bar { position: relative; width: 24px; }
+/* v1.43.0: each column is wide enough for its store on top and its flows below */
+.deep-col-head { font-size: 12px; color: #c3cfdd; width: 48px; text-align: center; white-space: nowrap; }
+.deep-col-foot { font-size: 11px; color: #55637a; width: 48px; text-align: center; letter-spacing: 0.08em; }
+.deep-bar { position: relative; width: 48px; display: flex; justify-content: center; }
 .deep-track {
     width: 24px;
     height: 160px;
@@ -261,7 +267,10 @@ body.in-deep #menu-btn i { color: #8fa1b6; }
     transform-origin: 50% 50%;
     transition: stroke-dashoffset 700ms ease, stroke-width 700ms ease;
 }
-.deep-crust-read { font-size: 12px; color: #6b7a8d; }
+.deep-crust-text { display: flex; flex-direction: column; line-height: 1.25; }
+.deep-crust-read { font-size: 12px; color: #9fb0c4; }
+/* the reason for everything, once, in mono: the year the colony believes it can go up */
+.deep-crust-year { font-size: 10px; color: #6b7a8d; letter-spacing: 0.04em; }
 .deep-crust-pending { display: flex; align-items: center; gap: 5px; color: #3f4b5c; }
 
 /* ---- the badge on a button (the length of one cryo press) ---------------- */
@@ -462,3 +471,71 @@ body.in-deep #version-info { z-index: 1400; }
 }
 .deep-lbl-in .building.is-on { opacity: 0.9; }
 .deep-lbl-in.is-building .ring-fg { stroke: #4a5666; }
+
+/* ---- v1.43.0: sleep is a state, the stores and their flows ---------------- */
+
+/* what comes in and goes out of each store in a day, under its bar */
+.deep-col-flows { margin-top: 6px; }
+.deep-col-flow {
+    width: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 10px;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.deep-col-flow .in { color: #8fa1b6; }
+.deep-col-flow .out { color: #55637a; }
+
+/* the tooltip of a purchase: the price row, the sentence, then what is missing or what it
+   does for the goal, set apart */
+#phase-deep .deep-price { display: flex; align-items: center; gap: 6px; }
+#phase-deep .deep-note { color: #c3cfdd; }
+#phase-deep .deep-note.is-missing { color: #d9a25f; }
+#phase-deep .deep-note.is-goal { color: #b9d4a8; }
+/* the counters and the columns open their tooltips below, away from the edge */
+#phase-deep .deep-hold-row .tooltip { right: 0; top: 110%; transform: none; }
+
+/* asleep the scene only darkens a little: the colony is still there, running */
+#phase-deep.is-sleeping #deep-scene,
+#phase-deep.is-sleeping #deep-labels { filter: brightness(0.72); }
+/* and an automated room shows it is working: a small pulse, only while the colony sleeps */
+.deep-lbl-in .pulse { display: none; }
+#phase-deep.is-sleeping .deep-lbl-in.is-auto .pulse {
+    display: block;
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: #7fb069;
+    animation: deep-pulse 1.4s ease-in-out infinite;
+}
+#phase-deep.is-sleeping .deep-lbl-in.is-auto .auto { display: none; }
+@keyframes deep-pulse { 0%, 100% { opacity: 0.25; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+/* the sun: the one live control while the years roll */
+#deep-wake-btn { background-color: #3c4a5c; color: #f2d98a; }
+
+/* the star machine on the lid: chapter I's three throws, one at a time, and a star on a win */
+.deep-lbl-in .deep-machine {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: #2b3442;
+    color: #dbe4f0;
+}
+.deep-machine .rps, .deep-machine .win { position: absolute; display: none; line-height: 0; }
+.deep-machine .rps.is-on { display: block; }
+.deep-lbl-in.is-win .deep-machine { background: #d9a25f; color: #1e2733; }
+.deep-lbl-in.is-win .deep-machine .rps { display: none; }
+.deep-lbl-in.is-win .deep-machine .win { display: block; }
+
+/* the wake-up strip opens with what woke the colony */
+.deep-replay-alarm { color: #d9a25f; }
+.deep-replay-made.is-lost { color: #8a6a5a; }

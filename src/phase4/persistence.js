@@ -6,12 +6,31 @@
  */
 
 import { normalizeLayout } from './layout.js';
-import { initialDeepState } from './deep.js';
+import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
-const MIGRATIONS = {};
+const MIGRATIONS = {
+    /* v1.43.0: the belief about the surface is the healing curve plus a `bias`, no longer a
+       bare mean, and the ring is on screen from the first second. A colony that never had a
+       probe back believed nothing, so it starts on the curve; one that had keeps its mean,
+       measured against the curve on the day it was saved. Scout parties carry people now;
+       the probes already out were sent empty. */
+    1: (p) => {
+        const st = p.state || {};
+        if (st.est && st.est.bias === undefined) {
+            const truth = surface(st.doom0 ?? DOOM_AT_BOOM, st.day || 0);
+            const spread = st.est.spread ?? ESTIMATE_START.spread;
+            st.est = st.estRevealed && Number.isFinite(st.est.mean)
+                ? { bias: st.est.mean - truth, spread }
+                : { bias: 0, spread };
+        }
+        st.probes = (st.probes || []).map((q) => ({ people: 0, ...q }));
+        p.state = st;
+        return p;
+    },
+};
 
 /**
  * @param {object} parsed - a parsed, possibly stale save

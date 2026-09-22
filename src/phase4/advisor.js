@@ -103,3 +103,95 @@ export function pushFeed(feed, lines) {
 
 /** Food eaten per day, for the people ledger. */
 export const foodEaten = (state) => (state.humans || 0) * FOOD_PER_HUMAN;
+
+/* ---------------------------------------------------------------------------
+ * v1.43.0: SLEEP IS A STATE. What woke the colony, what the scouts brought home,
+ * and the line that says what all of it is for. Pure, so the wording is tested.
+ * ------------------------------------------------------------------------ */
+
+/** The advisor's first line at the descent: the reason for everything that follows. */
+export const DESCENT_LINE = 'The surface will heal. Not in our lifetimes. We dig, we build, we sleep.';
+
+/** The glyph each alarm puts on the wake-up strip. */
+export const ALARM_GLYPH = {
+    food: 'wheat', energy: 'zap', stall: 'triangle-alert', few: 'user-minus', scouts: 'radar',
+    estimate: 'sunrise', surface: 'sunrise', act: 'check', manual: 'sun', debug: 'bell',
+};
+/** A stalled room shows its own glyph instead: the mine that stopped, not a warning sign. */
+export const alarmGlyph = (alarm, roomIcon = {}) => (alarm?.kind === 'stall' && roomIcon[alarm.type])
+    || ALARM_GLYPH[alarm?.kind] || 'bell';
+
+const chamberNo = (slot) => (slot >= 0 ? `chamber ${slot + 1}` : 'a chamber');
+
+/**
+ * One line per party that came home, awake, for the feed.
+ * @param {{outcome:string, reading:number|null, slot:number}} l
+ * @returns {string}
+ */
+export function scoutLine(l) {
+    if (l.outcome === 'reading') return `Scout party returned: surface ${Math.round(l.reading)} %.`;
+    if (l.outcome === 'wrong') return 'Scout party returned raving: reading unreliable.';
+    if (l.outcome === 'monster') return `Something came back with the scouts: ${chamberNo(l.slot)} dark.`;
+    return 'Scout party lost.';
+}
+/** The line the feed gets the day a party leaves. */
+export const scoutSentLine = (people) => `Scout party sent (${Math.round(people)} ${Math.round(people) === 1 ? 'person' : 'people'}).`;
+
+const JOB_DONE = {
+    dig: () => 'the new chamber is dug',
+    room: (t) => `the new ${ROOM_WORD[t]} is running`,
+    level: (t) => `the ${ROOM_WORDS[t]} are levelled`,
+    auto: (t) => `the ${ROOM_WORDS[t]} are automated`,
+};
+
+/**
+ * What woke the colony, in one sentence that starts with "Woke:". The strip carries the glyph;
+ * this is the words.
+ * @param {object} alarm - `sum.alarm` from sleep(), or { kind:'manual' }
+ * @returns {string}
+ */
+export function alarmLine(alarm) {
+    const a = alarm || { kind: 'manual' };
+    switch (a.kind) {
+    case 'food':
+        return a.days > 0 ? `Woke: food will run out in ${a.days} ${a.days === 1 ? 'day' : 'days'}.` : 'Woke: the food has run out.';
+    case 'energy':
+        return `Woke: energy is short, rooms run at ${a.pct} %.`;
+    case 'stall':
+        return a.why === 'fuel'
+            ? 'Woke: the generators stalled, no ore to burn.'
+            : `Woke: the ${ROOM_WORD[a.type] || a.type} stalled, no hands.`;
+    case 'few':
+        return 'Woke: too few of us left to keep the hall running.';
+    case 'scouts': {
+        const l = (a.landed || [])[0];
+        if (!l) return 'Woke: a scout party is home.';
+        if (l.outcome === 'reading') return `Woke: scout party returned. Surface ${Math.round(l.reading)} %.`;
+        if (l.outcome === 'wrong') return 'Woke: scout party returned raving. Reading unreliable.';
+        if (l.outcome === 'monster') return `Woke: something came back with the scouts. ${chamberNo(l.slot).replace(/^c/, 'C')} dark.`;
+        return 'Woke: scout party lost.';
+    }
+    case 'estimate':
+        return `Woke: the surface may be habitable. Estimate ${Math.round(a.est.mean)} ± ${Math.round(a.est.spread)} %.`;
+    case 'surface':
+        return `Woke: the sensor on the shaft reads ${Math.round(a.reading ?? 15)} %. The surface has healed.`;
+    case 'act': {
+        const done = a.job && JOB_DONE[a.job.kind] ? JOB_DONE[a.job.kind](a.job.type) : 'the order is in';
+        return `Woke: ${done}, and the next one is paid for.`;
+    }
+    case 'debug':
+        return 'Woke: a test alarm.';
+    default:
+        return 'Woke: the hall was opened by hand.';
+    }
+}
+
+/** The same trouble as a clause, for a tooltip that warns before the sleep: "the mine stalls, no hands". */
+export function troubleClause(t) {
+    if (!t) return '';
+    if (t.kind === 'stall') return t.why === 'fuel' ? 'the generators run out of ore' : `the ${ROOM_WORD[t.type] || t.type} stalls, no hands`;
+    if (t.kind === 'energy') return `energy runs short, rooms at ${t.pct} %`;
+    if (t.kind === 'food') return `food runs out in ${t.days} ${t.days === 1 ? 'day' : 'days'}`;
+    if (t.kind === 'few') return 'too few of us are left';
+    return 'something wakes it';
+}

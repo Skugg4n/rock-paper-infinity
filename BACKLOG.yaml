@@ -655,109 +655,123 @@ items:
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Things made while asleep must tick up visibly during the sleep (numbers spin with the years).
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Asleep the clock, ore and stars roll continuously (10 Hz sleep ticks, the frames interpolate), with the rate per day under each counter. Counters got a T step and two decimals past it so the top tiers still visibly move."
 
   - id: B055
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Cryo as a state, not a click: sleep runs until an alarm wakes you (food, energy, fault, scouts back); tiers raise years per second. Core loop change, Ola to confirm.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Cryo is a state: the snowflake starts a sleep that runs at the tier rate (a month to a hundred thousand years a real second) until an alarm (food, energy, a stalled room, too few people, a scout party home, an order done with the next one paid for, the estimate at the line, the sensor) or the sun button wakes it. sleep(s, days, { alarms }) and sleepTrouble() in deep.js; one plain \"Woke: ...\" line per alarm and a glyph on the wake-up strip."
 
   - id: B056
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Bars must explain why you build; show them as stores with flows in and out, absolute, not relative to each other.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "The four bars are stores on their own absolute scales (ore against the next thing ore buys, food in days of eating full at a year, energy spare as a share of what is made, free hands as a share of those awake; asleep, filled pods), with +in and -out per day in mono under each. The red dot stays on the weakest flow."
 
   - id: B057
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       People need a purpose: they wake and repair, go out as scout parties, die in cryo and out there; fewer people stops manual rooms.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "People die in the ice (0.3 % a sleeping year, 0.75x per dormitory level; a fed colony refills), leave as scout parties, lose half a party to a monster, and awake free hands clear a dark chamber in 10 days. Under 10 people the colony cannot sleep."
 
   - id: B058
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Probes renamed scout parties, made of people, with plain-text lines: sent, returned, lost, wrong, monster.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Probes are scout parties: 5 % of the colony (4 to 60 people), plain lines for sent, returned with a reading, lost, raving, and something coming back with them. Parties come home on their day, awake or asleep."
 
   - id: B059
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Lighter lanes and bright people; today dark grey on black is invisible.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Lanes mid grey, houses stay rock, people white and one size step larger. Checked in a headless screenshot at 1400x900; worth one look on Ola's own screen."
 
   - id: B060
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       The bottleneck dot alone is not a reason to buy; every purchase must connect to the goal (sleep longer safely, reach the surface).
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Every purchase tooltip ends with a dry-run consequence: \"Lets the colony sleep N more years without an alarm\", \"Food for N more days of sleep\", or \"+N stars a day toward Cryo II\". Early on, before stars flow, several read \"No change to the stars until the weakest column moves\"; that is true but thin."
 
   - id: B061
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       A month of sleep must take at most one second, or sleep runs continuously (see B055).
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Cryo I sleeps a month per real second, and the sleep runs on its own (B055)."
 
   - id: B062
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Food tooltip and the other ledgers rewritten in one clear line: 'Food: 45 days left. +84 grown, -39 eaten a day.'
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "One line per bar: \"Food: 45 days left. +84 grown, -39 eaten a day.\" and the same shape for ore, energy and people; asleep versions for food and people."
 
   - id: B063
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Cryo must not be offered before it is useful; tease it when the colony can survive a sleep.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "The hall and every next tier are gated on a dry run of one second of sleep at that tier (sleepTrouble). The tooltip says why: \"Cryo II needs food for 365 days: 210 today.\", \"Cryo II needs the farms to run without hands.\" Sleepers now eat a tenth of a ration (SLEEP_FOOD) so food can run out under the ice."
 
   - id: B064
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Cost and 'affordable in N days' on hover always, also when unaffordable.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Cost always on hover, plus \"Affordable in N days/years\" at today's flow, \"Needs a free chamber\", \"Already being built\", \"Needs 40 spare energy\" and so on."
 
   - id: B065
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       Rate per day under the ore and star counters; ore gets a pickaxe icon instead of the gem.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "Rate per day in mono under the ore and star counters; ore is a pickaxe everywhere (counter, tooltips, wake-up strip)."
 
   - id: B066
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       The surface ring visible from the start (no fog of war); scouts refine the reading and reveal hazards.
-    status: open
-    resolved_in: null
+    status: done
+    resolved_in: v1.43.0
+    notes: "No fog: the ring is the estimate from the first second, centred on the true healing curve with a wide band ({ bias, spread } in the save, schema 2 with a migration), \"habitable ~ year 802 701\" under it, narrowed and bent by scout parties. First advisor line at the descent: \"The surface will heal. Not in our lifetimes. We dig, we build, we sleep.\""
 
   - id: B067
     added: 2026-09-22
     source: "first outside playtest of IV (v1.42.0)"
     request: |
       When nothing moves nothing happens: people visible, machines visibly working, something always ticking toward the next decision.
-    status: open
-    resolved_in: null
+    status: partial
+    resolved_in: v1.43.0
+    notes: "Awake: people walk, build rings fill, the star machine on the lid throws rock, paper, scissors at a speed set by stars a day and flashes a star on a win. Asleep: the years, ore and stars roll and automated rooms pulse. Not yet: a visible countdown to the next decision while awake (the tooltips say \"affordable in N days\", nothing on screen says it unasked)."
