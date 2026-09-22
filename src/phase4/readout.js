@@ -13,18 +13,36 @@
 
 import {
     COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, roomMultiplier, upkeepMultiplier, BIRTH_FOOD,
-    FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, group, digCost, roomCost,
+    FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, cryoLabel, group, digCost, roomCost,
     freeChambers, sleepTrouble, BAD_ALARMS,
 } from './deep.js';
 import { ROOM_WORD, ROOM_WORDS } from './advisor.js';
 
-/** Numbers in a sentence are rounded; nobody reads 47.3182 spare energy. */
-const n = (v) => {
+/**
+ * EVERY NUMBER IN CHAPTER IV (v1.45.0). Ola, after v1.44.0: the numbers over the bars ran into
+ * each other ("313031.1 2280.6M d 9M"). One short form everywhere, the counters and the rates
+ * included: whole numbers under a thousand, then k, M, B, T with at most one decimal, and the
+ * decimal only below ten: "313 k", "2.3 B", "9 M". Past a thousand trillion, "4.8e15".
+ * @param {number} v
+ * @returns {string}
+ */
+const UNITS = [[1e3, 'k'], [1e6, 'M'], [1e9, 'B'], [1e12, 'T']];
+export function short(v) {
+    if (!Number.isFinite(v)) return v > 0 ? '∞' : '-';
+    const sign = v < 0 ? '-' : '';
     const a = Math.abs(v);
-    if (a >= 1e6) return `${Math.round(v / 1e5) / 10}M`;
-    if (a >= 1e4) return `${Math.round(v / 100) / 10}k`;
-    return String(Math.round(v));
-};
+    if (a >= 9.995e14) return `${sign}${a.toExponential(1).replace('+', '').replace('.0e', 'e')}`;
+    if (Math.round(a) < 1000) return `${sign}${Math.round(a)}`;
+    for (const [unit, name] of UNITS) {
+        const x = a / unit;
+        const r = x < 9.95 ? Math.round(x * 10) / 10 : Math.round(x);
+        // 999.7 k is 1 M, never "1000 k": a number that rounds to a thousand moves up a unit
+        if (r < 1000 || name === 'T') return `${sign}${r} ${name}`;
+    }
+    return `${sign}${Math.round(a)}`;
+}
+/** Numbers in a sentence use the same short form: nobody reads 47.3182 spare energy. */
+const n = short;
 /** "mine, farm and dorm", the way a person would say it. */
 export function list(words) {
     if (!words.length) return 'nothing';
@@ -132,6 +150,17 @@ export function span(days) {
     return y === 1 ? '1 year' : `${group(y)} years`;
 }
 
+/** How long until a party is home, the way the scout button says it: "1 y 3 m", "4 m", "12 d". */
+export function backIn(days) {
+    const d = Math.max(0, Math.ceil(days));
+    const y = Math.floor(d / DAYS_PER_YEAR);
+    const m = Math.floor((d - y * DAYS_PER_YEAR) / 30);
+    if (y && m) return `${group(y)} y ${m} m`;
+    if (y) return `${group(y)} y`;
+    if (m) return `${m} m`;
+    return `${Math.max(1, d)} d`;
+}
+
 /** What a tier sleeps in a second, the way a person says it: "a month", "a century". */
 const RATE_WORDS = {
     30: 'a month', 365: 'a year', 3650: 'ten years', 36500: 'a century', 365000: 'a thousand years',
@@ -149,6 +178,7 @@ export const rateWords = (days) => RATE_WORDS[days] || span(days);
  * @param {string} [o.blocked] - 'chamber' | 'pending' | 'top' | 'asleep' | 'people'
  * @returns {string} '' when it can be bought now
  */
+export const AFFORD_FAR_DAYS = 1000 * DAYS_PER_YEAR;
 export function affordText({ price, have, perDay, blocked }) {
     if (blocked === 'pending') return 'Already being built.';
     if (blocked === 'top') return 'The ladder is at its top.';
@@ -157,7 +187,10 @@ export function affordText({ price, have, perDay, blocked }) {
     if (blocked === 'chamber') return have >= price ? 'Needs a free chamber: dig one first.' : `Needs a free chamber, and ${affordText({ price, have, perDay }).toLowerCase()}`;
     if (!(price > have)) return '';
     if (!(perDay > 0)) return 'Not affordable at today\'s flow.';
-    return `Affordable in ${span((price - have) / perDay)}.`;
+    const wait = (price - have) / perDay;
+    // "Affordable in 1 695 937 617 years" is true and useless: past a millennium, say so
+    if (wait > AFFORD_FAR_DAYS) return 'More than a thousand years away at today\'s flow; asleep, the stars come faster.';
+    return `Affordable in ${span(wait)}.`;
 }
 
 /**
@@ -181,6 +214,29 @@ export function cryoGateText(tier, trouble, state) {
     if (trouble.kind === 'food') return `${name} needs food for ${group(CRYO[tier].days)} days: ${group(Math.floor((trouble.day || 0) + trouble.days))} today.`;
     return '';
 }
+
+/**
+ * The same reason in a few words, for the caption UNDER a locked cryo button (v1.45.0: Ola saw
+ * "100 y/s" greyed and could not tell what it wanted). "needs food for 100 y".
+ * @param {number} tier - index into CRYO
+ * @param {object|null} trouble - sleepTrouble()'s answer
+ * @param {object} [o]
+ * @param {number} [o.stars] - stars in hand, for a tier that is only waiting on its price
+ * @returns {string} '' when nothing stands in the way
+ */
+export function cryoGateShort(tier, trouble, { stars = Infinity } = {}) {
+    if (trouble) {
+        if (trouble.kind === 'few') return `needs ${MIN_SLEEPERS} people`;
+        if (trouble.kind === 'stall') return trouble.why === 'fuel' ? 'needs more mines' : `needs ${ROOM_WORDS[trouble.type] || trouble.type} automated`;
+        if (trouble.kind === 'energy') return 'needs spare power';
+        if (trouble.kind === 'food') return `needs food for ${cryoLabel(CRYO[tier].days)}`;
+        return 'not safe yet';
+    }
+    const price = CRYO[tier]?.cost ?? 0;
+    return stars < price ? `needs ${short(price)} stars` : '';
+}
+/** What the advisor says the day a longer sleep is there to be had. */
+export const cryoReadyLine = (tier) => `${cryoName(tier)} is ready: ${rateWords(CRYO[tier].days)} a second.`;
 
 /**
  * What a purchase costs the colony to RUN and what it gives back, in one sentence.

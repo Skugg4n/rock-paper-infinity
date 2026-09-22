@@ -16,18 +16,20 @@ import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_
 import {
     initialDeepState, tickDay, sleep, digCost, roomCost, levelCost, automationCost,
     ROOM_FOR_COLUMN, COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V, MAX_AUTO,
-    cryoLabel, cryoName, group, probeCost, probeDays, PROBE_ENERGY, launchProbe, resolveDueProbes,
-    clearChamber, clearDarkType, stalledRooms, ascentOffered, attemptAscent, ASCENT,
+    cryoLabel, cryoName, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
+    clearChamber, clearDarkType, stalledRooms, attemptAscent, canTryAscent, ascentOdds, SURVIVAL_AT,
     startBuild, completeBuilds, buildProgress, buildPending, estimateNow, habitableYear,
-    sleepTrouble, repairTick, scoutParty, MIN_SLEEPERS,
+    sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
+    ASCENT_MIN_PEOPLE,
 } from './deep.js';
 import {
     conditions, advisorLines, pushFeed, ROOM_WORD, DESCENT_LINE, alarmLine, alarmGlyph,
-    scoutLine, scoutSentLine, troubleClause,
+    scoutLine, scoutSentLine, troubleClause, ascentFailLine,
 } from './advisor.js';
 import {
     ledger, buySentence, preview, deltaText, stocks, flows, flowText, previewStocks,
-    nextOrePrice, affordText, cryoGateText, consequence, span, rateWords,
+    nextOrePrice, affordText, cryoGateText, cryoGateShort, cryoReadyLine, consequence, span, rateWords,
+    short, backIn,
 } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout } from './layout.js';
 import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
@@ -67,19 +69,9 @@ function scheduleIconRefresh() {
     });
 }
 
-/** Big numbers stay legible: 1 234, 45.6k, 3.1M, 2.0B. */
-export function formatCount(n) {
-    const v = Math.floor(Math.abs(n));
-    const sign = n < 0 ? '-' : '';
-    if (v < 10000) return sign + v.toLocaleString('en-US');
-    if (v < 1e6) return `${sign}${(v / 1e3).toFixed(1)}k`;
-    if (v < 1e9) return `${sign}${(v / 1e6).toFixed(1)}M`;
-    if (v < 1e12) return `${sign}${(v / 1e9).toFixed(1)}B`;
-    // a trillion step and two decimals past it: asleep at the top tiers the counters must
-    // still visibly tick (B054), and 6.0e+14 does not move for a long time
-    if (v < 1e15) return `${sign}${(v / 1e12).toFixed(1)}T`;
-    return `${sign}${v.toExponential(2)}`;
-}
+/** Every number in chapter IV, counters and rates included (v1.45.0): "313 k", "2.3 B", "9 M".
+ *  One short form, so the numbers over the bars never run into each other. See `short()`. */
+export const formatCount = short;
 
 /** Day 0 is the day the exit was blown: year 0, month 1, day 1. */
 export function calendar(day) {
@@ -164,6 +156,9 @@ export function init() {
         cryoBtn: document.getElementById('deep-cryo-btn'),
         wakeBtn: document.getElementById('deep-wake-btn'),
         cryoBadge: document.getElementById('deep-cryo-badge'),
+        cryoCaption: document.getElementById('deep-cryo-caption'),
+        cryoUpCaption: document.getElementById('deep-cryo-up-caption'),
+        probeBadge: document.getElementById('deep-probe-badge'),
         cryoUpBtn: document.getElementById('deep-cryo-up'),
         cryoUpBadge: document.getElementById('deep-cryo-up-badge'),
         probeBtn: document.getElementById('deep-probe-btn'),
@@ -173,7 +168,6 @@ export function init() {
         replay: document.getElementById('deep-replay'),
         root: document.getElementById('phase-deep'),
     };
-    crust = createCrust(ui.crust, { onIcons: scheduleIconRefresh });
     replay = createReplay(ui.replay, { onIcons: scheduleIconRefresh, format: formatCount });
 
     // --- the model ---
@@ -191,6 +185,9 @@ export function init() {
         }
     }
     if (!scene) ui.fallback.classList.add('is-on');
+    // the ring rides on the crust slab in the model; the flat band is only for a browser without it
+    crust = createCrust(scene ? scene.crustHost : ui.crust);
+    ui.crust.hidden = !!scene;
 
     // A transition is playing (the walk into the hall, the spin, the walk out, the climb):
     // nothing is clickable. Asleep is not busy: the wake button is live the whole sleep.
@@ -225,6 +222,12 @@ export function init() {
     function setTooltip(el, html) {
         const t = el.querySelector('.tooltip');
         if (t && t.innerHTML !== html) t.innerHTML = html;
+    }
+    /** The one-line caption beside a locked cryo button: the reason, without hovering. */
+    function setCaption(el, text) {
+        if (!el) return;
+        if (el.textContent !== text) el.textContent = text;
+        el.parentElement.classList.toggle('is-captioned', !!text);
     }
     /** A sentence goes into a tooltip as text, never as markup. */
     const escapeText = (s2) => String(s2).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
@@ -373,8 +376,11 @@ export function init() {
         const weakType = ROOM_FOR_COLUMN[report.weakest];
         const levelPrice = levelCost(weakType, state.level[weakType] || 0);
         const lvPending = buildPending(state, 'level', weakType);
-        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || lvPending);
-        buyTip(ui.levelBtn, { kind: 'level', type: weakType, price: levelPrice, currency: 'stars', sentence: buySentence('level', weakType, state), blocked: lvPending ? 'pending' : '', mark: roomMark(weakType) });
+        // levelling or automating a room type the colony has none of would buy nothing at all
+        const noneYet = !(state.rooms[weakType] > 0) && !buildPending(state, 'room', weakType);
+        const noneText = `Build a ${ROOM_WORD[weakType]} first: there is none to improve.`;
+        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || lvPending || noneYet);
+        buyTip(ui.levelBtn, { kind: 'level', type: weakType, price: levelPrice, currency: 'stars', sentence: noneYet ? noneText : buySentence('level', weakType, state), blocked: lvPending ? 'pending' : '', mark: roomMark(weakType) });
         showBuild(ui.levelBtn, 'level', weakType);
 
         // automation is teased only once the first level is bought
@@ -383,10 +389,10 @@ export function init() {
         if (anyLevel) {
             const autoPrice = automationCost(weakType, state.auto[weakType] || 0);
             const auPending = buildPending(state, 'auto', weakType);
-            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || auPending);
+            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || auPending || noneYet);
             buyTip(ui.autoBtn, {
                 kind: 'auto', type: weakType, price: autoPrice, currency: 'stars', mark: roomMark(weakType),
-                sentence: Number.isFinite(autoPrice) ? buySentence('auto', weakType, state) : '',
+                sentence: noneYet ? noneText : (Number.isFinite(autoPrice) ? buySentence('auto', weakType, state) : ''),
                 blocked: (state.auto[weakType] || 0) >= MAX_AUTO ? 'top' : (auPending ? 'pending' : ''),
             });
             showBuild(ui.autoBtn, 'auto', weakType);
@@ -398,6 +404,7 @@ export function init() {
         ui.cryoBtn.classList.toggle('hidden', asleep);
         ui.wakeBtn.classList.toggle('hidden', !asleep);
         ui.cryoBadge.classList.toggle('hidden', !owns);
+        if (owns) setCaption(ui.cryoCaption, state.humans < MIN_SLEEPERS ? `needs ${MIN_SLEEPERS} people` : '');
         if (asleep) {
             ui.wakeBtn.classList.toggle('is-locked', busy);
             setTooltip(ui.wakeBtn, says('Wake the colony.') + note(`${cryoName(tier)}: ${rateWords(CRYO[tier].days)} a second.`));
@@ -413,7 +420,9 @@ export function init() {
                 + note(warn, 'is-missing'));
         } else {
             const gate = cryoGateText(0, gates.hall, state);
-            ui.cryoBtn.classList.toggle('is-locked', busy || !free || state.stars < CRYO[0].cost || !!gates.hall);
+            const hallLocked = !free || state.stars < CRYO[0].cost || !!gates.hall;
+            setCaption(ui.cryoCaption, hallLocked ? (free ? cryoGateShort(0, gates.hall, { stars: state.stars }) : 'needs a free chamber') : '');
+            ui.cryoBtn.classList.toggle('is-locked', busy || hallLocked);
             setTooltip(ui.cryoBtn, priceRow(roomMark('cryo') + starCost(CRYO[0].cost))
                 + says(`${cryoName(0)}: a cryo hall. Asleep, a month passes every second and the machines keep working.`)
                 + note(gate || affordText({ price: CRYO[0].cost, have: state.stars, perDay: report.stars, blocked: free ? '' : 'chamber' }), 'is-missing'));
@@ -424,43 +433,67 @@ export function init() {
         if (nextTier && !asleep) {
             ui.cryoUpBadge.textContent = rateLabel(tier + 1);
             const gate = cryoGateText(tier + 1, gates.next, state);
-            ui.cryoUpBtn.classList.toggle('is-locked', busy || state.stars < nextTier.cost || !!gates.next);
+            const upLocked = state.stars < nextTier.cost || !!gates.next;
+            // the reason is on screen, not only under the cursor: "needs food for 100 y"
+            setCaption(ui.cryoUpCaption, upLocked ? cryoGateShort(tier + 1, gates.next, { stars: state.stars }) : '');
+            ui.cryoUpBtn.classList.toggle('is-locked', busy || upLocked);
             setTooltip(ui.cryoUpBtn, priceRow(roomMark('cryo') + starCost(nextTier.cost))
                 + says(`${cryoName(tier + 1)}: sleep ${rateWords(nextTier.days)} a second.`)
                 + note(gate || affordText({ price: nextTier.cost, have: state.stars, perDay: report.stars }), 'is-missing'));
         }
 
         // ---- scout parties: people up the shaft, for a reading of the sky ----
+        // Everything about a party is on the button before it goes (v1.45.0): who, how long, the
+        // odds of each way it can end, and how far a good reading may be off.
         const scoutsOn = owns || state.probesSent > 0 || state.probes.length > 0;
         ui.probeBtn.classList.toggle('hidden', !scoutsOn);
         if (scoutsOn) {
-            const price = probeCost(state.probesSent);
-            const party = scoutParty(state.humans);
-            const people = state.humans - party >= MIN_SLEEPERS;
+            const out = scoutsOut(state);
+            const odds = scoutOdds(state);
+            const people = state.humans - odds.people >= MIN_SLEEPERS;
             const power = report.parts.E >= PROBE_ENERGY;
-            ui.probeBtn.classList.toggle('is-locked', busy || asleep || state.minerals < price || !power || !people);
-            const away = span(probeDays(state.probesSent));
-            const missing = !people ? affordText({ blocked: 'people' })
-                : (!power ? `Needs ${PROBE_ENERGY} spare energy to open the shaft: ${formatCount(report.parts.E)} today.`
-                    : affordText({ price, have: state.minerals, perDay: report.parts.M, blocked: asleep ? 'asleep' : '' }));
-            setTooltip(ui.probeBtn, priceRow(mineralCost(price) + cost(PROBE_ENERGY, 'zap') + cost(party, 'users'))
-                + says(`Sends ${party} people up the shaft for about ${away}. They bring back a reading of the surface, or they do not come back.`)
-                + note(missing, 'is-missing')
-                + note('Every reading narrows the ring: the year we can go up.', 'is-goal'));
+            ui.probeBtn.classList.toggle('is-locked', busy || asleep || out || state.minerals < odds.price || !power || !people);
+            const trip = out ? state.probes[0] : null;
+            ui.probeBadge.classList.toggle('hidden', !out);
+            if (trip) ui.probeBadge.textContent = backIn(trip.dueDay - state.day);
+            const mark = ui.probeBtn.querySelector('.deep-build');
+            mark.classList.toggle('is-on', !!trip);
+            if (trip) mark.style.setProperty('--p', `${Math.round(100 * Math.min(1, (state.day - trip.sentDay) / Math.max(1, trip.dueDay - trip.sentDay)))}%`);
+            if (trip) {
+                setTooltip(ui.probeBtn, says(`Party out, back in ${backIn(trip.dueDay - state.day)}.`)
+                    + note(`${Math.round(trip.people)} people went up. One party at a time.`));
+            } else {
+                const p = odds.pct;
+                const missing = !people ? affordText({ blocked: 'people' })
+                    : (!power ? `Needs ${PROBE_ENERGY} spare energy a day to open the hatch: ${formatCount(report.parts.E)} today.`
+                        : affordText({ price: odds.price, have: state.minerals, perDay: report.parts.M, blocked: asleep ? 'asleep' : '' }));
+                setTooltip(ui.probeBtn, priceRow(mineralCost(odds.price) + cost(odds.people, 'users'))
+                    + says(`Scout party: ${odds.people} people, out ${span(odds.days)}. `
+                        + `Return ${p.reading} %, lost ${p.lost} %, back wrong ${p.wrong} %, followed home by something ${p.monster} %. `
+                        + `Reading ± ${odds.scatter} %.`)
+                    + note(missing, 'is-missing')
+                    + note('A good reading narrows the doubt on the ring.', 'is-goal'));
+            }
         }
 
-        // ---- the way up: greyed from the first second, open on what the colony believes ----
-        ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !ascentOffered(state));
-        setTooltip(ui.ascendBtn, priceRow(mineralCost(ASCENT.minerals) + starCost(ASCENT.stars) + cost(ASCENT.humans, 'users'))
-            + says('The way up. It opens when the ring says the surface is habitable and the climb is paid for.'));
+        // ---- the way up: you can always try (v1.45.0). The button never waits on the estimate;
+        //      it says what the colony believes, and what a wrong guess costs ----
+        const ao = ascentOdds(state);
+        const canTry = canTryAscent(state);
+        ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !canTry);
+        setTooltip(ui.ascendBtn, says(`Try to resurface: everyone goes up. Survival ${Math.round(ao.survival)} % `
+                + `(± ${Math.round(ao.spread)}). Below ${SURVIVAL_AT} % the first ${formatCount(ao.party)} die and the rest wait.`)
+            + note(asleep ? 'The colony is asleep: wake it to try.'
+                : (!canTry ? `Too few of us: at least ${ASCENT_MIN_PEOPLE} people to send anyone up.` : ''), 'is-missing'));
 
         const est = estimateNow(state);
         const year = habitableYear(state);
-        crust.update({ est, year: Number.isFinite(year) ? group(year) : '', pending: (state.probes || []).length });
+        crust.update({ est, year: Number.isFinite(year) ? group(year) : '' });
         scheduleIconRefresh();
     }
 
     /** The dry runs behind the cryo buttons. Once a colony day, never per frame. */
+    let readyTold = state.cryo;       // the highest tier the advisor has called ready
     function recomputeGates() {
         if (state.asleep) return;
         const owns = state.cryo >= 0;
@@ -469,6 +502,14 @@ export function init() {
             current: owns ? sleepTrouble(state, CRYO[state.cryo].days) : null,
             next: owns && CRYO[state.cryo + 1] ? sleepTrouble(state, CRYO[state.cryo + 1].days) : null,
         };
+        // the day a longer sleep can be had, the advisor says so once: "Cryo IV is ready: a century a second."
+        const want = state.cryo + 1;
+        const gate = owns ? gates.next : gates.hall;
+        if (CRYO[want] && want > readyTold && !gate && state.stars >= CRYO[want].cost
+            && (owns || freeChamber(layout) >= 0)) {
+            readyTold = want;
+            feed = pushFeed(feed, [cryoReadyLine(want)]);
+        }
     }
 
     function afterChange() {
@@ -533,7 +574,7 @@ export function init() {
     /** Levels the room type that fixes the weakest column: the dot is the instruction. */
     function levelWeakest() {
         const type = ROOM_FOR_COLUMN[report.weakest];
-        if (buildPending(state, 'level', type)) return;
+        if (buildPending(state, 'level', type) || !(state.rooms[type] > 0)) return;
         const price = levelCost(type, state.level[type] || 0);
         if (state.stars < price) return;
         state.stars -= price;
@@ -544,7 +585,7 @@ export function init() {
     }
     function automateWeakest() {
         const type = ROOM_FOR_COLUMN[report.weakest];
-        if (buildPending(state, 'auto', type)) return;
+        if (buildPending(state, 'auto', type) || !(state.rooms[type] > 0)) return;
         const price = automationCost(type, state.auto[type] || 0);
         if (!Number.isFinite(price) || state.stars < price) return;
         state.stars -= price;
@@ -726,6 +767,7 @@ export function init() {
         ui.root.classList.remove('is-sleeping');
         scene?.setState(state, layout);
         await (scene ? scene.release(SLEEP_TIMING.release) : Promise.resolve());
+        if (alarm.kind === 'scouts') for (const l of alarm.landed || []) if (l.back > 0) scene?.scoutsDown(l.back);
         report = dryRun();
         recomputeGates();
         replay.show({
@@ -743,29 +785,33 @@ export function init() {
     // --- scout parties ----------------------------------------------------------
     function sendProbe() {
         // the ore and the people are deep.js's business; the spare power is the chrome's, because
-        // the E column is a flow and not a stock: a colony with no headroom cannot open the shaft
-        if (report.parts.E < PROBE_ENERGY) return;
+        // the E column is a flow and not a stock: a colony with no headroom cannot open the hatch.
+        // One party at a time: the button waits for the one that is out.
+        if (report.parts.E < PROBE_ENERGY || scoutsOut(state)) return;
         const p = launchProbe(state);
         if (!p) return;
+        scene?.scoutsUp(p.people);
         feed = pushFeed(feed, [scoutSentLine(p.people)]);
         bought();
         afterChange();
     }
 
     // --- the way up -----------------------------------------------------------
-    /** The door opens on the estimate; what is behind it is the truth. A colony that
-     *  guessed wrong loses a quarter of itself and gets its doubt back. */
+    /** You can always try (v1.45.0). What is behind the hatch is the truth: on a surface that is
+     *  not ready the first party dies up there, the rest wait, and the colony knows the truth. */
     async function pressAscent() {
-        if (busy || state.asleep || !ascentOffered(state)) return;
+        if (busy || state.asleep || !canTryAscent(state)) return;
         setBusy(true);
         stopClock();
         const out = attemptAscent(state);
         saveGame();
         if (!out.success) {
-            advisorLine = `Year ${group(calendar(state.day).year)}: `
-                + `${formatCount(out.lost)} went up. Nobody came back.`;
-            feed = pushFeed(feed, [`${formatCount(out.lost)} went up. Nobody came back.`]);
+            scene?.scoutsUp(out.lost);
+            const line = ascentFailLine(out, formatCount);
+            advisorLine = `Year ${group(calendar(state.day).year)}: ${line}`;
+            feed = pushFeed(feed, [line]);
             report = dryRun();
+            recomputeGates();
             scene?.setState(state, layout);
             setBusy(false);
             startClock();
@@ -775,6 +821,7 @@ export function init() {
         replay.hide();
         await (scene ? scene.ascend(2.0) : Promise.resolve());
         crust.lighten();
+        scene?.lighten();
         await delay(700);
         playChapterCard({ roman: CHAPTER_V.roman, title: CHAPTER_V.title, mode: 'to-come', dark: true });
     }
@@ -818,7 +865,7 @@ export function init() {
     ui.wakeBtn.addEventListener('click', () => { if (!busy) wake({ kind: 'manual' }); }, { signal });
     ui.cryoUpBtn.addEventListener('click', guarded(buyCryoTier), { signal });
     ui.probeBtn.addEventListener('click', guarded(sendProbe), { signal });
-    ui.ascendBtn.addEventListener('click', () => pressAscent(), { signal });
+    ui.ascendBtn.addEventListener('click', guarded(pressAscent), { signal });
     // the replay strip stays until the next thing the player does
     ui.root.addEventListener('click', () => { if (replay.visible()) replay.hide(); }, { signal, capture: true });
     ui.resetBtn.addEventListener('click', () => { scene?.resetView(); ui.resetBtn.classList.remove('is-on'); }, { signal });
@@ -855,7 +902,10 @@ export function init() {
             landBuilds();
             report = tickDay(state, false);
             // parties come home on their own day, awake too, and the free hands mend what they let in
-            for (const l of resolveDueProbes(state, layout.slots, Math.random)) lines.push(scoutLine(l));
+            for (const l of resolveDueProbes(state, layout.slots, Math.random)) {
+                lines.push(scoutLine(l));
+                if (l.back > 0) scene?.scoutsDown(l.back);
+            }
             const cleared = repairTick(state, layout.slots, report.hands);
             if (cleared >= 0) lines.push(`The crew cleared chamber ${cleared + 1}.`);
         }
@@ -909,6 +959,7 @@ export function init() {
     // A colony that already climbed is finished: the wall stands again on every reload.
     if (state.ascended) {
         crust.lighten();
+        scene?.lighten();
         playChapterCard({ roman: CHAPTER_V.roman, title: CHAPTER_V.title, mode: 'to-come', dark: true });
     }
 
@@ -929,15 +980,12 @@ export function init() {
             else if (what === 'probe') {
                 state.minerals += probeCost(state.probesSent || 0);   // the hook is the party, not the bill
                 const p = launchProbe(state);
-                if (p) feed = pushFeed(feed, [scoutSentLine(p.people)]);
+                if (p) { scene?.scoutsUp(p.people); feed = pushFeed(feed, [scoutSentLine(p.people)]); }
             } else if (what === 'home') {
                 // bring every party home tomorrow: asleep, that is the next alarm
                 for (const p of state.probes || []) p.dueDay = state.day + 1;
             } else if (what === 'ascend') {
-                state.minerals = Math.max(state.minerals, ASCENT.minerals);
-                state.stars = Math.max(state.stars, ASCENT.stars);
-                state.humans = Math.max(state.humans, ASCENT.humans);
-                // believe the surface is at 14 %, whatever it really is
+                // believe survival up there is 86 %, whatever it really is, and try
                 state.est = { bias: (state.est?.bias || 0) + 14 - estimateNow(state).mean, spread: 3 };
                 state.estRevealed = true;
                 pressAscent();

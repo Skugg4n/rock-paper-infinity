@@ -127,7 +127,7 @@ describe('the bars explain themselves, and a purchase says what it will do', () 
         const s = colony();
         const r = tickDay(cloneState(s));
         const lines = { M: ledger('M', s, r), F: ledger('F', s, r), E: ledger('E', s, r), H: ledger('H', s, r) };
-        expect(lines.M).toMatch(/^Ore: [\d.k]+ in store\. \+\d+ mined, -\d+ burned a day\.$/);
+        expect(lines.M).toMatch(/^Ore: [\d.]+( k)? in store\. \+\d+ mined, -\d+ burned a day\.$/);
         expect(lines.F).toMatch(/^Food: \d+ days left\. \+\d+ grown, -\d+ eaten a day\.$/);
         expect(lines.E).toMatch(/^Energy: \d+ spare\. \+\d+ made, -\d+ used a day\.$/);
         expect(lines.H).toContain('free of');

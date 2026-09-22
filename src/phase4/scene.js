@@ -47,6 +47,27 @@ const R_ROOM = 0.55;      // the ring runs at this radius around a room
 const R_HUB = 0.80;       // wider on a landing, so it clears the shaft and the hatch
 const EDGE = 0.97;        // nothing is cut closer than this to the slab's edge
 const MAX_DOTS = 160;     // the colony grows past counting; the crowd does not
+/* THE SHAFT UP AND THE CRUST (v1.45.0). Ola: "we mention a shaft up to the earth but there is
+   nothing graphic." Now there is: a pipe in plate colour from the hatch on the lid up to the
+   crust, a flat slab of burnt ground over the colony that carries the ring. The top of the pipe
+   is rubble until the first party goes out, then a dark opening. Parties are dots that climb a
+   stair wound round the outside of the pipe and vanish into the crust; they come down the same
+   way, or they do not. */
+const CRUST = 0x353e4a;         // burnt ground: darker than a plate, lighter than the rock
+const CRUST_LIT = 0x8b97a8;     // the day the colony goes up and there is a sky
+const RUBBLE = 0x4a5361;
+const CRUST_Y = 4.4;            // the underside of the crust, over the lid
+const CRUST_T = 0.34;
+const CRUST_W = 4.6;
+const SHAFT_UP_R = 0.34;
+const LID_TOP = PLATE_H / 2 + 0.24;     // the top of the bar across the hatch
+const MAX_SCOUT_DOTS = 14;      // a party of sixty is drawn as fourteen
+const SCOUT_BUFFER = MAX_SCOUT_DOTS * 3;   // one party going up while one comes down, and a spare
+const SCOUT_SECONDS = 6;        // the walk to the hatch and the climb, start to finish
+/* a party is amber, the colour of the line on the ring they go up to read: white dots on the
+   plate-coloured pipe would vanish against it */
+const SCOUT = 0xe0a24f;
+const SCOUT_SIZE = 0.17;
 /* Chapter I's own three glyphs (rock is the gem there), and the star a win makes. */
 const MACHINE_HTML = '<span class="deep-machine">'
     + '<span class="rps is-on"><i data-lucide="gem" class="w-3.5 h-3.5"></i></span>'
@@ -165,6 +186,9 @@ export function createScene(container, opts = {}) {
     scene.add(lamp);
 
     const plateMat = new THREE.MeshLambertMaterial({ color: PLATE });
+    const crustMat = new THREE.MeshLambertMaterial({ color: CRUST });
+    const rubbleMat = new THREE.MeshLambertMaterial({ color: RUBBLE });
+    const holeMat = new THREE.MeshBasicMaterial({ color: ROCK });
     const rockMat = new THREE.MeshLambertMaterial({ color: ROCK });
     const laneMat = new THREE.MeshBasicMaterial({ color: LANE });
     const unitBox = new THREE.BoxGeometry(1, 1, 1);
@@ -180,6 +204,58 @@ export function createScene(container, opts = {}) {
     const peopleMesh = new THREE.Points(dots, new THREE.PointsMaterial({ color: PEOPLE, size: PEOPLE_SIZE }));
     peopleMesh.frustumCulled = false;
     scene.add(peopleMesh);
+
+    // ---- the shaft up and the crust: built once, the lid never moves ----
+    const above = new THREE.Group();
+    scene.add(above);
+    const crustTop = CRUST_Y + CRUST_T;
+    const crustSlab = new THREE.Mesh(new THREE.BoxGeometry(CRUST_W, CRUST_T, CRUST_W), crustMat);
+    crustSlab.position.set(0, CRUST_Y + CRUST_T / 2, 0);
+    above.add(crustSlab);
+    const shaftUpH = CRUST_Y - LID_TOP + 0.02;
+    const shaftUp = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R, SHAFT_UP_R, shaftUpH, 28), plateMat);
+    shaftUp.position.set(0, LID_TOP + shaftUpH / 2, 0);
+    above.add(shaftUp);
+    // the rubble the boom left on top of the pipe, and the opening under it once it is cleared
+    const rubble = new THREE.Group();
+    const rr = mulberry32(8012);
+    for (let i = 0; i < 9; i++) {
+        const w = 0.16 + rr() * 0.26, h = 0.1 + rr() * 0.2, d = 0.16 + rr() * 0.26;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rubbleMat);
+        const a = rr() * Math.PI * 2, r0 = rr() * 0.42;
+        m.position.set(Math.cos(a) * r0, crustTop + h / 2, Math.sin(a) * r0);
+        m.rotation.y = rr() * Math.PI;
+        rubble.add(m);
+    }
+    above.add(rubble);
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R + 0.08, SHAFT_UP_R + 0.08, 0.02, 28), holeMat);
+    hole.position.set(0, crustTop + 0.012, 0);
+    hole.visible = false;
+    above.add(hole);
+    // the ring stands over the hatch in the crust: a point straight above the pipe projects above
+    // it from every side the camera can orbit to, so the label never covers the opening
+    const crustHost = document.createElement('div');
+    crustHost.className = 'deep-crust-label';
+    const crustLabel = new CSS2DObject(crustHost);
+    crustLabel.position.set(0, crustTop + 1.1, 0);
+    above.add(crustLabel);
+    let shaftOpen = false;
+    function openShaft(open) {
+        if (open === shaftOpen) return;
+        shaftOpen = open;
+        rubble.visible = !open;
+        hole.visible = open;
+    }
+
+    // ---- scout parties: their own few dots, on their own routes ----
+    const scoutPos = new Float32Array(SCOUT_BUFFER * 3);
+    const scoutGeo = new THREE.BufferGeometry();
+    scoutGeo.setAttribute('position', new THREE.BufferAttribute(scoutPos, 3));
+    scoutGeo.setDrawRange(0, 0);
+    const scoutMesh = new THREE.Points(scoutGeo, new THREE.PointsMaterial({ color: SCOUT, size: SCOUT_SIZE }));
+    scoutMesh.frustumCulled = false;
+    scene.add(scoutMesh);
+    let outings = [];               // { dir:'up'|'down', k, dur, dots:[{ path, pathAt, delay }] }
 
     // ---- what the current build left behind ----
     let world = new THREE.Group();
@@ -585,6 +661,9 @@ export function createScene(container, opts = {}) {
             box.expandByPoint(new THREE.Vector3(c.x * PITCH + PLATE_W / 2, f.y + 0.9, c.z * PITCH + PLATE_W / 2));
         }));
         if (box.isEmpty()) return;
+        // the crust and its ring are part of the colony's picture: the goal is over their heads
+        box.expandByPoint(new THREE.Vector3(-CRUST_W / 2, crustTop + 1.5, -CRUST_W / 2));
+        box.expandByPoint(new THREE.Vector3(CRUST_W / 2, crustTop + 1.5, CRUST_W / 2));
         const tgt = box.getCenter(new THREE.Vector3());
         const dir = new THREE.Vector3(0.498, 0.485, 0.723).normalize();
         // The exact fit, not a bounding sphere: a sphere around a wide flat colony is mostly
@@ -688,6 +767,11 @@ export function createScene(container, opts = {}) {
                 l.buildEl.style.setProperty('--p', `${Math.round(p * 100)}%`);
             }
         }
+        // the rubble on the pipe goes the first time anyone climbs it; the scene clears it when
+        // the first of them gets to the top, not the moment the order is given
+        wantOpen = !!(state.shaftOpen || (state.probesSent || 0) > 0 || state.ascended);
+        if (!wantOpen) openShaft(false);
+        else if (!outings.some((o) => o.dir === 'up')) openShaft(true);
         // asleep, everyone is in the hall and the plates are empty
         if (!march) {
             if (state.asleep) { folk = []; dots.setDrawRange(0, 0); } else setPeople(state);
@@ -825,6 +909,82 @@ export function createScene(container, opts = {}) {
         const span = p.pathAt[i] - p.pathAt[i - 1] || 1;
         return out.lerpVectors(p.path[i - 1], p.path[i], Math.max(0, Math.min(1, (d - p.pathAt[i - 1]) / span)));
     }
+    /* ---- scout parties (v1.45.0): out through the hatch, up the pipe, into the crust ---- */
+    let wantOpen = false;
+    /** The walk from where someone is to an opening on the lid, on the graph they already walk. */
+    function routeToHatch(from) {
+        const doors = new Set(floors[0]?.doors || []);
+        if (!doors.size || from == null) return [];
+        const prev = new Map([[from, -1]]);
+        const queue = [from];
+        let found = -1;
+        while (queue.length) {
+            const at = queue.shift();
+            if (doors.has(at)) { found = at; break; }
+            for (const nb of nodes[at].adj) if (!prev.has(nb)) { prev.set(nb, at); queue.push(nb); }
+        }
+        if (found < 0) found = [...doors][Math.floor(rnd() * doors.size)];   // cut off: straight across
+        const route = [];
+        for (let at = found; at >= 0 && at !== undefined; at = prev.has(at) ? prev.get(at) : -1) route.unshift(at);
+        if (route[0] !== from) route.unshift(from);
+        return route.map((i) => nodes[i].p.clone());
+    }
+    /** Round the outside of the pipe, a turn and a half, from the lid to the underside of the crust. */
+    function stair(fromAngle) {
+        const pts = [];
+        const r = SHAFT_UP_R + 0.07;
+        const turns = 1.5, steps = 24;
+        for (let i = 0; i <= steps; i++) {
+            const k = i / steps;
+            const a = fromAngle + k * turns * Math.PI * 2;
+            pts.push(new THREE.Vector3(Math.cos(a) * r, LID_TOP + k * (CRUST_Y - 0.08 - LID_TOP), Math.sin(a) * r));
+        }
+        pts.push(new THREE.Vector3(0, CRUST_Y + CRUST_T / 2, 0));    // into the crust, and out of sight
+        return pts;
+    }
+    function scoutRoute() {
+        const start = floors[0]?.nodes?.length ? floors[0].nodes[Math.floor(rnd() * floors[0].nodes.length)] : null;
+        const walk = routeToHatch(start);
+        const door = walk.length ? walk[walk.length - 1] : new THREE.Vector3(0.7, WALK_Y, 0);
+        const angle = Math.atan2(door.z, door.x);
+        return [...walk, new THREE.Vector3(Math.cos(angle) * 0.42, LID_TOP, Math.sin(angle) * 0.42), ...stair(angle)];
+    }
+    /**
+     * A party leaves (`up`) or comes home (`down`): `n` people, drawn as at most MAX_SCOUT_DOTS.
+     * @returns {number} the dots drawn
+     */
+    function startOuting(dir, n) {
+        const count = Math.min(MAX_SCOUT_DOTS, Math.max(0, Math.round(n)));
+        if (!count || !floors.length) return 0;
+        const dots = [];
+        for (let i = 0; i < count; i++) {
+            const path = scoutRoute();
+            const p = { path: dir === 'up' ? path : path.slice().reverse(), delay: rnd() * 0.3 };
+            measure(p);
+            dots.push(p);
+        }
+        outings.push({ dir, k: 0, dur: SCOUT_SECONDS, dots });
+        return count;
+    }
+    function stepOutings(dt) {
+        if (!outings.length) { if (scoutGeo.drawRange.count) scoutGeo.setDrawRange(0, 0); return; }
+        let i = 0;
+        for (const o of outings) {
+            o.k = Math.min(1, o.k + dt / o.dur);
+            for (const d of o.dots) {
+                if (i >= SCOUT_BUFFER) break;
+                const u = Math.max(0, Math.min(1, (o.k - d.delay) / (1 - d.delay)));
+                pathPoint(d, u, p3);
+                scoutPos[i * 3] = p3.x; scoutPos[i * 3 + 1] = p3.y; scoutPos[i * 3 + 2] = p3.z;
+                i++;
+            }
+        }
+        scoutGeo.setDrawRange(0, i);
+        scoutGeo.attributes.position.needsUpdate = true;
+        outings = outings.filter((o) => o.k < 1);
+        if (wantOpen && !shaftOpen && !outings.some((o) => o.dir === 'up' && o.k < 0.85)) openShaft(true);
+    }
+
     /**
      * @param {'gather'|'release'|'ascend'} mode
      * @param {number} seconds - how long the whole crowd takes, stagger included
@@ -838,14 +998,15 @@ export function createScene(container, opts = {}) {
         }
         const cryo = cryoPoint();
         const cryoShaft = new THREE.Vector3(0, cryo.y - WALK_Y - 0.2, 0);
-        const sky = new THREE.Vector3(0, (floors[0] ? floors[0].y : 0) + 7, 0);
+        const hatch = new THREE.Vector3(0, LID_TOP, 0);
+        const sky = new THREE.Vector3(0, CRUST_Y + CRUST_T / 2, 0);     // up the pipe, into the crust
         for (const p of folk) {
             const mine = shaftPoint(p.floor);
             if (mode === 'release') {
                 p.path = [cryo.clone(), cryoShaft.clone(), mine, nodes[p.at] ? nodes[p.at].p.clone() : cryo.clone()];
             } else if (mode === 'ascend') {
                 personPosition(p, here3);
-                p.path = [here3.clone(), mine, sky.clone()];
+                p.path = [here3.clone(), mine, hatch.clone(), sky.clone()];
             } else {
                 personPosition(p, here3);
                 p.path = [here3.clone(), mine, cryoShaft.clone(), cryo.clone()];
@@ -922,6 +1083,7 @@ export function createScene(container, opts = {}) {
                 if (tween.k >= 1) tween = null;
             }
             stepMachine(dt);
+            stepOutings(dt);
             controls.update();
             updateLabels();
             renderer.render(scene, camera);
@@ -950,6 +1112,14 @@ export function createScene(container, opts = {}) {
         release(seconds = 1.2) { return startMarch('release', seconds); },
         /** Up the shaft and out: the last thing this chapter's model does. */
         ascend(seconds = 2.0) { return startMarch('ascend', seconds); },
+        /** A scout party leaves: dots walk to the hatch and climb the pipe into the crust. */
+        scoutsUp(n) { return startOuting('up', n); },
+        /** A party comes home: dots climb down out of the crust and walk off into the colony. */
+        scoutsDown(n) { return startOuting('down', n); },
+        /** Where the crust's ring is drawn: an element on the slab, for crust.js to fill. */
+        crustHost,
+        /** The crust the day they go up: burnt ground with a sky over it. */
+        lighten() { crustMat.color.set(CRUST_LIT); },
         /** Back to the view we started from. */
         resetView() {
             tween = { p: camera.position.clone(), t: controls.target.clone(), k: 0 };
@@ -961,12 +1131,25 @@ export function createScene(container, opts = {}) {
             dots.dispose();
             peopleMesh.material.dispose();
             unitBox.dispose(); plateGeo.dispose(); bridgeGeo.dispose();
+            above.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
+            above.removeFromParent();
+            scoutGeo.dispose(); scoutMesh.material.dispose();
+            outings = [];
             plateMat.dispose(); rockMat.dispose(); laneMat.dispose();
+            crustMat.dispose(); rubbleMat.dispose(); holeMat.dispose();
             renderer.dispose();
             renderer.domElement.remove();
             labelHost.innerHTML = '';
         },
         /** Test hook: what the scene believes it is drawing. */
-        get stats() { return { floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march, throws: machineThrow, machineRate }; },
+        get stats() {
+            return {
+                floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march,
+                throws: machineThrow, machineRate, shaftOpen,
+                scouts: outings.map((o) => ({ dir: o.dir, dots: o.dots.length, k: o.k })),
+            };
+        },
+        /** Test hook: where the scout dots stand right now (the first `n` of the buffer). */
+        scoutDots() { return Array.from(scoutPos.slice(0, scoutGeo.drawRange.count * 3)); },
     };
 }

@@ -539,3 +539,93 @@ body.in-deep #version-info { z-index: 1400; }
 /* the wake-up strip opens with what woke the colony */
 .deep-replay-alarm { color: #d9a25f; }
 .deep-replay-made.is-lost { color: #8a6a5a; }
+
+/* ---- v1.45.0: survival in one word, the crust in the model, captions ------ */
+
+/* THE RING ON THE CRUST. It fills as the surface heals: empty is certain death up there,
+   full is certain survival. The band round the reading is the doubt (lighter, wider), the
+   tick is the line (85 %). In the model it rides on the crust slab as a small tone plate;
+   in the fallback band it sits in the black strip at the top of the window. */
+.deep-crust-label {
+    pointer-events: auto;
+    cursor: help;
+}
+.deep-crust-label .deep-crust-in {
+    position: relative;
+    padding: 7px 12px 7px 8px;
+    border-radius: 12px;
+    background: rgba(5, 8, 11, 0.78);
+}
+.deep-crust-ring .ring-base { stroke: #1c2530; }
+.deep-crust-ring .ring-band {
+    stroke: #3d4a5b;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dasharray 700ms ease, stroke-dashoffset 700ms ease;
+}
+.deep-crust-ring .ring-fg { stroke-width: 3; }
+.deep-crust-ring .ring-need {
+    stroke: #d9a25f;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+}
+.deep-crust-ring { width: 40px; height: 40px; flex: 0 0 auto; }
+.deep-crust-sub { font-size: 11px; color: #8fa1b6; white-space: nowrap; }
+.deep-crust-spread { color: #c3cfdd; }
+.deep-crust-cap { color: #6b7a8d; margin-left: 6px; }
+.deep-crust-read { white-space: nowrap; }
+.deep-crust-year { white-space: nowrap; }
+.deep-crust-tip {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+    background-color: #2a3442;
+    color: #dbe4f0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 50;
+}
+.deep-crust-in:hover .deep-crust-tip { opacity: 1; }
+#deep-crust[hidden] { display: none; }
+
+/* NUMBERS OVER THE BARS. Every number is in the short form ("313 k", "2.3 B d") and a size
+   smaller, and each column is wide enough that four of them never touch. */
+.deep-col-head { font-size: 10px; width: 58px; }
+.deep-col-foot { width: 58px; }
+.deep-bar { width: 58px; }
+.deep-col-flow { width: 58px; font-size: 9px; }
+.deep-delta { font-size: 9px; }
+.deep-amount { font-size: 20px; }
+
+/* A LOCKED BUTTON dims its glyph, not its tooltip: at 30 % opacity on the whole button the
+   sentence that says why it is locked was drawn at 30 % too. */
+/* and it still takes the hover: style.css's global .is-locked sets pointer-events: none, so until
+   v1.45.0 no locked button in the deep ever showed the tooltip that says what it is waiting for.
+   The clicks are guarded in the phase, so hovering is all a locked button does. */
+#phase-deep .btn.is-locked { opacity: 1; background-color: rgba(30, 39, 51, 0.35); pointer-events: auto; filter: none; cursor: default; }
+#phase-deep .btn.is-locked > :not(.tooltip):not(.deep-caption) { opacity: 0.3; }
+#phase-deep .btn.is-locked:has(.deep-build.is-on) { opacity: 1; }
+#phase-deep .btn.is-locked:has(.deep-build.is-on) > :not(.tooltip):not(.deep-caption) { opacity: 0.6; }
+#phase-deep .btn.is-locked > .deep-build.is-on { opacity: 0.85; }
+#phase-deep.is-busy .btn:not(.is-locked) { opacity: 0.45; }
+
+/* THE REASON A CRYO BUTTON IS LOCKED, without hovering: one mono line beside it, level with
+   its badge. "needs food for 100 y". */
+#phase-deep .deep-caption {
+    position: absolute;
+    right: calc(100% + 10px);
+    bottom: 0;
+    font-size: 10px;
+    line-height: 16px;
+    color: #d9a25f;
+    white-space: nowrap;
+    display: none;
+}
+#phase-deep .btn.is-captioned .deep-caption { display: block; }
+#phase-deep .btn.is-captioned:hover .deep-caption { opacity: 0; }

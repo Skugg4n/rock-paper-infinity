@@ -938,3 +938,79 @@ items:
       push was not required; it went in anyway (every 3rd wave while we lead)
       because it only bites where the tester found the war easy. It moves the
       sim by at most a plate.
+
+  # Chapter IV, Ola's playtest of v1.44.0. Numbered from B100 to stay clear of the
+  # parallel WAR session's next ids.
+  - id: B100
+    added: 2026-09-22
+    source: "playtest of IV (v1.44.0), Ola"
+    request: |
+      "Scout party returned surface 93 %... what? Whole? Broken?" and "that ring
+      that gets smaller... you understand nothing." One word everywhere: survival
+      (the chance if we went up now); the ring fills as it heals, "survival 7 % ·
+      need 85 %", the estimate "± N" as a band with a tooltip.
+    status: done
+    resolved_in: "v1.45.0"
+
+  - id: B101
+    added: 2026-09-22
+    source: "playtest of IV (v1.44.0), Ola"
+    request: |
+      The scout button tells the odds before you send (return, lost, back wrong,
+      reading ±), and while a party is out it shows a badge and "back in 1 y 3 m".
+    status: done
+    resolved_in: "v1.45.0"
+
+  - id: B102
+    added: 2026-09-22
+    source: "playtest of IV (v1.44.0), Ola"
+    request: |
+      "We mention a shaft up to the earth but there is nothing graphic." Draw the
+      shaft from the lid to the crust (a slab in the scene with the ring on it),
+      rubble cleared by the first party, scout dots climbing up and down.
+    status: done
+    resolved_in: "v1.45.0"
+
+  - id: B103
+    added: 2026-09-22
+    source: "playtest of IV (v1.44.0), Ola"
+    request: |
+      "You cannot go out? Could you be allowed to try and then lose people?" The
+      ascent is always tryable; below the line the first party dies, the rest
+      wait, and the estimate becomes the truth.
+    status: done
+    resolved_in: "v1.45.0"
+
+  - id: B104
+    added: 2026-09-22
+    source: "playtest of IV (v1.44.0), Ola"
+    request: |
+      "A bit of AI-logic: things that seem to have a function but do not." Audit
+      every control, label and line in chapter IV.
+    status: done
+    resolved_in: "v1.45.0"
+    notes: |
+      Fixed: locked buttons took no hover (global .is-locked), tooltips of locked
+      buttons at 30 %, seedFromWar never seeded, scout energy shown as a price,
+      silent crust glyphs, level/automate for a room type with no rooms, waits in
+      billions of years, the ascent's price that gated nothing, unlit build rings.
+
+  - id: B105
+    added: 2026-09-22
+    source: "look at IV (v1.44.0), Ola"
+    request: |
+      The numbers over the bars overlap ("313031.1 2280.6M d 9M"). One short
+      formatter for every number in IV (k, M, B, T, one decimal), smaller mono,
+      wider columns; the same for the counters and rates.
+    status: done
+    resolved_in: "v1.45.0"
+
+  - id: B106
+    added: 2026-09-22
+    source: "look at IV (v1.44.0), Ola"
+    request: |
+      A greyed "100 y/s" does not say how to unlock it. A mono caption beside the
+      locked tier ("needs food for 100 y"), the same reason in the tooltip, and
+      an advisor line when a tier opens ("Cryo IV is ready: a century a second.").
+    status: done
+    resolved_in: "v1.45.0"

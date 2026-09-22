@@ -1,13 +1,13 @@
 /* eslint-env jest */
 import {
     initialDeepState, tickDay, sleep, surface, canResurface, canAscend, roomMultiplier, upkeepMultiplier,
-    digCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, ROOM, MAX_AUTO, ASCENT, BED_SHARE,
+    digCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, ROOM, MAX_AUTO, BED_SHARE,
     END_YEAR, DOOM_AT_BOOM, RESURFACE_AT, SURFACE_DECAY_YEARS, resurfaceDay,
     resolveProbe, probeOdds, probeSkill, probeCost, probeDays, updateEstimate, ESTIMATE_START,
     ESTIMATE_FLOOR, PROBE_OUTCOMES, PROBE_ODDS_EARLY, PROBE_ODDS_LATE, PROBE_WRONG_SHIFT,
-    stalledRooms, STALL_AT, ascentOffered, attemptAscent, ASCENT_FAIL_LOSS, ASCENT_FAIL_SPREAD,
+    stalledRooms, STALL_AT, attemptAscent, ASCENT_FAIL_LOSS, ASCENT_TAUGHT_SPREAD,
     ROOMS, cryoLabel, group, launchProbe, resolveDueProbes, darkenChamber, clearChamber,
-    clearDarkType, weakestOf, estimateText, estimateNow, scoutParty, MIN_SLEEPERS, SLEEP_FOOD,
+    clearDarkType, weakestOf, estimateText, scoutParty, MIN_SLEEPERS, SLEEP_FOOD,
 } from './deep.js';
 
 /** A rng that hands out exactly the numbers a test wants, then zeroes. */
@@ -152,12 +152,11 @@ describe('the deep', () => {
         expect(sum.stars).toBeCloseTo(stars, 6);
     });
 
-    test('the way up needs the ring and the means', () => {
+    test('the way up needs the ring and nothing else: time is the one thing not for sale', () => {
         const s = initialDeepState();
         s.day = 1.1 * END_YEAR * DAYS_PER_YEAR;
-        expect(canAscend(s)).toBe(false);
-        s.minerals = ASCENT.minerals; s.stars = ASCENT.stars; s.humans = ASCENT.humans;
-        expect(canAscend(s)).toBe(true);
+        expect(canAscend(s)).toBe(true);    // a poor colony on a healed surface goes up
+        s.minerals = 1e12; s.stars = 1e18;
         s.day = 0;
         expect(canAscend(s)).toBe(false);   // no amount of ore buys the years
     });
@@ -285,40 +284,25 @@ describe('the wake-up report', () => {
 });
 
 describe('the ascent is a decision, not a countdown', () => {
-    test('the door opens on the estimate, and the truth decides what is behind it', () => {
-        const rich = () => {
-            const s = initialDeepState();
-            s.minerals = ASCENT.minerals * 2; s.stars = ASCENT.stars * 2; s.humans = ASCENT.humans * 2;
-            return s;
-        };
+    test('you can always try, and the truth decides what is behind the hatch', () => {
         // the belief is the healing curve shifted by `bias`: this colony is 73 points too hopeful
         const believe = (s, mean, spread) => { s.est = { bias: mean - surface(s.doom0, s.day), spread }; };
-        const wrong = rich();
+        const wrong = initialDeepState({ people: 40 });
         believe(wrong, 12, 5);                     // the colony believes the surface is clear
-        expect(ascentOffered(wrong)).toBe(true);
         expect(canAscend(wrong)).toBe(false);      // on day 0 it very much is not
-        const people = wrong.humans;
         const out = attemptAscent(wrong);
-        expect(out.tried).toBe(true);
-        expect(out.success).toBe(false);
-        expect(out.lost).toBeCloseTo(people * ASCENT_FAIL_LOSS, 6);
-        expect(wrong.humans).toBeCloseTo(people * (1 - ASCENT_FAIL_LOSS), 6);
-        expect(wrong.est.spread).toBeGreaterThanOrEqual(ASCENT_FAIL_SPREAD);   // wide again
-        expect(estimateNow(wrong).mean).toBeGreaterThan(12);                   // and pointing the right way
+        expect(out).toEqual({ tried: true, success: false, lost: 10, survival: 15 });
+        expect(wrong.humans).toBe(40 - 40 * ASCENT_FAIL_LOSS);
+        expect(wrong.est).toEqual({ bias: 0, spread: ASCENT_TAUGHT_SPREAD });   // the dead taught us
         expect(wrong.ascended).toBeFalsy();
-        expect(wrong.minerals).toBeLessThan(ASCENT.minerals * 2);              // the party took the ore with it
+        expect(wrong.minerals).toBe(1500);         // a failed try costs people, not ore
 
-        const right = rich();
+        const right = initialDeepState();
         right.day = 1.1 * END_YEAR * DAYS_PER_YEAR;
         believe(right, 14, 4);
         expect(canAscend(right)).toBe(true);
-        expect(attemptAscent(right)).toEqual({ tried: true, success: true, lost: 0 });
+        expect(attemptAscent(right)).toMatchObject({ tried: true, success: true, lost: 0 });
         expect(right.ascended).toBe(true);
-
-        const poor = initialDeepState();
-        believe(poor, 5, 2);
-        expect(ascentOffered(poor)).toBe(false);
-        expect(attemptAscent(poor)).toEqual({ tried: false, success: false, lost: 0 });
     });
 });
 
@@ -416,6 +400,6 @@ describe('probes in flight, and what they do on the way home', () => {
     test('the wake-up strip reads the weakest column out of the histogram', () => {
         expect(weakestOf({ M: 3, F: 40, E: 1, H: 0 })).toBe('F');
         expect(weakestOf({})).toBe('M');
-        expect(estimateText({ mean: 39.6, spread: 40.4 })).toBe('40 ± 40 %');
+        expect(estimateText({ mean: 39.6, spread: 40.4 })).toBe('60 ± 40 %');   // doomsday 40 is survival 60
     });
 });

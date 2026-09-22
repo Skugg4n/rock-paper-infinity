@@ -96,12 +96,15 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         expect(sum.alarm.kind).toBe('scouts');
         const l = sum.alarm.landed[0];
         expect(l.outcome).toBe('reading');
-        expect(alarmLine(sum.alarm)).toBe(`Woke: scout party returned. Surface ${Math.round(l.reading)} %.`);
+        expect(alarmLine(sum.alarm)).toBe(`Woke: scout party returned, survival ${Math.round(100 - l.reading)} %. Not yet.`);
         expect(s.humans).toBeCloseTo(40, 0);     // they came home: a few may have died in the ice meanwhile
     });
 
     test('every way a party can come home has its own plain line', () => {
-        expect(scoutLine({ outcome: 'reading', reading: 41.2 })).toBe('Scout party returned: surface 41 %.');
+        // the rules count doomsday; the line says survival, and what it means (v1.45.0)
+        expect(scoutLine({ outcome: 'reading', reading: 93 })).toBe('Scout party returned: survival 7 %. Not yet.');
+        expect(scoutLine({ outcome: 'reading', reading: 38 })).toBe('Scout party returned: survival 62 %. Getting there.');
+        expect(scoutLine({ outcome: 'reading', reading: 14 })).toBe('Scout party returned: survival 86 %. We could go up.');
         expect(scoutLine({ outcome: 'lost' })).toBe('Scout party lost.');
         expect(scoutLine({ outcome: 'wrong', reading: 3 })).toBe('Scout party returned raving: reading unreliable.');
         expect(scoutLine({ outcome: 'monster', slot: 6 })).toBe('Something came back with the scouts: chamber 7 dark.');
@@ -136,7 +139,7 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         expect(sum.alarm.kind).toBe('estimate');
         expect(s.day).toBe(Math.ceil(opens));
         expect(estimateNow(s).mean).toBeLessThanOrEqual(RESURFACE_AT);
-        expect(alarmLine(sum.alarm)).toMatch(/^Woke: the surface may be habitable\. Estimate 1[45] ± 3 %\.$/);
+        expect(alarmLine(sum.alarm)).toMatch(/^Woke: we may survive up there\. Survival 8[56] ± 3 %, need 85 %\.$/);
     });
 
     test('the sensor on the shaft is the truth: it wakes the colony and sets the belief straight', () => {
@@ -147,7 +150,7 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         expect(sum.alarm.kind).toBe('surface');
         expect(s.est.bias).toBe(0);
         expect(s.est.spread).toBeLessThanOrEqual(4);
-        expect(alarmLine(sum.alarm)).toMatch(/^Woke: the sensor on the shaft reads 15 %\. The surface has healed\.$/);
+        expect(alarmLine(sum.alarm)).toMatch(/^Woke: the sensor on the shaft reads survival 85 %\. The surface has healed\.$/);
     });
 
     test('the top tier is a handful of loops, not a hundred million days', () => {
@@ -275,6 +278,7 @@ describe('the goal on screen, and the stores behind the bars', () => {
         expect(affordText({ price: 100, have: 40, perDay: 6 })).toBe('Affordable in 10 days.');
         expect(affordText({ price: 1e6, have: 0, perDay: 1000 })).toBe('Affordable in 3 years.');
         expect(affordText({ price: 100, have: 40, perDay: 0 })).toBe("Not affordable at today's flow.");
+        expect(affordText({ price: 1e16, have: 0, perDay: 3e4 })).toBe("More than a thousand years away at today's flow; asleep, the stars come faster.");
         expect(affordText({ price: 100, have: 400, perDay: 6 })).toBe('');
         expect(affordText({ price: 100, have: 400, blocked: 'chamber' })).toBe('Needs a free chamber: dig one first.');
         expect(span(1)).toBe('1 day');

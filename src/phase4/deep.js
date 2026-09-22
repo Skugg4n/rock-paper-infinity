@@ -132,13 +132,31 @@ export const SURFACE_HALF_LIFE_YEARS = SURFACE_DECAY_YEARS * Math.LN2;
 export const surface = (doom0, days) => doom0 * Math.exp(-(days / DAYS_PER_YEAR) / SURFACE_DECAY_YEARS);
 /** The day the ring opens for a colony that went down at `doom0`. */
 export const resurfaceDay = (doom0) => DAYS_PER_YEAR * SURFACE_DECAY_YEARS * Math.log(doom0 / RESURFACE_AT);
-/** The way up is built, not waited for: the ring opens the door, this pays for it. */
-export const ASCENT = { minerals: 2e6, stars: 2e9, humans: 200 };
 /** The working title of what waits at the top. One constant, so it is renamed in one place. */
 export const CHAPTER_V = { roman: 'V', title: 'RETURN' };
-export const ASCENT_FAIL_LOSS = 0.25;         // the share of the colony a bad guess costs
-export const ASCENT_FAIL_SPREAD = 20;         // and how wide the ring is again afterwards
+/** The first ones through the hatch: this share of the colony. On a surface that is not ready
+ *  they are the price of trying; on one that is, everyone follows them up. */
+export const ASCENT_FAIL_LOSS = 0.25;
+/** A colony this small cannot send anyone up and still be a colony. */
+export const ASCENT_MIN_PEOPLE = 3;
+/** What the dead taught us: after a failed try the colony knows the surface this well. */
+export const ASCENT_TAUGHT_SPREAD = 3;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/* ---------------------------------------------------------------------------
+ * SURVIVAL, ONE WORD EVERYWHERE (v1.45.0). Ola, after playing v1.44.0:
+ * "Scout party returned surface 93 %... what? Whole? Broken?" The rules count
+ * DOOMSDAY, as chapter III did (85 the day the exit was blown, 15 when the
+ * surface can be walked on). The player is only ever shown the other side of
+ * it: the chance of SURVIVAL if the colony went up now, 100 minus doomsday, so
+ * every number on screen grows toward the goal: 15 % at the descent, 85 % to go up.
+ * ------------------------------------------------------------------------ */
+/** The line, the way the player reads it: "need 85 %". */
+export const SURVIVAL_AT = 100 - RESURFACE_AT;
+/** Doomsday per cent to survival per cent. */
+export const survival = (doomPct) => clamp(100 - doomPct, 0, 100);
+/** The true chance of survival up there today. Nobody on screen knows this; the rules do. */
+export const survivalNow = (s) => survival(surface(s.doom0, s.day));
 
 /* ---------------------------------------------------------------------------
  * PROBES, AND WHAT THE COLONY BELIEVES ABOUT THE SURFACE
@@ -183,6 +201,45 @@ export function probeOdds(day) {
     return o;
 }
 
+/** How far a good reading may be off, in points, for a party that comes home on `day`. */
+export const probeScatter = (day) => Math.max(2, PROBE_NOISE * (1 - 0.7 * probeSkill(day)));
+
+/**
+ * Odds as whole per cents that add up to exactly 100 (largest remainder), so a tooltip never
+ * reads 99 % or 101 % between them.
+ * @param {object} odds - shares that sum to 1
+ * @param {string[]} keys - which of them, in order
+ * @returns {object} the same keys, integers
+ */
+export function wholePercents(odds, keys) {
+    const raw = keys.map((k) => 100 * (odds[k] || 0));
+    const out = raw.map(Math.floor);
+    let left = 100 - out.reduce((a, b) => a + b, 0);
+    const order = raw.map((v, i) => [v - Math.floor(v), i]).sort((a, b) => b[0] - a[0]);
+    for (let j = 0; left > 0 && j < order.length; j++, left--) out[order[j][1]] += 1;
+    return Object.fromEntries(keys.map((k, i) => [k, out[i]]));
+}
+
+/**
+ * Everything the scout button says before it is pressed (v1.45.0): who goes, for how long, the
+ * odds of each way it can end on the day they would come home, and how far a good reading may be
+ * off. Nothing about a party is hidden from the player.
+ * @param {object} s - state
+ * @returns {{people:number, days:number, price:number, pct:{reading:number, lost:number, wrong:number, monster:number}, scatter:number}}
+ */
+export function scoutOdds(s) {
+    const sent = s.probesSent || 0;
+    const days = probeDays(sent);
+    const back = (s.day || 0) + days;
+    return {
+        people: scoutParty(s.humans),
+        days,
+        price: probeCost(sent),
+        pct: wholePercents(probeOdds(back), PROBE_OUTCOMES),
+        scatter: Math.round(probeScatter(back)),
+    };
+}
+
 /**
  * What one probe comes back with, or does not. Pure: hand it the randomness.
  *
@@ -200,7 +257,7 @@ export function resolveProbe(rng, day, surfaceTrue) {
         if (roll < odds[key]) { outcome = key; break; }
         roll -= odds[key];
     }
-    const scatter = Math.max(2, PROBE_NOISE * (1 - 0.7 * probeSkill(day)));
+    const scatter = probeScatter(day);
     if (outcome === 'reading') {
         return { outcome, reading: clamp(surfaceTrue + (rng() * 2 - 1) * scatter, 0, 100), spread: scatter };
     }
@@ -237,8 +294,8 @@ export function updateEstimate(est, reading, spread) {
     };
 }
 
-/** What the ring says the colony believes, as the crust prints it: "40 ± 40 %". */
-export const estimateText = (est) => `${Math.round((est || ESTIMATE_START).mean)} ± ${Math.round((est || ESTIMATE_START).spread)} %`;
+/** What an estimate says, as the player reads it: "15 ± 40 %", the chance of survival up there. */
+export const estimateText = (est) => `${Math.round(survival((est || ESTIMATE_START).mean))} ± ${Math.round((est || ESTIMATE_START).spread)} %`;
 
 /* ---------------------------------------------------------------------------
  * THE GOAL ON SCREEN (v1.43.0, B066). The first outside playtest: "why build
@@ -257,6 +314,11 @@ export function estimateNow(s) {
     const e = s.est || {};
     return { mean: clamp(truth + (e.bias || 0), 0, 100), spread: e.spread ?? ESTIMATE_START.spread };
 }
+/** Today's belief the way the player reads it: the chance of survival up there, give or take. */
+export function believedSurvival(s) {
+    const e = estimateNow(s);
+    return { mean: survival(e.mean), spread: e.spread };
+}
 /** The day the colony BELIEVES the ring reaches the line, or Infinity when it never will. */
 export function estimateOpensDay(s) {
     const target = RESURFACE_AT - ((s.est && s.est.bias) || 0);
@@ -264,7 +326,7 @@ export function estimateOpensDay(s) {
     if (target >= s.doom0) return 0;
     return DAYS_PER_YEAR * SURFACE_DECAY_YEARS * Math.log(s.doom0 / target);
 }
-/** The year printed under the ring: "habitable ~ year 802 701". */
+/** The year printed under the ring: "survival 85 % ~ year 802 701". */
 export const habitableYear = (s) => {
     const d = estimateOpensDay(s);
     return Number.isFinite(d) ? Math.round(d / DAYS_PER_YEAR) : Infinity;
@@ -299,8 +361,11 @@ export function launchProbe(s) {
     const p = { sentDay: s.day, dueDay: s.day + probeDays(s.probesSent || 0), people: party };
     s.probesSent = (s.probesSent || 0) + 1;
     s.probes = (s.probes || []).concat([p]);
+    s.shaftOpen = true;                 // the first party clears the rubble at the top for good
     return p;
 }
+/** A party is out there: the button waits for it, one party at a time. */
+export const scoutsOut = (s) => (s.probes || []).length > 0;
 
 /**
  * A monster takes a chamber: it stands dark and makes nothing until it is cleared. Pure, so the
@@ -511,6 +576,7 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         repair: 0,                          // awake days spent clearing the first dark chamber
         actWokeDay: null,                   // the last "you can act" wake, so it comes at most once a decade
         ascended: false,
+        shaftOpen: false,                   // the rubble at the top of the shaft up, cleared by the first party
         cryo: -1, doom0,
     };
 }
@@ -799,38 +865,49 @@ export function stalledRooms(s, sum) {
 }
 
 export const canResurface = (s) => surface(s.doom0, s.day) <= RESURFACE_AT;
-/** Can the colony pay for the climb? Ore, stars and enough people to make the party. */
-export const canAffordAscent = (s) => s.minerals >= ASCENT.minerals && s.stars >= ASCENT.stars && s.humans >= ASCENT.humans;
-/** The ending: the ring is open AND the colony can pay for the climb. THE TRUTH, used by the
- *  simulation and by what actually happens when the hatch opens. */
-export const canAscend = (s) => canResurface(s) && canAffordAscent(s);
-/** What the player is OFFERED, which is the colony's belief and not the truth: the estimate says
- *  the surface is under the line, and the climb is paid for. Sending people up on a bad estimate
- *  is a decision the game lets you make. */
-export const ascentOffered = (s) => estimateNow(s).mean <= RESURFACE_AT && canAffordAscent(s);
+/** The ending is the ring and nothing else. Until v1.44.0 the climb had a price in ore, stars and
+ *  people as well; the colony that reaches the ring holds that price a hundred billion times over,
+ *  so it gated nothing and the button only looked like it was waiting for money. Time is the one
+ *  thing this chapter will not sell. */
+export const canAscend = canResurface;
+
+/** Who goes through the hatch first. */
+export const ascentParty = (s) => Math.max(1, Math.round((s.humans || 0) * ASCENT_FAIL_LOSS));
+/** Can the colony try at all? Awake, not gone, and big enough to send anyone. Never the estimate. */
+export const canTryAscent = (s) => !s.ascended && (s.humans || 0) >= ASCENT_MIN_PEOPLE;
 
 /**
- * Open the hatch. The cost is paid either way: a party that does not come back took the ore and
- * the years with it. On a bad estimate a share of the colony is lost, and what the survivors saw
- * both corrects the mean and widens the spread, so the next try is a decision again and not a
- * retry.
+ * What the ascent button says (v1.45.0): the colony's belief about survival up there, the same
+ * number the ring shows, and who would go first. The truth decides; this is what the colony knows.
+ * @param {object} s - state
+ * @returns {{survival:number, spread:number, party:number}} survival in per cent
+ */
+export function ascentOdds(s) {
+    const b = believedSurvival(s);
+    return { survival: b.mean, spread: b.spread, party: ascentParty(s) };
+}
+
+/**
+ * Open the hatch. You can always try (Ola, after v1.44.0: "Could you be allowed to try and then
+ * lose people? Better than now anyway."). On a surface that is ready, everyone goes up. On one
+ * that is not, the first party (ASCENT_FAIL_LOSS of the colony) dies up there, the rest wait, and
+ * what the dead taught the colony sets its belief straight: the estimate is the truth, give or
+ * take ASCENT_TAUGHT_SPREAD.
  *
  * @param {object} s - state, mutated
- * @returns {{tried:boolean, success:boolean, lost:number}}
+ * @returns {{tried:boolean, success:boolean, lost:number, survival:number}} survival: the truth, in per cent
  */
 export function attemptAscent(s) {
-    if (!canAffordAscent(s)) return { tried: false, success: false, lost: 0 };
-    s.minerals -= ASCENT.minerals;
-    s.stars -= ASCENT.stars;
+    const truth = survivalNow(s);
+    if (!canTryAscent(s)) return { tried: false, success: false, lost: 0, survival: truth };
+    s.shaftOpen = true;
     if (canResurface(s)) {
         s.ascended = true;
-        return { tried: true, success: true, lost: 0 };
+        return { tried: true, success: true, lost: 0, survival: truth };
     }
-    const lost = s.humans * ASCENT_FAIL_LOSS;
-    s.humans = Math.max(2, s.humans - lost);
-    // what the survivors saw pulls the belief halfway back to the truth, and the doubt returns
-    const est = s.est || {};
-    s.est = { bias: (est.bias || 0) / 2, spread: Math.max(est.spread ?? ESTIMATE_START.spread, ASCENT_FAIL_SPREAD) };
+    const lost = Math.min(ascentParty(s), s.humans - 2);
+    s.humans -= lost;
+    s.est = { bias: 0, spread: Math.min(s.est?.spread ?? ESTIMATE_START.spread, ASCENT_TAUGHT_SPREAD) };
     s.estRevealed = true;
-    return { tried: true, success: false, lost };
+    return { tried: true, success: false, lost, survival: truth };
 }

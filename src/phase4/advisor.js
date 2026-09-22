@@ -13,7 +13,7 @@
  * phase only has to print what it is handed.
  */
 
-import { ROOMS, ROOM_FOR_COLUMN, FOOD_PER_HUMAN } from './deep.js';
+import { ROOMS, ROOM_FOR_COLUMN, FOOD_PER_HUMAN, survival, SURVIVAL_AT } from './deep.js';
 
 /** What the advisor calls each room and each column, in a sentence. */
 export const ROOM_WORD = { mine: 'mine', farm: 'farm', generator: 'generator', dorm: 'dormitory' };
@@ -123,13 +123,30 @@ export const alarmGlyph = (alarm, roomIcon = {}) => (alarm?.kind === 'stall' && 
 
 const chamberNo = (slot) => (slot >= 0 ? `chamber ${slot + 1}` : 'a chamber');
 
+/** Where a reading leaves the colony, in two words. */
+export const GETTING_THERE_AT = 50;
+export function verdict(pct) {
+    if (pct >= SURVIVAL_AT) return 'We could go up.';
+    if (pct >= GETTING_THERE_AT) return 'Getting there.';
+    return 'Not yet.';
+}
+/**
+ * A reading as the player reads it (v1.45.0): the rules count doomsday, the screen says the
+ * chance of survival if we went up now, and what that means. "survival 7 %. Not yet."
+ * @param {number} doomPct - the reading, in the rules' doomsday per cent
+ */
+export function readingText(doomPct) {
+    const pct = Math.round(survival(doomPct));
+    return `survival ${pct} %. ${verdict(pct)}`;
+}
+
 /**
  * One line per party that came home, awake, for the feed.
  * @param {{outcome:string, reading:number|null, slot:number}} l
  * @returns {string}
  */
 export function scoutLine(l) {
-    if (l.outcome === 'reading') return `Scout party returned: surface ${Math.round(l.reading)} %.`;
+    if (l.outcome === 'reading') return `Scout party returned: ${readingText(l.reading)}`;
     if (l.outcome === 'wrong') return 'Scout party returned raving: reading unreliable.';
     if (l.outcome === 'monster') return `Something came back with the scouts: ${chamberNo(l.slot)} dark.`;
     return 'Scout party lost.';
@@ -166,15 +183,15 @@ export function alarmLine(alarm) {
     case 'scouts': {
         const l = (a.landed || [])[0];
         if (!l) return 'Woke: a scout party is home.';
-        if (l.outcome === 'reading') return `Woke: scout party returned. Surface ${Math.round(l.reading)} %.`;
+        if (l.outcome === 'reading') return `Woke: scout party returned, ${readingText(l.reading)}`;
         if (l.outcome === 'wrong') return 'Woke: scout party returned raving. Reading unreliable.';
         if (l.outcome === 'monster') return `Woke: something came back with the scouts. ${chamberNo(l.slot).replace(/^c/, 'C')} dark.`;
         return 'Woke: scout party lost.';
     }
     case 'estimate':
-        return `Woke: the surface may be habitable. Estimate ${Math.round(a.est.mean)} ± ${Math.round(a.est.spread)} %.`;
+        return `Woke: we may survive up there. Survival ${Math.round(survival(a.est.mean))} ± ${Math.round(a.est.spread)} %, need ${SURVIVAL_AT} %.`;
     case 'surface':
-        return `Woke: the sensor on the shaft reads ${Math.round(a.reading ?? 15)} %. The surface has healed.`;
+        return `Woke: the sensor on the shaft reads survival ${Math.round(survival(a.reading ?? 15))} %. The surface has healed.`;
     case 'act': {
         const done = a.job && JOB_DONE[a.job.kind] ? JOB_DONE[a.job.kind](a.job.type) : 'the order is in';
         return `Woke: ${done}, and the next one is paid for.`;
@@ -194,4 +211,13 @@ export function troubleClause(t) {
     if (t.kind === 'food') return `food runs out in ${t.days} ${t.days === 1 ? 'day' : 'days'}`;
     if (t.kind === 'few') return 'too few of us are left';
     return 'something wakes it';
+}
+
+/**
+ * The line a failed try at the surface writes (v1.45.0).
+ * @param {{lost:number, survival:number}} out - attemptAscent()'s answer
+ * @param {Function} [fmt] - number formatter
+ */
+export function ascentFailLine(out, fmt = (v) => String(Math.round(v))) {
+    return `${fmt(Math.round(out.lost))} went up and did not come back. Survival up there is ${Math.round(out.survival)} %; we need ${SURVIVAL_AT}.`;
 }
