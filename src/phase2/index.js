@@ -46,7 +46,8 @@ async function goDeep() {
         return;
     }
     playChapterCard({
-        roman: 'IV', title: 'THE DEEP', dark: true, hold: 4000,
+        // Slow and dark like the WAR card: a long fade, IV, then THE DEEP; a click or 5 s ends the hold.
+        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, hold: 5000,
         onMidpoint: () => {
             setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
         },

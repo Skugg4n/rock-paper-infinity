@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.43.1 - 2026-09-22
+
+- The descent card into THE DEEP is now slow and dark like the WAR card: long fade, IV, then the title, a click or five seconds ends it (Ola's playtest note via the WAR session).
+
 ## v1.43.0 - 2026-09-22
 
 ### Chapter IV: sleep is a state. Alarms, scout parties, stores and flows, the goal on screen
