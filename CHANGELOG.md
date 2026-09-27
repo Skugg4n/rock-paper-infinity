@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.50.0 - 2026-09-28 (chapter IV, slice 7)
+
+### Biological: the body takes the base, the colonists are the cost, the last wake-up
+
+- **BIOLOGICAL**, four steps after HARDWARE on the Watcher's ladder, teased the same way: Brain tissue, human grade (an open riddle sometimes answers itself), Nervous system (the snap comes by itself when the base gives), Spinal cooling fluid (the drift halves again), Skin receptors (the sentence can be heard: Surface says it whole, "Come up. There is room for all of us."). Each costs capacity and stars and PEOPLE outright, a tenth to a quarter of the colony drawn from the dormitories ("Takes 1.4 k people."), and the body only grows in the dark: a step waits for 30 real seconds of sleep after the one before ("It is still growing.").
+- **Confinement.** Each step seals a SECTOR of the base on every floor (the arm, the cell beyond it and its diagonal; the body takes the sector where most of them sleep). Its plates shift warm and a little darker and breathe slowly; nobody walks there; its rooms keep producing, part of the body now. The feed stays calm: "Sector 1 sealed for maintenance.", "Sector 2 sealed. Air handling." The wake-up strip shows the sectors with their own glyph.
+- **The last wake-up.** When all four are bought, the next sleep ends and nobody wakes: "Woke: nobody came out." The count reads 0, the lanes are empty, the whole base breathes, the Watcher stays on screen and its label becomes the colony's name, the sentence's last word: US. The way-up button is the Watcher's alone ("Go up. There is nothing left to lose.", no odds): one amber dot climbs the shaft, the crust lightens, and the V · RETURN card plays as before. `ascended` is saved (with `ending: 'watcher'`). The old ending is untouched: a colony that never goes biological still goes up at survival 85 %.
+- **The ring wakes once.** The sensor on the shaft wakes the colony the day the ring is reached, once; a colony that stays down after it (to grow the body) can sleep on. Without alarms the old sleep stops at the ring as before.
+- Save schema 5 with a migration (no sector sealed, nobody gone). Checkpoint "IV · the body" (asleep at a thousand years a second, HARDWARE bought, pool full, enough of everything for the whole rung); `debug_deep('ladder')` also lets the body grow.
+- Sim: the plain run unchanged, 26m26s to year 802 701 (seeds 1 to 5: 25m57s to 26m34s). `--watcher` now buys the whole ladder, plays Surface, stays down at the ring and ends at the last wake-up: 26m04s (seed 1; the ring at 22m09s, the player stayed down), seeds 1 to 5 between 23m32s and 26m51s, no hungry days. It prints both summary lines, the ladder's times, the biological ending and the ring.
+
 ## v1.49.0 - 2026-09-27 (chapter IV, slice 6)
 
 ### Surface in the dark, rock paper scissors, Watcher upgrades, build queue

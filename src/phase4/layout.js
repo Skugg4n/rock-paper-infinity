@@ -16,6 +16,23 @@ export const RING_1 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 /** The ring outside them, walked round from the north. Every cell here touches
  *  one of the arms, so a floor is always one connected piece of ground. */
 export const RING_2 = [[0, -2], [1, -1], [2, 0], [1, 1], [0, 2], [-1, 1], [-2, 0], [-1, -1]];
+/**
+ * THE FOUR SECTORS (v1.50.0). Every floor is cut into four sectors, one per arm: the arm, the
+ * cell beyond it, and the diagonal clockwise of it. Numbered 1 to 4 on screen (north, east,
+ * south, west), 0 to 3 here. What the Watcher's body seals is a sector, on every floor at once.
+ */
+export const SECTORS = 4;
+const SECTOR_OF_CELL = {
+    '0,-1': 0, '0,-2': 0, '1,-1': 0,
+    '1,0': 1, '2,0': 1, '1,1': 1,
+    '0,1': 2, '0,2': 2, '-1,1': 2,
+    '-1,0': 3, '-2,0': 3, '-1,-1': 3,
+};
+/** Which sector chamber number `index` is in. */
+export function sectorOf(index) {
+    const p = placeChamber(index);
+    return SECTOR_OF_CELL[`${p.x},${p.z}`];
+}
 /** Chamber cells in the order they are dug. The centre is the landing, never a chamber. */
 export const CHAMBER_CELLS = [...RING_1, ...RING_2];
 export const CHAMBERS_PER_FLOOR = CHAMBER_CELLS.length;

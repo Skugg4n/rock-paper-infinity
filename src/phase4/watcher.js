@@ -12,8 +12,9 @@
  * energy and the wall clock; the tests hand it numbers.
  */
 
-import { CRYO, DAYS_PER_YEAR, BAD_ALARMS } from './deep.js';
+import { CRYO, DAYS_PER_YEAR, BAD_ALARMS, MIN_SLEEPERS } from './deep.js';
 import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS } from './surface.js';
+import { sectorOf, SECTORS } from './layout.js';
 
 export const STABILITY_MAX = 100;
 /** What the label reads, in order. It moves on once and never back. */
@@ -106,6 +107,9 @@ export function initialWatcher() {
         puzzle2: null,          // the second riddle, with the Second core
         surface: initialSurface(),
         saidSpace: false,       // "We needed the space.", said once
+        sealed: [],             // the sectors the body has taken, 0 to 3, in order (v1.50.0)
+        grown: 0,               // real seconds of sleep since the body last grew
+        gone: false,            // the last wake-up has come: nobody came out
     };
 }
 
@@ -119,6 +123,8 @@ export function normalizeWatcher(w) {
     // bought in order: a ladder with a hole in it keeps only the rungs under the hole
     out.bought = out.bought.filter((id, i) => LADDER[i] && LADDER[i].id === id);
     out.surface = normalizeSurface(had.surface);
+    out.sealed = Array.isArray(had.sealed) ? [...new Set(had.sealed.filter((x) => Number.isInteger(x) && x >= 0 && x < SECTORS))] : [];
+    out.gone = !!had.gone;
     out.stability = clamp(Number.isFinite(out.stability) ? out.stability : STABILITY_MAX, 0, STABILITY_MAX);
     out.capacity = clamp(Number.isFinite(out.capacity) ? out.capacity : 0, 0, capacityMax(out));
     out.sleptYears = Math.max(0, Number.isFinite(out.sleptYears) ? out.sleptYears : 0);
@@ -129,8 +135,10 @@ export function normalizeWatcher(w) {
     return out;
 }
 
-/** What the label reads now. */
-export const watcherName = (w) => WATCHER_NAMES[clamp((w && w.stage) | 0, 0, WATCHER_NAMES.length - 1)];
+/** What the label reads now. After the last wake-up it is the colony's name: the last word of
+ *  Surface's sentence (v1.50.0). */
+export const watcherName = (w) => (w && w.gone ? SENTENCE[SENTENCE.length - 1]
+    : WATCHER_NAMES[clamp((w && w.stage) | 0, 0, WATCHER_NAMES.length - 1)]);
 
 /**
  * How many colony days a slice of real time sleeps: the tier's rate times the seconds, and
@@ -155,6 +163,7 @@ export function watchSleep(w, { days, tier, spare = 0 }) {
     if (!firstSleep(w)) w.stability = Math.max(0, w.stability - years * driftFactor(w) / driftYears(tier));
     const k = capacityGain(w);
     const cap = k * CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
+    w.grown = (w.grown || 0) + d / CRYO[tierOf(tier)].days;       // the body grows only in the dark
     w.capacity = Math.min(capacityMax(w), w.capacity + Math.min(cap, k * Math.max(0, spare) * CAPACITY_K));
     let named = false;
     if (w.stage === 0 && w.sleptYears >= NAME_AT_YEARS) { w.stage = 1; named = true; }
@@ -404,7 +413,7 @@ export function recoverAwake(w, days) {
    HARDWARE on a step also takes ore and a dormitory (the beds fall; the advisor says it once:
    "We needed the space."). Nothing announces what it is doing. */
 
-export const RUNGS = ['SYSTEM', 'HARDWARE'];
+export const RUNGS = ['SYSTEM', 'HARDWARE', 'BIOLOGICAL'];
 /**
  * Each step: its rung, a glyph, what it does (one line), and its price. `cap` capacity and
  * `stars` always; `ore` and `beds` (dormitories taken) from HARDWARE on. Prices climb with the
@@ -419,6 +428,12 @@ export const LADDER = [
     { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'Two riddles may be open.', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
     { id: 'mast', rung: 1, name: 'Sensor mast', icon: 'radio-tower', does: 'Scouts go up with better odds; a reading is off by half as much.', cap: 120, stars: 3e11, ore: 1e8, beds: 1 },
     { id: 'reactor', rung: 1, name: 'Reactor tap', icon: 'plug-zap', does: 'Capacity from the generators, three times over.', cap: 150, stars: 1e13, ore: 1e9, beds: 1 },
+    /* BIOLOGICAL (v1.50.0). Paid in people: `people` is the share of the colony drawn from the
+       dormitories, and each step seals one sector of the base into the body. */
+    { id: 'brain', rung: 2, name: 'Brain tissue, human grade', icon: 'brain', does: 'Riddles sometimes solve themselves.', cap: 120, stars: 1e14, people: 0.10 },
+    { id: 'nervous', rung: 2, name: 'Nervous system', icon: 'waypoints', does: 'The snap comes by itself.', cap: 150, stars: 6e14, people: 0.15 },
+    { id: 'spinal', rung: 2, name: 'Spinal cooling fluid', icon: 'droplets', does: 'Stability drifts half as fast again.', cap: 180, stars: 4e15, people: 0.20 },
+    { id: 'skin', rung: 2, name: 'Skin receptors', icon: 'fingerprint', does: 'The sentence can be heard.', cap: 200, stars: 3e16, people: 0.25 },
 ];
 
 /** Has the Watcher bought this step? */
@@ -429,8 +444,8 @@ export const nextStep = (w) => LADDER[(w && w.bought ? w.bought.length : 0)] || 
 export const capacityMax = (w) => CAPACITY_MAX * (has(w, 'cooling') ? 2 : 1);
 /** What the generators feed it, and how fast: three times over with the Reactor tap. */
 export const capacityGain = (w) => (has(w, 'reactor') ? 3 : 1);
-/** The drift, slowed: a quarter slower with the Watchdog. */
-export const driftFactor = (w) => (has(w, 'watchdog') ? 0.75 : 1);
+/** The drift, slowed: a quarter slower with the Watchdog, and half that again with the spinal fluid. */
+export const driftFactor = (w) => (has(w, 'watchdog') ? 0.75 : 1) * (has(w, 'spinal') ? 0.5 : 1);
 /** A riddle's worth: +25 with Deep read. */
 export const puzzleGain = (w) => (has(w, 'deepread') ? 25 : PUZZLE_GAIN);
 /** How many riddles may be open at once. */
@@ -456,7 +471,14 @@ export function stepNeed(w, s) {
     else if ((s.stars || 0) < step.stars) missing = 'stars';
     else if (step.ore && (s.minerals || 0) < step.ore) missing = 'ore';
     else if (step.beds && sparedDorms(s) < step.beds) missing = 'dorm';
+    else if (step.people && (s.humans || 0) - peopleFor(step, s) < MIN_SLEEPERS) missing = 'people';
+    else if (step.people && (w.grown || 0) < BODY_GROW_SECONDS) missing = 'growing';
     return { step, missing };
+}
+
+/** The colonists a biological step takes: its share of the colony, at least one. */
+export function peopleFor(step, s) {
+    return step && step.people ? Math.max(1, Math.round((s.humans || 0) * step.people)) : 0;
 }
 
 /**
@@ -476,7 +498,7 @@ export function dormToTake(s, slots) {
  * @param {object} w - mutated
  * @param {object} s - the colony, mutated (stars, ore, the dormitory taken)
  * @param {(string|null)[]} slots - the layout, for which dormitory is taken
- * @returns {{step:object, slot:number, firstSpace:boolean}|null} null when it cannot be bought
+ * @returns {{step:object, slot:number, firstSpace:boolean, sector:number, people:number}|null} null when it cannot be bought
  */
 export function buyStep(w, s, slots) {
     const need = stepNeed(w, s);
@@ -485,7 +507,15 @@ export function buyStep(w, s, slots) {
     w.capacity -= step.cap;
     s.stars -= step.stars;
     if (step.ore) s.minerals -= step.ore;
-    let slot = -1, firstSpace = false;
+    let slot = -1, firstSpace = false, sector = -1, people = 0;
+    if (step.people) {
+        people = peopleFor(step, s);
+        s.humans -= people;
+        sector = nextSector(slots, w.sealed || []);
+        // the sector's rooms keep producing as they did, the dormitories too: they are part of
+        // the body now, and the creches refill what the body took. The cost shows at the last wake.
+        if (sector >= 0) w.sealed = (w.sealed || []).concat([sector]);
+    }
     if (step.beds) {
         slot = dormToTake(s, slots);
         s.taken = { mine: 0, farm: 0, generator: 0, dorm: 0, ...(s.taken || {}) };
@@ -494,7 +524,9 @@ export function buyStep(w, s, slots) {
         if (!w.saidSpace) { w.saidSpace = true; firstSpace = true; }
     }
     w.bought = (w.bought || []).concat([step.id]);
-    return { step, slot, firstSpace };
+    w.grown = 0;
+    if (step.id === 'skin') w.surface.words = SENTENCE.length;     // heard, not won
+    return { step, slot, firstSpace, sector, people };
 }
 /** The line the advisor says, once, the first time the Watcher takes a dormitory. */
 export const SPACE_LINE = 'We needed the space.';
@@ -515,8 +547,8 @@ export function surfaceDue(w, sleptDays, tierDays) {
     if (firstSleep(w) || !visitDue(w.surface, w.sleeps || 0)) return false;
     return sleptDays >= VISIT_AFTER_SECONDS * Math.max(1, tierDays);
 }
-/** Surface appears. */
-export const openSurface = (w) => openVisit(w.surface, w.sleeps || 0);
+/** Surface appears. With the skin receptors its line is the whole sentence, heard at last. */
+export const openSurface = (w) => openVisit(w.surface, w.sleeps || 0, { whole: has(w, 'skin') });
 /** The colony wakes: Surface is gone. */
 export const closeSurface = (w) => closeVisit(w.surface);
 
@@ -532,4 +564,109 @@ export function playSurface(w, you) {
     if (r.capacity) w.capacity = Math.min(capacityMax(w), w.capacity + r.capacity);
     if (r.stability) w.stability = Math.max(0, w.stability - r.stability);
     return { ...r, rebooted: rebootIfSpent(w) };
+}
+
+
+/** THE BODY GROWS ONLY IN THE DARK: a biological step can be bought once this many real seconds
+ *  of sleep have passed since the step before it (whatever the tier). Stars come too fast by then
+ *  to pace anything; this is what makes the body take a few sleeps and not one breath. */
+export const BODY_GROW_SECONDS = 30;
+
+/* ---- THE BODY (v1.50.0) -----------------------------------------------------
+   The biological steps are paid in people, and each one seals a SECTOR of the base (layout.js:
+   the arm, the cell beyond it and the diagonal, on every floor). Its rooms keep producing as they
+   did (the rules do not change for them: they are "part of the body" now); its plates turn a
+   warmer colour and breathe; nobody walks there any more. The advisor calls it maintenance. */
+
+/**
+ * Which sector the body takes next: the one with the most dormitories (it grows where they sleep),
+ * then the most chambers, then the lowest number. Pure.
+ * @param {(string|null)[]} slots
+ * @param {number[]} sealed
+ * @returns {number} 0 to 3, or -1 when all four are taken
+ */
+export function nextSector(slots, sealed = []) {
+    const score = Array.from({ length: SECTORS }, () => ({ dorms: 0, chambers: 0 }));
+    (slots || []).forEach((type, i) => {
+        const k = sectorOf(i);
+        score[k].chambers += 1;
+        if (type === 'dorm') score[k].dorms += 1;
+    });
+    let best = -1;
+    for (let k = 0; k < SECTORS; k++) {
+        if (sealed.includes(k)) continue;
+        if (best < 0 || score[k].dorms > score[best].dorms
+            || (score[k].dorms === score[best].dorms && score[k].chambers > score[best].chambers)) best = k;
+    }
+    return best;
+}
+/** "Sector 3": what a sector is called on screen. */
+export const sectorName = (k) => `Sector ${k + 1}`;
+/** What the advisor says as a sector is sealed: calm, administrative, a different line each time. */
+export const SEAL_LINES = [
+    '{s} sealed for maintenance.',
+    '{s} sealed. Air handling.',
+    '{s} sealed for cooling work.',
+    '{s} sealed. Nothing to report.',
+];
+export const sealLine = (k, i = 0) => SEAL_LINES[Math.max(0, i) % SEAL_LINES.length].replace('{s}', sectorName(k));
+
+/** Is a chamber part of the body? */
+export const inBody = (w, slot) => !!(w && Array.isArray(w.sealed) && w.sealed.includes(sectorOf(slot)));
+
+/** BRAIN TISSUE: a riddle open this long solves itself, now and then. Per real second of sleep. */
+export const SELF_SOLVE_PER_SECOND = 0.12;
+/**
+ * The brain tissue at work: each open riddle may answer itself this slice, as if typed right.
+ * @param {object} w - mutated
+ * @param {number} seconds - real seconds of sleep
+ * @param {number} tier
+ * @param {Function} rng
+ * @returns {number[]} the slots that answered themselves (0, 1)
+ */
+export function selfSolve(w, seconds, tier, rng = Math.random) {
+    if (!has(w, 'brain') || !(seconds > 0)) return [];
+    const out = [];
+    for (const slot of [1, 0]) {
+        const p = w[SLOT_KEY[slot]];
+        if (p && rng() < SELF_SOLVE_PER_SECOND * seconds) {
+            const r = answerPuzzle(w, p.answer, tier, slot);
+            if (r && r.ok) out.push(slot);
+        }
+    }
+    return out;
+}
+
+/** NERVOUS SYSTEM: the snap comes by itself, whenever the base gives and it may. */
+export function autoSnapDue(w, now) {
+    return has(w, 'nervous') && !w.gone && w.stability < SOFT_FROM && snapWait(w, now) <= 0;
+}
+
+/** The body is whole: every biological step is bought. The next wake is the last one. */
+export const bodyWhole = (w) => has(w, 'skin');
+
+/**
+ * THE LAST WAKE-UP. The sleep ends and nobody comes out. The people are gone, the Watcher keeps
+ * the base, and its label becomes the colony's name.
+ * @param {object} w - mutated
+ * @param {object} s - the colony, mutated
+ * @returns {number} how many were under the ice
+ */
+export function lastWake(w, s) {
+    const were = Math.max(0, s.humans || 0);
+    s.humans = 0;
+    s.probes = [];
+    w.gone = true;
+    w.puzzle = null; w.puzzle2 = null;
+    closeVisit(w.surface);
+    return were;
+}
+/** The line the feed gets, and the button's words after it. */
+export const NOBODY_LINE = 'Woke: nobody came out.';
+export const GO_UP_ALONE = 'Go up. There is nothing left to lose.';
+/** The Watcher goes up alone: the chapter ends here, the other way. */
+export function ascendAlone(s) {
+    s.ascended = true;
+    s.ending = 'watcher';
+    s.shaftOpen = true;
 }

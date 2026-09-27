@@ -827,15 +827,16 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-puzzle.is-second:not(.is-on) { display: none; }
 
 /* ---- v1.49.0: SURFACE ------------------------------------------------------
-   Opposite the Watcher, at the top: a faint ring, its name, one line, and a game of rock, paper,
+   Opposite the Watcher: a faint ring, its name, one line, and a game of rock, paper,
    scissors with chapter I's glyphs. It is fainter than the Watcher, and gone at the wake. */
+/* bottom right, on the Watcher's baseline: the top centre is the crust's ring, and a tall colony
+   frames the ring close to the top of the window */
 #deep-surface {
-    left: 50%;
-    top: 58px;
-    transform: translateX(-50%);
+    right: 148px;
+    bottom: 34px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-end;
     gap: 7px;
     color: #b9b3a5;
     animation: deep-watcher-in 2400ms ease;
@@ -872,3 +873,11 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-rps-btn.is-it:disabled { opacity: 0.8; color: #8d877b; box-shadow: 0 0 0 1px rgba(185, 179, 165, 0.4); }
 .deep-surface-said { font-size: 11px; color: #b9b3a5; min-height: 14px; white-space: nowrap; }
 .deep-surface-words { font-size: 10px; letter-spacing: 0.28em; color: #8d877b; white-space: nowrap; }
+
+/* ---- v1.50.0: THE BODY on the wake-up strip -------------------------------------------
+   The sectors the body took over the sleep: its glyph and their numbers, on one line. */
+.deep-replay-group.deep-replay-body { align-items: center; gap: 6px; color: #b39c8e; white-space: nowrap; }
+.deep-replay-body .deep-mono { font-size: 13px; letter-spacing: 0.12em; }
+.deep-replay-made { white-space: nowrap; }
+/* after the last wake-up the Watcher stays in the awake world, a little dimmer */
+#deep-watcher.is-whole .deep-watcher-name { letter-spacing: 0.5em; }

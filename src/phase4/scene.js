@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { placeChamber, floorCount } from './layout.js';
+import { placeChamber, floorCount, sectorOf } from './layout.js';
 import { digCost } from './deep.js';
 
 /* TWO COLOURS, and since v1.41.1 they are the other way round (Ola: "we build in
@@ -31,6 +31,13 @@ const PLATE = 0xd5dbe3;
    rock), and the people are bright white and one step larger: white on grey reads,
    and white on the light slab still reads as a spark where they cross it. */
 const LANE = 0x7b8595;
+/* THE BODY (v1.50.0). A sector the Watcher's body has taken keeps the two colours, only the plate
+   shifted warm and a little darker, and it breathes: a slow swell of the whole sector, nothing
+   else. */
+const BODY = 0xc9b8ad;
+const BREATH_RATE = 0.8;        // radians a second: a breath every eight seconds
+const BREATH_SCALE = 0.012;     // how far a sector swells, as a share of its distance from the shaft
+const BREATH_RISE = 0.035;      // and how far it rises, in world units
 const PEOPLE = 0xffffff;
 const PEOPLE_SIZE = 0.085;
 
@@ -145,6 +152,7 @@ function structureKey(state, layout) {
         (layout.slots || []).map((s) => s || '.').join(''),
         Object.keys(state.auto).sort().map((t) => `${t}${state.auto[t]}`).join(''),
         (state.takenSlots || []).join(','),
+        ((state.watcher && state.watcher.sealed) || []).join(','),
     ].join('|');
 }
 
@@ -236,6 +244,7 @@ export function createScene(container, opts = {}) {
     let softClock = 0;
 
     const plateMat = soften(new THREE.MeshLambertMaterial({ color: PLATE }));
+    const bodyMat = soften(new THREE.MeshLambertMaterial({ color: BODY }));
     const crustMat = new THREE.MeshLambertMaterial({ color: CRUST });
     const rubbleMat = new THREE.MeshLambertMaterial({ color: RUBBLE });
     const holeMat = new THREE.MeshBasicMaterial({ color: ROCK });
@@ -327,6 +336,17 @@ export function createScene(container, opts = {}) {
     let machinePhase = 0, machineThrow = 0, machineWin = 0;
     const cryoAt = new THREE.Vector3(0, 0, 0);
     const rnd = mulberry32(20260921);
+    // the body: one group per sealed sector, so a sector breathes as one; `into` is where a cell
+    // being built puts its meshes (null: the world)
+    let bodyGroups = [];
+    let into = null;
+    let breath = 0;
+    let whole = false;              // the last wake-up has come: the base breathes as one
+    const put = (m) => (into || world).add(m);
+    function bodyGroup(k) {
+        if (!bodyGroups[k]) { bodyGroups[k] = new THREE.Group(); world.add(bodyGroups[k]); }
+        return bodyGroups[k];
+    }
 
     function clearWorld() {
         for (const l of labels) l.obj.removeFromParent();
@@ -336,15 +356,16 @@ export function createScene(container, opts = {}) {
         world = new THREE.Group();
         scene.add(world);
         solids = []; nodes = []; floors = []; folk = []; digLabel = null; machine = null;
+        bodyGroups = []; into = null;
         march = null;
         cryoAt.set(0, 0, 0);
         dots.setDrawRange(0, 0);
     }
 
     function addPlate(x, y, z) {
-        const m = new THREE.Mesh(plateGeo, plateMat);
+        const m = new THREE.Mesh(plateGeo, into ? bodyMat : plateMat);
         m.position.set(x, y, z);
-        world.add(m); solids.push(m);
+        put(m); solids.push(m);
     }
     /** A bridge is the floor itself, only narrower: same height, same thickness,
      *  so a floor reads as one sharp slab and not as plates with sticks between. */
@@ -360,12 +381,12 @@ export function createScene(container, opts = {}) {
         const m = new THREE.Mesh(unitBox, mat);
         m.scale.set(w, 0.02, d);
         m.position.set(cx, y + LANE_Y, cz);
-        world.add(m);
+        put(m);
     }
     function addCylinder(r, h, x, y, z, mat) {
         const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 32, Math.max(1, Math.ceil(h / 0.5))), mat);
         m.position.set(x, y, z);
-        world.add(m); solids.push(m);
+        put(m); solids.push(m);
         return m;
     }
     function makeLabel(html, x, y, z, kind) {
@@ -377,7 +398,7 @@ export function createScene(container, opts = {}) {
         wrap.appendChild(inner);
         const obj = new CSS2DObject(wrap);
         obj.position.set(x, y, z);
-        world.add(obj);
+        put(obj);
         const rec = { obj, inner, kind };
         labels.push(rec);
         return rec;
@@ -409,6 +430,7 @@ export function createScene(container, opts = {}) {
     function planFloors(state, layout) {
         const slots = layout.slots || [];
         const taken = new Set(state.takenSlots || []);
+        const sealed = new Set((state.watcher && state.watcher.sealed) || []);
         const deepest = Math.max(floorCount(slots.length) - 1, placeChamber(slots.length).floor);
         const plan = [];
         for (let f = 0; f <= deepest; f++) plan.push({ y: -f * FLOOR_GAP, cells: [{ x: 0, z: 0, hub: true, lid: f === 0 }], doors: [], people: 0 });
@@ -419,6 +441,8 @@ export function createScene(container, opts = {}) {
                 lvl: type ? (state.level[type] || 0) : 0,
                 auto: type ? (state.auto[type] || 0) > 0 : false,
                 taken: taken.has(i),        // v1.49.0: a dormitory the Watcher took for its hardware
+                body: sealed.has(sectorOf(i)),      // v1.50.0: part of the body; nobody walks here
+                sector: sectorOf(i),
             });
         });
         return plan;
@@ -441,6 +465,7 @@ export function createScene(container, opts = {}) {
             floor.cells.forEach((c) => {
                 const cx = c.x * PITCH, cz = c.z * PITCH, y = floor.y;
                 const isHub = !!c.hub;
+                into = c.body ? bodyGroup(c.sector) : null;
                 const r = isHub ? R_HUB : R_ROOM;
                 const prnd = plateSeed(fi, c.x, c.z);
                 addPlate(cx, y, cz);
@@ -640,6 +665,7 @@ export function createScene(container, opts = {}) {
                 }
             });
 
+            into = null;
             // bridges, and the lane that runs over them
             floor.cells.forEach((c) => {
                 const r = c.hub ? R_HUB : R_ROOM;
@@ -658,7 +684,7 @@ export function createScene(container, opts = {}) {
                     cut((c.x + n.x) / 2 * PITCH, floor.y, (c.z + n.z) / 2 * PITCH,
                         d[0] ? PITCH - PLATE_W + 0.04 : LANE_W,
                         d[0] ? LANE_W : PITCH - PLATE_W + 0.04);
-                    if (c.auto || n.auto) return;
+                    if (c.auto || n.auto || c.body || n.body) return;
                     const b = addNode((c.x + n.x) / 2 * PITCH, floor.y + WALK_Y, (c.z + n.z) / 2 * PITCH, 'lane', fi);
                     link(b, c.mid[s1]);
                     link(b, n.mid[s2]);
@@ -666,10 +692,11 @@ export function createScene(container, opts = {}) {
             });
         });
 
-        // an automated room is one nobody walks to: cut its slab off the network
+        // an automated room is one nobody walks to: cut its slab off the network; and since
+        // v1.50.0 a room that is part of the body, whatever it is
         plan.forEach((floor, fi) => {
             floor.cells.forEach((c) => {
-                if (!c.auto) return;
+                if (!c.auto && !c.body) return;
                 const near = (o) => o.floor === fi
                     && Math.abs(o.p.x - c.x * PITCH) < 1.02 && Math.abs(o.p.z - c.z * PITCH) < 1.02;
                 nodes.forEach((nd) => { if (near(nd)) nd.adj.length = 0; });
@@ -784,6 +811,7 @@ export function createScene(container, opts = {}) {
 
     function refresh(state) {
         lastState = state;
+        whole = !!(state.watcher && state.watcher.gone);
         // the ring on the chamber being dug: while an order is under way it shows how far
         // along the digging is, and before that how much of its price has been brought in
         const digJob = (state.builds || []).find((j) => j.kind === 'dig');
@@ -959,6 +987,20 @@ export function createScene(container, opts = {}) {
         }
     }
     const p3 = new THREE.Vector3();
+    /** The body breathes: each sealed sector swells and settles, slowly, out of step with the
+     *  others; after the last wake-up the whole base breathes with them. */
+    function stepBreath(dt) {
+        breath += dt;
+        bodyGroups.forEach((g, k) => {
+            if (!g) return;
+            const a = Math.sin(breath * BREATH_RATE + k * 1.7);
+            g.scale.set(1 + BREATH_SCALE * a, 1, 1 + BREATH_SCALE * a);
+            g.position.y = BREATH_RISE * a;
+        });
+        const b = whole ? Math.sin(breath * BREATH_RATE * 0.6) : 0;
+        world.scale.set(1 + 0.006 * b, 1, 1 + 0.006 * b);
+        world.position.y = 0.02 * b;
+    }
 
     /* ---- everyone at once: into the cryo hall, back out of it, or up and away ----
        The walking graph is not thrown away. Each person keeps the node they were standing
@@ -1164,6 +1206,7 @@ export function createScene(container, opts = {}) {
             stepMachine(dt);
             stepOutings(dt);
             stepSoft(dt);
+            stepBreath(dt);
             controls.update();
             updateLabels();
             renderer.render(scene, camera);
@@ -1194,6 +1237,14 @@ export function createScene(container, opts = {}) {
         ascend(seconds = 2.0) { return startMarch('ascend', seconds); },
         /** A scout party leaves: dots walk to the hatch and climb the pipe into the crust. */
         scoutsUp(n) { return startOuting('up', n); },
+        /**
+         * The Watcher goes up alone (v1.50.0): one amber dot, from the lid up the shaft into the
+         * crust. Resolves when it is through; a wall clock stands behind it for a hidden tab.
+         */
+        climbAlone(seconds = 4.5) {
+            if (startOuting('up', 1)) outings[outings.length - 1].dur = seconds;
+            return new Promise((resolve) => setTimeout(resolve, Math.ceil(seconds * 1000) + 200));
+        },
         /** A party comes home: dots climb down out of the crust and walk off into the colony. */
         scoutsDown(n) { return startOuting('down', n); },
         /** How soft the base should be, 0 (rigid) to 1: the Watcher's stability, read by watcher.js's
@@ -1237,7 +1288,7 @@ export function createScene(container, opts = {}) {
             above.removeFromParent();
             scoutGeo.dispose(); scoutMesh.material.dispose();
             outings = [];
-            plateMat.dispose(); rockMat.dispose(); laneMat.dispose();
+            plateMat.dispose(); bodyMat.dispose(); rockMat.dispose(); laneMat.dispose();
             crustMat.dispose(); rubbleMat.dispose(); holeMat.dispose();
             renderer.dispose();
             renderer.domElement.remove();
@@ -1249,6 +1300,8 @@ export function createScene(container, opts = {}) {
                 floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march,
                 throws: machineThrow, machineRate, shaftOpen,
                 soft: softNow, softTarget, softAmp: softU.uSoft.value, snapping: !!snapping || snapHold > 0, flash,
+                body: bodyGroups.filter(Boolean).length, bodyPlates: bodyGroups.reduce((a, g) => a + (g ? g.children.filter((o) => o.isMesh && o.material === bodyMat && o.geometry === plateGeo).length : 0), 0),
+                whole, breath: bodyGroups.map((g) => (g ? +g.position.y.toFixed(4) : null)),
                 scouts: outings.map((o) => ({ dir: o.dir, dots: o.dots.length, k: o.k })),
             };
         },

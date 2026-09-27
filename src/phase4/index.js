@@ -45,12 +45,13 @@ import { createReplay } from './replay.js';
 import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js';
 import {
     normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
-    puzzleDue, openPuzzle, beginSleep, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays,
+    puzzleDue, openPuzzle, beginSleep, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays, puzzleGain,
     STABILITY_MAX, firstSleep, FIRST_SLEEP_DAYS, WATCHER_HELLO, snapWait, SNAP_COOLDOWN_MS,
     recoverAwake, LADDER, RUNGS, stepNeed, buyStep, capacityMax, surfaceDue, openSurface, closeSurface,
-    playSurface, SPACE_LINE,
+    playSurface, SPACE_LINE, peopleFor, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
+    NOBODY_LINE, GO_UP_ALONE, sealLine, BODY_GROW_SECONDS,
 } from './watcher.js';
-import { THROWS, sentenceShown } from './surface.js';
+import { THROWS, sentenceShown, SENTENCE_LINE } from './surface.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
 
@@ -344,7 +345,7 @@ export function init() {
         const have = currency === 'stars' ? state.stars : state.minerals;
         const perDay = currency === 'stars' ? report.stars : report.parts.M;
         const priceHtml = Number.isFinite(price) ? (currency === 'stars' ? starCost(price) : mineralCost(price)) : '';
-        const missing = affordText({ price, have, perDay, blocked: state.asleep ? 'asleep' : blocked });
+        const missing = affordText({ price, have, perDay, blocked: state.watcher.gone ? 'gone' : (state.asleep ? 'asleep' : blocked) });
         let goal = '';
         if (hovering && hovering.kind === kind && hovering.type === type && Number.isFinite(price)) {
             const key = `${kind}|${type}|${state.day}|${state.cryo}`;
@@ -413,7 +414,7 @@ export function init() {
                 // the first sleep says one thing, once: what the label under the scene is
                 ? (firstSleep(state.watcher) ? WATCHER_HELLO
                     : `Asleep: ${rateWords(CRYO[state.cryo].days)} a second. The hall wakes us if anything goes wrong.`)
-                : `Year ${group(cal.year)}. ${low.line}`);
+                : `Year ${group(cal.year)}. ${state.watcher.gone ? 'Nobody came out.' : low.line}`);
         // the feed: the last five things worth saying, newest at the bottom
         if (ui.feed.childElementCount !== feed.length
             || (feed.length && ui.feed.lastElementChild.textContent !== feed[feed.length - 1])) {
@@ -431,7 +432,9 @@ export function init() {
             + note(`${formatCount(report.stars)} a day: ten for every unit of the weakest column.`));
         setTooltip(ui.oreRow, says(`Ore in store. ${perDayText(report.parts.M)} after the generators have burned theirs.`));
 
-        const asleep = !!state.asleep;
+        // after the last wake-up there is nobody to build anything: the buttons stand as if asleep
+        const gone = !!state.watcher.gone;
+        const asleep = !!state.asleep || gone;
         // the buttons. Since v1.49.0 a button can be pressed again while its order is being built:
         // the next order is paid now, at the next price, and waits in the queue under the buttons
         const full = (state.builds || []).length >= QUEUE_MAX;
@@ -480,12 +483,14 @@ export function init() {
         const tier = state.cryo;
         const owns = tier >= 0;
         ui.cryoBtn.classList.toggle('hidden', asleep);
-        ui.wakeBtn.classList.toggle('hidden', !asleep);
+        ui.wakeBtn.classList.toggle('hidden', !state.asleep);
         ui.cryoBadge.classList.toggle('hidden', !owns);
         if (owns) setCaption(ui.cryoCaption, state.humans < MIN_SLEEPERS ? `needs ${MIN_SLEEPERS} people` : '');
-        if (asleep) {
+        if (state.asleep) {
             ui.wakeBtn.classList.toggle('is-locked', busy);
             setTooltip(ui.wakeBtn, says('Wake the colony.') + note(`${cryoName(tier)}: ${rateWords(CRYO[tier].days)} a second.`));
+        } else if (gone) {
+            // nobody is left to sleep
         } else if (owns) {
             ui.cryoBadge.textContent = rateLabel(tier);
             const few = state.humans < MIN_SLEEPERS;
@@ -521,7 +526,7 @@ export function init() {
         // ---- scout parties: people up the shaft, for a reading of the sky ----
         // Everything about a party is on the button before it goes (v1.45.0): who, how long, the
         // odds of each way it can end, and how far a good reading may be off.
-        const scoutsOn = owns || state.probesSent > 0 || state.probes.length > 0;
+        const scoutsOn = !gone && (owns || state.probesSent > 0 || state.probes.length > 0);
         ui.probeBtn.classList.toggle('hidden', !scoutsOn);
         if (scoutsOn) {
             const out = scoutsOut(state);
@@ -556,11 +561,18 @@ export function init() {
         //      it says what the colony believes, and what a wrong guess costs ----
         const ao = ascentOdds(state);
         const canTry = canTryAscent(state);
-        ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !canTry);
-        setTooltip(ui.ascendBtn, says(`Try to resurface: everyone goes up. Survival ${Math.round(ao.survival)} % `
-                + `(± ${Math.round(ao.spread)}). Below ${SURVIVAL_AT} % the first ${formatCount(ao.party)} die and the rest wait.`)
-            + note(asleep ? 'The colony is asleep: wake it to try.'
-                : (!canTry ? `Too few of us: at least ${ASCENT_MIN_PEOPLE} people to send anyone up.` : ''), 'is-missing'));
+        if (gone) {
+            // v1.50.0: the Watcher alone. No odds: there is nothing left to lose
+            ui.ascendBtn.classList.toggle('is-locked', busy || !!state.ascended);
+            ui.ascendBtn.setAttribute('aria-label', 'Go up');
+            setTooltip(ui.ascendBtn, says(GO_UP_ALONE));
+        } else {
+            ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !canTry);
+            setTooltip(ui.ascendBtn, says(`Try to resurface: everyone goes up. Survival ${Math.round(ao.survival)} % `
+                    + `(± ${Math.round(ao.spread)}). Below ${SURVIVAL_AT} % the first ${formatCount(ao.party)} die and the rest wait.`)
+                + note(asleep ? 'The colony is asleep: wake it to try.'
+                    : (!canTry ? `Too few of us: at least ${ASCENT_MIN_PEOPLE} people to send anyone up.` : ''), 'is-missing'));
+        }
 
         const est = estimateNow(state);
         const year = habitableYear(state);
@@ -578,8 +590,10 @@ export function init() {
         const w = state.watcher;
         const asleep = !!state.asleep;
         if (ui.watcher) {
-            ui.watcher.hidden = !asleep;
-            if (asleep) {
+            // after the last wake-up the Watcher stays: there is no other world to go back to
+            ui.watcher.hidden = !asleep && !w.gone;
+            ui.watcher.classList.toggle('is-whole', !!w.gone);
+            if (asleep || w.gone) {
                 const name = watcherName(w);
                 if (ui.watcherName.textContent !== name) ui.watcherName.textContent = name;
                 const stab = Math.round(w.stability);
@@ -621,11 +635,13 @@ export function init() {
        is shown (chapter II's way). One line on hover: what it does, and quietly what it takes. */
     let ladderKey = '';
     let ladderNext = null;          // the button of the next step, for its lock and its tooltip
+    const sealedThisSleep = [];     // sectors the body took in this sleep, for the wake-up strip
     function stepTip(step, need) {
         const rung = RUNGS[step.rung];
         const takes = [];
         if (step.ore) takes.push(`${formatCount(step.ore)} ore`);
         if (step.beds) takes.push(step.beds === 1 ? 'a dormitory' : `${step.beds} dormitories`);
+        if (step.people) takes.push(`${formatCount(peopleFor(step, state))} people`);
         const price = priceRow(`<span class="deep-mono">${formatCount(step.cap)}</span><span class="deep-mono deep-cap-word">cap</span>`
             + starCost(step.stars));
         let missing = '';
@@ -635,6 +651,8 @@ export function init() {
             else if (need.missing === 'stars') missing = affordText({ price: step.stars, have: state.stars, perDay: report.stars });
             else if (need.missing === 'ore') missing = `Needs ${formatCount(step.ore)} ore: ${formatCount(state.minerals)} in store.`;
             else if (need.missing === 'dorm') missing = 'Needs a dormitory to spare.';
+            else if (need.missing === 'people') missing = 'Needs more people: some must stay under the ice.';
+            else if (need.missing === 'growing') missing = 'It is still growing.';
         }
         return price + says(`${rung} · ${step.name}: ${step.does}`)
             + note(takes.length ? `Takes ${takes.join(' and ')}.` : '')
@@ -676,6 +694,18 @@ export function init() {
         const out = buyStep(state.watcher, state, layout.slots);
         if (!out) return;
         if (out.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
+        // a sector goes into the body: the advisor calls it maintenance, and the wake strip shows it
+        if (out.sector >= 0) {
+            feed = pushFeed(feed, [sealLine(out.sector, state.watcher.sealed.length - 1)]);
+            sealedThisSleep.push(out.sector);
+        }
+        // the skin: the sentence can be heard, now, whether Surface was here or not
+        if (out.step.id === 'skin') {
+            const sf = state.watcher.surface;
+            if (!sf.visit) openSurface(state.watcher);
+            else sf.visit.line = SENTENCE_LINE;
+            surfaceKey = '';
+        }
         ladderKey = '';
         report = dryRun();
         scene?.setState(state, layout);
@@ -972,6 +1002,7 @@ export function init() {
         updateChrome();                 // the sleep world at once: the Watcher, and its one line
         sleepSum = freshSum();
         sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
+        sealedThisSleep.length = 0;
         beginSleep(state.watcher, state.cryo);
         // falling asleep: the first moment spins like the odometer it always was
         const before = snapshot();
@@ -1025,6 +1056,21 @@ export function init() {
         if (puzzleDue(state.watcher, { asleep: true, alarmPending: busy })) openPuzzle(state.watcher, state, state.cryo);
         // and in some sleeps, a few seconds in, Surface (v1.49.0)
         if (sleepSum && surfaceDue(state.watcher, sleepSum.days, CRYO[state.cryo].days)) openSurface(state.watcher);
+        // the body at work (v1.50.0): a riddle answers itself now and then, the snap comes by itself
+        const before = ui.cards.map((c) => state.watcher[c.slot ? 'puzzle2' : 'puzzle']);
+        for (const slot of selfSolve(state.watcher, dt, state.cryo, Math.random)) {
+            const card = ui.cards[slot];
+            const p = before[slot];
+            if (!card || !p) continue;
+            state.stars += puzzleStars(report.stars);
+            card.shown = p;
+            card.input.value = String(p.answer);
+            card.input.disabled = true;
+            sayOnCard(card, `+${Math.round(puzzleGain(state.watcher))}`, 'is-right');
+            card.lingerUntil = performance.now() + 900;
+            setTimeout(() => updateWatcher(), 950);
+        }
+        if (autoSnapDue(state.watcher, Date.now())) { scene?.snap(); snapWatcher(state.watcher, Date.now()); }
         updateChrome();
         if (sleepTicks % 10 === 0) saveGame();
     }
@@ -1042,6 +1088,7 @@ export function init() {
         // the alarm is a jolt to the Watcher; a low one says it slightly wrong, never the reboot
         const w = state.watcher;
         closeSurface(w);                // Surface, and everything it said, is gone the moment they wake
+        if (bodyWhole(w) && !w.gone) { await lastWakeUp(); return; }
         const rebooted = alarm.kind !== 'reboot' && (alarmHit(w, alarm.kind) || !!alarm.rebooted);
         const said = alarm.kind === 'reboot' ? [alarmLine(alarm)]
             : watcherLines(w, [alarmLine(alarm), ...(alarm.kind === 'scouts' ? (alarm.landed || []).slice(1).map(scoutLine) : [])]);
@@ -1073,10 +1120,45 @@ export function init() {
             rooms: state.rooms, stalled: state.stalled, alarm: alarmGlyph(alarm, ROOM_ICON),
             minerals: t.minerals, food: t.food, stars: t.stars, weakest: t.weakest, died: t.died,
             shows: { minerals: rewardShows(from.ore, t.minerals), food: rewardShows(from.food, t.food), stars: rewardShows(from.stars, t.stars) },
+            sealed: sealedThisSleep.slice(),
         });
         sleepSum = null;
         sleepFrom = null;
         toldAbout = null;               // a new day for the advisor: say where we stand again
+        setBusy(false);
+        startClock();
+        updateChrome();
+        saveGame();
+    }
+
+    /**
+     * THE LAST WAKE-UP (v1.50.0). The body is whole, the sleep ends, and nobody comes out: the
+     * count reads 0, no one walks the lanes, the base breathes, and the Watcher stays on screen
+     * under the colony's name. The only thing left to press is the way up.
+     */
+    async function lastWakeUp() {
+        const w = state.watcher;
+        const t = sleepSum || freshSum();
+        const were = lastWake(w, state);
+        feed = pushFeed(feed, [NOBODY_LINE]);
+        advisorLine = `Year ${group(calendar(state.day).year)}. ${NOBODY_LINE}`;
+        state.stalled = {};
+        if (roll?.done) clearTimeout(roll.done);
+        roll = null;
+        drawCounters(snapshot());
+        ui.root.classList.remove('is-sleeping');
+        scene?.setState(state, layout);
+        report = dryRun();
+        const from = sleepFrom || { ore: state.minerals, food: state.food, stars: state.stars };
+        replay.show({
+            rooms: state.rooms, stalled: {}, alarm: alarmGlyph({ kind: 'nobody' }, ROOM_ICON),
+            minerals: t.minerals, food: t.food, stars: t.stars, weakest: t.weakest, died: were,
+            shows: { minerals: rewardShows(from.ore, t.minerals), food: rewardShows(from.food, t.food), stars: rewardShows(from.stars, t.stars) },
+            sealed: sealedThisSleep.slice(),
+        });
+        sleepSum = null;
+        sleepFrom = null;
+        toldAbout = null;
         setBusy(false);
         startClock();
         updateChrome();
@@ -1101,6 +1183,7 @@ export function init() {
     /** You can always try (v1.45.0). What is behind the hatch is the truth: on a surface that is
      *  not ready the first party dies up there, the rest wait, and the colony knows the truth. */
     async function pressAscent() {
+        if (state.watcher.gone) { await goUpAlone(); return; }
         if (busy || state.asleep || !canTryAscent(state)) return;
         setBusy(true);
         stopClock();
@@ -1121,6 +1204,21 @@ export function init() {
         }
         replay.hide();
         await (scene ? scene.ascend(2.0) : Promise.resolve());
+        crust.lighten();
+        scene?.lighten();
+        await delay(700);
+        playChapterCard({ roman: CHAPTER_V.roman, title: CHAPTER_V.title, mode: 'to-come', dark: true });
+    }
+
+    /** The Watcher goes up alone (v1.50.0): one amber dot climbs the shaft, and V waits at the top. */
+    async function goUpAlone() {
+        if (busy || state.ascended) return;
+        setBusy(true);
+        stopClock();
+        ascendAlone(state);
+        saveGame();
+        replay.hide();
+        await (scene ? scene.climbAlone(4.5) : Promise.resolve());
         crust.lighten();
         scene?.lighten();
         await delay(700);
@@ -1322,7 +1420,7 @@ export function init() {
         }
         if (lines.length) feed = pushFeed(feed, lines);
         report = dryRun();
-        speak();
+        if (!state.watcher.gone) speak();
         recomputeGates();
         scene?.setState(state, layout);
         updateChrome();
@@ -1411,6 +1509,7 @@ export function init() {
                     state.watcher.capacity = capacityMax(state.watcher);
                     state.stars += step.stars;
                     state.minerals += step.ore || 0;
+                    state.watcher.grown = BODY_GROW_SECONDS;       // and the body has grown enough
                 }
             }
             else if (what === 'stars') state.stars += 1e8;

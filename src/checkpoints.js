@@ -11,7 +11,7 @@ import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from 
 import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
-import { initialWatcher, puzzleGapYears } from './phase4/watcher.js';
+import { initialWatcher, puzzleGapYears, BODY_GROW_SECONDS } from './phase4/watcher.js';
 import { initialSurface } from './phase4/surface.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
@@ -189,9 +189,35 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-body', label: 'IV · the body', apply: () => {
+        clearAll();
+        // Late (v1.50.0): asleep at a thousand years a second, SYSTEM and HARDWARE bought (four
+        // dormitories taken), the pool full, stars and people enough for the whole BIOLOGICAL
+        // rung. Buy it, watch the sectors seal, wake: nobody comes out. Then go up alone.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        const day = 300000 * DAYS_PER_YEAR;
+        const slept = 290000;
+        Object.assign(deep, {
+            day, minerals: 5.0e14, food: 5.0e12, stars: 3.0e15, humans: 1800,
+            chambers: 60, rooms: { mine: 16, farm: 12, generator: 12, dorm: 18, cryo: 1 },
+            level: { mine: 12, farm: 12, generator: 12, dorm: 10 },
+            auto: { mine: 4, farm: 4, generator: 4, dorm: 4 },
+            cryo: 4, asleep: true,
+            est: { bias: -2, spread: 6 }, estRevealed: true, probesSent: 5, shaftOpen: true,
+            taken: { mine: 0, farm: 0, generator: 0, dorm: 4 }, takenSlots: [57, 56, 55, 54],
+            watcher: {
+                ...initialWatcher(), stage: 1, stability: 60, capacity: 200, sleptYears: slept, seed: 11, sleeps: 70, grown: BODY_GROW_SECONDS,
+                nextPuzzleYears: slept + puzzleGapYears(4), saidSpace: true,
+                bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore', 'mast', 'reactor'],
+                surface: { ...initialSurface(), visits: 30, words: 8, lastSleep: 69, wins: 10, losses: 9, lastYou: 'paper' },
+            },
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
-export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3] };
+export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-body': CRYO[4] };
 
 const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 

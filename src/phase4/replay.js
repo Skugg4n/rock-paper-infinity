@@ -50,8 +50,9 @@ export function createReplay(host, opts = {}) {
          * @param {number} [data.died] - lost in the ice over the sleep
          * @param {object} [data.shows] - which of ore, food and stars move their counter visibly
          *        (v1.48.0): a number that changes nothing on screen is left off the strip
+         * @param {number[]} [data.sealed] - sectors the body took over the sleep, 0 to 3 (v1.50.0)
          */
-        show({ rooms = {}, stalled = {}, minerals = 0, food = 0, stars = 0, weakest = {}, alarm = '', died = 0, shows = {} } = {}) {
+        show({ rooms = {}, stalled = {}, minerals = 0, food = 0, stars = 0, weakest = {}, alarm = '', died = 0, shows = {}, sealed = [] } = {}) {
             const glyphs = ROOMS.filter((t) => (rooms[t] || 0) > 0).map((t) => {
                 const bad = !!stalled[t];
                 return `<span class="deep-replay-room${bad ? ' is-stalled' : ''}">`
@@ -71,7 +72,11 @@ export function createReplay(host, opts = {}) {
             const lost = died >= 0.5
                 ? `<span class="deep-replay-made is-lost"><span class="deep-mono">-${fmt(died)}</span><i data-lucide="user-minus" class="w-4 h-4"></i></span>`
                 : '';
-            host.innerHTML = woke + `<span class="deep-replay-group">${glyphs}</span>`
+            // a sector the body took: its own glyph, and the sector's number, nothing else
+            const body = sealed.length
+                ? `<span class="deep-replay-group deep-replay-body"><i data-lucide="dna" class="w-5 h-5"></i><span class="deep-mono">${sealed.map((k) => k + 1).join(' ')}</span></span>`
+                : '';
+            host.innerHTML = woke + `<span class="deep-replay-group">${glyphs}</span>` + body
                 + `<span class="deep-replay-group">${shows.minerals === false ? '' : madeRow('pickaxe', minerals)}`
                 + `${shows.food === false ? '' : madeRow('wheat', food)}${shows.stars === false ? '' : madeRow('star', stars)}${lost}</span>`
                 + `<span class="deep-replay-group deep-replay-hist">${bars}</span>`;

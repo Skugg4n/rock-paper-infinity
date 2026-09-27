@@ -187,6 +187,7 @@ export function affordText({ price, have, perDay, blocked }) {
     if (blocked === 'full') return 'Eight orders are on the books: wait for one to land.';
     if (blocked === 'top') return 'The ladder is at its top.';
     if (blocked === 'asleep') return 'The colony is asleep: wake it to buy.';
+    if (blocked === 'gone') return 'Nobody is left to build it.';
     if (blocked === 'people') return `Needs at least ${MIN_SLEEPERS} people to stay behind.`;
     if (blocked === 'chamber') return have >= price ? 'Needs a free chamber: dig one first.' : `Needs a free chamber, and ${affordText({ price, have, perDay }).toLowerCase()}`;
     if (!(price > have)) return '';

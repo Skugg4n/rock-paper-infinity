@@ -705,5 +705,51 @@ It feels like the whole development of madness is missing after the sleep starts
   A dormitory taken is `s.taken.dorm` (out of `live()` in tickDay, like a dark chamber) and
   `s.takenSlots` (the scene draws a cpu glyph); the colony keeps its last one.
 - **Awake recovery**: +2 stability per awake month (`recoverAwake`).
-- **Sim** `--watcher`: 24m08s to the ring, HARDWARE complete at 17m24s. The plain run unchanged.
+- **Sim** `--watcher` (as shipped in v1.49.0): 24m08s to the ring, HARDWARE complete at 17m24s.
+  The plain run unchanged.
+
+### Slice 7 (v1.50.0): the body, the last wake-up
+
+- **BIOLOGICAL** (watcher.js, after HARDWARE): Brain tissue, human grade (`selfSolve`: an open
+  riddle answers itself at 0.12 a real second), Nervous system (`autoSnapDue`: the snap whenever
+  the base gives, below 80, and the cooldown allows), Spinal cooling fluid (drift x0.5 again),
+  Skin receptors (the sentence whole; Surface's line becomes it). Capacity 120, 150, 180, 200;
+  stars 100 T, 600 T, 4e15, 3e16; people 10, 15, 20, 25 % of the colony (`peopleFor`), leaving
+  at least MIN_SLEEPERS. `BODY_GROW_SECONDS` = 30: a step waits for that much real sleep after the
+  one before, whatever the tier (stars grow too fast by then to pace anything). The people come
+  back through the creches: the cost is quiet until the last wake-up, where it is everyone.
+- **Sectors** (layout.js `sectorOf`): four per floor, the arm, the cell beyond it, the diagonal
+  clockwise. `nextSector`: the unsealed sector with the most dormitories, then the most chambers,
+  then the first. `w.sealed` holds them. The rules do not change for a sealed room (it produces as
+  before, "part of the body"); the scene draws its plates in BODY (the plate colour shifted warm),
+  in one group per sector that breathes (a slow swell and rise), and cuts its lanes off the walking
+  graph. `sealLine`: "Sector 3 sealed for maintenance." and three more like it.
+- **The last wake-up** (`bodyWhole`, `lastWake`): the first wake after the skin. People 0, parties
+  gone, riddles and Surface closed, `w.gone`. `watcherName` is then the sentence's last word, US.
+  The Watcher stays on screen awake; every purchase is closed; the ascent button says
+  `GO_UP_ALONE` and `ascendAlone` saves `ascended` with `ending: 'watcher'`; the scene's
+  `climbAlone` sends one amber dot up the shaft before the V card.
+- **The ring wakes once** (`s.ringWoke`): a colony may stay down after it.
+
+### The two endings
+
+1. **The ring** (slices 2 to 4). The surface heals with time; at survival 85 % the colony goes up,
+   everyone climbs, V · RETURN. A colony that never buys a biological step can only end this way.
+2. **The Watcher** (slices 6 and 7). The Watcher makes itself out of the colony: SYSTEM, HARDWARE
+   (the dormitories), BIOLOGICAL (the people, the sectors). The next wake is the last; nobody comes
+   out; the Watcher, now called US, goes up alone. V · RETURN, the same card, the other way.
+
+A player can have both open at once (the ring reached while the body grows): the sensor wakes the
+colony once, and the choice is whether to go up with them or stay down.
+
+**Simulation**: the plain greedy player is unchanged (26m26s to year 802 701, 88 wake-ups, no hungry
+days; seeds 1 to 5 between 25m57s and 26m34s). `--watcher` buys the ladder as capacity comes (asleep,
+the next step the moment it can be paid; it stays under up to 20 s a sleep while the next step waits
+on capacity or on growth, waits out mourning instead of buying farms, plays Surface at random, and
+stays down at the ring): HARDWARE complete at 17m24s, the last wake-up at 26m04s (seed 1, the ring at
+22m09s), seeds 1 to 5 between 23m32s and 26m51s.
+
+Left (BACKLOG B132 to B135): more riddle types (B117), more Surface lines and a longer exchange,
+tuning after Ola's playtest (the body's pace, the people cost the creches refill, the ladder's
+prices), and whether a sealed sector should also dim what it makes.
 

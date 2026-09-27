@@ -11,7 +11,8 @@
 //   --table  a row a minute          --why  where the colony stood when the run ended (for tuning)
 //   --watcher  (v1.49.0) the same player, who also buys the Watcher's ladder as the capacity comes
 //              in (asleep, the next step the moment it can be paid), plays Surface when it comes,
-//              and does not wake by hand while the next step waits only on capacity (up to
+//              and does not wake by hand while the next step waits only on capacity or on the
+//              body growing (up to
 //              WATCHER_HOLD real seconds a sleep). Without the flag the run is the plain one.
 import {
   ROOMS, COLUMN, ROOM_FOR_COLUMN, ROOM, initialDeepState, tickDay, sleep, surface, canResurface, canAscend,
@@ -21,7 +22,7 @@ import {
 } from '../src/phase4/deep.js';
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, NAME_AT_YEARS, recoverAwake,
-  LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface,
+  LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake,
 } from '../src/phase4/watcher.js';
 import { THROWS } from '../src/phase4/surface.js';
 
@@ -49,6 +50,7 @@ const WATCHER_HOLD = 20;           // real seconds a sleep the player stays unde
 if (WATCHER) s.watcher = w;        // the rules read the Scheduler, Night vision and the Sensor mast off the state
 const ladderAt = [];               // { id, real, year }
 let surfaceGames = 0;
+let bodyEnd = null;                // v1.50.0: the last wake-up, { real, year, were }
 let real = 0, wakeUps = 0, buysThisWake = 0;
 const alarmsSeen = {};
 let scoutsSent = 0, scoutsLost = 0, monsters = 0, diedInIce = 0, handWakes = 0, sleepReal = 0;
@@ -150,7 +152,11 @@ function maybeScout(r) {
 }
 
 let summaryWeakest = null;   // what the wake-up summary said stalled while the colony slept
-while (real < REAL_CAP && !canAscend(s)) {
+// the --watcher player does not go up at the ring: it grows the body, and its run ends at the
+// last wake-up (v1.50.0; the sensor wakes the colony once at the ring, and it sleeps on after)
+let ringAt = null;
+while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
+  if (ringAt === null && canAscend(s)) ringAt = real;
   completeBuilds(s);                    // nothing is instant: orders land on their day
   const r = tickDay(s, false);
   for (const l of resolveDueProbes(s, slots(), rng)) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
@@ -202,11 +208,13 @@ while (real < REAL_CAP && !canAscend(s)) {
       // v1.48.0: the first sleep ends on a plain alarm after a year, whatever else happens
       if (firstSleep(w) && slept >= FIRST_SLEEP_DAYS) { alarm = 'first'; break; }
       // the --watcher player stays under a while longer when the next step waits only on capacity
-      const waitsOnCapacity = WATCHER && stepNeed(w, s)?.missing === 'capacity' && held < WATCHER_HOLD;
+      const waitsOnCapacity = WATCHER && ['capacity', 'growing'].includes(stepNeed(w, s)?.missing) && held < WATCHER_HOLD;
       if (waitsOnCapacity && wantsToWake()) { held += spent; continue; }
       if (wantsToWake()) { alarm = 'hand'; handWakes++; break; }
     }
     closeSurface(w);
+    // v1.50.0: the body is whole, and this was its last sleep: nobody comes out. The run ends here.
+    if (WATCHER && bodyWhole(w)) { bodyEnd = { real, year: s.day / DAYS_PER_YEAR, were: lastWake(w, s) }; break; }
     // v1.48.0: a sleep that cost lives in the ice is mourned for a year after the wake
     if (died >= 0.5) mourn(s);
     alarmsSeen[alarm] = (alarmsSeen[alarm] || 0) + 1;
@@ -236,7 +244,11 @@ const alarmText = Object.entries(alarmsSeen).sort((a, b) => b[1] - a[1]).map(([k
 console.log(`ended at ${fmt(real)}  year ${yr(s.day)}  survival ${survival(surface(s.doom0, s.day)).toFixed(1)} %  wake-ups ${wakeUps} (${alarmText}; ${avgBuys} buys each, sleeps per tier ${pressesPerTier.join('/')}, ${fmt(sleepReal)} asleep)  scouts ${scoutsSent} (lost ${scoutsLost}, monsters ${monsters})  died in the ice ${Math.round(diedInIce)}  humans ${Math.round(s.humans)} (low ${Math.round(minHumans)}, hungry ${starved} d)  longest stall ${worstStall} s  chambers ${s.chambers}  cryo ${s.cryo + 1}/${CRYO.length}  stars/day ${starsDay0.toPrecision(3)} → ${starsDayEnd.toPrecision(3)} (×${(starsDayEnd / (starsDay0 || 1)).toPrecision(2)})  weakest awake ${share(weakAwake)} | asleep ${share(weakAsleep)}  ascent ${canAscend(s)} (ring ${canResurface(s)})`);
 if (WATCHER) {
   const at = (id) => { const e = ladderAt.find((x) => x.id === id); return e ? fmt(e.real) : 'never'; };
-  console.log(`ladder (--watcher)  ${LADDER.map((u) => `${u.id} ${at(u.id)}`).join('  ')}  dormitories taken ${s.taken?.dorm || 0}  surface games ${surfaceGames} (words ${w.surface.words}/${9})`);
+  console.log(`ladder (--watcher)  ${LADDER.map((u) => `${u.id} ${at(u.id)}`).join('  ')}  dormitories taken ${s.taken?.dorm || 0}  sectors sealed ${(w.sealed || []).length}  surface games ${surfaceGames} (words ${w.surface.words}/${9})`);
+  console.log(bodyEnd
+    ? `biological ending (--watcher)  the last wake-up at ${fmt(bodyEnd.real)}, year ${Math.round(bodyEnd.year)}: nobody came out (${Math.round(bodyEnd.were)} under the ice)`
+    : 'biological ending (--watcher)  never');
+  console.log(`the ring (--watcher)  ${ringAt === null ? 'not reached' : `reached at ${fmt(ringAt)}, the player stayed down`}`);
 }
 console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (${NAME_AT_YEARS} slept y)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);

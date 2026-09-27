@@ -1077,7 +1077,13 @@ items:
       Biological upgrades: human grade brain tissue, nervous system, spinal
       cooling fluid, skin receptors. Paid first in power and minerals, then in
       beds and dormitories, then in the colonists themselves.
-    status: open
+    status: done
+    resolved_in: "v1.50.0"
+    notes: |
+      Brain tissue, Nervous system, Spinal cooling fluid, Skin receptors after
+      HARDWARE: capacity, stars and a share of the colony each, and 30 real
+      seconds of sleep between them (the body grows only in the dark). The beds
+      and dormitories were HARDWARE's price (v1.49.0).
 
   - id: B115
     added: 2026-09-22
@@ -1086,7 +1092,12 @@ items:
       Confinement: colonists confined to areas so they do not understand; the
       areas change graphically as the biological body takes them over (plates
       turning organic).
-    status: open
+    status: done
+    resolved_in: "v1.50.0"
+    notes: |
+      Each biological step seals a sector (arm, cell beyond, diagonal) on every
+      floor: warm plates that breathe, no walkers, rooms still producing. The
+      feed calls it maintenance; the wake strip shows the sector's number.
 
   - id: B116
     added: 2026-09-22
@@ -1094,7 +1105,13 @@ items:
     request: |
       The ending: the last wake-up where no one wakes, the Watcher's ascent with
       the biomass, the hand-over to V (and VI · CLONES from the originals).
-    status: open
+    status: done
+    resolved_in: "v1.50.0"
+    notes: |
+      The last wake-up: "Woke: nobody came out.", people 0, the Watcher named
+      US stays on screen, and goes up alone (one amber dot) to V · RETURN. The
+      survival-85 % ascent still exists for a colony that never goes biological.
+      VI · CLONES is not built.
 
   - id: B117
     added: 2026-09-22
@@ -1231,8 +1248,50 @@ items:
       "It feels like the whole development of madness is missing after the
       sleep starts. I have played far and long and notice nothing more
       happening." The madness must grow after the sleeps begin.
-    status: open
+    status: done
+    resolved_in: "v1.50.0"
     notes: |
       v1.49.0 (slice 6): Surface, rock paper scissors, the SYSTEM and HARDWARE
       ladder, the dormitories the Watcher takes. Slice 7 (biological, the body,
       the last wake-up) closes it.
+      v1.50.0 (slice 7): the body, confinement, the colonists as the cost, the
+      last wake-up and the Watcher's ascent. The madness now has a course from
+      the second sleep to the end.
+
+  - id: B132
+    added: 2026-09-28
+    source: "slices 6 and 7 (what was left out)"
+    request: |
+      More Surface: more lines per stage, lines that answer what the player did
+      (a sector sealed, a reboot, a lost party), and more than one throw a
+      visit (best of three when the stakes rise).
+    status: open
+
+  - id: B133
+    added: 2026-09-28
+    source: "slices 6 and 7 (balance, needs Ola's playtest)"
+    request: |
+      Tune the Watcher's ladder on a real playtest: the prices in capacity and
+      stars, BODY_GROW_SECONDS (30), the share of people each biological step
+      takes (the creches refill it quickly at the high tiers, so the cost is
+      quiet until the last wake-up), the dormitories HARDWARE takes, and the
+      Scheduler's price.
+    status: open
+
+  - id: B134
+    added: 2026-09-28
+    source: "slices 6 and 7 (design question)"
+    request: |
+      Should a sealed sector change what it makes (a room that is part of the
+      body making more, or something else: capacity, stability)? Today its
+      rooms produce exactly as before.
+    status: open
+
+  - id: B135
+    added: 2026-09-28
+    source: "slices 6 and 7 (what was left out)"
+    request: |
+      More riddle types and riddles that grow harder with the slept years
+      (B117 carried forward, now with two cards and the brain tissue solving
+      some of them).
+    status: open

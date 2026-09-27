@@ -9,7 +9,7 @@ import { normalizeLayout } from './layout.js';
 import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
 import { initialWatcher, normalizeWatcher } from './watcher.js';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -47,6 +47,16 @@ const MIGRATIONS = {
         st.watcher = normalizeWatcher(st.watcher || initialWatcher());
         st.taken = { mine: 0, farm: 0, generator: 0, dorm: 0, ...(st.taken || {}) };
         st.takenSlots = Array.isArray(st.takenSlots) ? st.takenSlots : [];
+        p.state = st;
+        return p;
+    },
+    /* v1.50.0: the body. No sector sealed, nothing grown, nobody gone; and a colony that was
+       already woken by the sensor at the ring (it can only have stayed down by reloading) is
+       counted as woken, so it may sleep on. */
+    4: (p) => {
+        const st = p.state || {};
+        st.watcher = normalizeWatcher(st.watcher || initialWatcher());
+        st.ringWoke = !!st.ringWoke;
         p.state = st;
         return p;
     },

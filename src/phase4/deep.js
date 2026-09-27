@@ -958,7 +958,12 @@ export function sleep(s, days, opts = {}) {
     };
     let steps = 0;
     let wasAbove = estimateNow(s).mean > RESURFACE_AT;
+    // The sensor wakes the colony the day the ring is reached, and once only (v1.50.0): a colony
+    // that stays down after it (a Watcher growing its body) can sleep again. The plain sleep of
+    // slices 1 and 2, without alarms, stops at the ring every time, as it always did.
+    const ringDue = () => canResurface(s) && !(alarms && s.ringWoke);
     const surfaced = () => {
+        if (alarms) s.ringWoke = true;
         sum.wokenEarly = sum.days < days;
         sum.alarm = { kind: 'surface', reading: surface(s.doom0, s.day) };
         // the sensor on the shaft is a reading like any other, and the best one there is
@@ -973,7 +978,7 @@ export function sleep(s, days, opts = {}) {
         const r = tickDay(s, true);
         sum.days++;
         add(r, 1);
-        if (canResurface(s)) { surfaced(); break; }
+        if (ringDue()) { surfaced(); break; }
         if (alarms) {
             const bad = troubleIn(s, r);
             if (bad) { sum.alarm = bad; break; }
@@ -999,7 +1004,8 @@ export function sleep(s, days, opts = {}) {
         const steady = Math.abs(s.humans - h0) <= 1e-9 * Math.max(1, h0) && s.food >= food0
             && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).some((j) => !isQueued(j));
         if (!steady) continue;
-        let n = Math.min(days - sum.days, Math.ceil(opens - s.day));
+        let n = days - sum.days;
+        if (s.day < opens) n = Math.min(n, Math.ceil(opens - s.day));
         if (alarms && benign) {
             // stop the day before anything can happen, so the next lived day is the day it does
             const due = nextScoutDue(s);
@@ -1013,7 +1019,7 @@ export function sleep(s, days, opts = {}) {
             sum.days += n;
             add(r, n);
         }
-        if (canResurface(s)) { surfaced(); break; }
+        if (ringDue()) { surfaced(); break; }
     }
     // The wake-up replay reads `ran` as a share of the sleep, not a count of days.
     if (sum.days > 0) for (const t of ROOMS) sum.ran[t] /= sum.days;
