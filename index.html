@@ -552,6 +552,8 @@
                 <span class="deep-build"></span>
                 <div class="tooltip deep-tip-wide"></div>
             </button>
+            <!-- v1.49.0: the build queue, under the buttons that fill it: "dig, mine, farm" -->
+            <div class="deep-queue deep-mono" id="deep-queue" hidden></div>
             <button class="btn" id="deep-level-btn" aria-label="Level a room type">
                 <i data-lucide="chevrons-up" class="w-7 h-7"></i>
                 <span class="deep-build"></span>
@@ -612,6 +614,31 @@
                     autocomplete="off" spellcheck="false" aria-label="Answer">
                 <span class="deep-mono deep-puzzle-said" id="deep-puzzle-said"></span>
             </div>
+            <!-- v1.49.0: the second riddle, with the Second core -->
+            <div class="deep-puzzle is-second" id="deep-puzzle-2">
+                <span class="deep-mono deep-puzzle-q" id="deep-puzzle-2-q"></span>
+                <input class="deep-mono deep-puzzle-in" id="deep-puzzle-2-in" type="text" inputmode="numeric"
+                    autocomplete="off" spellcheck="false" aria-label="Answer">
+                <span class="deep-mono deep-puzzle-said" id="deep-puzzle-2-said"></span>
+            </div>
+            <!-- v1.49.0: what the Watcher can make of itself, one step at a time -->
+            <div class="deep-ladder" id="deep-ladder"></div>
+        </div>
+
+        <!-- v1.49.0: Surface, opposite the Watcher, only in some sleeps. A line, and a game -->
+        <div class="deep-chrome" id="deep-surface" hidden>
+            <div class="deep-surface-head">
+                <span class="deep-surface-glyph"></span>
+                <span class="deep-mono deep-surface-name">SURFACE</span>
+            </div>
+            <div class="deep-mono deep-surface-line" id="deep-surface-line"></div>
+            <div class="deep-surface-rps" id="deep-surface-rps">
+                <button class="deep-rps-btn" data-throw="rock" aria-label="Rock"><i data-lucide="gem" class="w-4 h-4"></i></button>
+                <button class="deep-rps-btn" data-throw="paper" aria-label="Paper"><i data-lucide="file-text" class="w-4 h-4"></i></button>
+                <button class="deep-rps-btn" data-throw="scissors" aria-label="Scissors"><i data-lucide="scissors" class="w-4 h-4"></i></button>
+            </div>
+            <div class="deep-mono deep-surface-said" id="deep-surface-said"></div>
+            <div class="deep-mono deep-surface-words" id="deep-surface-words"></div>
         </div>
 
         <!-- v1.48.0: the snap's cooldown, a thin ring round the cursor while the base will not answer -->
@@ -647,7 +674,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.48.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.49.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

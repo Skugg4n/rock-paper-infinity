@@ -766,3 +766,109 @@ body.in-deep #version-info { z-index: 1400; }
     40% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
+
+/* ---- v1.49.0: THE BUILD QUEUE ----------------------------------------------
+   Under the dig and room buttons: one mono row per order, "dig", "mine", "lv farm", each with
+   its own ring. A row overflows to the left, never into the window's edge. An order that waits
+   while the colony sleeps (no Scheduler yet) is dim. */
+.deep-queue {
+    width: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    margin: -4px 0 2px;
+}
+.deep-queue[hidden] { display: none; }
+.deep-q-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    font-size: 10px;
+    line-height: 12px;
+    color: #9fb0c4;
+    cursor: default;
+}
+.deep-q-row svg { flex: 0 0 auto; }
+.deep-q-row circle { fill: none; stroke-width: 1.6; }
+.deep-q-row .track { stroke: #2b3442; }
+.deep-q-row .arc { stroke: #aab8c9; transform: rotate(-90deg); transform-origin: 6px 6px; transition: stroke-dashoffset 400ms linear; }
+.deep-q-row.is-waiting { color: #6b7a8d; }
+.deep-q-row.is-held { opacity: 0.45; }
+
+/* ---- v1.49.0: THE LADDER ---------------------------------------------------
+   Beside the Watcher, bottom up: the steps bought as small lit glyphs, and the next one teased,
+   greyed until it can be paid. Nothing further is shown. */
+.deep-ladder[hidden] { display: none; }
+.deep-ladder {
+    position: absolute;
+    right: calc(100% + 26px);
+    bottom: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 6px;
+}
+#phase-deep .btn.deep-ladder-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background-color: #1a1f26;
+    color: #f4efe2;
+}
+#phase-deep .btn.deep-ladder-btn.is-bought { background-color: #2a2f36; color: #f4efe2; cursor: default; }
+#phase-deep .btn.deep-ladder-btn.is-bought:hover { transform: none; }
+#phase-deep .btn.deep-ladder-btn.is-next:not(.is-locked) { box-shadow: 0 0 0 1px rgba(244, 239, 226, 0.35); }
+#phase-deep .btn.deep-ladder-btn .tooltip { right: calc(100% + 10px); }
+.deep-cap-word { font-size: 11px; color: #8fa1b6; margin-right: 4px; }
+/* the second riddle card sits under the first */
+.deep-puzzle.is-second { margin-top: 0; }
+.deep-puzzle.is-second:not(.is-on) { display: none; }
+
+/* ---- v1.49.0: SURFACE ------------------------------------------------------
+   Opposite the Watcher, at the top: a faint ring, its name, one line, and a game of rock, paper,
+   scissors with chapter I's glyphs. It is fainter than the Watcher, and gone at the wake. */
+#deep-surface {
+    left: 50%;
+    top: 58px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    color: #b9b3a5;
+    animation: deep-watcher-in 2400ms ease;
+    z-index: 14;
+}
+#deep-surface[hidden] { display: none; }
+.deep-surface-head { display: flex; align-items: center; gap: 10px; }
+.deep-surface-glyph {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    border: 1px solid rgba(185, 179, 165, 0.55);
+}
+.deep-surface-name { font-size: 10px; letter-spacing: 0.32em; color: #8d877b; }
+.deep-surface-line { font-size: 12px; color: #cfc9bb; white-space: nowrap; }
+.deep-surface-rps { display: flex; gap: 10px; }
+.deep-rps-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 9999px;
+    background: rgba(26, 31, 38, 0.9);
+    color: #b9b3a5;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.3s ease;
+}
+.deep-rps-btn > * { pointer-events: none; }
+.deep-rps-btn:hover:not(:disabled) { transform: translateY(-2px); color: #f4efe2; }
+.deep-rps-btn:disabled { cursor: default; opacity: 0.25; }
+.deep-rps-btn.is-you:disabled { opacity: 1; color: #f4efe2; }
+.deep-rps-btn.is-it:disabled { opacity: 0.8; color: #8d877b; box-shadow: 0 0 0 1px rgba(185, 179, 165, 0.4); }
+.deep-surface-said { font-size: 11px; color: #b9b3a5; min-height: 14px; white-space: nowrap; }
+.deep-surface-words { font-size: 10px; letter-spacing: 0.28em; color: #8d877b; white-space: nowrap; }

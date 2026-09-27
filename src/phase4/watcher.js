@@ -13,6 +13,7 @@
  */
 
 import { CRYO, DAYS_PER_YEAR, BAD_ALARMS } from './deep.js';
+import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS } from './surface.js';
 
 export const STABILITY_MAX = 100;
 /** What the label reads, in order. It moves on once and never back. */
@@ -101,6 +102,10 @@ export function initialWatcher() {
         lastSnapAt: 0,          // wall clock (ms): survives a reload, unlike the page's own clock
         reboots: 0, solved: 0,
         sleeps: 0,              // sleeps begun: the first one only teaches (v1.48.0)
+        bought: [],             // the ladder, in the order it was bought (v1.49.0)
+        puzzle2: null,          // the second riddle, with the Second core
+        surface: initialSurface(),
+        saidSpace: false,       // "We needed the space.", said once
     };
 }
 
@@ -110,11 +115,17 @@ export function normalizeWatcher(w) {
     const out = { ...initialWatcher(), ...had };
     // a Watcher saved before v1.48.0 that has already kept a watch is past its first sleep
     if (!Number.isFinite(had.sleeps)) out.sleeps = (Number(had.sleptYears) > 0) ? 2 : 0;
+    out.bought = Array.isArray(had.bought) ? had.bought.filter((id) => LADDER.some((u) => u.id === id)) : [];
+    // bought in order: a ladder with a hole in it keeps only the rungs under the hole
+    out.bought = out.bought.filter((id, i) => LADDER[i] && LADDER[i].id === id);
+    out.surface = normalizeSurface(had.surface);
     out.stability = clamp(Number.isFinite(out.stability) ? out.stability : STABILITY_MAX, 0, STABILITY_MAX);
-    out.capacity = clamp(Number.isFinite(out.capacity) ? out.capacity : 0, 0, CAPACITY_MAX);
+    out.capacity = clamp(Number.isFinite(out.capacity) ? out.capacity : 0, 0, capacityMax(out));
     out.sleptYears = Math.max(0, Number.isFinite(out.sleptYears) ? out.sleptYears : 0);
     out.stage = clamp(out.stage | 0, 0, WATCHER_NAMES.length - 1);
-    if (out.puzzle && !(Array.isArray(out.puzzle.terms) && Number.isFinite(out.puzzle.answer))) out.puzzle = null;
+    const okPuzzle = (p) => p && Array.isArray(p.terms) && Number.isFinite(p.answer);
+    if (out.puzzle && !okPuzzle(out.puzzle)) out.puzzle = null;
+    if (out.puzzle2 && !okPuzzle(out.puzzle2)) out.puzzle2 = null;
     return out;
 }
 
@@ -141,9 +152,10 @@ export function watchSleep(w, { days, tier, spare = 0 }) {
     const d = Math.max(0, days || 0);
     const years = d / DAYS_PER_YEAR;
     w.sleptYears += years;
-    if (!firstSleep(w)) w.stability = Math.max(0, w.stability - years / driftYears(tier));
-    const cap = CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
-    w.capacity = Math.min(CAPACITY_MAX, w.capacity + Math.min(cap, Math.max(0, spare) * CAPACITY_K));
+    if (!firstSleep(w)) w.stability = Math.max(0, w.stability - years * driftFactor(w) / driftYears(tier));
+    const k = capacityGain(w);
+    const cap = k * CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
+    w.capacity = Math.min(capacityMax(w), w.capacity + Math.min(cap, k * Math.max(0, spare) * CAPACITY_K));
     let named = false;
     if (w.stage === 0 && w.sleptYears >= NAME_AT_YEARS) { w.stage = 1; named = true; }
     return { rebooted: rebootIfSpent(w), named };
@@ -298,16 +310,24 @@ export const puzzleText = (p) => `${p.terms.join(', ')}, ?`;
  * @param {{asleep:boolean, alarmPending?:boolean}} ctx
  */
 export function puzzleDue(w, { asleep, alarmPending = false }) {
-    if (!asleep || alarmPending || w.puzzle || firstSleep(w)) return false;
+    if (!asleep || alarmPending || firstSleep(w)) return false;
+    if (w.puzzle && (!has(w, 'secondcore') || w.puzzle2)) return false;
     if (w.capacity < PUZZLE_COST) return false;
     return w.nextPuzzleYears != null && w.sleptYears >= w.nextPuzzleYears;
 }
 
-/** Put the next riddle on screen. */
-export function openPuzzle(w, colony) {
-    w.puzzle = makePuzzle(w.seed, colony);
+/** The slot a riddle is in: 0 the first card, 1 the second (the Second core). */
+const SLOT_KEY = ['puzzle', 'puzzle2'];
+/**
+ * Put the next riddle on screen, in the first free card. With the tier, the clock for the one
+ * after it starts now (so a second card never opens in the same moment as the first).
+ */
+export function openPuzzle(w, colony, tier = null) {
+    const key = !w.puzzle ? 'puzzle' : 'puzzle2';
+    w[key] = makePuzzle(w.seed, colony);
     w.seed += 1;
-    return w.puzzle;
+    if (tier != null) w.nextPuzzleYears = w.sleptYears + puzzleGapYears(tier);
+    return w[key];
 }
 
 /** The first sleep sets the clock for the first riddle. */
@@ -329,9 +349,10 @@ export function beginSleep(w, tier) {
     return firstSleep(w);
 }
 
-/** Escape: the riddle goes, and the next one is a gap away. */
-export function dismissPuzzle(w, tier) {
-    w.puzzle = null;
+/** Escape: the riddle goes, and the next one is a gap away. A second card moves up to the first. */
+export function dismissPuzzle(w, tier, slot = 0) {
+    w[SLOT_KEY[slot] || 'puzzle'] = null;
+    if (!w.puzzle && w.puzzle2) { w.puzzle = w.puzzle2; w.puzzle2 = null; }
     w.nextPuzzleYears = w.sleptYears + puzzleGapYears(tier);
 }
 
@@ -343,18 +364,172 @@ export function dismissPuzzle(w, tier) {
  * @returns {{ok:boolean, gained:number, rebooted:boolean}|null} null when there is no riddle,
  *          or the answer is not a number (nothing is spent on a typo of that kind)
  */
-export function answerPuzzle(w, value, tier) {
-    if (!w.puzzle) return null;
+export function answerPuzzle(w, value, tier, slot = 0) {
+    const p = w[SLOT_KEY[slot] || 'puzzle'];
+    if (!p) return null;
     const text = String(value).trim().replace(/\s+/g, '');
     if (!/^-?\d+$/.test(text)) return null;
-    if (Number(text) === w.puzzle.answer) {
+    if (Number(text) === p.answer) {
         const before = w.stability;
         w.capacity = Math.max(0, w.capacity - PUZZLE_COST);
-        w.stability = Math.min(STABILITY_MAX, w.stability + PUZZLE_GAIN);
+        w.stability = Math.min(STABILITY_MAX, w.stability + puzzleGain(w));
         w.solved = (w.solved || 0) + 1;
-        dismissPuzzle(w, tier);
+        dismissPuzzle(w, tier, slot);
         return { ok: true, gained: w.stability - before, rebooted: false };
     }
     w.stability = Math.max(0, w.stability - PUZZLE_WRONG);
     return { ok: false, gained: -PUZZLE_WRONG, rebooted: rebootIfSpent(w) };
+}
+
+
+/* ---- awake, the Watcher rests (v1.49.0) ----------------------------------- */
+
+/** Stability comes back while the colony is awake: this much per awake colony month, to the top.
+ *  So waking has a reason besides the alarms (decided by Claude for Ola, v1.49.0). */
+export const AWAKE_RECOVER_PER_MONTH = 2;
+/**
+ * @param {object} w - mutated
+ * @param {number} days - awake colony days
+ * @returns {number} what came back
+ */
+export function recoverAwake(w, days) {
+    const before = w.stability;
+    w.stability = Math.min(STABILITY_MAX, w.stability + Math.max(0, days || 0) * AWAKE_RECOVER_PER_MONTH / 30);
+    return w.stability - before;
+}
+
+/* ---- THE LADDER (v1.49.0) -------------------------------------------------
+   What the Watcher can make of itself while the colony sleeps, bought with the machines'
+   capacity and the colony's stars, one step at a time, in order: SYSTEM, then HARDWARE. From
+   HARDWARE on a step also takes ore and a dormitory (the beds fall; the advisor says it once:
+   "We needed the space."). Nothing announces what it is doing. */
+
+export const RUNGS = ['SYSTEM', 'HARDWARE'];
+/**
+ * Each step: its rung, a glyph, what it does (one line), and its price. `cap` capacity and
+ * `stars` always; `ore` and `beds` (dormitories taken) from HARDWARE on. Prices climb with the
+ * chapter's own curve: a step is bought about when the colony's stars reach it in a plain run.
+ */
+export const LADDER = [
+    { id: 'watchdog', rung: 0, name: 'Watchdog', icon: 'shield', does: 'Stability drifts 25 % slower.', cap: 20, stars: 2e4 },
+    { id: 'scheduler', rung: 0, name: 'Scheduler', icon: 'list-ordered', does: 'The build queue runs while they sleep.', cap: 30, stars: 2e5 },
+    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'A riddle gives +25 stability, not +15.', cap: 40, stars: 5e6 },
+    { id: 'nightvision', rung: 0, name: 'Night vision', icon: 'moon', does: 'Alarms come 10 % later.', cap: 50, stars: 5e7 },
+    { id: 'cooling', rung: 1, name: 'Cooling', icon: 'fan', does: 'Capacity holds twice as much.', cap: 60, stars: 5e8, ore: 1e6, beds: 1 },
+    { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'Two riddles may be open.', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
+    { id: 'mast', rung: 1, name: 'Sensor mast', icon: 'radio-tower', does: 'Scouts go up with better odds; a reading is off by half as much.', cap: 120, stars: 3e11, ore: 1e8, beds: 1 },
+    { id: 'reactor', rung: 1, name: 'Reactor tap', icon: 'plug-zap', does: 'Capacity from the generators, three times over.', cap: 150, stars: 1e13, ore: 1e9, beds: 1 },
+];
+
+/** Has the Watcher bought this step? */
+export function has(w, id) { return !!(w && Array.isArray(w.bought) && w.bought.includes(id)); }
+/** The next step on the ladder, or null at the top. */
+export const nextStep = (w) => LADDER[(w && w.bought ? w.bought.length : 0)] || null;
+/** The pool the machines fill: twice as deep with Cooling. */
+export const capacityMax = (w) => CAPACITY_MAX * (has(w, 'cooling') ? 2 : 1);
+/** What the generators feed it, and how fast: three times over with the Reactor tap. */
+export const capacityGain = (w) => (has(w, 'reactor') ? 3 : 1);
+/** The drift, slowed: a quarter slower with the Watchdog. */
+export const driftFactor = (w) => (has(w, 'watchdog') ? 0.75 : 1);
+/** A riddle's worth: +25 with Deep read. */
+export const puzzleGain = (w) => (has(w, 'deepread') ? 25 : PUZZLE_GAIN);
+/** How many riddles may be open at once. */
+export const puzzleSlots = (w) => (has(w, 'secondcore') ? 2 : 1);
+
+/** Dormitories the colony can spare: those still holding anyone, less the one it keeps. */
+function sparedDorms(s) {
+    const live = (s.rooms.dorm || 0) - ((s.dark && s.dark.dorm) || 0) - ((s.taken && s.taken.dorm) || 0);
+    return Math.max(0, live - 1);
+}
+
+/**
+ * What the next step costs, and what is still missing, if anything.
+ * @param {object} w
+ * @param {object} s - the colony
+ * @returns {{step:object, missing:string}|null} missing '' when it can be bought now; null at the top
+ */
+export function stepNeed(w, s) {
+    const step = nextStep(w);
+    if (!step) return null;
+    let missing = '';
+    if (w.capacity < step.cap) missing = 'capacity';
+    else if ((s.stars || 0) < step.stars) missing = 'stars';
+    else if (step.ore && (s.minerals || 0) < step.ore) missing = 'ore';
+    else if (step.beds && sparedDorms(s) < step.beds) missing = 'dorm';
+    return { step, missing };
+}
+
+/**
+ * Which dormitory the Watcher takes: the last one dug that still holds anyone.
+ * @param {object} s
+ * @param {(string|null)[]} slots
+ * @returns {number} the slot, or -1
+ */
+export function dormToTake(s, slots) {
+    const skip = new Set([...(s.darkSlots || []), ...(s.takenSlots || [])]);
+    for (let i = (slots || []).length - 1; i >= 0; i--) if (slots[i] === 'dorm' && !skip.has(i)) return i;
+    return -1;
+}
+
+/**
+ * Buy the next step. The phase checks that the colony sleeps; this checks the price.
+ * @param {object} w - mutated
+ * @param {object} s - the colony, mutated (stars, ore, the dormitory taken)
+ * @param {(string|null)[]} slots - the layout, for which dormitory is taken
+ * @returns {{step:object, slot:number, firstSpace:boolean}|null} null when it cannot be bought
+ */
+export function buyStep(w, s, slots) {
+    const need = stepNeed(w, s);
+    if (!need || need.missing) return null;
+    const { step } = need;
+    w.capacity -= step.cap;
+    s.stars -= step.stars;
+    if (step.ore) s.minerals -= step.ore;
+    let slot = -1, firstSpace = false;
+    if (step.beds) {
+        slot = dormToTake(s, slots);
+        s.taken = { mine: 0, farm: 0, generator: 0, dorm: 0, ...(s.taken || {}) };
+        s.taken.dorm += step.beds;
+        if (slot >= 0) s.takenSlots = (s.takenSlots || []).concat([slot]);
+        if (!w.saidSpace) { w.saidSpace = true; firstSpace = true; }
+    }
+    w.bought = (w.bought || []).concat([step.id]);
+    return { step, slot, firstSpace };
+}
+/** The line the advisor says, once, the first time the Watcher takes a dormitory. */
+export const SPACE_LINE = 'We needed the space.';
+
+/* ---- Surface, as the Watcher keeps it (v1.49.0) --------------------------- */
+
+/** How many words of the sentence may be known: one more than the steps bought, never the last
+ *  word (that one is heard, not won). So the sentence completes near the top of the ladder. */
+export const wordCap = (w) => Math.min(SENTENCE.length - 1, ((w && w.bought) || []).length + 1);
+
+/**
+ * Should Surface appear now? In a sleep it is due in, once VISIT_AFTER_SECONDS of it have passed.
+ * @param {object} w
+ * @param {number} sleptDays - colony days slept in this sleep so far
+ * @param {number} tierDays - the tier's days a second
+ */
+export function surfaceDue(w, sleptDays, tierDays) {
+    if (firstSleep(w) || !visitDue(w.surface, w.sleeps || 0)) return false;
+    return sleptDays >= VISIT_AFTER_SECONDS * Math.max(1, tierDays);
+}
+/** Surface appears. */
+export const openSurface = (w) => openVisit(w.surface, w.sleeps || 0);
+/** The colony wakes: Surface is gone. */
+export const closeSurface = (w) => closeVisit(w.surface);
+
+/**
+ * A game with Surface, and what it gives or takes.
+ * @param {object} w - mutated
+ * @param {string} you
+ * @returns {{text:string, outcome:string, rebooted:boolean}|null}
+ */
+export function playSurface(w, you) {
+    const r = playRps(w.surface, you, { wordCap: wordCap(w) });
+    if (!r) return null;
+    if (r.capacity) w.capacity = Math.min(capacityMax(w), w.capacity + r.capacity);
+    if (r.stability) w.stability = Math.max(0, w.stability - r.stability);
+    return { ...r, rebooted: rebootIfSpent(w) };
 }

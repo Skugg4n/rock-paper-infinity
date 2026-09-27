@@ -9,7 +9,7 @@ import { normalizeLayout } from './layout.js';
 import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
 import { initialWatcher, normalizeWatcher } from './watcher.js';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -36,6 +36,17 @@ const MIGRATIONS = {
     2: (p) => {
         const st = p.state || {};
         st.watcher = normalizeWatcher(st.watcher || initialWatcher());
+        p.state = st;
+        return p;
+    },
+    /* v1.49.0: the Watcher's ladder and Surface, the build queue, and the dormitories the Watcher
+       takes. Nothing is bought, nobody has come, no dormitory is taken; every order already on the
+       books is one that was started (the queue is new), so it keeps its days. */
+    3: (p) => {
+        const st = p.state || {};
+        st.watcher = normalizeWatcher(st.watcher || initialWatcher());
+        st.taken = { mine: 0, farm: 0, generator: 0, dorm: 0, ...(st.taken || {}) };
+        st.takenSlots = Array.isArray(st.takenSlots) ? st.takenSlots : [];
         p.state = st;
         return p;
     },

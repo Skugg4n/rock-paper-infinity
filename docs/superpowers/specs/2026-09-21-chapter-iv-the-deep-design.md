@@ -669,3 +669,41 @@ mourns ice deaths at the wake): **26m26s to year 802 701** (was 28m40s), 88 wake
 days, longest stall 76 s, Cryo I at 6m36s (was 11m32s); seeds 1 to 5 between 25m57s and 26m34s.
 Unattended Watcher: stability 38 at the end, lowest 1, 2 reboots, named at 15m55s.
 
+## Built: slices 6 and 7 (v1.49.0, v1.50.0)
+
+Ola after playing far into the sleeps (2026-09-27): "Queuing digging of rooms would be a nice
+QoL update. Automate building, to build while people are sleeping. But how much more is there?
+It feels like the whole development of madness is missing after the sleep starts."
+
+### Slice 6 (v1.49.0): Surface, the ladder, the queue
+
+- **The build queue** (deep.js). An order is placed with `orderBuild()`: paid now at `nextPrice()`
+  (the price after every order on the books), started at once if its LANE (a dig, or one kind of
+  order for one room type) is free and, for a room, a chamber stands empty; else it waits
+  (`startDay` null). `chambersAhead()` lets a room be ordered against a dig still being made.
+  `completeBuilds(s, { asleep })` lands what is due and starts the next in each lane, awake always,
+  asleep only with the Scheduler (`queueRunsAsleep`). Fast forward in `sleep()` only waits on
+  orders under way. `buildEta()` gives each order its day for the list and "ready in". `QUEUE_MAX`
+  8. `startBuild()` is unchanged for the simulation and the tests.
+- **Surface** (surface.js, pure). Visits from the second sleep (`FIRST_VISIT_SLEEP`), then after
+  `VISIT_GAPS` [3, 3, 2, 2, 1] sleeps, three real seconds in. A seeded throw (`surfaceThrow`), from
+  the fifth visit half the time the counter to the player's last throw. `play()`: win 8 capacity
+  and a word (`wordCap` = steps bought + 1, never the last word), loss 3 stability, draw nothing.
+  Lines by stage (`STAGE_AT` 0, 4, 9 visits). The sentence: COME UP THERE IS ROOM FOR ALL OF US.
+  Closed at every wake.
+- **The ladder** (watcher.js `LADDER`, `stepNeed`, `buyStep`), bought asleep, in order:
+  | step | does | capacity | stars | also |
+  |---|---|---|---|---|
+  | Watchdog | drift x0.75 | 20 | 20 k | |
+  | Scheduler | the queue runs asleep | 30 | 200 k | |
+  | Deep read | a riddle +25 | 40 | 5 M | |
+  | Night vision | food alarm at 27 d, act wakes 10 % apart | 50 | 50 M | |
+  | Cooling | pool 200 | 60 | 500 M | 1 M ore, a dormitory |
+  | Second core | two riddles | 90 | 10 B | 10 M ore, a dormitory |
+  | Sensor mast | skill +0.3, scatter x0.5 | 120 | 300 B | 100 M ore, a dormitory |
+  | Reactor tap | capacity x3, cap x3 | 150 | 10 T | 1 B ore, a dormitory |
+  A dormitory taken is `s.taken.dorm` (out of `live()` in tickDay, like a dark chamber) and
+  `s.takenSlots` (the scene draws a cpu glyph); the colony keeps its last one.
+- **Awake recovery**: +2 stability per awake month (`recoverAwake`).
+- **Sim** `--watcher`: 24m08s to the ring, HARDWARE complete at 17m24s. The plain run unchanged.
+

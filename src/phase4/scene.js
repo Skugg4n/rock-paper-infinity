@@ -144,6 +144,7 @@ function structureKey(state, layout) {
         state.chambers,
         (layout.slots || []).map((s) => s || '.').join(''),
         Object.keys(state.auto).sort().map((t) => `${t}${state.auto[t]}`).join(''),
+        (state.takenSlots || []).join(','),
     ].join('|');
 }
 
@@ -407,6 +408,7 @@ export function createScene(container, opts = {}) {
     /** The cells of a floor: its landing, and every chamber dug on it. */
     function planFloors(state, layout) {
         const slots = layout.slots || [];
+        const taken = new Set(state.takenSlots || []);
         const deepest = Math.max(floorCount(slots.length) - 1, placeChamber(slots.length).floor);
         const plan = [];
         for (let f = 0; f <= deepest; f++) plan.push({ y: -f * FLOOR_GAP, cells: [{ x: 0, z: 0, hub: true, lid: f === 0 }], doors: [], people: 0 });
@@ -416,6 +418,7 @@ export function createScene(container, opts = {}) {
                 x: p.x, z: p.z, room: type || null, slot: i,
                 lvl: type ? (state.level[type] || 0) : 0,
                 auto: type ? (state.auto[type] || 0) > 0 : false,
+                taken: taken.has(i),        // v1.49.0: a dormitory the Watcher took for its hardware
             });
         });
         return plan;
@@ -584,9 +587,10 @@ export function createScene(container, opts = {}) {
                     machine = makeLabel(MACHINE_HTML, 0.9, y + 0.55, -0.9, 'machine');
                     machine.glyphs = [...machine.inner.querySelectorAll('.rps')];
                 } else if (c.room) {
-                    let html = `<i data-lucide="${ROOM_ICON[c.room] || 'square'}" class="w-7 h-7"></i>`;
+                    // a dormitory the Watcher took holds no one: its glyph is the Watcher's, not a bed
+                    let html = `<i data-lucide="${c.taken ? 'cpu' : (ROOM_ICON[c.room] || 'square')}" class="w-7 h-7"></i>`;
                     // the cryo hall has no ladder of its own: its level is which tier is bought
-                    if (c.room !== 'cryo') html += `<span class="lvl mono">${c.lvl}</span>`;
+                    if (c.room !== 'cryo' && !c.taken) html += `<span class="lvl mono">${c.lvl}</span>`;
                     if (c.auto) html += '<i data-lucide="repeat" class="auto w-3.5 h-3.5"></i><span class="pulse"></span>';
                     // a room that stopped while the colony slept, and a chamber something took
                     html += '<span class="stall hidden"></span>';

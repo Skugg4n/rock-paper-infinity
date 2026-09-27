@@ -20,13 +20,14 @@
 
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from '../constants.js';
 import {
-    initialDeepState, tickDay, sleep, digCost, roomCost, levelCost, automationCost,
+    initialDeepState, tickDay, sleep,
     COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V, MAX_AUTO,
     cryoLabel, cryoName, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
     clearChamber, clearDarkType, stalledRooms, attemptAscent, canTryAscent, ascentOdds, SURVIVAL_AT,
-    startBuild, completeBuilds, buildProgress, buildPending, estimateNow, habitableYear,
+    completeBuilds, buildProgress, buildPending, estimateNow, habitableYear,
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
     ASCENT_MIN_PEOPLE, ordersDone, mourn,
+    orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep, ordered,
 } from './deep.js';
 import {
     conditions, advisorLines, pushFeed, ROOM_WORD, DESCENT_LINE, alarmLine, alarmGlyph,
@@ -45,8 +46,11 @@ import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js'
 import {
     normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
     puzzleDue, openPuzzle, beginSleep, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays,
-    CAPACITY_MAX, STABILITY_MAX, firstSleep, FIRST_SLEEP_DAYS, WATCHER_HELLO, snapWait, SNAP_COOLDOWN_MS,
+    STABILITY_MAX, firstSleep, FIRST_SLEEP_DAYS, WATCHER_HELLO, snapWait, SNAP_COOLDOWN_MS,
+    recoverAwake, LADDER, RUNGS, stepNeed, buyStep, capacityMax, surfaceDue, openSurface, closeSurface,
+    playSurface, SPACE_LINE,
 } from './watcher.js';
+import { THROWS, sentenceShown } from './surface.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
 
@@ -188,10 +192,23 @@ export function init() {
         stabFill: document.getElementById('deep-stab-fill'),
         stabVal: document.getElementById('deep-stab-val'),
         capFill: document.getElementById('deep-cap-fill'),
-        puzzle: document.getElementById('deep-puzzle'),
-        puzzleQ: document.getElementById('deep-puzzle-q'),
-        puzzleIn: document.getElementById('deep-puzzle-in'),
-        puzzleSaid: document.getElementById('deep-puzzle-said'),
+        // the riddle cards: the first, and the second the Second core opens (v1.49.0)
+        cards: ['deep-puzzle', 'deep-puzzle-2'].map((id, slot) => ({
+            slot,
+            el: document.getElementById(id),
+            q: document.getElementById(`${id}-q`),
+            input: document.getElementById(`${id}-in`),
+            said: document.getElementById(`${id}-said`),
+            shown: null,
+            lingerUntil: 0,
+        })),
+        queue: document.getElementById('deep-queue'),
+        ladder: document.getElementById('deep-ladder'),
+        surface: document.getElementById('deep-surface'),
+        surfaceLine: document.getElementById('deep-surface-line'),
+        surfaceSaid: document.getElementById('deep-surface-said'),
+        surfaceWords: document.getElementById('deep-surface-words'),
+        rpsBtns: [...document.querySelectorAll('#deep-surface .deep-rps-btn')],
         snapRing: document.getElementById('deep-snap-ring'),
         snapArc: document.querySelector('#deep-snap-ring .arc'),
     };
@@ -415,32 +432,33 @@ export function init() {
         setTooltip(ui.oreRow, says(`Ore in store. ${perDayText(report.parts.M)} after the generators have burned theirs.`));
 
         const asleep = !!state.asleep;
-        // the buttons
-        const free = freeChamber(layout) >= 0;
-        const digPrice = digCost(state.chambers);
-        ui.digBtn.classList.toggle('is-locked', asleep || state.minerals < digPrice || buildPending(state, 'dig'));
-        buyTip(ui.digBtn, { kind: 'dig', type: null, price: digPrice, currency: 'minerals', sentence: buySentence('dig', null, state), blocked: buildPending(state, 'dig') ? 'pending' : '' });
+        // the buttons. Since v1.49.0 a button can be pressed again while its order is being built:
+        // the next order is paid now, at the next price, and waits in the queue under the buttons
+        const full = (state.builds || []).length >= QUEUE_MAX;
+        const roomRoom = chambersAhead(state) > 0;
+        const digPrice = nextPrice(state, 'dig');
+        ui.digBtn.classList.toggle('is-locked', asleep || state.minerals < digPrice || full);
+        buyTip(ui.digBtn, { kind: 'dig', type: null, price: digPrice, currency: 'minerals', sentence: buySentence('dig', null, state), blocked: full ? 'full' : '' });
         showBuild(ui.digBtn, 'dig', null);
 
         for (const { type, el } of ui.roomBtns) {
-            const price = roomCost(type, state.rooms[type] || 0);
-            const pending = buildPending(state, 'room', type);
-            el.classList.toggle('is-locked', asleep || !free || state.minerals < price || pending);
-            buyTip(el, { kind: 'room', type, price, currency: 'minerals', sentence: buySentence('room', type, state), blocked: pending ? 'pending' : (!free ? 'chamber' : '') });
+            const price = nextPrice(state, 'room', type);
+            el.classList.toggle('is-locked', asleep || !roomRoom || state.minerals < price || full);
+            buyTip(el, { kind: 'room', type, price, currency: 'minerals', sentence: buySentence('room', type, state), blocked: full ? 'full' : (!roomRoom ? 'chamber' : '') });
             showBuild(el, 'room', type);
         }
+        drawQueue();
 
         // v1.48.0: the level and automate buttons sell what the NEXT GOAL needs (the next cryo tier),
         // then what runs low, then the weakest column, and their tooltips say which and why
         const offer = offers(need, low);
         const lvType = offer.level.type;
-        const levelPrice = levelCost(lvType, state.level[lvType] || 0);
-        const lvPending = buildPending(state, 'level', lvType);
+        const levelPrice = nextPrice(state, 'level', lvType);
         // levelling or automating a room type the colony has none of would buy nothing at all
         const noneOf = (t) => !(state.rooms[t] > 0) && !buildPending(state, 'room', t);
         const noneText = (t) => `Build a ${ROOM_WORD[t]} first: there is none to improve.`;
-        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || lvPending || noneOf(lvType));
-        buyTip(ui.levelBtn, { kind: 'level', type: lvType, price: levelPrice, currency: 'stars', sentence: noneOf(lvType) ? noneText(lvType) : `${offer.level.head} ${buySentence('level', lvType, state)}`, blocked: lvPending ? 'pending' : '', mark: roomMark(lvType) });
+        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || full || noneOf(lvType));
+        buyTip(ui.levelBtn, { kind: 'level', type: lvType, price: levelPrice, currency: 'stars', sentence: noneOf(lvType) ? noneText(lvType) : `${offer.level.head} ${buySentence('level', lvType, state)}`, blocked: full ? 'full' : '', mark: roomMark(lvType) });
         showBuild(ui.levelBtn, 'level', lvType);
 
         // automation is teased once the first level is bought, or the moment cryo needs it
@@ -448,13 +466,12 @@ export function init() {
         const autoShown = Object.values(state.level).some((l) => l > 0) || need?.button === 'auto';
         ui.autoBtn.classList.toggle('hidden', !autoShown);
         if (autoShown) {
-            const autoPrice = automationCost(auType, state.auto[auType] || 0);
-            const auPending = buildPending(state, 'auto', auType);
-            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || auPending || noneOf(auType));
+            const autoPrice = nextPrice(state, 'auto', auType);
+            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || full || noneOf(auType));
             buyTip(ui.autoBtn, {
                 kind: 'auto', type: auType, price: autoPrice, currency: 'stars', mark: roomMark(auType),
                 sentence: noneOf(auType) ? noneText(auType) : (Number.isFinite(autoPrice) ? `${offer.auto.head} ${buySentence('auto', auType, state)}` : ''),
-                blocked: (state.auto[auType] || 0) >= MAX_AUTO ? 'top' : (auPending ? 'pending' : ''),
+                blocked: (state.auto[auType] || 0) + ordered(state, 'auto', auType) >= MAX_AUTO ? 'top' : (full ? 'full' : ''),
             });
             showBuild(ui.autoBtn, 'auto', auType);
         }
@@ -554,9 +571,9 @@ export function init() {
 
     /* ---- THE WATCHER (v1.46.0) ------------------------------------------------
        Only in the sleep world: a slow pulse, a name, a meter, a sliver of capacity, and now and
-       then a riddle. No sentence says what it is. */
-    let puzzleShown = null;          // the riddle the card is showing, so it is drawn once
-    let lingerUntil = 0;             // a solved riddle stays on its card this long (performance.now)
+       then a riddle. No sentence says what it is. Since v1.49.0 also its ladder (a column of
+       teased glyphs beside it), a second riddle card with the Second core, and, opposite it in
+       some sleeps, Surface. */
     function updateWatcher() {
         const w = state.watcher;
         const asleep = !!state.asleep;
@@ -569,26 +586,133 @@ export function init() {
                 const v = String(stab);
                 if (ui.stabVal.textContent !== v) ui.stabVal.textContent = v;
                 ui.stabFill.style.width = `${(100 * w.stability / STABILITY_MAX).toFixed(1)}%`;
-                ui.capFill.style.width = `${(100 * w.capacity / CAPACITY_MAX).toFixed(1)}%`;
+                ui.capFill.style.width = `${(100 * w.capacity / capacityMax(w)).toFixed(1)}%`;
                 ui.watcher.classList.toggle('is-low', w.stability < 35);
+                drawLadder();
             }
-            const want = asleep ? (w.puzzle || (performance.now() < lingerUntil ? puzzleShown : null)) : null;
-            if (want !== puzzleShown) {
-                puzzleShown = want;
-                ui.puzzle.classList.toggle('is-on', !!want);
-                if (want) {
-                    ui.puzzleQ.textContent = puzzleText(want);
-                    ui.puzzleIn.value = '';
-                    ui.puzzleSaid.textContent = '';
-                    ui.puzzleIn.disabled = false;
-                    try { ui.puzzleIn.focus({ preventScroll: true }); } catch { /* ignore */ }
-                } else if (document.activeElement === ui.puzzleIn) {
-                    ui.puzzleIn.blur();
-                }
-            }
+            for (const card of ui.cards) drawCard(card, asleep ? w[card.slot ? 'puzzle2' : 'puzzle'] : null);
         }
+        drawSurface();
         // the base: as soft as the meter says while the colony sleeps, rigid when it wakes
         scene?.setSoftness(asleep ? softness(w.stability) : 0);
+    }
+    /** One riddle card: drawn once per riddle, and it lingers a moment on a right answer. */
+    function drawCard(card, puzzle) {
+        if (!card.el) return;
+        const want = performance.now() < card.lingerUntil ? card.shown : puzzle;
+        if (want === card.shown) return;
+        card.shown = want;
+        card.el.classList.toggle('is-on', !!want);
+        if (want) {
+            card.q.textContent = puzzleText(want);
+            card.input.value = '';
+            card.said.textContent = '';
+            card.input.disabled = false;
+            if (!ui.cards.some((c) => c !== card && document.activeElement === c.input)) {
+                try { card.input.focus({ preventScroll: true }); } catch { /* ignore */ }
+            }
+        } else if (document.activeElement === card.input) {
+            card.input.blur();
+        }
+    }
+
+    /* ---- THE LADDER (v1.49.0): what the Watcher makes of itself, bought asleep. The steps
+       bought are lit glyphs; the next one is teased greyed until it can be paid; nothing past it
+       is shown (chapter II's way). One line on hover: what it does, and quietly what it takes. */
+    let ladderKey = '';
+    let ladderNext = null;          // the button of the next step, for its lock and its tooltip
+    function stepTip(step, need) {
+        const rung = RUNGS[step.rung];
+        const takes = [];
+        if (step.ore) takes.push(`${formatCount(step.ore)} ore`);
+        if (step.beds) takes.push(step.beds === 1 ? 'a dormitory' : `${step.beds} dormitories`);
+        const price = priceRow(`<span class="deep-mono">${formatCount(step.cap)}</span><span class="deep-mono deep-cap-word">cap</span>`
+            + starCost(step.stars));
+        let missing = '';
+        if (need) {
+            const w = state.watcher;
+            if (need.missing === 'capacity') missing = `Needs ${formatCount(step.cap)} capacity: ${Math.floor(w.capacity)} now.`;
+            else if (need.missing === 'stars') missing = affordText({ price: step.stars, have: state.stars, perDay: report.stars });
+            else if (need.missing === 'ore') missing = `Needs ${formatCount(step.ore)} ore: ${formatCount(state.minerals)} in store.`;
+            else if (need.missing === 'dorm') missing = 'Needs a dormitory to spare.';
+        }
+        return price + says(`${rung} · ${step.name}: ${step.does}`)
+            + note(takes.length ? `Takes ${takes.join(' and ')}.` : '')
+            + note(missing, 'is-missing');
+    }
+    function drawLadder() {
+        if (!ui.ladder) return;
+        const w = state.watcher;
+        // the first sleep only teaches: the ladder shows itself from the second
+        ui.ladder.hidden = firstSleep(w) && !(w.bought || []).length;
+        const bought = w.bought || [];
+        const next = LADDER[bought.length] || null;
+        const key = `${bought.join(',')}|${next ? next.id : ''}`;
+        if (key !== ladderKey) {
+            ladderKey = key;
+            ui.ladder.textContent = '';
+            const add = (step, isNext) => {
+                const b = document.createElement('button');
+                b.className = `btn deep-ladder-btn${isNext ? ' is-next' : ' is-bought'}`;
+                b.setAttribute('aria-label', step.name);
+                b.innerHTML = `<i data-lucide="${step.icon}" class="w-4 h-4"></i><div class="tooltip deep-tip-wide"></div>`;
+                if (!isNext) setTooltip(b, says(`${RUNGS[step.rung]} · ${step.name}: ${step.does}`));
+                else b.addEventListener('click', () => buyLadder(), { signal });
+                ui.ladder.appendChild(b);
+                return b;
+            };
+            LADDER.slice(0, bought.length).forEach((step) => add(step, false));
+            ladderNext = next ? add(next, true) : null;
+            scheduleIconRefresh();
+        }
+        if (ladderNext && next) {
+            const need = stepNeed(w, state);
+            ladderNext.classList.toggle('is-locked', !!need.missing || busy);
+            setTooltip(ladderNext, stepTip(next, need));
+        }
+    }
+    function buyLadder() {
+        if (!state.asleep || busy || paused()) return;
+        const out = buyStep(state.watcher, state, layout.slots);
+        if (!out) return;
+        if (out.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
+        ladderKey = '';
+        report = dryRun();
+        scene?.setState(state, layout);
+        updateChrome();
+        saveGame();
+    }
+
+    /* ---- SURFACE (v1.49.0): opposite the Watcher, only in the sleeps it comes in. One line,
+       a game, what the game gave, and the sentence as far as it is known. Gone at the wake. */
+    let surfaceKey = '';
+    function drawSurface() {
+        if (!ui.surface) return;
+        const sf = state.watcher.surface;
+        const v = state.asleep ? sf.visit : null;
+        ui.surface.hidden = !v;
+        if (!v) { surfaceKey = ''; return; }
+        const key = `${sf.visits}|${v.result ? v.result.text : ''}|${sf.words}`;
+        if (key === surfaceKey) return;
+        surfaceKey = key;
+        ui.surfaceLine.textContent = v.line;
+        ui.surfaceSaid.textContent = v.result ? v.result.text : '';
+        ui.surface.classList.toggle('is-played', !!v.result);
+        ui.surfaceWords.textContent = sf.words > 0 ? sentenceShown(sf) : '';
+        for (const b of ui.rpsBtns) {
+            b.disabled = !!v.result;
+            b.classList.toggle('is-you', !!v.result && v.result.you === b.dataset.throw);
+            b.classList.toggle('is-it', !!v.result && v.result.it === b.dataset.throw);
+        }
+        scheduleIconRefresh();
+    }
+    function throwAtSurface(you) {
+        if (!state.asleep || busy || paused() || !THROWS.includes(you)) return;
+        const r = playSurface(state.watcher, you);
+        if (!r) return;
+        updateChrome();
+        saveGame();
+        if (r.rebooted) wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e));
     }
 
     /** The dry runs behind the cryo buttons. Once a colony day, never per frame. */
@@ -637,7 +761,7 @@ export function init() {
     function showBuild(el, kind, type) {
         const mark = el.querySelector('.deep-build');
         if (!mark) return;
-        const job = (state.builds || []).find((j) => j.kind === kind && (type === null || j.type === type));
+        const job = (state.builds || []).find((j) => j.kind === kind && (type === null || j.type === type) && !isQueued(j));
         mark.classList.toggle('is-on', !!job);
         if (job) mark.style.setProperty('--p', `${Math.round(buildProgress(state, job) * 100)}%`);
     }
@@ -650,24 +774,24 @@ export function init() {
 
     // --- buying: the price now, the thing itself in a few days ---------------
     function bought() { advisorLine = ''; said.key = ''; }
+    /* Since v1.49.0 every order goes through the queue (deep.js `orderBuild`): paid now, at the
+       price after the orders already on the books, started when its lane and its chamber are free.
+       A room takes whichever chamber is empty the day it starts. */
+    const queueFull = () => (state.builds || []).length >= QUEUE_MAX;
     function dig() {
-        const price = digCost(state.chambers);
-        if (state.minerals < price || buildPending(state, 'dig')) return;
+        const price = nextPrice(state, 'dig');
+        if (state.minerals < price || queueFull()) return;
         state.minerals -= price;
-        startBuild(state, 'dig');
+        orderBuild(state, 'dig');
         bought();
         afterChange();
     }
     function buildRoom(type) {
-        const slot = freeChamber(layout);
-        if (slot < 0 || buildPending(state, 'room', type)) return;
-        const price = roomCost(type, state.rooms[type] || 0);
+        if (chambersAhead(state) <= 0 || queueFull()) return;
+        const price = nextPrice(state, 'room', type);
         if (state.minerals < price) return;
         state.minerals -= price;
-        // the chamber is spoken for the moment the order goes in, so the next order
-        // cannot be given the same one
-        layout.slots[slot] = null;
-        startBuild(state, 'room', { type, slot });
+        orderBuild(state, 'room', { type });
         mendType(type);
         bought();
         afterChange();
@@ -675,25 +799,64 @@ export function init() {
     /** Levels the room type the button offers (the next goal, what runs low, the weakest). */
     function levelWeakest() {
         const type = offers().level.type;
-        if (buildPending(state, 'level', type) || !(state.rooms[type] > 0)) return;
-        const price = levelCost(type, state.level[type] || 0);
+        if (!(state.rooms[type] > 0) || queueFull()) return;
+        const price = nextPrice(state, 'level', type);
         if (state.stars < price) return;
         state.stars -= price;
-        startBuild(state, 'level', { type });
+        orderBuild(state, 'level', { type });
         mendType(type);
         bought();
         afterChange();
     }
     function automateWeakest() {
         const type = offers().auto.type;
-        if (buildPending(state, 'auto', type) || !(state.rooms[type] > 0)) return;
-        const price = automationCost(type, state.auto[type] || 0);
+        if (!(state.rooms[type] > 0) || queueFull()) return;
+        const price = nextPrice(state, 'auto', type);
         if (!Number.isFinite(price) || state.stars < price) return;
         state.stars -= price;
-        startBuild(state, 'auto', { type });
+        orderBuild(state, 'auto', { type });
         mendType(type);
         bought();
         afterChange();
+    }
+
+    /* ---- THE QUEUE, under the buttons (v1.49.0): "dig, mine, farm", each with its ring. An order
+       that waits while the colony sleeps (no Scheduler yet) is drawn dim. Rebuilt only when the
+       orders change; the rings are moved on every pass. */
+    const QUEUE_WORD = { mine: 'mine', farm: 'farm', generator: 'gen', dorm: 'dorm' };
+    const queueWord = (j) => (j.kind === 'dig' ? 'dig' : j.kind === 'room' ? QUEUE_WORD[j.type]
+        : `${j.kind === 'level' ? 'lv' : 'auto'} ${QUEUE_WORD[j.type]}`);
+    const Q_RING = 2 * Math.PI * 4.5;
+    let queueKey = '';
+    let queueRows = [];
+    function drawQueue() {
+        const jobs = state.builds || [];
+        const key = jobs.map((j) => `${j.kind}${j.type}${j.startDay}`).join('|');
+        if (key !== queueKey) {
+            queueKey = key;
+            ui.queue.textContent = '';
+            queueRows = jobs.map((j) => {
+                const row = document.createElement('div');
+                row.className = 'deep-q-row';
+                row.innerHTML = `<span class="deep-q-word">${queueWord(j)}</span>`
+                    + '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">'
+                    + '<circle class="track" cx="6" cy="6" r="4.5"></circle>'
+                    + `<circle class="arc" cx="6" cy="6" r="4.5" stroke-dasharray="${Q_RING.toFixed(1)}" stroke-dashoffset="${Q_RING.toFixed(1)}"></circle></svg>`;
+                ui.queue.appendChild(row);
+                return { job: j, row, arc: row.querySelector('.arc') };
+            });
+            ui.queue.hidden = !jobs.length;
+        }
+        const held = state.asleep && !queueRunsAsleep(state);
+        const eta = queueRows.length ? buildEta(state) : null;
+        for (const r of queueRows) {
+            const waiting = isQueued(r.job);
+            r.row.classList.toggle('is-waiting', waiting);
+            r.row.classList.toggle('is-held', waiting && held);
+            r.arc.setAttribute('stroke-dashoffset', (Q_RING * (1 - buildProgress(state, r.job))).toFixed(1));
+            const left = Math.max(0, Math.ceil((eta.get(r.job) ?? state.day) - state.day));
+            r.row.title = waiting && held ? 'Waits for the colony to wake.' : `Ready in ${backIn(left)}.`;
+        }
     }
 
     /** Orders that landed: the layout is told where a new room went and gets a fresh chamber
@@ -859,7 +1022,9 @@ export function init() {
             || (firstSleep(state.watcher) && sleepSum && sleepSum.days >= FIRST_SLEEP_DAYS ? { kind: 'first' } : null);
         if (woke) { wake(woke).catch((e) => console.error('the deep: the wake broke', e)); return; }
         // a riddle, now and then, never over an alarm
-        if (puzzleDue(state.watcher, { asleep: true, alarmPending: busy })) openPuzzle(state.watcher, state);
+        if (puzzleDue(state.watcher, { asleep: true, alarmPending: busy })) openPuzzle(state.watcher, state, state.cryo);
+        // and in some sleeps, a few seconds in, Surface (v1.49.0)
+        if (sleepSum && surfaceDue(state.watcher, sleepSum.days, CRYO[state.cryo].days)) openSurface(state.watcher);
         updateChrome();
         if (sleepTicks % 10 === 0) saveGame();
     }
@@ -876,6 +1041,7 @@ export function init() {
         state.asleep = false;
         // the alarm is a jolt to the Watcher; a low one says it slightly wrong, never the reboot
         const w = state.watcher;
+        closeSurface(w);                // Surface, and everything it said, is gone the moment they wake
         const rebooted = alarm.kind !== 'reboot' && (alarmHit(w, alarm.kind) || !!alarm.rebooted);
         const said = alarm.kind === 'reboot' ? [alarmLine(alarm)]
             : watcherLines(w, [alarmLine(alarm), ...(alarm.kind === 'scouts' ? (alarm.landed || []).slice(1).map(scoutLine) : [])]);
@@ -1030,48 +1196,52 @@ export function init() {
         ui.snapArc?.setAttribute('stroke-dashoffset', (RING_LEN * wait / SNAP_COOLDOWN_MS).toFixed(1));
     }
 
-    /** The riddle's answer, typed. Enter answers, Escape lets it go. */
-    function sayOnCard(text, cls) {
-        ui.puzzleSaid.textContent = text;
-        ui.puzzle.classList.remove('is-right', 'is-wrong');
-        void ui.puzzle.offsetWidth;
-        ui.puzzle.classList.add(cls);
+    /** The riddle's answer, typed. Enter answers, Escape lets it go. One card or two. */
+    function sayOnCard(card, text, cls) {
+        card.said.textContent = text;
+        card.el.classList.remove('is-right', 'is-wrong');
+        void card.el.offsetWidth;
+        card.el.classList.add(cls);
     }
-    function answer() {
+    function answer(card) {
         const w = state.watcher;
-        if (!state.asleep || busy || paused() || !w.puzzle) return;
-        const out = answerPuzzle(w, ui.puzzleIn.value, state.cryo);
-        if (!out) { sayOnCard('?', 'is-wrong'); return; }
+        const key = card.slot ? 'puzzle2' : 'puzzle';
+        if (!state.asleep || busy || paused() || !w[key]) return;
+        const out = answerPuzzle(w, card.input.value, state.cryo, card.slot);
+        if (!out) { sayOnCard(card, '?', 'is-wrong'); return; }
         if (out.ok) {
             // the stars only get a number on the card when the counter visibly moves (v1.48.0)
             const gain = puzzleStars(report.stars);
             const shows = rewardShows(state.stars, gain);
             state.stars += gain;
-            ui.puzzleIn.disabled = true;
-            sayOnCard(shows ? `+${Math.round(out.gained)} · +${formatCount(gain)} stars` : `+${Math.round(out.gained)}`, 'is-right');
-            // the card lingers a moment on its answer, then goes
-            lingerUntil = performance.now() + 900;
+            card.input.disabled = true;
+            sayOnCard(card, shows ? `+${Math.round(out.gained)} · +${formatCount(gain)} stars` : `+${Math.round(out.gained)}`, 'is-right');
+            // the card lingers a moment on its answer, then goes (a second card moves up after it)
+            card.lingerUntil = performance.now() + 900;
             setTimeout(() => updateWatcher(), 950);
             updateChrome();
             saveGame();
             return;
         }
-        ui.puzzleIn.value = '';
-        sayOnCard(`${Math.round(out.gained)}`, 'is-wrong');
+        card.input.value = '';
+        sayOnCard(card, `${Math.round(out.gained)}`, 'is-wrong');
         if (out.rebooted) { wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e)); return; }
         updateChrome();
         saveGame();
     }
-    ui.puzzleIn?.addEventListener('keydown', (e) => {
-        e.stopPropagation();
-        if (e.key === 'Enter') { e.preventDefault(); answer(); }
-        else if (e.key === 'Escape') {
-            e.preventDefault();
-            dismissPuzzle(state.watcher, state.cryo);
-            updateChrome();
-            saveGame();
-        }
-    }, { signal });
+    for (const card of ui.cards) {
+        card.input?.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') { e.preventDefault(); answer(card); }
+            else if (e.key === 'Escape') {
+                e.preventDefault();
+                dismissPuzzle(state.watcher, state.cryo, card.slot);
+                updateChrome();
+                saveGame();
+            }
+        }, { signal });
+    }
+    for (const b of ui.rpsBtns) b.addEventListener('click', () => throwAtSurface(b.dataset.throw), { signal });
 
     // a click puts a button's tooltip away until the cursor leaves it (v1.48.0: the snowflake's
     // tooltip stayed over the scene after the click that started the sleep)
@@ -1085,17 +1255,17 @@ export function init() {
     ui.levelBtn.addEventListener('click', guarded(levelWeakest), { signal });
     ui.autoBtn.addEventListener('click', guarded(automateWeakest), { signal });
     // the preview: every purchase button shows its own future on the bars
-    watchHover(ui.digBtn, () => ({ kind: 'dig', type: null, price: digCost(state.chambers), currency: 'minerals' }));
+    watchHover(ui.digBtn, () => ({ kind: 'dig', type: null, price: nextPrice(state, 'dig'), currency: 'minerals' }));
     for (const { type, el } of ui.roomBtns) {
-        watchHover(el, () => ({ kind: 'room', type, price: roomCost(type, state.rooms[type] || 0), currency: 'minerals' }));
+        watchHover(el, () => ({ kind: 'room', type, price: nextPrice(state, 'room', type), currency: 'minerals' }));
     }
     watchHover(ui.levelBtn, () => {
         const type = offers().level.type;
-        return { kind: 'level', type, price: levelCost(type, state.level[type] || 0), currency: 'stars' };
+        return { kind: 'level', type, price: nextPrice(state, 'level', type), currency: 'stars' };
     });
     watchHover(ui.autoBtn, () => {
         const type = offers().auto.type;
-        const price = automationCost(type, state.auto[type] || 0);
+        const price = nextPrice(state, 'auto', type);
         return { kind: 'auto', type, price: Number.isFinite(price) ? price : 0, currency: 'stars' };
     });
     ui.cryoBtn.addEventListener('click', guarded(pressCryo), { signal });
@@ -1137,6 +1307,8 @@ export function init() {
         const days = Math.max(1, Math.min(MAX_CATCHUP_DAYS, elapsed));
         lastDayAt = now;
         const lines = [];
+        // awake, the Watcher rests: two points of stability an awake month (v1.49.0)
+        recoverAwake(state.watcher, days);
         for (let i = 0; i < days; i++) {
             landBuilds();
             report = tickDay(state, false);
@@ -1219,11 +1391,27 @@ export function init() {
             else if (what === 'stability') {
                 // the Watcher's meter, set by hand: 0 reboots at the next sleeping tick
                 state.watcher.stability = Math.max(0, Math.min(STABILITY_MAX, Number(n) || 0));
-            } else if (what === 'capacity') state.watcher.capacity = Math.max(0, Math.min(CAPACITY_MAX, Number(n ?? CAPACITY_MAX)));
+            } else if (what === 'capacity') state.watcher.capacity = Math.max(0, Math.min(capacityMax(state.watcher), Number(n ?? capacityMax(state.watcher))));
             else if (what === 'puzzle') {
                 // a riddle now, whatever the gap and the capacity say
-                state.watcher.capacity = Math.max(state.watcher.capacity, CAPACITY_MAX);
+                state.watcher.capacity = Math.max(state.watcher.capacity, capacityMax(state.watcher));
                 if (!state.watcher.puzzle) openPuzzle(state.watcher, state);
+            } else if (what === 'surface') {
+                // Surface now, in this sleep, whatever the gaps say (v1.49.0)
+                if (state.asleep) {
+                    const sf = state.watcher.surface;
+                    sf.visit = null;
+                    sf.lastSleep = 0;
+                    openSurface(state.watcher);
+                }
+            } else if (what === 'ladder') {
+                // the price of the next step, handed over: capacity, stars, ore
+                const step = LADDER[(state.watcher.bought || []).length];
+                if (step) {
+                    state.watcher.capacity = capacityMax(state.watcher);
+                    state.stars += step.stars;
+                    state.minerals += step.ore || 0;
+                }
             }
             else if (what === 'stars') state.stars += 1e8;
             else if (what === 'day100') { for (let i = 0; i < 100; i++) report = tickDay(state, state.asleep); }

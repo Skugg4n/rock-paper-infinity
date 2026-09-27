@@ -14,7 +14,7 @@
 import {
     COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, roomMultiplier, upkeepMultiplier, BIRTH_FOOD,
     FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, cryoLabel, group, digCost, roomCost,
-    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending,
+    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending, buildEta,
 } from './deep.js';
 import { ROOM_WORD, ROOM_WORDS, foodDaysLeft } from './advisor.js';
 
@@ -178,12 +178,13 @@ export const rateWords = (days) => RATE_WORDS[days] || span(days);
  * @param {number} o.price
  * @param {number} o.have
  * @param {number} o.perDay - what comes in a day, in the same currency
- * @param {string} [o.blocked] - 'chamber' | 'pending' | 'top' | 'asleep' | 'people'
+ * @param {string} [o.blocked] - 'chamber' | 'pending' | 'full' | 'top' | 'asleep' | 'people'
  * @returns {string} '' when it can be bought now
  */
 export const AFFORD_FAR_DAYS = 1000 * DAYS_PER_YEAR;
 export function affordText({ price, have, perDay, blocked }) {
     if (blocked === 'pending') return 'Already being built.';
+    if (blocked === 'full') return 'Eight orders are on the books: wait for one to land.';
     if (blocked === 'top') return 'The ladder is at its top.';
     if (blocked === 'asleep') return 'The colony is asleep: wake it to buy.';
     if (blocked === 'people') return `Needs at least ${MIN_SLEEPERS} people to stay behind.`;
@@ -273,7 +274,9 @@ export function cryoNeed(tier, { state, trouble = null, planned = null, starsPer
         return say('other', 'is not safe yet', '');
     }
     if (trouble) {
-        const left = (state.builds || []).reduce((a, j) => Math.max(a, j.doneDay - state.day), 0);
+        // v1.49.0: an order waiting in the queue lands after the ones ahead of it
+        const eta = buildEta(state);
+        const left = (state.builds || []).reduce((a, j) => Math.max(a, (eta.get(j) ?? state.day) - state.day), 0);
         return { kind: 'wait', short: `ready in ${backIn(left)}`, long: `${name} is ready in ${backIn(left)}: it waits for the orders being built.` };
     }
     const price = CRYO[tier]?.cost ?? 0;
@@ -432,6 +435,7 @@ export function cloneState(state) {
         ...state,
         rooms: { ...state.rooms }, level: { ...state.level }, auto: { ...state.auto },
         dark: { ...(state.dark || {}) }, darkSlots: (state.darkSlots || []).slice(),
+        taken: { ...(state.taken || {}) }, takenSlots: (state.takenSlots || []).slice(),
         builds: [], probes: (state.probes || []).slice(), stalled: { ...(state.stalled || {}) },
     };
 }

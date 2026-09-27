@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.49.0 - 2026-09-27 (chapter IV, slice 6)
+
+### Surface in the dark, rock paper scissors, Watcher upgrades, build queue
+
+Ola: "Queuing digging of rooms would be a nice QoL update. Automate building, to build while people are sleeping, so it does not stop when I click Cryo. But how much more is there? It feels like the whole development of madness is missing after the sleep starts."
+
+- **The build queue.** Every buy button can be pressed again while its order is being built. The next order is paid at once, at the next price (a second dig costs the chamber after the first), and waits in its lane; a room also waits for a chamber, so "dig, mine, farm" can be ordered with no chamber free. A small mono list under the room buttons shows the orders, each with its own ring, at most eight. Asleep, the order under way finishes and the rest wait for the wake (drawn dim), until the Watcher has the **Scheduler**: then the queue runs while everyone sleeps, and no "the next one is paid for" alarm wakes them while orders remain. Rules in deep.js (`orderBuild`, `nextPrice`, `chambersAhead`, `buildEta`); the simulation's own orders land exactly as before.
+- **Surface.** From the second sleep on, a few seconds in, rarely at first and from its fifth visit every sleep, something appears opposite the Watcher: a faint ring, SURFACE, one line, and three small buttons with chapter I's glyphs. It has already chosen. "Surface: paper. You: rock. It takes 3 stability." / "You: scissors. Surface: paper. It gives 8 capacity and a word." A win gives one word of a sentence revealed over many sleeps (never more words than the ladder's steps plus one, never the last). Its lines drift from "It is quiet up here." to "Why do you keep them cold?" to "You could come up alone.", and from its fifth visit it half the time throws what beat your last throw. It is gone the moment the colony wakes. Pure rules and tests in the new `src/phase4/surface.js`.
+- **The Watcher's ladder.** Beside the Watcher, asleep only (and not in the first sleep), a column of glyphs: the steps bought, and the next one teased, greyed until it can be paid. SYSTEM: Watchdog (drift 25 % slower), Scheduler (the queue runs asleep), Deep read (a riddle gives +25), Night vision (alarms 10 % later). HARDWARE: Cooling (capacity pool twice as deep), Second core (two riddles open), Sensor mast (better scout odds, half the scatter), Reactor tap (three times the capacity). Each costs capacity and stars, climbing; from HARDWARE on also ore and a dormitory: the Watcher takes the last one dug, its plate shows a cpu glyph, the beds fall, and the feed says once "We needed the space."
+- **Stability recovers awake** (Claude's decision for Ola): +2 per awake colony month, up to 100, so waking has a reason besides the alarms.
+- Save schema 4 with a migration (an empty ladder, no Surface yet, no dormitory taken; orders already placed keep their days). Checkpoint "IV · Surface" (asleep at a century a second, SYSTEM and half of HARDWARE bought, the sentence half known, Surface due in seconds); `debug_deep('surface')` forces a visit, `debug_deep('ladder')` pays the next step.
+- Sim: the plain run is unchanged, 26m26s to year 802 701, 88 wake-ups, no hungry days. Its unattended Watcher now rests awake: stability 10 at the end, lowest 10, no reboots (was 38, 1, 2). New `--watcher` player (buys the ladder as capacity comes, plays Surface, stays under up to 20 s for capacity, waits out mourning instead of buying farms): 24m08s to the ring, SYSTEM done at 10m25s, HARDWARE at 17m24s, four dormitories taken.
+
 ## v1.48.0 - 2026-09-23 (chapter IV, the overnight playtest)
 
 ### Cryo reachable, the first sleep teaches, the dot marks what runs low, weight to people, bugs

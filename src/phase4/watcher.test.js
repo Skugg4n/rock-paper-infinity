@@ -322,7 +322,7 @@ describe('the save', () => {
         back.state.watcher = w;
         const raw = serializeDeep(back.state, back.layout);
         expect(JSON.parse(raw).schemaVersion).toBe(SCHEMA_VERSION);
-        expect(SCHEMA_VERSION).toBe(3);
+        expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(3);
         expect(deserializeDeep(raw).state.watcher).toEqual(w);
     });
     test('a broken Watcher in a save is mended, not thrown away', () => {

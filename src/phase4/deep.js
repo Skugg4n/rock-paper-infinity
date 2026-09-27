@@ -218,16 +218,20 @@ export function probeSkill(day) {
     const end = END_YEAR * DAYS_PER_YEAR;
     return clamp(Math.log10(1 + Math.max(0, day)) / Math.log10(1 + end), 0, 1);
 }
+/** THE SENSOR MAST (v1.49.0, a Watcher upgrade): the parties go up with better instruments. Their
+ *  odds are those of a colony this much further along, and a good reading is off by half as much. */
+export const MAST_SKILL = 0.3;
+export const MAST_SCATTER = 0.5;
 /** @returns {{reading:number, lost:number, wrong:number, monster:number}} the odds on this day */
-export function probeOdds(day) {
-    const k = probeSkill(day);
+export function probeOdds(day, mast = false) {
+    const k = Math.min(1, probeSkill(day) + (mast ? MAST_SKILL : 0));
     const o = {};
     for (const key of PROBE_OUTCOMES) o[key] = PROBE_ODDS_EARLY[key] + k * (PROBE_ODDS_LATE[key] - PROBE_ODDS_EARLY[key]);
     return o;
 }
 
 /** How far a good reading may be off, in points, for a party that comes home on `day`. */
-export const probeScatter = (day) => Math.max(2, PROBE_NOISE * (1 - 0.7 * probeSkill(day)));
+export const probeScatter = (day, mast = false) => Math.max(mast ? 1 : 2, PROBE_NOISE * (1 - 0.7 * probeSkill(day)) * (mast ? MAST_SCATTER : 1));
 
 /**
  * Odds as whole per cents that add up to exactly 100 (largest remainder), so a tooltip never
@@ -256,12 +260,13 @@ export function scoutOdds(s) {
     const sent = s.probesSent || 0;
     const days = probeDays(sent);
     const back = (s.day || 0) + days;
+    const mast = watcherHas(s, 'mast');
     return {
         people: scoutParty(s.humans),
         days,
         price: probeCost(sent),
-        pct: wholePercents(probeOdds(back), PROBE_OUTCOMES),
-        scatter: Math.round(probeScatter(back)),
+        pct: wholePercents(probeOdds(back, mast), PROBE_OUTCOMES),
+        scatter: Math.round(probeScatter(back, mast)),
     };
 }
 
@@ -274,15 +279,15 @@ export function scoutOdds(s) {
  * @returns {{outcome:'reading'|'lost'|'wrong'|'monster', reading:number|null, spread:number}}
  *          `spread` is how much to trust the reading; 0 when there is none.
  */
-export function resolveProbe(rng, day, surfaceTrue) {
-    const odds = probeOdds(day);
+export function resolveProbe(rng, day, surfaceTrue, mast = false) {
+    const odds = probeOdds(day, mast);
     let roll = rng();
     let outcome = PROBE_OUTCOMES[PROBE_OUTCOMES.length - 1];
     for (const key of PROBE_OUTCOMES) {
         if (roll < odds[key]) { outcome = key; break; }
         roll -= odds[key];
     }
-    const scatter = probeScatter(day);
+    const scatter = probeScatter(day, mast);
     if (outcome === 'reading') {
         return { outcome, reading: clamp(surfaceTrue + (rng() * 2 - 1) * scatter, 0, 100), spread: scatter };
     }
@@ -403,8 +408,9 @@ export const scoutsOut = (s) => (s.probes || []).length > 0;
  */
 export function darkenChamber(s, slots, rng) {
     const taken = s.darkSlots || [];
+    const watcher = s.takenSlots || [];         // what the Watcher took is not the monster's to take
     const open = [];
-    (slots || []).forEach((type, i) => { if (type && ROOMS.includes(type) && taken.indexOf(i) < 0) open.push(i); });
+    (slots || []).forEach((type, i) => { if (type && ROOMS.includes(type) && taken.indexOf(i) < 0 && watcher.indexOf(i) < 0) open.push(i); });
     if (!open.length) return -1;
     const slot = open[Math.min(open.length - 1, Math.floor(rng() * open.length))];
     s.dark = s.dark || {};
@@ -453,7 +459,7 @@ export function resolveDueProbes(s, slots, rng) {
     for (const p of (s.probes || [])) {
         if (p.dueDay > s.day) { still.push(p); continue; }
         const truth = surface(s.doom0, p.dueDay);
-        const r = resolveProbe(rng, p.dueDay, truth);
+        const r = resolveProbe(rng, p.dueDay, truth, watcherHas(s, 'mast'));
         const people = p.people || 0;
         let slot = -1, back = 0;
         if (r.outcome === 'monster') {
@@ -537,6 +543,8 @@ export const BUILD_DAYS = { dig: 8, room: 5, level: 6, auto: 12 };
 
 /**
  * Place an order. The caller has already taken the price; this only says when it lands.
+ * It starts at once: the simulation and the tests order into an empty lane only. The phase goes
+ * through `orderBuild()`, which queues an order behind the one already in its lane (v1.49.0).
  * @param {object} s - state, mutated
  * @param {'dig'|'room'|'level'|'auto'} kind
  * @param {object} [opts]
@@ -550,36 +558,158 @@ export function startBuild(s, kind, { type = null, slot = -1 } = {}) {
     return job;
 }
 
-/** How far along a job is, 0 to 1. */
+/** How far along a job is, 0 to 1. An order still waiting in its lane is at 0. */
 export function buildProgress(s, job) {
+    if (isQueued(job)) return 0;
     const span = job.doneDay - job.startDay;
     if (!(span > 0)) return 1;
     return Math.max(0, Math.min(1, (s.day - job.startDay) / span));
 }
 
-/** Is this room type already waiting on an order of this kind? One at a time, per kind. */
+/** Is this room type already waiting on an order of this kind (under way or in the queue)? */
 export function buildPending(s, kind, type = null) {
     return (s.builds || []).some((j) => j.kind === kind && (type === null || j.type === type));
+}
+
+/* ---------------------------------------------------------------------------
+ * THE BUILD QUEUE (v1.49.0). Ola: "Queuing digging of rooms would be a nice QoL update.
+ * Automate building, to build while people are sleeping, so it does not stop when I click
+ * Cryo." A button can be pressed again while its order is being built: the next order is paid
+ * at once (the price of the NEXT one: a second dig costs what the chamber after the first
+ * costs) and waits in its LANE behind the first. A lane is a dig, or a kind of order for one
+ * room type (the mines' rooms, the farms' levels...), so different lanes still run side by side
+ * as they always did. A room waits for its chamber as well as for its lane.
+ *
+ * Awake, the next order in a lane starts the day the one before it lands. Asleep, only the
+ * order already under way finishes; the next one waits for the colony to wake, unless the
+ * Watcher has the Scheduler (watcher.js), which runs the queue while everyone sleeps.
+ * ------------------------------------------------------------------------ */
+/** At most this many orders on the books at once: the list under the buttons stays short. */
+export const QUEUE_MAX = 8;
+/** Is this job waiting in its lane, not yet started? */
+export const isQueued = (job) => job.startDay == null;
+const laneOf = (job) => (job.kind === 'dig' ? 'dig' : `${job.kind}:${job.type}`);
+/** How many orders of this kind (and type) are on the books, started or waiting. */
+export const ordered = (s, kind, type = null) => (s.builds || []).filter((j) => j.kind === kind && (type === null || j.type === type)).length;
+/** Does the Watcher have this upgrade? The rules read a few of them (the Scheduler, Night vision,
+ *  the Sensor mast); watcher.js owns the ladder and what it costs. */
+export const watcherHas = (s, id) => !!(s && s.watcher && Array.isArray(s.watcher.bought) && s.watcher.bought.includes(id));
+/** The queue runs while the colony sleeps only with the Scheduler. */
+export const queueRunsAsleep = (s) => watcherHas(s, 'scheduler');
+
+/** Chambers standing empty today with no room under way in them: where a room can start now. */
+function openChambers(s) {
+    const used = ROOMS.reduce((a, t) => a + (s.rooms[t] || 0), 0) + (s.rooms.cryo || 0)
+        + (s.builds || []).filter((j) => j.kind === 'room' && !isQueued(j)).length;
+    return s.chambers - used;
+}
+/**
+ * Chambers a new room order can count on: the empty ones and the ones being dug, less every
+ * room already ordered. A room is only ordered when this is above zero, so every room that
+ * waits in the queue has a chamber coming.
+ */
+export function chambersAhead(s) {
+    return freeChambers(s) + ordered(s, 'dig');
+}
+
+/** What the next order of this kind costs: the price after every order already on the books. */
+export function nextPrice(s, kind, type = null) {
+    if (kind === 'dig') return digCost(s.chambers + ordered(s, 'dig'));
+    if (kind === 'room') return roomCost(type, (s.rooms[type] || 0) + ordered(s, 'room', type));
+    if (kind === 'level') return levelCost(type, (s.level[type] || 0) + ordered(s, 'level', type));
+    return automationCost(type, (s.auto[type] || 0) + ordered(s, 'auto', type));
+}
+
+/** Can this job start today: its lane free, and for a room a chamber to put it in. */
+function canStart(s, job) {
+    if ((s.builds || []).some((j) => j !== job && !isQueued(j) && laneOf(j) === laneOf(job))) return false;
+    return job.kind !== 'room' || openChambers(s) > 0;
+}
+
+/**
+ * Place an order the way the phase does (v1.49.0): at once when its lane is free (and, for a
+ * room, a chamber stands empty), else at the back of its lane. The caller has taken the price.
+ * @param {object} s - state, mutated
+ * @param {'dig'|'room'|'level'|'auto'} kind
+ * @param {object} [opts] - { type }
+ * @returns {object} the job
+ */
+export function orderBuild(s, kind, { type = null } = {}) {
+    const job = { kind, type, slot: -1, startDay: null, doneDay: null };
+    if (canStart(s, job)) { job.startDay = s.day; job.doneDay = s.day + BUILD_DAYS[kind]; }
+    s.builds = (s.builds || []).concat([job]);
+    return job;
+}
+
+/** Start every waiting order that can start today, in the order they were placed. */
+function startQueued(s) {
+    let started = false;
+    for (const job of s.builds || []) {
+        if (!isQueued(job) || !canStart(s, job)) continue;
+        job.startDay = s.day;
+        job.doneDay = s.day + BUILD_DAYS[job.kind];
+        started = true;
+    }
+    return started;
+}
+
+/**
+ * The day each order on the books should land, awake: the ones under way on their own day, the
+ * ones waiting one after the other in their lane. A room waiting for its chamber is counted from
+ * the dig that makes it. For the list under the buttons and "ready in N d".
+ * @param {object} s
+ * @returns {Map<object, number>} job to day
+ */
+export function buildEta(s) {
+    const eta = new Map();
+    const laneEnd = {};
+    const chamberDays = [];             // the days the digs on the books hand over a chamber
+    for (const j of s.builds || []) {
+        if (isQueued(j)) continue;
+        eta.set(j, j.doneDay);
+        laneEnd[laneOf(j)] = Math.max(laneEnd[laneOf(j)] ?? -Infinity, j.doneDay);
+        if (j.kind === 'dig') chamberDays.push(j.doneDay);
+    }
+    chamberDays.sort((x, y) => x - y);
+    let free = openChambers(s);
+    for (const j of s.builds || []) {
+        if (!isQueued(j)) continue;
+        let from = Math.max(s.day, laneEnd[laneOf(j)] ?? -Infinity);
+        if (j.kind === 'room') {
+            if (free > 0) free--;
+            else if (chamberDays.length) from = Math.max(from, chamberDays.shift());
+        }
+        const done = from + BUILD_DAYS[j.kind];
+        eta.set(j, done);
+        laneEnd[laneOf(j)] = done;
+        if (j.kind === 'dig') { chamberDays.push(done); chamberDays.sort((x, y) => x - y); }
+    }
+    return eta;
 }
 
 /**
  * Everything whose day has come. Called once per colony day, and by `sleep()`, never from
  * `tickDay` itself: a dry run on a clone must show today's numbers and not tomorrow's.
+ * Since v1.49.0 it also starts the next order in every lane that came free, awake always, and
+ * asleep only with the Scheduler (`asleep`, from sleep()).
  *
  * @param {object} s - state, mutated
+ * @param {{asleep?:boolean}} [opts]
  * @returns {Array<object>} the jobs that finished, for the layout and the scene to follow
  */
-export function completeBuilds(s) {
-    const done = [], still = [];
-    for (const job of s.builds || []) (job.doneDay <= s.day ? done : still).push(job);
-    if (!done.length) return done;
-    s.builds = still;
-    for (const job of done) {
-        if (job.kind === 'dig') s.chambers += 1;
-        else if (job.kind === 'room') s.rooms[job.type] = (s.rooms[job.type] || 0) + 1;
-        else if (job.kind === 'level') s.level[job.type] = (s.level[job.type] || 0) + 1;
-        else if (job.kind === 'auto') s.auto[job.type] = (s.auto[job.type] || 0) + 1;
+export function completeBuilds(s, { asleep = false } = {}) {
+    const done = (s.builds || []).filter((j) => !isQueued(j) && j.doneDay <= s.day);
+    if (done.length) {
+        s.builds = s.builds.filter((j) => !done.includes(j));
+        for (const job of done) {
+            if (job.kind === 'dig') s.chambers += 1;
+            else if (job.kind === 'room') s.rooms[job.type] = (s.rooms[job.type] || 0) + 1;
+            else if (job.kind === 'level') s.level[job.type] = (s.level[job.type] || 0) + 1;
+            else if (job.kind === 'auto') s.auto[job.type] = (s.auto[job.type] || 0) + 1;
+        }
     }
+    // the next order in a lane that came free starts today (never due today: no build is 0 days)
+    if (!asleep || queueRunsAsleep(s)) startQueued(s);
     return done;
 }
 
@@ -592,7 +722,7 @@ export function completeBuilds(s) {
  */
 export function ordersDone(s) {
     const c = JSON.parse(JSON.stringify(s));
-    for (const job of c.builds || []) job.doneDay = c.day;
+    for (const job of c.builds || []) { job.startDay = c.day; job.doneDay = c.day; }
     completeBuilds(c);
     return c;
 }
@@ -608,6 +738,9 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         // are cleared. Empty, and every number below is exactly what it was before probes existed.
         dark: { mine: 0, farm: 0, generator: 0, dorm: 0 },
         darkSlots: [],                      // which chambers those are; the scene's business, not the rules'
+        // What the Watcher took for its hardware (v1.49.0): dormitories that stand, and hold no one
+        taken: { mine: 0, farm: 0, generator: 0, dorm: 0 },
+        takenSlots: [],
         stalled: {},                        // room types that stopped during the last sleep
         probes: [], probesSent: 0,          // in flight: { sentDay, dueDay }
         builds: [],                         // ordered, not yet finished: { kind, type, slot, startDay, doneDay }
@@ -634,7 +767,8 @@ export function tickDay(s, asleep = false) {
     const upkeep = (t) => upkeepMultiplier(s.level[t], s.auto[t]);
     // Rooms a monster has taken make nothing and need nothing until they are cleared. With
     // none taken this is s.rooms[t] exactly, so the whole economy is the one the sim balanced.
-    const live = (t) => Math.max(0, (s.rooms[t] || 0) - ((s.dark && s.dark[t]) || 0));
+    // Since v1.49.0 the rooms the Watcher took (`taken`) are gone from the colony the same way.
+    const live = (t) => Math.max(0, (s.rooms[t] || 0) - ((s.dark && s.dark[t]) || 0) - ((s.taken && s.taken[t]) || 0));
     // Hands. A manual room type needs crew × rooms × its own multiplier; automation needs none.
     // Short of hands a room type runs at a fraction, never all-or-nothing: half the crew, half the ore.
     const staff = {}; let crewLeft = awake;
@@ -726,6 +860,11 @@ export function tickDay(s, asleep = false) {
 export const FOOD_ALARM_DAYS = 30;
 /** "You can act" wakes come at most once in this many sleeping days. */
 export const ACT_WAKE_GAP_DAYS = 10 * DAYS_PER_YEAR;
+/** NIGHT VISION (v1.49.0, a Watcher upgrade): the alarms that can wait come this much later. The
+ *  food alarm at 27 days and not 30, the "you can act" wake a tenth further apart. */
+export const NIGHT_VISION_LATE = 0.1;
+const foodAlarmDays = (s) => FOOD_ALARM_DAYS * (watcherHas(s, 'nightvision') ? 1 - NIGHT_VISION_LATE : 1);
+const actGapDays = (s) => ACT_WAKE_GAP_DAYS * (watcherHas(s, 'nightvision') ? 1 + NIGHT_VISION_LATE : 1);
 /** The alarms that mean harm. A tier is only offered when a dry run meets none of them. */
 export const BAD_ALARMS = ['food', 'energy', 'stall', 'few'];
 
@@ -768,7 +907,7 @@ export function troubleIn(s, r) {
     const need = s.humans * FOOD_PER_HUMAN * SLEEP_FOOD - r.food;
     if (need > 0) {
         const days = s.food / need;
-        if (days < FOOD_ALARM_DAYS) return { kind: 'food', days: Math.floor(days) };
+        if (days < foodAlarmDays(s)) return { kind: 'food', days: Math.floor(days) };
     }
     if (s.humans < MIN_SLEEPERS) return { kind: 'few' };
     return null;
@@ -828,7 +967,7 @@ export function sleep(s, days, opts = {}) {
     while (sum.days < days && steps < maxSteps) {
         steps++;
         // the machines do not stop when the people lie down: orders land on their day
-        const built = (s.builds || []).length ? completeBuilds(s) : [];
+        const built = (s.builds || []).length ? completeBuilds(s, { asleep: true }) : [];
         if (built.length) sum.built = sum.built.concat(built);
         const h0 = s.humans, food0 = s.food;
         const r = tickDay(s, true);
@@ -847,8 +986,10 @@ export function sleep(s, days, opts = {}) {
                 const above = estimateNow(s).mean > RESURFACE_AT;
                 if (wasAbove && !above) { sum.alarm = { kind: 'estimate', est: estimateNow(s) }; break; }
                 wasAbove = above;
-                if (built.length && canActOn(s, r.weakest)
-                    && s.day - (s.actWokeDay ?? -Infinity) >= ACT_WAKE_GAP_DAYS) {
+                // with the Scheduler the Watcher runs the queue itself, and does not wake anyone
+                // for an order while there are more on the books (v1.49.0)
+                if (built.length && !(queueRunsAsleep(s) && (s.builds || []).length) && canActOn(s, r.weakest)
+                    && s.day - (s.actWokeDay ?? -Infinity) >= actGapDays(s)) {
                     s.actWokeDay = s.day;
                     sum.alarm = { kind: 'act', job: built[built.length - 1], column: r.weakest };
                     break;
@@ -856,7 +997,7 @@ export function sleep(s, days, opts = {}) {
             }
         }
         const steady = Math.abs(s.humans - h0) <= 1e-9 * Math.max(1, h0) && s.food >= food0
-            && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).length;
+            && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).some((j) => !isQueued(j));
         if (!steady) continue;
         let n = Math.min(days - sum.days, Math.ceil(opens - s.day));
         if (alarms && benign) {

@@ -12,6 +12,7 @@ import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays } from './phase4/deep.
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
 import { initialWatcher, puzzleGapYears } from './phase4/watcher.js';
+import { initialSurface } from './phase4/surface.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
 const P4 = PHASE4_CONSTANTS.SAVE_KEY;
@@ -162,9 +163,35 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-surface', label: 'IV · Surface', apply: () => {
+        clearAll();
+        // Deep in the ladder (v1.49.0): asleep at a century a second, SYSTEM bought and half of
+        // HARDWARE (Cooling, the Second core: two dormitories taken), the sentence half known, and
+        // Surface due in this sleep, a few seconds in. The Sensor mast is next and can be paid.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        const day = 6000 * DAYS_PER_YEAR;
+        const slept = 5800;
+        Object.assign(deep, {
+            day, minerals: 3.0e8, food: 2.0e6, stars: 6.0e14, humans: 120,
+            chambers: 29, rooms: { mine: 8, farm: 6, generator: 6, dorm: 6, cryo: 1 },
+            level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
+            auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
+            cryo: 3, asleep: true,
+            est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
+            taken: { mine: 0, farm: 0, generator: 0, dorm: 2 }, takenSlots: [25, 24],
+            watcher: {
+                ...initialWatcher(), stage: 1, stability: 70, capacity: 160, sleptYears: slept, seed: 5, sleeps: 40,
+                nextPuzzleYears: slept + puzzleGapYears(3), saidSpace: true,
+                bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore'],
+                surface: { ...initialSurface(), visits: 6, words: 4, lastSleep: 39, wins: 4, losses: 1, lastYou: 'rock' },
+            },
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
-export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3] };
+export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3] };
 
 const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 

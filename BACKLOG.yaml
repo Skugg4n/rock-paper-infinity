@@ -1033,14 +1033,27 @@ items:
     request: |
       Surface as an entity during cryo: it appears in the dark, a short
       conversation, and vanishes with everything about it when the sleep ends.
-    status: open
+    status: done
+    resolved_in: "v1.49.0"
+    notes: |
+      Surface appears opposite the Watcher from the second sleep on (then every
+      third, every second, and from the fifth visit every sleep), a few seconds
+      into the sleep: a faint ring, SURFACE, one line that drifts from neutral to
+      unsettling to intimate, and it is gone at the wake. src/phase4/surface.js.
 
   - id: B112
     added: 2026-09-22
     source: "the Watcher, slice 6 (Ola: RPS must have a flavour in IV)"
     request: |
       Rock, paper, scissors exchanges with Surface during the sleep.
-    status: open
+    status: done
+    resolved_in: "v1.49.0"
+    notes: |
+      One game of rock, paper, scissors a visit, chapter I's glyphs. Surface has
+      chosen (seeded; from the fifth visit half the time it throws what beat your
+      last throw). A win: 8 capacity and a word of the sentence COME UP THERE IS
+      ROOM FOR ALL OF US (no more words than ladder steps + 1, never the last);
+      a loss: 3 stability.
 
   - id: B113
     added: 2026-09-22
@@ -1048,7 +1061,14 @@ items:
     request: |
       Upgrades to the Watcher: system, then hardware, paid in power during cryo
       and minerals. Stability as a currency for longer sleeps.
-    status: open
+    status: done
+    resolved_in: "v1.49.0"
+    notes: |
+      The ladder beside the Watcher, asleep only, in order: SYSTEM (Watchdog,
+      Scheduler, Deep read, Night vision), HARDWARE (Cooling, Second core, Sensor
+      mast, Reactor tap). Capacity and stars; from HARDWARE on also ore and a
+      dormitory ("We needed the space.", once). Stability as a currency for
+      longer sleeps was not built: the ladder is the sink.
 
   - id: B114
     added: 2026-09-22
@@ -1102,6 +1122,8 @@ items:
       second (was 1.0); no sleep opens on a riddle. Still open: at Cryo IV the
       meter drains 1.6/s and the snap gives at most 1.25/s; garbled lines are
       rarely reached (playtest B17, B18).
+      v1.49.0: stability now recovers awake, +2 per awake colony month
+      (Claude's decision for Ola), so waking has a reason.
 
   - id: B119
     added: 2026-09-23
@@ -1187,3 +1209,30 @@ items:
     resolved_in: "war-playtest-4 (unreleased)"
     notes: |
       ?debug in the URL, or five clicks within 2 s on the version label.
+
+  - id: B130
+    added: 2026-09-27
+    source: "Ola, after playing IV far and long"
+    request: |
+      Queuing digging of rooms would be a nice QoL update. Automate building, to
+      build while people are sleeping, so it does not stop when I click Cryo.
+    status: done
+    resolved_in: "v1.49.0"
+    notes: |
+      Every buy button queues (at most eight orders, a mono list with rings
+      under the room buttons), paid at order time at the next price. Asleep the
+      order under way finishes; the rest wait for the wake, or run on with the
+      Watcher's Scheduler (and no "you can act" wake while orders remain).
+
+  - id: B131
+    added: 2026-09-27
+    source: "Ola, after playing IV far and long"
+    request: |
+      "It feels like the whole development of madness is missing after the
+      sleep starts. I have played far and long and notice nothing more
+      happening." The madness must grow after the sleeps begin.
+    status: open
+    notes: |
+      v1.49.0 (slice 6): Surface, rock paper scissors, the SYSTEM and HARDWARE
+      ladder, the dormitories the Watcher takes. Slice 7 (biological, the body,
+      the last wake-up) closes it.
