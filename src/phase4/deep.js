@@ -641,6 +641,38 @@ export function orderBuild(s, kind, { type = null } = {}) {
     return job;
 }
 
+/**
+ * TAKE AN ORDER BACK (v1.51.0). A click on an order in the strip at the bottom of the window
+ * removes it and gives its price back. What comes back is the price the NEXT order of that kind
+ * would cost once this one is gone, which is what the last one placed was paid: an order is paid
+ * at the price after every order already on the books, so taking any one of them back takes the
+ * price back down one step. The next order in the lane starts at once (awake, or asleep with the
+ * Scheduler). A dig a waiting room counts on for its chamber cannot be taken back.
+ * @param {object} s - state, mutated
+ * @param {object} job - one of s.builds
+ * @param {{asleep?:boolean}} [opts]
+ * @returns {{refund:number, currency:'minerals'|'stars'}|null} null when it cannot be taken back
+ */
+export function cancelOrder(s, job, { asleep = false } = {}) {
+    if (!job || !(s.builds || []).includes(job)) return null;
+    if (job.kind === 'dig' && !digSpare(s)) return null;
+    s.builds = s.builds.filter((j) => j !== job);
+    const refund = nextPrice(s, job.kind, job.type);
+    const currency = job.kind === 'dig' || job.kind === 'room' ? 'minerals' : 'stars';
+    if (Number.isFinite(refund) && refund > 0) {
+        if (currency === 'minerals') s.minerals = (s.minerals || 0) + refund;
+        else s.stars = (s.stars || 0) + refund;
+    }
+    if (!asleep || queueRunsAsleep(s)) startQueued(s);
+    return { refund: Number.isFinite(refund) ? refund : 0, currency };
+}
+/** Can one dig on the books go without leaving a room order with no chamber to go into? */
+export function digSpare(s) {
+    const used = ROOMS.reduce((a, t) => a + (s.rooms[t] || 0), 0) + (s.rooms.cryo || 0)
+        + (s.builds || []).filter((j) => j.kind === 'room').length;
+    return s.chambers - used + ordered(s, 'dig') - 1 >= 0;
+}
+
 /** Start every waiting order that can start today, in the order they were placed. */
 function startQueued(s) {
     let started = false;

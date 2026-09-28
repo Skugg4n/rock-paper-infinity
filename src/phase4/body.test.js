@@ -93,9 +93,9 @@ describe('the biological rung', () => {
         const s = late({ humans: MIN_SLEEPERS });
         expect(stepNeed(s.watcher, s).missing).toBe('people');
     });
-    test('what the steps do: riddles answer themselves, the snap comes, the drift halves, the sentence is heard', () => {
+    test('what the steps do: the lamps answer themselves, the snap comes, the drift halves, the sentence is heard', () => {
         const w = { ...initialWatcher(), sleeps: 5, capacity: 200, bought: [...HARDWARE, 'brain'], stability: 50 };
-        openPuzzle(w, { chambers: 4 });
+        openPuzzle(w, [2, 4, 6]);
         // a riddle answers itself now and then: at rng 0 it does, at rng 0.99 it does not
         expect(selfSolve(w, 1, 2, () => 0.99)).toEqual([]);
         expect(selfSolve(w, 1, 2, () => 0)).toEqual([0]);

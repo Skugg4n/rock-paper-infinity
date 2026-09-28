@@ -342,6 +342,7 @@ export function createScene(container, opts = {}) {
     let into = null;
     let breath = 0;
     let whole = false;              // the last wake-up has come: the base breathes as one
+    let lampKey = '';               // the lamps as last drawn (v1.51.0)
     const put = (m) => (into || world).add(m);
     function bodyGroup(k) {
         if (!bodyGroups[k]) { bodyGroups[k] = new THREE.Group(); world.add(bodyGroups[k]); }
@@ -358,6 +359,8 @@ export function createScene(container, opts = {}) {
         solids = []; nodes = []; floors = []; folk = []; digLabel = null; machine = null;
         bodyGroups = []; into = null;
         march = null;
+        lampKey = '';
+        labelHost.classList.remove('is-lamp-game');
         cryoAt.set(0, 0, 0);
         dots.setDrawRange(0, 0);
     }
@@ -366,6 +369,7 @@ export function createScene(container, opts = {}) {
         const m = new THREE.Mesh(plateGeo, into ? bodyMat : plateMat);
         m.position.set(x, y, z);
         put(m); solids.push(m);
+        return m;
     }
     /** A bridge is the floor itself, only narrower: same height, same thickness,
      *  so a floor reads as one sharp slab and not as plates with sticks between. */
@@ -468,7 +472,9 @@ export function createScene(container, opts = {}) {
                 into = c.body ? bodyGroup(c.sector) : null;
                 const r = isHub ? R_HUB : R_ROOM;
                 const prnd = plateSeed(fi, c.x, c.z);
-                addPlate(cx, y, cz);
+                const plate = addPlate(cx, y, cz);
+                // v1.51.0: a plate knows its chamber, so a click on it can answer the lamps
+                plate.userData.slot = Number.isInteger(c.slot) ? c.slot : -1;
 
                 // the ring
                 const span = 2 * r + LANE_W;
@@ -622,6 +628,7 @@ export function createScene(container, opts = {}) {
                     html += '<span class="dark hidden"></span>';
                     html += '<span class="building"></span>';
                     const rec = makeLabel(html, cx, y + 0.45, cz, 'room');
+                    rec.obj.element.dataset.slot = String(c.slot);      // v1.51.0: which chamber, for the tests
                     if (c.auto) rec.inner.classList.add('is-auto');
                     rec.cell = c;
                     rec.lvlEl = rec.inner.querySelector('.lvl');
@@ -1263,6 +1270,66 @@ export function createScene(container, opts = {}) {
             pick.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
             ray.setFromCamera(pick, camera);
             return ray.intersectObjects(solids, false).length > 0 || ray.intersectObject(shaftUp, false).length > 0;
+        },
+        /**
+         * Which chamber a point on the screen lands on (v1.51.0, the lamps): the plate hit first,
+         * or -1 (the shaft, a bridge, the black around the model).
+         * @param {number} clientX
+         * @param {number} clientY
+         * @returns {number}
+         */
+        slotAt(clientX, clientY) {
+            const r = renderer.domElement.getBoundingClientRect();
+            if (!(r.width > 0 && r.height > 0)) return -1;
+            pick.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+            ray.setFromCamera(pick, camera);
+            const hit = ray.intersectObjects(solids, false)[0];
+            const slot = hit && hit.object.userData ? hit.object.userData.slot : undefined;
+            return Number.isInteger(slot) ? slot : -1;
+        },
+        /**
+         * THE LAMPS (v1.51.0). While a lamp event runs the lamps on the automated rooms stop
+         * pulsing and stand dim; `lit` are lit steady, `flash` blinks bright, `off` is dark,
+         * `wrong` goes amber. null: the lamps pulse as they always did.
+         * @param {{lit?:number[], flash?:number[], off?:number[], wrong?:number[]}|null} spec
+         */
+        setLamps(spec) {
+            const key = spec ? JSON.stringify(spec) : '';
+            if (key === lampKey) return;
+            lampKey = key;
+            labelHost.classList.toggle('is-lamp-game', !!spec);
+            const has = (list, slot) => !!spec && Array.isArray(list) && list.includes(slot);
+            for (const l of labels) {
+                if (l.kind !== 'room' || !l.cell) continue;
+                const slot = l.cell.slot;
+                l.inner.classList.toggle('lamp-lit', has(spec?.lit, slot));
+                l.inner.classList.toggle('lamp-flash', has(spec?.flash, slot));
+                l.inner.classList.toggle('lamp-off', has(spec?.off, slot));
+                l.inner.classList.toggle('lamp-wrong', has(spec?.wrong, slot));
+            }
+        },
+        /**
+         * Of these chambers, the ones whose lamp can be seen now: its label in the window and
+         * nothing in front of it. The lamps are chosen among them, so no event asks for a lamp
+         * behind a floor.
+         * @param {number[]} slots
+         * @returns {number[]}
+         */
+        visibleSlots(slots) {
+            const want = new Set(slots || []);
+            const out = [];
+            for (const l of labels) {
+                if (l.kind !== 'room' || !l.cell || !want.has(l.cell.slot)) continue;
+                l.obj.getWorldPosition(tmp);
+                const ndc = tmp.clone().project(camera);
+                if (Math.abs(ndc.x) > 0.95 || Math.abs(ndc.y) > 0.95 || ndc.z > 1) continue;
+                const dist = camera.position.distanceTo(tmp);
+                ray.set(camera.position, tmp.clone().sub(camera.position).normalize());
+                const hit = ray.intersectObjects(solids, false)[0];
+                if (hit && hit.distance < dist - 0.5) continue;
+                out.push(l.cell.slot);
+            }
+            return out;
         },
         /** A click on the base while the colony sleeps: rigid again, with a soft flash. */
         snap() {

@@ -5,10 +5,10 @@
  */
 import {
     initialWatcher, normalizeWatcher, watcherName, watchSleep, alarmHit, snap, softness,
-    shouldGarble, garble, watcherLines, makePuzzle, puzzleText, puzzleDue, openPuzzle, armPuzzles,
-    dismissPuzzle, answerPuzzle, sleepDays, driftYears, puzzleGapYears, puzzleStars,
+    shouldGarble, garble, watcherLines, makePuzzle, puzzleDue, openPuzzle, armPuzzles,
+    dismissPuzzle, sleepDays, driftYears, puzzleGapYears, puzzleStars,
     STABILITY_MAX, NAME_AT_YEARS, DRIFT_PER_SECOND, ALARM_DROP, ALARM_DROP_BAD, REBOOT_TO,
-    SNAP_GAIN, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST, PUZZLE_GAIN, PUZZLE_WRONG,
+    SNAP_GAIN, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST,
     GARBLE_BELOW, GARBLE_EVERY, WATCHER_NAMES, PUZZLE_STARS_MIN,
     beginSleep, firstSleep, snapWait, FIRST_SLEEP_DAYS, WATCHER_HELLO,
 } from './watcher.js';
@@ -187,27 +187,8 @@ describe('capacity from the machines', () => {
     });
 });
 
-describe('riddles', () => {
-    test('a seeded sequence and its next term: the same seed is the same riddle', () => {
-        for (let seed = 1; seed < 60; seed++) {
-            const p = makePuzzle(seed, { chambers: 12 });
-            expect(p.terms).toHaveLength(5);
-            expect(Number.isInteger(p.answer)).toBe(true);
-            expect(p.terms.every(Number.isInteger)).toBe(true);
-            expect(makePuzzle(seed, { chambers: 12 })).toEqual(p);
-            expect(puzzleText(p)).toMatch(/^\d+(, \d+){4}, \?$/);
-        }
-        // the answers follow their rules
-        const byRule = {};
-        for (let seed = 1; seed < 200; seed++) { const p = makePuzzle(seed, { chambers: 7 }); byRule[p.rule] = p; }
-        expect(Object.keys(byRule).sort()).toEqual(['add', 'double-plus', 'fib', 'growing', 'squares', 'times']);
-        const f = byRule.fib;
-        expect(f.answer).toBe(f.terms[3] + f.terms[4]);
-        const q = byRule.squares;
-        expect(Math.sqrt(q.answer)).toBe(Math.sqrt(q.terms[4]) + 1);
-    });
-
-    test('a riddle comes asleep, with the capacity for it, a gap of slept years apart, never over an alarm', () => {
+describe('riddles (v1.46.0 to v1.50.0), the lamps since v1.51.0: see lamps.test.js', () => {
+    test('an event comes asleep, with the capacity for it, a gap of slept years apart, never over an alarm', () => {
         const w = { ...initialWatcher(), sleeps: 2 };
         w.capacity = CAPACITY_MAX;
         expect(puzzleDue(w, { asleep: true })).toBe(false);          // the clock is not armed yet
@@ -221,7 +202,7 @@ describe('riddles', () => {
         w.capacity = PUZZLE_COST - 1;
         expect(puzzleDue(w, { asleep: true })).toBe(false);
         w.capacity = CAPACITY_MAX;
-        openPuzzle(w, { chambers: 5 });
+        openPuzzle(w, [4, 5, 6]);
         expect(puzzleDue(w, { asleep: true })).toBe(false);          // one at a time
         // escape: gone, and the next is a gap away
         dismissPuzzle(w, 2);
@@ -231,38 +212,7 @@ describe('riddles', () => {
         expect(puzzleGapYears(3) / puzzleGapYears(0)).toBeCloseTo(CRYO[3].days / CRYO[0].days, 9);
     });
 
-    test('right: costs capacity, +PUZZLE_GAIN. Wrong: -PUZZLE_WRONG and it stays. Not a number: nothing', () => {
-        const w = initialWatcher();
-        w.capacity = CAPACITY_MAX; w.stability = 40;
-        openPuzzle(w, { chambers: 5 });
-        const answer = w.puzzle.answer;
-        expect(answerPuzzle(w, 'abc', 0)).toBe(null);
-        expect(w.stability).toBe(40);
-        const wrong = answerPuzzle(w, String(answer + 1), 0);
-        expect(wrong.ok).toBe(false);
-        expect(w.stability).toBe(40 - PUZZLE_WRONG);
-        expect(w.puzzle).not.toBe(null);
-        expect(w.capacity).toBe(CAPACITY_MAX);
-        const right = answerPuzzle(w, ` ${answer} `, 0);
-        expect(right.ok).toBe(true);
-        expect(right.gained).toBe(PUZZLE_GAIN);
-        expect(w.stability).toBe(40 - PUZZLE_WRONG + PUZZLE_GAIN);
-        expect(w.capacity).toBe(CAPACITY_MAX - PUZZLE_COST);
-        expect(w.puzzle).toBe(null);
-        expect(w.solved).toBe(1);
-        expect(answerPuzzle(w, '1', 0)).toBe(null);
-    });
-
-    test('a wrong answer that takes the last of it reboots the system', () => {
-        const w = initialWatcher();
-        w.capacity = CAPACITY_MAX; w.stability = PUZZLE_WRONG;
-        openPuzzle(w, {});
-        const out = answerPuzzle(w, String(w.puzzle.answer + 1), 0);
-        expect(out.rebooted).toBe(true);
-        expect(w.stability).toBe(REBOOT_TO);
-    });
-
-    test('a solved riddle pays a month of the machine, never less than a hundred', () => {
+    test('a solved event pays a month of the machine, never less than a hundred', () => {
         expect(puzzleStars(0)).toBe(PUZZLE_STARS_MIN);
         expect(puzzleStars(1000)).toBe(30000);
     });
@@ -318,7 +268,7 @@ describe('the save', () => {
         const back = deserializeDeep(JSON.stringify({ schemaVersion: 2, state: old, layout: { slots: ['farm', 'generator', 'dorm'] } }));
         expect(back.state.watcher).toEqual(initialWatcher());
         expect(back.state.day).toBe(5000);
-        const w = { ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: 1234, seed: 9, puzzle: makePuzzle(8, {}) };
+        const w = { ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: 1234, seed: 9, puzzle: makePuzzle(8, [1, 2, 3], { kind: 'dark' }) };
         back.state.watcher = w;
         const raw = serializeDeep(back.state, back.layout);
         expect(JSON.parse(raw).schemaVersion).toBe(SCHEMA_VERSION);

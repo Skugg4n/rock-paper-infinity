@@ -6,7 +6,8 @@
  * after enough slept years, once and quietly, as THE WATCHER. Under it a STABILITY meter
  * that drifts down with the years and drops on alarms. Low, the base softens, the feed lines
  * get slightly wrong, and at zero the system reboots and wakes the colony. A click on the
- * base snaps it back; a riddle solved with the machines' spare capacity holds it up.
+ * base snaps it back. Since v1.51.0 the riddles are gone; now and then the lamps ask for
+ * something instead, paid with the machines' spare capacity.
  *
  * Pure: no DOM, no clock of its own. The phase hands it the days slept, the tier, the spare
  * energy and the wall clock; the tests hand it numbers.
@@ -57,6 +58,8 @@ export const REBOOT_TO = 40;
 /** THE SNAP. A click on the base: the structure snaps back, and a little stability with it,
  *  at most once in SNAP_COOLDOWN_MS of real time. */
 export const SNAP_GAIN = 5;
+/** With Deep read (v1.51.0) a snap gives this instead. */
+export const SNAP_GAIN_DEEP = 10;
 export const SNAP_COOLDOWN_MS = 4000;
 
 /** Below this the base starts to soften; at zero it is as soft as it gets. */
@@ -104,7 +107,8 @@ export function initialWatcher() {
         reboots: 0, solved: 0,
         sleeps: 0,              // sleeps begun: the first one only teaches (v1.48.0)
         bought: [],             // the ladder, in the order it was bought (v1.49.0)
-        puzzle2: null,          // the second riddle, with the Second core
+        puzzle2: null,          // v1.49.0 to v1.50.0: the second riddle; always null since v1.51.0
+        lampSleep: null,        // the sleep the last lamp event came in (v1.51.0): one in two sleeps at most
         surface: initialSurface(),
         saidSpace: false,       // "We needed the space.", said once
         sealed: [],             // the sectors the body has taken, 0 to 3, in order (v1.50.0)
@@ -129,9 +133,16 @@ export function normalizeWatcher(w) {
     out.capacity = clamp(Number.isFinite(out.capacity) ? out.capacity : 0, 0, capacityMax(out));
     out.sleptYears = Math.max(0, Number.isFinite(out.sleptYears) ? out.sleptYears : 0);
     out.stage = clamp(out.stage | 0, 0, WATCHER_NAMES.length - 1);
-    const okPuzzle = (p) => p && Array.isArray(p.terms) && Number.isFinite(p.answer);
-    if (out.puzzle && !okPuzzle(out.puzzle)) out.puzzle = null;
-    if (out.puzzle2 && !okPuzzle(out.puzzle2)) out.puzzle2 = null;
+    // v1.51.0: the lamps, which lamp went out, a number. A sequence riddle from an older save is let go
+    // v1.51.0: the riddles are gone; only a lamp event can be open, and only one. A number
+    // riddle or a second card from an older save is let go; an event comes back to be shown from
+    // the start
+    const ints = (a) => Array.isArray(a) && a.length > 0 && a.every(Number.isInteger);
+    const okPuzzle = (p) => !!p && ((p.kind === 'lamps' && ints(p.answer) && ints(p.shown) && ints(p.lamps))
+        || (p.kind === 'dark' && ints(p.lamps) && Number.isInteger(p.out)));
+    out.puzzle = okPuzzle(out.puzzle) ? { ...out.puzzle, ...(out.puzzle.kind === 'lamps' ? { at: 0 } : {}) } : null;
+    out.puzzle2 = null;
+    if (!Number.isFinite(out.lampSleep)) out.lampSleep = null;
     return out;
 }
 
@@ -207,13 +218,13 @@ export function snapWait(w, now) {
  * A click on the base. The snap itself is the scene's; this is what it gives back.
  * @param {object} w - mutated
  * @param {number} now - wall clock, ms
- * @returns {number} the stability gained: SNAP_GAIN, or 0 inside the cooldown
+ * @returns {number} the stability gained: snapGain(w), or 0 inside the cooldown
  */
 export function snap(w, now) {
     if (now - (w.lastSnapAt || 0) < SNAP_COOLDOWN_MS && now >= (w.lastSnapAt || 0)) return 0;
     w.lastSnapAt = now;
     const before = w.stability;
-    w.stability = Math.min(STABILITY_MAX, w.stability + SNAP_GAIN);
+    w.stability = Math.min(STABILITY_MAX, w.stability + snapGain(w));
     return w.stability - before;
 }
 
@@ -260,7 +271,19 @@ export function watcherLines(w, lines, rng = Math.random) {
     return lines.map((l) => (shouldGarble(w, rng) ? garble(l, rng) : l));
 }
 
-/* ---- riddles ------------------------------------------------------------- */
+/* ---- THE LAMPS (v1.51.0) ----------------------------------------------------
+   Ola, after v1.50.0: "the number-sequence riddles are very hard and a bit boring", and the cut
+   (docs/superpowers/specs/2026-09-28-chapter-iv-reduction.md): sanity is the snap; the riddles are
+   gone. What is left is an occasional EVENT played on the model itself, at most once in
+   LAMP_EVERY_SLEEPS sleeps and never while Surface is there (one demand on screen at a time):
+   THE LAMPS: the indicator lamps on the automated rooms blink a sequence, three to seven long
+     (longer as stability falls), and the Watcher repeats it by clicking the rooms; a wrong click
+     ends it.
+   WHICH LAMP WENT OUT: every lamp is lit, one goes dark, and it must be found within DARK_MS.
+   Below LIE_BELOW a lamp may blink once without being part of the answer: the madness creeping
+   in. Nothing says so. Solved: PUZZLE_COST capacity, puzzleGain() stability and a month of the
+   machine's wins (twice both with the Second core). Lost: PUZZLE_WRONG. The state keeps the old
+   name, `w.puzzle`, so a save needs no new schema. */
 
 function mulberry32(a) {
     return function () {
@@ -270,82 +293,147 @@ function mulberry32(a) {
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
 }
+/** A seeded stream per event and per use, so the kind and the lamps never share draws. */
+const rngFor = (seed, salt) => mulberry32((((seed | 0) * 2654435761) + salt * 40503) >>> 0);
 
-/** The rules a sequence can follow. Each takes a start and a step and gives the next term from
- *  the last one and its index. 'fib' (each term the sum of the two before) is written out in
- *  makePuzzle, because it needs two terms back. */
-const RULES = [
-    { id: 'add', make: (a, k) => (x, i) => (i === 0 ? a : x + k + 1) },
-    { id: 'double-plus', make: (a, k) => (x, i) => (i === 0 ? a : 2 * x + 1 + (k % 3)) },
-    { id: 'times', make: (a, k) => (x, i) => (i === 0 ? a : x * (2 + (k % 2))) },
-    { id: 'growing', make: (a) => (x, i) => (i === 0 ? a : x + i) },
-    { id: 'squares', make: (a) => (x, i) => (a + i) * (a + i) },
-];
+export const PUZZLE_KINDS = ['lamps', 'dark'];
+/** Of the lamp events, this share is "which lamp went out". */
+export const DARK_SHARE = 0.4;
+/** At most one lamp event in this many sleeps. */
+export const LAMP_EVERY_SLEEPS = 2;
+/** The length of a lamp sequence: three at full stability, seven at none. */
+export const LAMPS_MIN = 3;
+export const LAMPS_MAX = 7;
+export const lampLength = (stability = STABILITY_MAX) =>
+    LAMPS_MIN + Math.round((LAMPS_MAX - LAMPS_MIN) * clamp(1 - stability / STABILITY_MAX, 0, 1));
+/** Below this a lamp may lie, once a sequence, this often. */
+export const LIE_BELOW = GARBLE_BELOW;
+export const LIE_CHANCE = 0.5;
+/** Which lamp went out: this long to find it (ms of real time). */
+export const DARK_MS = 3000;
 
 /**
- * A riddle, grown from a seed and the colony's own numbers: a short sequence and its next term.
- * One type for now. The start comes from the colony (its chambers), so the same seed in a
- * bigger colony is a different riddle.
- *
- * @param {number} seed
- * @param {{chambers?:number}} [colony]
- * @returns {{seed:number, rule:string, terms:number[], answer:number}}
+ * The lamps: the chambers whose room type is automated (the pulse only an automated room has),
+ * less the cryo hall and whatever is skipped (a dark chamber, a dormitory the Watcher took).
+ * @param {(string|null)[]} slots
+ * @param {{auto?:object, skip?:number[]}} [o]
+ * @returns {number[]} chamber indices
  */
-export function makePuzzle(seed, colony = {}) {
-    const r = mulberry32((seed * 2654435761) >>> 0);
-    const kinds = ['add', 'double-plus', 'times', 'growing', 'squares', 'fib'];
-    const rule = kinds[Math.floor(r() * kinds.length)];
-    const a = 1 + (((colony.chambers || 3) + Math.floor(r() * 7)) % 9);
-    const k = 1 + Math.floor(r() * 6);
-    const seq = [];
-    if (rule === 'fib') {
-        let x = a, y = a + k;
-        for (let i = 0; i < 6; i++) { seq.push(x); [x, y] = [y, x + y]; }
-    } else {
-        const next = RULES.find((q) => q.id === rule).make(a, k);
-        let x = 0;
-        for (let i = 0; i < 6; i++) { x = next(x, i); seq.push(x); }
-    }
-    return { seed, rule, terms: seq.slice(0, 5), answer: seq[5] };
+export function lampSlots(slots, { auto = {}, skip = [] } = {}) {
+    const no = new Set(skip);
+    const out = [];
+    (slots || []).forEach((type, i) => {
+        if (type && type !== 'cryo' && (auto[type] || 0) > 0 && !no.has(i)) out.push(i);
+    });
+    return out;
+}
+/** Is this an event played on the lamps (every event is, since v1.51.0)? */
+export const isLampKind = (p) => !!p && (p.kind === 'lamps' || p.kind === 'dark');
+/** Does a click on this chamber count as an answer (it is one of the event's lamps)? */
+export const isLamp = (p, slot) => isLampKind(p) && p.lamps.includes(slot);
+
+/** A draw from the list, not `not` when there is anything else. */
+function pickFrom(r, list, not) {
+    const pool = list.length > 1 ? list.filter((x) => x !== not) : list;
+    return pool[Math.floor(r() * pool.length)];
 }
 
-/** What the card shows: "3, 7, 15, 31, 63, ?" */
-export const puzzleText = (p) => `${p.terms.join(', ')}, ?`;
+/**
+ * THE LAMPS. `answer` is what the player must click, in order; `shown` is what blinks, which is
+ * the answer with, now and then below LIE_BELOW, one false blink at `lie` (-1: none). No lamp
+ * blinks twice in a row in the answer.
+ * @param {number} seed
+ * @param {number[]} lamps
+ * @param {number} [stability]
+ * @returns {{kind:'lamps', seed:number, lamps:number[], answer:number[], shown:number[], lie:number, at:number}}
+ */
+export function makeLampPuzzle(seed, lamps, stability = STABILITY_MAX) {
+    const r = rngFor(seed, 11);
+    const n = lampLength(stability);
+    const answer = [];
+    for (let i = 0; i < n; i++) answer.push(pickFrom(r, lamps, answer[i - 1]));
+    const shown = answer.slice();
+    let lie = -1;
+    if (stability < LIE_BELOW && lamps.length > 1 && r() < LIE_CHANCE) {
+        lie = Math.floor(r() * (n + 1));
+        const around = [answer[lie - 1], answer[lie]];
+        const pool = lamps.filter((x) => !around.includes(x));
+        const from = pool.length ? pool : lamps.filter((x) => x !== answer[lie - 1]);
+        shown.splice(lie, 0, from[Math.floor(r() * from.length)]);
+    }
+    return { kind: 'lamps', seed, lamps: lamps.slice(), answer, shown, lie, at: 0 };
+}
+
+/** WHICH LAMP WENT OUT: every lamp lit, then `out` goes dark. */
+export function makeDarkPuzzle(seed, lamps) {
+    const r = rngFor(seed, 13);
+    return { kind: 'dark', seed, lamps: lamps.slice(), out: lamps[Math.floor(r() * lamps.length)] };
+}
+
+/** Which of the two a seed makes. */
+export function puzzleKind(seed) {
+    return rngFor(seed, 5)() < DARK_SHARE ? 'dark' : 'lamps';
+}
 
 /**
- * May a riddle come now? Asleep, none on screen, no alarm pending, the machines have the
- * capacity for it, and the slept years since the last one are enough.
+ * A lamp event, grown from a seed, the lamps there are and the Watcher's stability.
+ * @param {number} seed
+ * @param {number[]} lamps - at least two
+ * @param {{kind?:string|null, stability?:number}} [o]
+ * @returns {object|null} null with fewer than two lamps
+ */
+export function makePuzzle(seed, lamps = [], { kind = null, stability = STABILITY_MAX } = {}) {
+    if (!Array.isArray(lamps) || lamps.length < 2) return null;
+    const k = kind || puzzleKind(seed);
+    return k === 'dark' ? makeDarkPuzzle(seed, lamps) : makeLampPuzzle(seed, lamps, stability);
+}
+
+/** THE SCHEDULER: what is asking for the player now. Surface, or the lamps, or nothing; never two. */
+export function demand(w) {
+    if (w && w.surface && w.surface.visit) return 'surface';
+    if (w && w.puzzle) return 'lamps';
+    return null;
+}
+
+/**
+ * May a lamp event come now? Asleep, nothing else asking (no Surface, no event open), no alarm
+ * pending, not in the first sleep nor within LAMP_EVERY_SLEEPS of the last event, the machines
+ * have the capacity for it, and the slept years since the last one are enough.
  * @param {object} w
  * @param {{asleep:boolean, alarmPending?:boolean}} ctx
  */
 export function puzzleDue(w, { asleep, alarmPending = false }) {
-    if (!asleep || alarmPending || firstSleep(w)) return false;
-    if (w.puzzle && (!has(w, 'secondcore') || w.puzzle2)) return false;
+    if (!asleep || alarmPending || firstSleep(w) || demand(w)) return false;
+    if (w.lampSleep != null && (w.sleeps || 0) - w.lampSleep < LAMP_EVERY_SLEEPS) return false;
     if (w.capacity < PUZZLE_COST) return false;
     return w.nextPuzzleYears != null && w.sleptYears >= w.nextPuzzleYears;
 }
 
-/** The slot a riddle is in: 0 the first card, 1 the second (the Second core). */
-const SLOT_KEY = ['puzzle', 'puzzle2'];
 /**
- * Put the next riddle on screen, in the first free card. With the tier, the clock for the one
- * after it starts now (so a second card never opens in the same moment as the first).
+ * The lamps begin: an event on screen, counted against this sleep.
+ * @param {object} w - mutated
+ * @param {number[]} lamps
+ * @param {number|null} [tier] - with it, the clock for the next one starts now
+ * @param {{kind?:string|null}} [o] - force a kind (the debug hooks)
+ * @returns {object|null} the event, or null (fewer than two lamps: nothing happens)
  */
-export function openPuzzle(w, colony, tier = null) {
-    const key = !w.puzzle ? 'puzzle' : 'puzzle2';
-    w[key] = makePuzzle(w.seed, colony);
+export function openPuzzle(w, lamps, tier = null, { kind = null } = {}) {
+    const p = makePuzzle(w.seed, lamps, { kind, stability: w.stability });
+    if (!p) return null;
+    w.puzzle = p;
     w.seed += 1;
+    w.lampSleep = w.sleeps || 0;
     if (tier != null) w.nextPuzzleYears = w.sleptYears + puzzleGapYears(tier);
-    return w[key];
+    return p;
 }
 
-/** The first sleep sets the clock for the first riddle. */
+/** The first sleep sets the clock for the first event. */
 export function armPuzzles(w, tier) {
     if (w.nextPuzzleYears == null) w.nextPuzzleYears = w.sleptYears + puzzleGapYears(tier);
 }
 
 /**
- * A sleep begins (v1.48.0): counted, and the riddle clock set so that no riddle opens in the first
+ * A sleep begins (v1.48.0): counted, and the event clock set so that nothing opens in the first
  * seconds of any sleep (half a gap at least). The first sleep has none at all (`puzzleDue`).
  * @param {object} w - mutated
  * @param {number} tier
@@ -358,38 +446,55 @@ export function beginSleep(w, tier) {
     return firstSleep(w);
 }
 
-/** Escape: the riddle goes, and the next one is a gap away. A second card moves up to the first. */
-export function dismissPuzzle(w, tier, slot = 0) {
-    w[SLOT_KEY[slot] || 'puzzle'] = null;
-    if (!w.puzzle && w.puzzle2) { w.puzzle = w.puzzle2; w.puzzle2 = null; }
+/** Escape: the lamps go quiet, and the next event is a gap away (and still two sleeps away). */
+export function dismissPuzzle(w, tier) {
+    w.puzzle = null;
     w.nextPuzzleYears = w.sleptYears + puzzleGapYears(tier);
 }
 
-/**
- * An answer.
- * @param {object} w - mutated
- * @param {string|number} value - what was typed
- * @param {number} tier - for the gap to the next riddle
- * @returns {{ok:boolean, gained:number, rebooted:boolean}|null} null when there is no riddle,
- *          or the answer is not a number (nothing is spent on a typo of that kind)
- */
-export function answerPuzzle(w, value, tier, slot = 0) {
-    const p = w[SLOT_KEY[slot] || 'puzzle'];
-    if (!p) return null;
-    const text = String(value).trim().replace(/\s+/g, '');
-    if (!/^-?\d+$/.test(text)) return null;
-    if (Number(text) === p.answer) {
-        const before = w.stability;
-        w.capacity = Math.max(0, w.capacity - PUZZLE_COST);
-        w.stability = Math.min(STABILITY_MAX, w.stability + puzzleGain(w));
-        w.solved = (w.solved || 0) + 1;
-        dismissPuzzle(w, tier, slot);
-        return { ok: true, gained: w.stability - before, rebooted: false };
-    }
+/** The event solved: the capacity it costs, the stability it gives. */
+export function solvePuzzle(w, tier) {
+    const before = w.stability;
+    w.capacity = Math.max(0, w.capacity - PUZZLE_COST);
+    w.stability = Math.min(STABILITY_MAX, w.stability + puzzleGain(w));
+    w.solved = (w.solved || 0) + 1;
+    dismissPuzzle(w, tier);
+    return { ok: true, gained: w.stability - before, rebooted: false };
+}
+/** The event lost: a wrong click, or the lamp not found in time. It ends, and it costs. */
+function failLamps(w, tier) {
     w.stability = Math.max(0, w.stability - PUZZLE_WRONG);
+    dismissPuzzle(w, tier);
     return { ok: false, gained: -PUZZLE_WRONG, rebooted: rebootIfSpent(w) };
 }
 
+/**
+ * A click on a lamp. The phase only sends clicks that land on one of the event's lamps.
+ * THE LAMPS: the right lamp moves the answer on and the last one solves it; a wrong one ends it.
+ * WHICH LAMP WENT OUT: the dark one within DARK_MS solves it; anything else ends it.
+ * @param {object} w - mutated
+ * @param {number} lamp - the chamber clicked
+ * @param {number} tier
+ * @param {{elapsedMs?:number}} [o] - since the lamp went out
+ * @returns {{ok:boolean, done:boolean, gained:number, rebooted:boolean, at?:number}|null}
+ */
+export function pressLamp(w, lamp, tier, { elapsedMs = 0 } = {}) {
+    const p = w.puzzle;
+    if (!isLampKind(p)) return null;
+    if (p.kind === 'dark') {
+        const r = lamp === p.out && elapsedMs <= DARK_MS ? solvePuzzle(w, tier) : failLamps(w, tier);
+        return { ...r, done: true };
+    }
+    if (lamp !== p.answer[p.at]) return { ...failLamps(w, tier), done: true };
+    p.at += 1;
+    if (p.at >= p.answer.length) return { ...solvePuzzle(w, tier), done: true };
+    return { ok: true, done: false, gained: 0, rebooted: false, at: p.at };
+}
+/** The dark lamp was not found in time: as a wrong click. */
+export function expireLamps(w, tier) {
+    if (!w.puzzle || w.puzzle.kind !== 'dark') return null;
+    return { ...failLamps(w, tier), done: true };
+}
 
 /* ---- awake, the Watcher rests (v1.49.0) ----------------------------------- */
 
@@ -420,21 +525,53 @@ export const RUNGS = ['SYSTEM', 'HARDWARE', 'BIOLOGICAL'];
  * chapter's own curve: a step is bought about when the colony's stars reach it in a plain run.
  */
 export const LADDER = [
-    { id: 'watchdog', rung: 0, name: 'Watchdog', icon: 'shield', does: 'Stability drifts 25 % slower.', cap: 20, stars: 2e4 },
-    { id: 'scheduler', rung: 0, name: 'Scheduler', icon: 'list-ordered', does: 'The build queue runs while they sleep.', cap: 30, stars: 2e5 },
-    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'A riddle gives +25 stability, not +15.', cap: 40, stars: 5e6 },
-    { id: 'nightvision', rung: 0, name: 'Night vision', icon: 'moon', does: 'Alarms come 10 % later.', cap: 50, stars: 5e7 },
-    { id: 'cooling', rung: 1, name: 'Cooling', icon: 'fan', does: 'Capacity holds twice as much.', cap: 60, stars: 5e8, ore: 1e6, beds: 1 },
-    { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'Two riddles may be open.', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
-    { id: 'mast', rung: 1, name: 'Sensor mast', icon: 'radio-tower', does: 'Scouts go up with better odds; a reading is off by half as much.', cap: 120, stars: 3e11, ore: 1e8, beds: 1 },
-    { id: 'reactor', rung: 1, name: 'Reactor tap', icon: 'plug-zap', does: 'Capacity from the generators, three times over.', cap: 150, stars: 1e13, ore: 1e9, beds: 1 },
+    { id: 'watchdog', rung: 0, name: 'Watchdog', icon: 'shield', does: 'Stability drifts 25 % slower.', short: 'stability drifts slower', cap: 20, stars: 2e4 },
+    { id: 'scheduler', rung: 0, name: 'Scheduler', icon: 'list-ordered', does: 'The build queue runs while they sleep.', short: 'the queue runs while they sleep', cap: 30, stars: 2e5 },
+    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'A snap gives +10 stability, not +5.', short: 'a snap gives +10', cap: 40, stars: 5e6 },
+    { id: 'nightvision', rung: 0, name: 'Night vision', icon: 'moon', does: 'Alarms come 10 % later.', short: 'alarms come later', cap: 50, stars: 5e7 },
+    { id: 'cooling', rung: 1, name: 'Cooling', icon: 'fan', does: 'Capacity holds twice as much.', short: 'capacity holds twice as much', cap: 60, stars: 5e8, ore: 1e6, beds: 1 },
+    { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'The lamps give twice as much.', short: 'the lamps give double', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
+    { id: 'mast', rung: 1, name: 'Sensor mast', icon: 'radio-tower', does: 'Scouts go up with better odds; a reading is off by half as much.', short: 'scouts read the sky better', cap: 120, stars: 3e11, ore: 1e8, beds: 1 },
+    { id: 'reactor', rung: 1, name: 'Reactor tap', icon: 'plug-zap', does: 'Capacity from the generators, three times over.', short: 'three times the capacity', cap: 150, stars: 1e13, ore: 1e9, beds: 1 },
     /* BIOLOGICAL (v1.50.0). Paid in people: `people` is the share of the colony drawn from the
        dormitories, and each step seals one sector of the base into the body. */
-    { id: 'brain', rung: 2, name: 'Brain tissue, human grade', icon: 'brain', does: 'Riddles sometimes solve themselves.', cap: 120, stars: 1e14, people: 0.10 },
-    { id: 'nervous', rung: 2, name: 'Nervous system', icon: 'waypoints', does: 'The snap comes by itself.', cap: 150, stars: 6e14, people: 0.15 },
-    { id: 'spinal', rung: 2, name: 'Spinal cooling fluid', icon: 'droplets', does: 'Stability drifts half as fast again.', cap: 180, stars: 4e15, people: 0.20 },
-    { id: 'skin', rung: 2, name: 'Skin receptors', icon: 'fingerprint', does: 'The sentence can be heard.', cap: 200, stars: 3e16, people: 0.25 },
+    { id: 'brain', rung: 2, name: 'Brain tissue, human grade', icon: 'brain', does: 'The lamps sometimes answer themselves.', short: 'the lamps answer themselves', cap: 120, stars: 1e14, people: 0.10 },
+    { id: 'nervous', rung: 2, name: 'Nervous system', icon: 'waypoints', does: 'The snap comes by itself.', short: 'the snap comes by itself', cap: 150, stars: 6e14, people: 0.15 },
+    { id: 'spinal', rung: 2, name: 'Spinal cooling fluid', icon: 'droplets', does: 'Stability drifts half as fast again.', short: 'stability drifts half as fast', cap: 180, stars: 4e15, people: 0.20 },
+    { id: 'skin', rung: 2, name: 'Skin receptors', icon: 'fingerprint', does: 'The sentence can be heard.', short: 'the sentence can be heard', cap: 200, stars: 3e16, people: 0.25 },
 ];
+
+/* THE LADDER YOU CAN SEE (v1.51.0). Ola could not find BIOLOGICAL: twelve round buttons in one
+   place read as one button. Now the whole road is one thin line with a tick at each rung and a
+   filled trail, and under it ONE pill with the next step only: its rung, its name, what it takes
+   and what it does. The rung after the one being climbed is named on the line as a teaser; the one
+   past that is a tick with no name until it comes near. The advisor says one line when a rung opens. */
+/** The advisor's line the moment a rung opens (indexed by the rung that opens). */
+export const RUNG_OPEN_LINES = ['', 'The system is in. There is room for hardware now.', 'The hardware is in. Something else is possible now.'];
+/** The line to say when this step was the last of its rung, or ''. */
+export function rungOpenLine(stepId) {
+    const i = LADDER.findIndex((u) => u.id === stepId);
+    const next = LADDER[i + 1];
+    if (i < 0 || !next || next.rung === LADDER[i].rung) return '';
+    return RUNG_OPEN_LINES[next.rung] || '';
+}
+/**
+ * The line over the pill: the trail (0 to 1, a share of the whole ladder) and a tick per rung,
+ * each 'done', 'open' (being climbed), 'tease' (the next: its name readable) or 'far' (no name).
+ * @param {object} w
+ * @returns {{trail:number, top:boolean, rung:number, ticks:{name:string, at:number, state:string}[]}}
+ */
+export function ladderLine(w) {
+    const n = Math.min(LADDER.length, ((w && w.bought) || []).length);
+    const top = n >= LADDER.length;
+    const rung = top ? RUNGS.length : LADDER[n].rung;
+    const ticks = RUNGS.map((name, r) => {
+        const at = LADDER.findIndex((u) => u.rung === r) / LADDER.length;
+        const state = r < rung ? 'done' : r === rung ? 'open' : r === rung + 1 ? 'tease' : 'far';
+        return { name, at, state };
+    });
+    return { trail: n / LADDER.length, top, rung, ticks };
+}
 
 /** Has the Watcher bought this step? */
 export function has(w, id) { return !!(w && Array.isArray(w.bought) && w.bought.includes(id)); }
@@ -447,9 +584,13 @@ export const capacityGain = (w) => (has(w, 'reactor') ? 3 : 1);
 /** The drift, slowed: a quarter slower with the Watchdog, and half that again with the spinal fluid. */
 export const driftFactor = (w) => (has(w, 'watchdog') ? 0.75 : 1) * (has(w, 'spinal') ? 0.5 : 1);
 /** A riddle's worth: +25 with Deep read. */
-export const puzzleGain = (w) => (has(w, 'deepread') ? 25 : PUZZLE_GAIN);
-/** How many riddles may be open at once. */
-export const puzzleSlots = (w) => (has(w, 'secondcore') ? 2 : 1);
+/** A snap's worth: +10 with Deep read (v1.51.0; it made a riddle worth +25 before the riddles went). */
+export const snapGain = (w) => (has(w, 'deepread') ? SNAP_GAIN_DEEP : SNAP_GAIN);
+/** What a lamp event gives, times this: twice with the Second core (v1.51.0; it opened a second
+ *  riddle card before). The stability and the machine's wins alike. */
+export const lampFactor = (w) => (has(w, 'secondcore') ? 2 : 1);
+/** A lamp event's worth in stability. */
+export const puzzleGain = (w) => PUZZLE_GAIN * lampFactor(w);
 
 /** Dormitories the colony can spare: those still holding anyone, less the one it keeps. */
 function sparedDorms(s) {
@@ -544,7 +685,8 @@ export const wordCap = (w) => Math.min(SENTENCE.length - 1, ((w && w.bought) || 
  * @param {number} tierDays - the tier's days a second
  */
 export function surfaceDue(w, sleptDays, tierDays) {
-    if (firstSleep(w) || !visitDue(w.surface, w.sleeps || 0)) return false;
+    // one demand at a time (v1.51.0): Surface waits while the lamps are asking
+    if (firstSleep(w) || demand(w) || !visitDue(w.surface, w.sleeps || 0)) return false;
     return sleptDays >= VISIT_AFTER_SECONDS * Math.max(1, tierDays);
 }
 /** Surface appears. With the skin receptors its line is the whole sentence, heard at last. */
@@ -614,25 +756,23 @@ export const sealLine = (k, i = 0) => SEAL_LINES[Math.max(0, i) % SEAL_LINES.len
 /** Is a chamber part of the body? */
 export const inBody = (w, slot) => !!(w && Array.isArray(w.sealed) && w.sealed.includes(sectorOf(slot)));
 
-/** BRAIN TISSUE: a riddle open this long solves itself, now and then. Per real second of sleep. */
+/** BRAIN TISSUE: a lamp event answers itself now and then (it was a riddle before v1.51.0). Per
+ *  real second of sleep. */
 export const SELF_SOLVE_PER_SECOND = 0.12;
 /**
- * The brain tissue at work: each open riddle may answer itself this slice, as if typed right.
+ * The brain tissue at work: the open lamp event may answer itself this slice, as if played right.
  * @param {object} w - mutated
  * @param {number} seconds - real seconds of sleep
  * @param {number} tier
  * @param {Function} rng
- * @returns {number[]} the slots that answered themselves (0, 1)
+ * @returns {number[]} [0] when it answered itself, [] when not
  */
 export function selfSolve(w, seconds, tier, rng = Math.random) {
     if (!has(w, 'brain') || !(seconds > 0)) return [];
     const out = [];
-    for (const slot of [1, 0]) {
-        const p = w[SLOT_KEY[slot]];
-        if (p && rng() < SELF_SOLVE_PER_SECOND * seconds) {
-            const r = answerPuzzle(w, p.answer, tier, slot);
-            if (r && r.ok) out.push(slot);
-        }
+    if (w.puzzle && rng() < SELF_SOLVE_PER_SECOND * seconds) {
+        solvePuzzle(w, tier);
+        out.push(0);
     }
     return out;
 }
@@ -657,7 +797,7 @@ export function lastWake(w, s) {
     s.humans = 0;
     s.probes = [];
     w.gone = true;
-    w.puzzle = null; w.puzzle2 = null;
+    w.puzzle = null;
     closeVisit(w.surface);
     return were;
 }

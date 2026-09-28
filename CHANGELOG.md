@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.51.0 - 2026-09-28 (chapter IV, slice 8)
+
+### Chapter IV UX: queue strip, button groups, the ladder you can see, lamp events, animated rock paper scissors
+
+After Ola's playtest of v1.50.0, and aligned with the cut in docs/superpowers/specs/2026-09-28-chapter-iv-reduction.md (one demand on screen at a time).
+
+- **The queue is a strip.** Orders sit in one mono line along the bottom of the window, under the chapter label: "dig ◔ · dig ○ · mine ○", each with its ring. It has its own place, so an order never moves a button (measured: the sleep button stands still through three orders and a take-back). It stays while the colony sleeps (an order waiting for the wake is dim). A click on an order takes it back and returns its price, which is the price the next order of that kind would cost without it (deep.js `cancelOrder`); a dig a waiting room counts on for its chamber cannot be taken back. Empty, the strip is not there.
+- **Three groups in the right column**, each under a tiny mono word: BUILD (dig and the four rooms) and GROW (level, automate, the longer sleep) are round, products; ACT is wide pills with a word ("Sleep · 1 000 y/s", "Scout party", "Go up", "Wake"), so an action never looks like a room. Asleep, the longer-sleep button stays greyed where it is and the sun takes the sleep pill's place, so nothing jumps. Reset view stays alone at the bottom. The column fits a 900 px window (815 px at its fullest).
+- **The ladder you can see.** Under the Watcher: one thin line with a tick for each rung (SYSTEM, HARDWARE, BIOLOGICAL) and a filled trail, the next rung named as a teaser, and ONE pill with the next step only: "HARDWARE · Sensor mast · 120 cap + 300 B ★" and under it what it does and takes, or what is missing ("needs 120 · 84 now"). When BIOLOGICAL opens the pill turns warm and leads with the people it takes ("BIOLOGICAL · Brain tissue, human grade · 1.4 k people"). The tooltip starts with the step's name in capitals. The advisor says one line when a rung opens: "The system is in. There is room for hardware now.", "The hardware is in. Something else is possible now." The capacity bar is gone from the Watcher; capacity is only ever shown inside the pill.
+- **The riddles are gone; the lamps are an event.** At most once in two sleeps, never in the first, never while Surface is there: THE LAMPS (the indicator lamps on the automated rooms go still and blink a sequence, 3 to 7 long, longer as stability falls; the Watcher repeats it by clicking the rooms in the model, a wrong click ends it at -5, the whole sequence gives +15) or WHICH LAMP WENT OUT (all lit, one goes dark, find it within 3 s). Below stability 35 a lamp may blink once without being part of the answer; nothing says so. The lamps are chosen among those in view. Escape lets an event go; it also goes at the wake. Rules in watcher.js (`makeLampPuzzle`, `makeDarkPuzzle`, `pressLamp`, `expireLamps`, `demand`), tested in the new lamps.test.js; the lamps drawn in scene.js (`setLamps`, `slotAt`, `visibleSlots`).
+- **One demand at a time.** Surface does not come while the lamps ask, and the lamps do not come while Surface is there (`demand()`).
+- **Two steps do something new:** Deep read makes a snap +10 (was: a riddle +25); Second core makes the lamps give double, stability and stars (was: a second riddle card). Brain tissue now plays the lamps itself now and then.
+- **Rock, paper, scissors, played out.** On a throw both fists shake for 0.6 s, Surface's hidden throw turns face up, the losing glyph cracks and fades, the winning one pulses once, and only then the line. A won word slides into the sentence letter by letter. CSS one-shots, no library.
+- Saves: no new schema. A number riddle or a second card from an older save is let go; a lamp event comes back to be shown from the start.
+- Sim: both lines unchanged, byte for byte (the plain run 26m26s to year 802 701; `--watcher` 26m04s to the last wake-up).
+
 ## v1.50.0 - 2026-09-28 (chapter IV, slice 7)
 
 ### Biological: the body takes the base, the colonists are the cost, the last wake-up

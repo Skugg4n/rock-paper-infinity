@@ -525,78 +525,94 @@
             </div>
         </div>
 
-        <!-- the buttons -->
+        <!-- the buttons. v1.51.0: three groups, each under a tiny mono word. BUILD and GROW are
+             products (round), ACT are things the colony does (wide pills with a word), so an action
+             never looks like a room. The queue lives in its own strip at the bottom of the window -->
         <div class="deep-chrome deep-btn-col">
-            <button class="btn" id="deep-dig-btn" aria-label="Dig a chamber">
-                <i data-lucide="shovel" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn deep-room-btn" id="deep-room-mine" data-room="mine" aria-label="Mine">
-                <i data-lucide="pickaxe" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn deep-room-btn" id="deep-room-farm" data-room="farm" aria-label="Farm">
-                <i data-lucide="sprout" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn deep-room-btn" id="deep-room-generator" data-room="generator" aria-label="Generator">
-                <i data-lucide="zap" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn deep-room-btn" id="deep-room-dorm" data-room="dorm" aria-label="Dormitory">
-                <i data-lucide="bed" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <!-- v1.49.0: the build queue, under the buttons that fill it: "dig, mine, farm" -->
-            <div class="deep-queue deep-mono" id="deep-queue" hidden></div>
-            <button class="btn" id="deep-level-btn" aria-label="Level a room type">
-                <i data-lucide="chevrons-up" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn" id="deep-auto-btn" aria-label="Automate a room type">
-                <i data-lucide="repeat" class="w-7 h-7"></i>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn is-locked has-caption" id="deep-cryo-btn" aria-label="Cryo">
-                <i data-lucide="snowflake" class="w-7 h-7"></i>
-                <span class="deep-badge deep-mono hidden" id="deep-cryo-badge"></span>
-                <span class="deep-caption deep-mono" id="deep-cryo-caption"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn hidden" id="deep-wake-btn" aria-label="Wake the colony">
-                <i data-lucide="sun" class="w-7 h-7"></i>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn hidden has-caption" id="deep-cryo-up" aria-label="A longer sleep">
-                <i data-lucide="chevrons-up" class="w-7 h-7"></i>
-                <span class="deep-badge deep-mono" id="deep-cryo-up-badge"></span>
-                <span class="deep-caption deep-mono" id="deep-cryo-up-caption"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn hidden" id="deep-probe-btn" aria-label="Send a scout party">
-                <i data-lucide="footprints" class="w-7 h-7"></i>
-                <span class="deep-badge deep-mono hidden" id="deep-probe-badge"></span>
-                <span class="deep-build"></span>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
-            <button class="btn" id="deep-ascend-btn" aria-label="Try to resurface">
-                <i data-lucide="arrow-up-from-line" class="w-7 h-7"></i>
-                <div class="tooltip deep-tip-wide"></div>
-            </button>
+            <div class="deep-group" id="deep-group-build">
+                <span class="deep-group-word deep-mono">BUILD</span>
+                <button class="btn" id="deep-dig-btn" aria-label="Dig a chamber">
+                    <i data-lucide="shovel" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-room-btn" id="deep-room-mine" data-room="mine" aria-label="Mine">
+                    <i data-lucide="pickaxe" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-room-btn" id="deep-room-farm" data-room="farm" aria-label="Farm">
+                    <i data-lucide="sprout" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-room-btn" id="deep-room-generator" data-room="generator" aria-label="Generator">
+                    <i data-lucide="zap" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-room-btn" id="deep-room-dorm" data-room="dorm" aria-label="Dormitory">
+                    <i data-lucide="bed" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+            </div>
+            <div class="deep-group" id="deep-group-grow">
+                <span class="deep-group-word deep-mono">GROW</span>
+                <button class="btn" id="deep-level-btn" aria-label="Level a room type">
+                    <i data-lucide="chevrons-up" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn" id="deep-auto-btn" aria-label="Automate a room type">
+                    <i data-lucide="repeat" class="w-7 h-7"></i>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn hidden has-caption" id="deep-cryo-up" aria-label="A longer sleep">
+                    <i data-lucide="snowflake" class="w-7 h-7"></i>
+                    <span class="deep-badge deep-mono" id="deep-cryo-up-badge"></span>
+                    <span class="deep-caption deep-mono" id="deep-cryo-up-caption"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+            </div>
+            <div class="deep-group is-act" id="deep-group-act">
+                <span class="deep-group-word deep-mono">ACT</span>
+                <button class="btn deep-pill is-locked has-caption" id="deep-cryo-btn" aria-label="Sleep">
+                    <i data-lucide="snowflake" class="w-5 h-5"></i>
+                    <span class="deep-pill-text deep-mono" id="deep-cryo-text">Cryo hall</span>
+                    <span class="deep-caption deep-mono" id="deep-cryo-caption"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-pill hidden" id="deep-wake-btn" aria-label="Wake the colony">
+                    <i data-lucide="sun" class="w-5 h-5"></i>
+                    <span class="deep-pill-text deep-mono">Wake</span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-pill hidden" id="deep-probe-btn" aria-label="Send a scout party">
+                    <i data-lucide="footprints" class="w-5 h-5"></i>
+                    <span class="deep-pill-text deep-mono" id="deep-probe-text">Scout party</span>
+                    <span class="deep-build"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+                <button class="btn deep-pill" id="deep-ascend-btn" aria-label="Go up">
+                    <i data-lucide="arrow-up-from-line" class="w-5 h-5"></i>
+                    <span class="deep-pill-text deep-mono">Go up</span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
+            </div>
             <button class="btn" id="deep-reset-view" aria-label="Reset the view">
                 <i data-lucide="scan" class="w-6 h-6"></i>
             </button>
         </div>
 
+        <!-- v1.51.0: THE BUILD QUEUE, a fixed strip along the bottom of the window beside the chapter
+             label: "dig ◔ · dig ○ · mine ○". It never moves the buttons; a click on an order takes it
+             back and returns its price; empty, it is not there -->
+        <div class="deep-chrome deep-queue deep-mono" id="deep-queue" hidden></div>
+
         <!-- v1.47.0: what stays awake while the colony sleeps. Only in the sleep world: a slow
-             pulse, a name, a meter, the machines' spare capacity, and now and then a riddle -->
+             pulse, a name, a meter, now and then the lamps, and (v1.51.0) the ladder as one pill -->
         <div class="deep-chrome" id="deep-watcher" hidden>
             <div class="deep-watcher-head">
                 <span class="deep-watcher-pulse"></span>
@@ -607,25 +623,31 @@
                 <span class="deep-watcher-track"><span class="deep-watcher-fill" id="deep-stab-fill"></span></span>
                 <span class="deep-mono deep-watcher-val" id="deep-stab-val">100</span>
             </div>
-            <div class="deep-watcher-cap"><span class="deep-watcher-cap-fill" id="deep-cap-fill"></span></div>
+            <!-- v1.51.0: the lamps, when they come: one line, what they ask and how far along -->
             <div class="deep-puzzle" id="deep-puzzle">
                 <span class="deep-mono deep-puzzle-q" id="deep-puzzle-q"></span>
-                <input class="deep-mono deep-puzzle-in" id="deep-puzzle-in" type="text" inputmode="numeric"
-                    autocomplete="off" spellcheck="false" aria-label="Answer">
                 <span class="deep-mono deep-puzzle-said" id="deep-puzzle-said"></span>
             </div>
-            <!-- v1.49.0: the second riddle, with the Second core -->
-            <div class="deep-puzzle is-second" id="deep-puzzle-2">
-                <span class="deep-mono deep-puzzle-q" id="deep-puzzle-2-q"></span>
-                <input class="deep-mono deep-puzzle-in" id="deep-puzzle-2-in" type="text" inputmode="numeric"
-                    autocomplete="off" spellcheck="false" aria-label="Answer">
-                <span class="deep-mono deep-puzzle-said" id="deep-puzzle-2-said"></span>
+            <!-- v1.51.0: the ladder you can see. The whole road as a line with three ticks and a
+                 trail, and one pill with the next step -->
+            <div class="deep-ladder" id="deep-ladder" hidden>
+                <div class="deep-ladder-line">
+                    <span class="deep-ladder-track"><span class="deep-ladder-trail" id="deep-ladder-trail"></span></span>
+                    <span class="deep-ladder-tick" data-rung="0"><span class="deep-mono">SYSTEM</span></span>
+                    <span class="deep-ladder-tick" data-rung="1"><span class="deep-mono">HARDWARE</span></span>
+                    <span class="deep-ladder-tick" data-rung="2"><span class="deep-mono">BIOLOGICAL</span></span>
+                </div>
+                <button class="deep-ladder-pill" id="deep-ladder-pill" aria-label="The next step">
+                    <span class="deep-pill-head deep-mono"><span class="rung" id="deep-pill-rung"></span><span class="sep"> · </span><span class="name" id="deep-pill-name"></span><span class="sep"> · </span><span class="cost" id="deep-pill-cost"></span></span>
+                    <span class="deep-pill-sub deep-mono" id="deep-pill-sub"></span>
+                    <div class="tooltip deep-tip-wide"></div>
+                </button>
             </div>
-            <!-- v1.49.0: what the Watcher can make of itself, one step at a time -->
-            <div class="deep-ladder" id="deep-ladder"></div>
         </div>
 
-        <!-- v1.49.0: Surface, opposite the Watcher, only in some sleeps. A line, and a game -->
+        <!-- v1.49.0: Surface, opposite the Watcher, only in some sleeps. A line, and a game.
+             v1.51.0: the game is played out: both fists shake, Surface's throw turns over, the
+             loser cracks, the winner pulses, then the line; a won word slides into the sentence -->
         <div class="deep-chrome" id="deep-surface" hidden>
             <div class="deep-surface-head">
                 <span class="deep-surface-glyph"></span>
@@ -636,6 +658,14 @@
                 <button class="deep-rps-btn" data-throw="rock" aria-label="Rock"><i data-lucide="gem" class="w-4 h-4"></i></button>
                 <button class="deep-rps-btn" data-throw="paper" aria-label="Paper"><i data-lucide="file-text" class="w-4 h-4"></i></button>
                 <button class="deep-rps-btn" data-throw="scissors" aria-label="Scissors"><i data-lucide="scissors" class="w-4 h-4"></i></button>
+            </div>
+            <div class="deep-rps-duel" id="deep-rps-duel" hidden>
+                <span class="deep-fist is-you" id="deep-fist-you"></span>
+                <span class="deep-mono deep-duel-vs">·</span>
+                <span class="deep-fist is-it" id="deep-fist-it">
+                    <span class="deep-fist-face is-back"></span>
+                    <span class="deep-fist-face is-front" id="deep-fist-it-front"></span>
+                </span>
             </div>
             <div class="deep-mono deep-surface-said" id="deep-surface-said"></div>
             <div class="deep-mono deep-surface-words" id="deep-surface-words"></div>
@@ -674,7 +704,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.50.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.51.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

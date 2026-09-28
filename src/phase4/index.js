@@ -28,6 +28,7 @@ import {
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
     ASCENT_MIN_PEOPLE, ordersDone, mourn,
     orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep, ordered,
+    cancelOrder, digSpare,
 } from './deep.js';
 import {
     conditions, advisorLines, pushFeed, ROOM_WORD, DESCENT_LINE, alarmLine, alarmGlyph,
@@ -45,13 +46,14 @@ import { createReplay } from './replay.js';
 import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js';
 import {
     normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
-    puzzleDue, openPuzzle, beginSleep, dismissPuzzle, answerPuzzle, puzzleText, puzzleStars, sleepDays, puzzleGain,
+    puzzleDue, openPuzzle, beginSleep, dismissPuzzle, puzzleStars, sleepDays,
     STABILITY_MAX, firstSleep, FIRST_SLEEP_DAYS, WATCHER_HELLO, snapWait, SNAP_COOLDOWN_MS,
     recoverAwake, LADDER, RUNGS, stepNeed, buyStep, capacityMax, surfaceDue, openSurface, closeSurface,
     playSurface, SPACE_LINE, peopleFor, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, GO_UP_ALONE, sealLine, BODY_GROW_SECONDS,
+    lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, ladderLine, rungOpenLine, nextStep,
 } from './watcher.js';
-import { THROWS, sentenceShown, SENTENCE_LINE } from './surface.js';
+import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE } from './surface.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
 
@@ -175,11 +177,11 @@ export function init() {
         levelBtn: document.getElementById('deep-level-btn'),
         autoBtn: document.getElementById('deep-auto-btn'),
         cryoBtn: document.getElementById('deep-cryo-btn'),
+        cryoText: document.getElementById('deep-cryo-text'),
         wakeBtn: document.getElementById('deep-wake-btn'),
-        cryoBadge: document.getElementById('deep-cryo-badge'),
         cryoCaption: document.getElementById('deep-cryo-caption'),
         cryoUpCaption: document.getElementById('deep-cryo-up-caption'),
-        probeBadge: document.getElementById('deep-probe-badge'),
+        probeText: document.getElementById('deep-probe-text'),
         cryoUpBtn: document.getElementById('deep-cryo-up'),
         cryoUpBadge: document.getElementById('deep-cryo-up-badge'),
         probeBtn: document.getElementById('deep-probe-btn'),
@@ -192,19 +194,25 @@ export function init() {
         watcherName: document.getElementById('deep-watcher-name'),
         stabFill: document.getElementById('deep-stab-fill'),
         stabVal: document.getElementById('deep-stab-val'),
-        capFill: document.getElementById('deep-cap-fill'),
-        // the riddle cards: the first, and the second the Second core opens (v1.49.0)
-        cards: ['deep-puzzle', 'deep-puzzle-2'].map((id, slot) => ({
-            slot,
-            el: document.getElementById(id),
-            q: document.getElementById(`${id}-q`),
-            input: document.getElementById(`${id}-in`),
-            said: document.getElementById(`${id}-said`),
-            shown: null,
-            lingerUntil: 0,
-        })),
+        // v1.51.0: the lamps' one line under the Watcher (the riddle cards are gone)
+        card: {
+            el: document.getElementById('deep-puzzle'),
+            q: document.getElementById('deep-puzzle-q'),
+            said: document.getElementById('deep-puzzle-said'),
+        },
         queue: document.getElementById('deep-queue'),
         ladder: document.getElementById('deep-ladder'),
+        ladderTrail: document.getElementById('deep-ladder-trail'),
+        ladderTicks: [...document.querySelectorAll('#deep-ladder .deep-ladder-tick')],
+        pill: document.getElementById('deep-ladder-pill'),
+        pillRung: document.getElementById('deep-pill-rung'),
+        pillName: document.getElementById('deep-pill-name'),
+        pillCost: document.getElementById('deep-pill-cost'),
+        pillSub: document.getElementById('deep-pill-sub'),
+        duel: document.getElementById('deep-rps-duel'),
+        fistYou: document.getElementById('deep-fist-you'),
+        fistIt: document.getElementById('deep-fist-it'),
+        fistItFront: document.getElementById('deep-fist-it-front'),
         surface: document.getElementById('deep-surface'),
         surfaceLine: document.getElementById('deep-surface-line'),
         surfaceSaid: document.getElementById('deep-surface-said'),
@@ -484,7 +492,9 @@ export function init() {
         const owns = tier >= 0;
         ui.cryoBtn.classList.toggle('hidden', asleep);
         ui.wakeBtn.classList.toggle('hidden', !state.asleep);
-        ui.cryoBadge.classList.toggle('hidden', !owns);
+        // v1.51.0: an action is a pill with a word: "Cryo hall" until it is dug, then "Sleep · 1 y/s"
+        const cryoWord = owns ? `Sleep · ${rateLabel(tier)}` : 'Cryo hall';
+        if (ui.cryoText.textContent !== cryoWord) ui.cryoText.textContent = cryoWord;
         if (owns) setCaption(ui.cryoCaption, state.humans < MIN_SLEEPERS ? `needs ${MIN_SLEEPERS} people` : '');
         if (state.asleep) {
             ui.wakeBtn.classList.toggle('is-locked', busy);
@@ -492,7 +502,6 @@ export function init() {
         } else if (gone) {
             // nobody is left to sleep
         } else if (owns) {
-            ui.cryoBadge.textContent = rateLabel(tier);
             const few = state.humans < MIN_SLEEPERS;
             ui.cryoBtn.classList.toggle('is-locked', busy || few);
             const warn = few
@@ -510,17 +519,18 @@ export function init() {
                 + says(`${cryoName(0)}: a cryo hall, dug with its own chamber. Asleep, a month passes every second and the machines keep working.`)
                 + note(need ? need.long : '', 'is-missing'));
         }
-        // the next tier: on screen once the hall is dug, offered once a sleep at its rate is safe
+        // the next tier: on screen once the hall is dug, offered once a sleep at its rate is safe.
+        // v1.51.0: asleep it stays where it is, greyed, so the pills under it never move
         const nextTier = owns ? CRYO[tier + 1] : null;
-        ui.cryoUpBtn.classList.toggle('hidden', !nextTier || asleep);
-        if (nextTier && !asleep) {
+        ui.cryoUpBtn.classList.toggle('hidden', !nextTier);
+        if (nextTier) {
             ui.cryoUpBadge.textContent = rateLabel(tier + 1);
             // the reason is on screen, not only under the cursor, and it is the tooltip's reason too
-            setCaption(ui.cryoUpCaption, need ? need.short : '');
-            ui.cryoUpBtn.classList.toggle('is-locked', busy || !!need);
+            setCaption(ui.cryoUpCaption, need && !asleep ? need.short : '');
+            ui.cryoUpBtn.classList.toggle('is-locked', busy || asleep || !!need);
             setTooltip(ui.cryoUpBtn, priceRow(roomMark('cryo') + starCost(nextTier.cost))
                 + says(`${cryoName(tier + 1)}: sleep ${rateWords(nextTier.days)} a second.`)
-                + note(need ? need.long : '', 'is-missing'));
+                + note(asleep ? affordText({ blocked: gone ? 'gone' : 'asleep' }) : (need ? need.long : ''), 'is-missing'));
         }
 
         // ---- scout parties: people up the shaft, for a reading of the sky ----
@@ -535,8 +545,8 @@ export function init() {
             const power = report.parts.E >= PROBE_ENERGY;
             ui.probeBtn.classList.toggle('is-locked', busy || asleep || out || state.minerals < odds.price || !power || !people);
             const trip = out ? state.probes[0] : null;
-            ui.probeBadge.classList.toggle('hidden', !out);
-            if (trip) ui.probeBadge.textContent = backIn(trip.dueDay - state.day);
+            const probeWord = trip ? `Scout party · ${backIn(trip.dueDay - state.day)}` : 'Scout party';
+            if (ui.probeText.textContent !== probeWord) ui.probeText.textContent = probeWord;
             const mark = ui.probeBtn.querySelector('.deep-build');
             mark.classList.toggle('is-on', !!trip);
             if (trip) mark.style.setProperty('--p', `${Math.round(100 * Math.min(1, (state.day - trip.sentDay) / Math.max(1, trip.dueDay - trip.sentDay)))}%`);
@@ -582,10 +592,10 @@ export function init() {
     }
 
     /* ---- THE WATCHER (v1.46.0) ------------------------------------------------
-       Only in the sleep world: a slow pulse, a name, a meter, a sliver of capacity, and now and
-       then a riddle. No sentence says what it is. Since v1.49.0 also its ladder (a column of
-       teased glyphs beside it), a second riddle card with the Second core, and, opposite it in
-       some sleeps, Surface. */
+       Only in the sleep world: a slow pulse, a name, a meter, and now and then the lamps. No
+       sentence says what it is. Since v1.51.0 its ladder is a line and one pill under it, the
+       capacity is only ever shown inside that pill, and the lamps' one line replaces the riddle
+       cards. Opposite it in some sleeps, Surface. */
     function updateWatcher() {
         const w = state.watcher;
         const asleep = !!state.asleep;
@@ -600,94 +610,82 @@ export function init() {
                 const v = String(stab);
                 if (ui.stabVal.textContent !== v) ui.stabVal.textContent = v;
                 ui.stabFill.style.width = `${(100 * w.stability / STABILITY_MAX).toFixed(1)}%`;
-                ui.capFill.style.width = `${(100 * w.capacity / capacityMax(w)).toFixed(1)}%`;
                 ui.watcher.classList.toggle('is-low', w.stability < 35);
                 drawLadder();
             }
-            for (const card of ui.cards) drawCard(card, asleep ? w[card.slot ? 'puzzle2' : 'puzzle'] : null);
+            drawLampCard();
         }
         drawSurface();
         // the base: as soft as the meter says while the colony sleeps, rigid when it wakes
         scene?.setSoftness(asleep ? softness(w.stability) : 0);
     }
-    /** One riddle card: drawn once per riddle, and it lingers a moment on a right answer. */
-    function drawCard(card, puzzle) {
-        if (!card.el) return;
-        const want = performance.now() < card.lingerUntil ? card.shown : puzzle;
-        if (want === card.shown) return;
-        card.shown = want;
-        card.el.classList.toggle('is-on', !!want);
-        if (want) {
-            card.q.textContent = puzzleText(want);
-            card.input.value = '';
-            card.said.textContent = '';
-            card.input.disabled = false;
-            if (!ui.cards.some((c) => c !== card && document.activeElement === c.input)) {
-                try { card.input.focus({ preventScroll: true }); } catch { /* ignore */ }
-            }
-        } else if (document.activeElement === card.input) {
-            card.input.blur();
-        }
-    }
 
-    /* ---- THE LADDER (v1.49.0): what the Watcher makes of itself, bought asleep. The steps
-       bought are lit glyphs; the next one is teased greyed until it can be paid; nothing past it
-       is shown (chapter II's way). One line on hover: what it does, and quietly what it takes. */
-    let ladderKey = '';
-    let ladderNext = null;          // the button of the next step, for its lock and its tooltip
+    /* ---- THE LADDER YOU CAN SEE (v1.51.0) ------------------------------------------
+       The whole road as one thin line (a tick per rung, a filled trail, the next rung named as a
+       teaser) and ONE pill under it with the next step: its rung, its name, what it takes, and
+       either what it does or what is still missing ("needs 120 · 84 now"). BIOLOGICAL turns the
+       pill warm and leads with the people it takes. The tooltip starts with the step's name in
+       capitals, so no two read alike. */
     const sealedThisSleep = [];     // sectors the body took in this sleep, for the wake-up strip
-    function stepTip(step, need) {
-        const rung = RUNGS[step.rung];
+    function takesOf(step) {
         const takes = [];
         if (step.ore) takes.push(`${formatCount(step.ore)} ore`);
         if (step.beds) takes.push(step.beds === 1 ? 'a dormitory' : `${step.beds} dormitories`);
         if (step.people) takes.push(`${formatCount(peopleFor(step, state))} people`);
-        const price = priceRow(`<span class="deep-mono">${formatCount(step.cap)}</span><span class="deep-mono deep-cap-word">cap</span>`
-            + starCost(step.stars));
-        let missing = '';
-        if (need) {
-            const w = state.watcher;
-            if (need.missing === 'capacity') missing = `Needs ${formatCount(step.cap)} capacity: ${Math.floor(w.capacity)} now.`;
-            else if (need.missing === 'stars') missing = affordText({ price: step.stars, have: state.stars, perDay: report.stars });
-            else if (need.missing === 'ore') missing = `Needs ${formatCount(step.ore)} ore: ${formatCount(state.minerals)} in store.`;
-            else if (need.missing === 'dorm') missing = 'Needs a dormitory to spare.';
-            else if (need.missing === 'people') missing = 'Needs more people: some must stay under the ice.';
-            else if (need.missing === 'growing') missing = 'It is still growing.';
+        return takes;
+    }
+    /** What is still missing for the next step, in the pill's own short words, or ''. */
+    function needWords(step, need) {
+        const w = state.watcher;
+        switch (need && need.missing) {
+            case 'capacity': return `needs ${formatCount(step.cap)} · ${Math.floor(w.capacity)} now`;
+            case 'stars': return `needs ${formatCount(step.stars)} ★ · ${formatCount(state.stars)} now`;
+            case 'ore': return `needs ${formatCount(step.ore)} ore · ${formatCount(state.minerals)} now`;
+            case 'dorm': return 'needs a dormitory to spare';
+            case 'people': return 'needs more people: some must stay under the ice';
+            case 'growing': return 'it is still growing';
+            default: return '';
         }
-        return price + says(`${rung} · ${step.name}: ${step.does}`)
+    }
+    function stepTip(step, need) {
+        const takes = takesOf(step);
+        const price = priceRow(`<span class="deep-mono">${formatCount(step.cap)} cap</span>` + starCost(step.stars));
+        return `<span class="deep-step-name">${escapeText(step.name.toUpperCase())}</span>`
+            + price + says(`${RUNGS[step.rung]}: ${step.does}`)
             + note(takes.length ? `Takes ${takes.join(' and ')}.` : '')
-            + note(missing, 'is-missing');
+            + note(need && need.missing ? needWords(step, need).replace(/^./, (c) => c.toUpperCase()) + '.' : '', 'is-missing');
     }
     function drawLadder() {
         if (!ui.ladder) return;
         const w = state.watcher;
         // the first sleep only teaches: the ladder shows itself from the second
         ui.ladder.hidden = firstSleep(w) && !(w.bought || []).length;
-        const bought = w.bought || [];
-        const next = LADDER[bought.length] || null;
-        const key = `${bought.join(',')}|${next ? next.id : ''}`;
-        if (key !== ladderKey) {
-            ladderKey = key;
-            ui.ladder.textContent = '';
-            const add = (step, isNext) => {
-                const b = document.createElement('button');
-                b.className = `btn deep-ladder-btn${isNext ? ' is-next' : ' is-bought'}`;
-                b.setAttribute('aria-label', step.name);
-                b.innerHTML = `<i data-lucide="${step.icon}" class="w-4 h-4"></i><div class="tooltip deep-tip-wide"></div>`;
-                if (!isNext) setTooltip(b, says(`${RUNGS[step.rung]} · ${step.name}: ${step.does}`));
-                else b.addEventListener('click', () => buyLadder(), { signal });
-                ui.ladder.appendChild(b);
-                return b;
-            };
-            LADDER.slice(0, bought.length).forEach((step) => add(step, false));
-            ladderNext = next ? add(next, true) : null;
-            scheduleIconRefresh();
-        }
-        if (ladderNext && next) {
-            const need = stepNeed(w, state);
-            ladderNext.classList.toggle('is-locked', !!need.missing || busy);
-            setTooltip(ladderNext, stepTip(next, need));
-        }
+        const line = ladderLine(w);
+        ui.ladderTrail.style.width = `${(100 * line.trail).toFixed(1)}%`;
+        line.ticks.forEach((t, i) => {
+            const el = ui.ladderTicks[i];
+            if (!el) return;
+            el.style.left = `${(100 * t.at).toFixed(2)}%`;
+            const cls = `deep-ladder-tick is-${t.state}${i === RUNGS.length - 1 ? ' is-bio' : ''}`;
+            if (el.className !== cls) el.className = cls;
+        });
+        const step = nextStep(w);
+        ui.pill.hidden = !step || !!w.gone;
+        if (!step || w.gone) return;
+        const need = stepNeed(w, state);
+        const bio = !!step.people;
+        const missing = needWords(step, need);
+        ui.pill.classList.toggle('is-bio', bio);
+        ui.pill.classList.toggle('is-locked', !!need.missing || busy);
+        ui.pill.classList.toggle('is-missing', !!missing);
+        const set = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+        set(ui.pillRung, RUNGS[step.rung]);
+        set(ui.pillName, step.name);
+        const stars = `${formatCount(step.cap)} cap + ${formatCount(step.stars)} ★`;
+        set(ui.pillCost, bio ? `${formatCount(peopleFor(step, state))} people` : stars);
+        const extra = bio ? stars : takesOf(step).join(', ');
+        set(ui.pillSub, missing || (extra ? `${step.short} · ${bio ? '' : 'takes '}${extra}` : step.short));
+        setTooltip(ui.pill, stepTip(step, need));
     }
     function buyLadder() {
         if (!state.asleep || busy || paused()) return;
@@ -699,14 +697,18 @@ export function init() {
             feed = pushFeed(feed, [sealLine(out.sector, state.watcher.sealed.length - 1)]);
             sealedThisSleep.push(out.sector);
         }
-        // the skin: the sentence can be heard, now, whether Surface was here or not
+        // v1.51.0: the last step of a rung opens the next one, and the advisor says so once
+        const opened = rungOpenLine(out.step.id);
+        if (opened) feed = pushFeed(feed, [opened]);
+        // the skin: the sentence can be heard, now, whether Surface was here or not (and the
+        // lamps go quiet for it: one demand at a time)
         if (out.step.id === 'skin') {
             const sf = state.watcher.surface;
+            if (state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
             if (!sf.visit) openSurface(state.watcher);
             else sf.visit.line = SENTENCE_LINE;
             surfaceKey = '';
         }
-        ladderKey = '';
         report = dryRun();
         scene?.setState(state, layout);
         updateChrome();
@@ -714,35 +716,225 @@ export function init() {
     }
 
     /* ---- SURFACE (v1.49.0): opposite the Watcher, only in the sleeps it comes in. One line,
-       a game, what the game gave, and the sentence as far as it is known. Gone at the wake. */
+       a game, what the game gave, and the sentence as far as it is known. Gone at the wake.
+       v1.51.0: the game is played out. On a throw both fists shake for 0.6 s (the three buttons
+       stand still), Surface's hidden throw turns face up, the loser cracks and fades, the winner
+       pulses once, and only then the line; a won word slides into the sentence letter by letter.
+       The rules are settled the moment the throw is made; only the showing waits. */
+    const RPS_TIMING = { shake: 600, reveal: 300, settle: 380 };
     let surfaceKey = '';
+    let rps = null;                 // the game being played out: { you, it, outcome, word, stage }
+    let rpsTimers = [];
+    const glyph = (t) => `<i data-lucide="${THROW_ICON[t]}" class="w-4 h-4"></i>`;
+    /** The sentence as far as it is known; the word just won (index `fresh`) slides in by letter. */
+    function drawWords(known, fresh) {
+        const el = ui.surfaceWords;
+        if (!(known > 0)) { el.textContent = ''; return; }
+        el.innerHTML = SENTENCE.map((word, i) => {
+            if (i === fresh) {
+                return `<span class="deep-word-new">${[...word].map((ch, k) => `<span style="animation-delay:${k * 70}ms">${ch}</span>`).join('')}</span>`;
+            }
+            return i < known ? word : '·';
+        }).join(' ');
+    }
     function drawSurface() {
         if (!ui.surface) return;
         const sf = state.watcher.surface;
         const v = state.asleep ? sf.visit : null;
         ui.surface.hidden = !v;
         if (!v) { surfaceKey = ''; return; }
-        const key = `${sf.visits}|${v.result ? v.result.text : ''}|${sf.words}`;
+        const r = v.result;
+        const stage = rps ? rps.stage : (r ? 'line' : 'open');
+        const key = `${sf.visits}|${stage}|${sf.words}|${v.line}`;
         if (key === surfaceKey) return;
         surfaceKey = key;
         ui.surfaceLine.textContent = v.line;
-        ui.surfaceSaid.textContent = v.result ? v.result.text : '';
-        ui.surface.classList.toggle('is-played', !!v.result);
-        ui.surfaceWords.textContent = sf.words > 0 ? sentenceShown(sf) : '';
+        ui.surface.classList.toggle('is-played', !!r);
+        const said = !!r && stage === 'line';
+        ui.surfaceSaid.textContent = said ? r.text : '';
+        ui.surfaceSaid.classList.toggle('is-in', said && !!rps);
+        // the word a win gives is held back until the line is said, then it slides in
+        const holding = !!r && r.word && !said;
+        const fresh = said && rps && r.word ? sf.words - 1 : -1;
+        drawWords(holding ? sf.words - 1 : sf.words, fresh);
         for (const b of ui.rpsBtns) {
-            b.disabled = !!v.result;
-            b.classList.toggle('is-you', !!v.result && v.result.you === b.dataset.throw);
-            b.classList.toggle('is-it', !!v.result && v.result.it === b.dataset.throw);
+            b.disabled = !!r;
+            b.classList.remove('is-you', 'is-it');
+        }
+        ui.duel.hidden = !r;
+        if (r) {
+            const icons = `${r.you}|${r.it}`;
+            if (ui.duel.dataset.icons !== icons) {
+                ui.duel.dataset.icons = icons;
+                ui.fistYou.innerHTML = glyph(r.you);
+                ui.fistItFront.innerHTML = glyph(r.it);
+            }
+            const shown = stage === 'reveal' || stage === 'settle' || stage === 'line';
+            const settled = stage === 'settle' || stage === 'line';
+            ui.duel.classList.toggle('is-shaking', stage === 'shake');
+            ui.duel.classList.toggle('is-revealed', shown);
+            ui.fistYou.classList.toggle('is-won', settled && r.outcome === 'win');
+            ui.fistYou.classList.toggle('is-lost', settled && r.outcome === 'lose');
+            ui.fistIt.classList.toggle('is-won', settled && r.outcome === 'lose');
+            ui.fistIt.classList.toggle('is-lost', settled && r.outcome === 'win');
+        } else {
+            delete ui.duel.dataset.icons;
         }
         scheduleIconRefresh();
     }
+    function stopRps() {
+        for (const t of rpsTimers) clearTimeout(t);
+        rpsTimers = [];
+        rps = null;
+    }
     function throwAtSurface(you) {
-        if (!state.asleep || busy || paused() || !THROWS.includes(you)) return;
+        if (!state.asleep || busy || paused() || rps || !THROWS.includes(you)) return;
         const r = playSurface(state.watcher, you);
         if (!r) return;
+        rps = { you, it: r.it, outcome: r.outcome, word: r.word, stage: 'shake', log: [['throw', performance.now()]] };
+        const at = (ms, stage) => rpsTimers.push(setTimeout(() => {
+            if (!rps) return;
+            rps.stage = stage;
+            rps.log.push([stage, performance.now()]);
+            updateWatcher();
+            if (stage === 'line') {
+                rpsLast = rps.log;
+                rpsTimers.push(setTimeout(() => { rps = null; }, 600));
+                if (r.rebooted) wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e));
+            }
+        }, ms));
+        at(RPS_TIMING.shake, 'reveal');
+        at(RPS_TIMING.shake + RPS_TIMING.reveal, 'settle');
+        at(RPS_TIMING.shake + RPS_TIMING.reveal + RPS_TIMING.settle, 'line');
+        rps.log.push(['shake', performance.now()]);
         updateChrome();
         saveGame();
-        if (r.rebooted) wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e));
+    }
+    let rpsLast = null;             // the last game's timeline, for the tests: throw, shake, reveal, settle, line
+
+    /* ---- THE LAMPS (v1.51.0) ----------------------------------------------------------
+       Now and then (at most once in two sleeps, never while Surface is there) the lamps on the
+       automated rooms ask for something. THE LAMPS: they go still, then blink a sequence, and the
+       Watcher repeats it by clicking the rooms. WHICH LAMP WENT OUT: all lit, one goes dark, find
+       it within three seconds. The rules are in watcher.js; this plays them on the model and
+       keeps its own clock (a wall clock, held while paused). */
+    const LAMP_T = { lead: 900, on: 460, gap: 220, darkLead: 1300 };
+    let lamp = null;                // the event being played: { p, t, phase, outAt, last }
+    let lampFx = null;              // a lamp answering a click, for a moment: { spec, until }
+    let cardSaid = null;            // the card's last word, lingering after the event: { q, said, cls, until }
+    function lampsNow() {
+        return lampSlots(layout.slots, { auto: state.auto, skip: [...(state.darkSlots || []), ...(state.takenSlots || [])] });
+    }
+    /** The lamps an event may use: the ones in view, when two or more are. */
+    function lampsInView() {
+        const all = lampsNow();
+        const seen = scene ? scene.visibleSlots(all) : all;
+        return seen.length >= 2 ? seen : all;
+    }
+    function lampFlash(spec, ms) { lampFx = { spec, until: performance.now() + ms }; }
+    let lampLast = 0;
+    /** The lamps' clock: from the frames and from the sleep timer alike (a hidden tab still plays). */
+    function stepLamps() {
+        const now = performance.now();
+        const dt = Math.min(250, Math.max(0, now - (lampLast || now)));
+        lampLast = now;
+        const w = state.watcher;
+        const p = state.asleep ? w.puzzle : null;
+        if (!p) lamp = null;
+        else if (!lamp || lamp.p !== p) lamp = { p, t: 0, phase: 'lead', outAt: 0 };
+        let spec = null;
+        if (lamp) {
+            if (!paused() && !busy) lamp.t += dt;
+            const t = lamp.t;
+            if (p.kind === 'dark') {
+                if (t < LAMP_T.darkLead) { lamp.phase = 'lead'; spec = { lit: p.lamps }; }
+                else {
+                    if (lamp.phase !== 'out') { lamp.phase = 'out'; lamp.outAt = LAMP_T.darkLead; }
+                    spec = { lit: p.lamps.filter((x) => x !== p.out), off: [p.out] };
+                    if (t - lamp.outAt > DARK_MS) {
+                        const lamps = p.lamps.slice();
+                        const out = expireLamps(w, state.cryo);
+                        if (out) endLamps(out, lamps, -1, p);
+                        return;
+                    }
+                }
+            } else {
+                const per = LAMP_T.on + LAMP_T.gap;
+                if (t < LAMP_T.lead) { lamp.phase = 'lead'; spec = {}; }
+                else if (t < LAMP_T.lead + per * p.shown.length) {
+                    lamp.phase = 'show';
+                    if (p.at) p.at = 0;         // nothing counts before the sequence has been shown
+                    const k = t - LAMP_T.lead;
+                    const i = Math.floor(k / per);
+                    spec = k - i * per < LAMP_T.on ? { flash: [p.shown[i]] } : {};
+                } else { lamp.phase = 'input'; spec = {}; }
+            }
+        }
+        if (lampFx && now < lampFx.until) spec = { ...(spec || {}), ...lampFx.spec };
+        else lampFx = null;
+        scene?.setLamps(spec && state.asleep ? spec : null);
+        drawLampCard();
+    }
+    /** The one line under the Watcher: what the lamps ask, how far along. Nothing about a lie. */
+    function drawLampCard() {
+        const card = ui.card;
+        if (!card.el) return;
+        let q = '', said = '', cls = '';
+        const now = performance.now();
+        if (cardSaid && now < cardSaid.until) ({ q, said, cls } = cardSaid);
+        else if (lamp && state.asleep) {
+            cardSaid = null;
+            const p = lamp.p;
+            if (p.kind === 'dark') {
+                q = lamp.phase === 'out' ? `ONE WENT OUT · ${Math.max(0, (DARK_MS - (lamp.t - lamp.outAt)) / 1000).toFixed(1)} s` : 'LAMPS · ALL LIT';
+            } else {
+                q = lamp.phase === 'input' ? `LAMPS · YOUR TURN${p.at ? ` · ${p.at}` : ''}` : 'LAMPS · WATCH';
+            }
+        }
+        const on = !!q;
+        if (card.el.classList.contains('is-on') !== on) card.el.classList.toggle('is-on', on);
+        if (card.q.textContent !== q) card.q.textContent = q;
+        if (card.said.textContent !== said) card.said.textContent = said;
+        if (cls && !card.el.classList.contains(cls)) {
+            card.el.classList.remove('is-right', 'is-wrong');
+            void card.el.offsetWidth;
+            card.el.classList.add(cls);
+        } else if (!cls) card.el.classList.remove('is-right', 'is-wrong');
+    }
+    /**
+     * A click on a chamber while the lamps ask. Only a lamp of the event counts, and only once the
+     * sequence has been shown (or the lamp has gone out); anything else is left to the snap.
+     * @returns {object|null} what pressLamp() said, or null when the click was not an answer
+     */
+    function pressSlot(slot) {
+        const w = state.watcher;
+        const p = w.puzzle;
+        if (!state.asleep || busy || paused() || !lamp || lamp.p !== p || !isLamp(p, slot)) return null;
+        if (!(lamp.phase === 'input' || lamp.phase === 'out')) return null;
+        const lamps = p.lamps.slice();
+        const out = pressLamp(w, slot, state.cryo, { elapsedMs: p.kind === 'dark' ? lamp.t - lamp.outAt : 0 });
+        if (!out) return null;
+        if (!out.done) { lampFlash({ flash: [slot] }, 260); drawLampCard(); return out; }
+        endLamps(out, lamps, slot, p);
+        return out;
+    }
+    function endLamps(out, lamps, slot, p) {
+        const w = state.watcher;
+        lamp = null;
+        if (out.ok) {
+            // the machine's wins, twice with the Second core; a number only where the counter moves
+            const gain = puzzleStars(report.stars) * lampFactor(w);
+            const shows = rewardShows(state.stars, gain);
+            state.stars += gain;
+            lampFlash({ flash: lamps }, 520);
+            cardSaid = { q: 'LAMPS', said: shows ? `+${Math.round(out.gained)} · +${formatCount(gain)} stars` : `+${Math.round(out.gained)}`, cls: 'is-right', until: performance.now() + 1200 };
+        } else {
+            lampFlash({ wrong: slot >= 0 ? [slot] : [], ...(p.kind === 'dark' ? { off: [p.out] } : {}) }, 700);
+            cardSaid = { q: 'LAMPS', said: `${Math.round(out.gained)}`, cls: 'is-wrong', until: performance.now() + 1200 };
+        }
+        updateChrome();
+        saveGame();
+        if (out.rebooted) wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e));
     }
 
     /** The dry runs behind the cryo buttons. Once a colony day, never per frame. */
@@ -850,9 +1042,11 @@ export function init() {
         afterChange();
     }
 
-    /* ---- THE QUEUE, under the buttons (v1.49.0): "dig, mine, farm", each with its ring. An order
-       that waits while the colony sleeps (no Scheduler yet) is drawn dim. Rebuilt only when the
-       orders change; the rings are moved on every pass. */
+    /* ---- THE QUEUE (v1.49.0), since v1.51.0 a strip along the bottom of the window: "dig ◔ ·
+       dig ○ · mine ○", each order with its ring. It never moves a button. An order that waits
+       while the colony sleeps (no Scheduler yet) is drawn dim. A click on an order takes it back
+       and returns its price (deep.js `cancelOrder`). Rebuilt only when the orders change; the
+       rings are moved on every pass. */
     const QUEUE_WORD = { mine: 'mine', farm: 'farm', generator: 'gen', dorm: 'dorm' };
     const queueWord = (j) => (j.kind === 'dig' ? 'dig' : j.kind === 'room' ? QUEUE_WORD[j.type]
         : `${j.kind === 'level' ? 'lv' : 'auto'} ${QUEUE_WORD[j.type]}`);
@@ -866,12 +1060,14 @@ export function init() {
             queueKey = key;
             ui.queue.textContent = '';
             queueRows = jobs.map((j) => {
-                const row = document.createElement('div');
+                const row = document.createElement('button');
                 row.className = 'deep-q-row';
+                row.type = 'button';
                 row.innerHTML = `<span class="deep-q-word">${queueWord(j)}</span>`
                     + '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">'
                     + '<circle class="track" cx="6" cy="6" r="4.5"></circle>'
                     + `<circle class="arc" cx="6" cy="6" r="4.5" stroke-dasharray="${Q_RING.toFixed(1)}" stroke-dashoffset="${Q_RING.toFixed(1)}"></circle></svg>`;
+                row.addEventListener('click', () => takeBack(j), { signal });
                 ui.queue.appendChild(row);
                 return { job: j, row, arc: row.querySelector('.arc') };
             });
@@ -879,14 +1075,26 @@ export function init() {
         }
         const held = state.asleep && !queueRunsAsleep(state);
         const eta = queueRows.length ? buildEta(state) : null;
+        const spare = digSpare(state);
         for (const r of queueRows) {
             const waiting = isQueued(r.job);
+            const stuck = r.job.kind === 'dig' && !spare;
             r.row.classList.toggle('is-waiting', waiting);
             r.row.classList.toggle('is-held', waiting && held);
+            r.row.classList.toggle('is-stuck', stuck);
             r.arc.setAttribute('stroke-dashoffset', (Q_RING * (1 - buildProgress(state, r.job))).toFixed(1));
             const left = Math.max(0, Math.ceil((eta.get(r.job) ?? state.day) - state.day));
-            r.row.title = waiting && held ? 'Waits for the colony to wake.' : `Ready in ${backIn(left)}.`;
+            const when = waiting && held ? 'Waits for the colony to wake.' : `Ready in ${backIn(left)}.`;
+            const title = `${when} ${stuck ? 'A room waits for this chamber.' : 'Click to take it back.'}`;
+            if (r.row.title !== title) r.row.title = title;
         }
+    }
+    /** A click on an order in the strip: gone, and its price back. */
+    function takeBack(job) {
+        if (busy || state.watcher.gone) return;
+        if (!cancelOrder(state, job, { asleep: !!state.asleep })) return;
+        said.key = '';
+        afterChange();
     }
 
     /** Orders that landed: the layout is told where a new room went and gets a fresh chamber
@@ -1052,24 +1260,21 @@ export function init() {
         const woke = alarmOf(sum)
             || (firstSleep(state.watcher) && sleepSum && sleepSum.days >= FIRST_SLEEP_DAYS ? { kind: 'first' } : null);
         if (woke) { wake(woke).catch((e) => console.error('the deep: the wake broke', e)); return; }
-        // a riddle, now and then, never over an alarm
-        if (puzzleDue(state.watcher, { asleep: true, alarmPending: busy })) openPuzzle(state.watcher, state, state.cryo);
-        // and in some sleeps, a few seconds in, Surface (v1.49.0)
-        if (sleepSum && surfaceDue(state.watcher, sleepSum.days, CRYO[state.cryo].days)) openSurface(state.watcher);
-        // the body at work (v1.50.0): a riddle answers itself now and then, the snap comes by itself
-        const before = ui.cards.map((c) => state.watcher[c.slot ? 'puzzle2' : 'puzzle']);
-        for (const slot of selfSolve(state.watcher, dt, state.cryo, Math.random)) {
-            const card = ui.cards[slot];
-            const p = before[slot];
-            if (!card || !p) continue;
-            state.stars += puzzleStars(report.stars);
-            card.shown = p;
-            card.input.value = String(p.answer);
-            card.input.disabled = true;
-            sayOnCard(card, `+${Math.round(puzzleGain(state.watcher))}`, 'is-right');
-            card.lingerUntil = performance.now() + 900;
-            setTimeout(() => updateWatcher(), 950);
+        // ONE DEMAND AT A TIME (v1.51.0): the lamps now and then (never over an alarm, never while
+        // Surface is here, at most once in two sleeps), and in some sleeps, a few seconds in,
+        // Surface (never while the lamps ask). watcher.js's demand() keeps them apart.
+        const w = state.watcher;
+        // an event whose lamp went away (a dormitory taken, a chamber gone dark) goes quietly
+        if (w.puzzle && w.puzzle.lamps.some((sl) => !lampsNow().includes(sl))) { dismissPuzzle(w, state.cryo); lamp = null; }
+        if (puzzleDue(w, { asleep: true, alarmPending: busy })) openPuzzle(w, lampsInView(), state.cryo);
+        if (sleepSum && surfaceDue(w, sleepSum.days, CRYO[state.cryo].days)) openSurface(w);
+        // the body at work (v1.50.0): the lamps answer themselves now and then, the snap comes by itself
+        const open = w.puzzle;
+        const held = w.stability;
+        if (open && selfSolve(w, dt, state.cryo, Math.random).length) {
+            endLamps({ ok: true, done: true, gained: w.stability - held, rebooted: false }, open.lamps.slice(), -1, open);
         }
+        stepLamps();
         if (autoSnapDue(state.watcher, Date.now())) { scene?.snap(); snapWatcher(state.watcher, Date.now()); }
         updateChrome();
         if (sleepTicks % 10 === 0) saveGame();
@@ -1088,6 +1293,11 @@ export function init() {
         // the alarm is a jolt to the Watcher; a low one says it slightly wrong, never the reboot
         const w = state.watcher;
         closeSurface(w);                // Surface, and everything it said, is gone the moment they wake
+        stopRps();
+        // v1.51.0: the lamps are a thing of the dark: an event still open goes with the sleep
+        if (w.puzzle) dismissPuzzle(w, state.cryo);
+        lamp = null;
+        scene?.setLamps(null);
         if (bodyWhole(w) && !w.gone) { await lastWakeUp(); return; }
         const rebooted = alarm.kind !== 'reboot' && (alarmHit(w, alarm.kind) || !!alarm.rebooted);
         const said = alarm.kind === 'reboot' ? [alarmLine(alarm)]
@@ -1275,6 +1485,8 @@ export function init() {
         if (!p || e.button !== 0) return;
         if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > CLICK_PX || performance.now() - p.t > CLICK_MS) return;
         if (!scene || !scene.hitsBase(e.clientX, e.clientY)) return;
+        // v1.51.0: while the lamps ask, a click on one of their rooms is an answer, not a snap
+        if (state.asleep && lamp && pressSlot(scene.slotAt(e.clientX, e.clientY))) return;
         snapBase();
     }, { signal });
     ui.sceneHost.addEventListener('pointermove', (e) => { pointer = { x: e.clientX, y: e.clientY }; }, { signal });
@@ -1294,51 +1506,15 @@ export function init() {
         ui.snapArc?.setAttribute('stroke-dashoffset', (RING_LEN * wait / SNAP_COOLDOWN_MS).toFixed(1));
     }
 
-    /** The riddle's answer, typed. Enter answers, Escape lets it go. One card or two. */
-    function sayOnCard(card, text, cls) {
-        card.said.textContent = text;
-        card.el.classList.remove('is-right', 'is-wrong');
-        void card.el.offsetWidth;
-        card.el.classList.add(cls);
-    }
-    function answer(card) {
-        const w = state.watcher;
-        const key = card.slot ? 'puzzle2' : 'puzzle';
-        if (!state.asleep || busy || paused() || !w[key]) return;
-        const out = answerPuzzle(w, card.input.value, state.cryo, card.slot);
-        if (!out) { sayOnCard(card, '?', 'is-wrong'); return; }
-        if (out.ok) {
-            // the stars only get a number on the card when the counter visibly moves (v1.48.0)
-            const gain = puzzleStars(report.stars);
-            const shows = rewardShows(state.stars, gain);
-            state.stars += gain;
-            card.input.disabled = true;
-            sayOnCard(card, shows ? `+${Math.round(out.gained)} · +${formatCount(gain)} stars` : `+${Math.round(out.gained)}`, 'is-right');
-            // the card lingers a moment on its answer, then goes (a second card moves up after it)
-            card.lingerUntil = performance.now() + 900;
-            setTimeout(() => updateWatcher(), 950);
-            updateChrome();
-            saveGame();
-            return;
-        }
-        card.input.value = '';
-        sayOnCard(card, `${Math.round(out.gained)}`, 'is-wrong');
-        if (out.rebooted) { wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e)); return; }
+    /** Escape lets the lamps go (no cost; the next event is still two sleeps away). */
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !state.asleep || !state.watcher.puzzle) return;
+        dismissPuzzle(state.watcher, state.cryo);
+        lamp = null;
         updateChrome();
         saveGame();
-    }
-    for (const card of ui.cards) {
-        card.input?.addEventListener('keydown', (e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter') { e.preventDefault(); answer(card); }
-            else if (e.key === 'Escape') {
-                e.preventDefault();
-                dismissPuzzle(state.watcher, state.cryo, card.slot);
-                updateChrome();
-                saveGame();
-            }
-        }, { signal });
-    }
+    }, { signal });
+    ui.pill.addEventListener('click', () => buyLadder(), { signal });
     for (const b of ui.rpsBtns) b.addEventListener('click', () => throwAtSurface(b.dataset.throw), { signal });
 
     // a click puts a button's tooltip away until the cursor leaves it (v1.48.0: the snowflake's
@@ -1446,6 +1622,7 @@ export function init() {
         lastFrame = now;
         if (roll) drawCounters(rollingValue(now));
         stepCursor();
+        stepLamps();
         // paused, the scene still draws (and the camera still turns by hand), but nobody walks
         // and the base's jitter holds still
         scene?.step(paused() ? 0 : dt);
@@ -1480,6 +1657,11 @@ export function init() {
     window.rpiDeep = {
         get state() { return state; }, get layout() { return layout; }, get report() { return report; },
         get feed() { return feed.slice(); }, get gates() { return gates; }, scene,
+        // v1.51.0, for the tests: the lamp event as it is being played, a click on a chamber as the
+        // player's click would land, and the last game with Surface as a timeline
+        get lamp() { return lamp ? { kind: lamp.p.kind, phase: lamp.phase, t: lamp.t, at: lamp.p.at || 0 } : null; },
+        pressSlot: (slot) => pressSlot(slot),
+        get rps() { return rps ? { stage: rps.stage, log: rps.log.slice() } : (rpsLast ? { stage: 'done', log: rpsLast.slice() } : null); },
     };
     let debugOn = false;
     try { debugOn = window.location.search.includes('debug') || localStorage.getItem(DEBUG_KEY) === '1'; } catch { /* ignore */ }
@@ -1490,13 +1672,22 @@ export function init() {
                 // the Watcher's meter, set by hand: 0 reboots at the next sleeping tick
                 state.watcher.stability = Math.max(0, Math.min(STABILITY_MAX, Number(n) || 0));
             } else if (what === 'capacity') state.watcher.capacity = Math.max(0, Math.min(capacityMax(state.watcher), Number(n ?? capacityMax(state.watcher))));
-            else if (what === 'puzzle') {
-                // a riddle now, whatever the gap and the capacity say
+            else if (what === 'puzzle' || what === 'lamps' || what === 'dark') {
+                // the lamps now, whatever the gap, the two sleeps and the capacity say (v1.51.0);
+                // 'lamps' or 'dark' picks the kind. Surface goes first: one demand at a time
                 state.watcher.capacity = Math.max(state.watcher.capacity, capacityMax(state.watcher));
-                if (!state.watcher.puzzle) openPuzzle(state.watcher, state);
+                if (state.asleep) {
+                    closeSurface(state.watcher);
+                    stopRps();
+                    state.watcher.puzzle = null;
+                    lamp = null;
+                    openPuzzle(state.watcher, lampsInView(), null, { kind: what === 'puzzle' ? null : what });
+                }
             } else if (what === 'surface') {
                 // Surface now, in this sleep, whatever the gaps say (v1.49.0)
                 if (state.asleep) {
+                    if (state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
+                    stopRps();
                     const sf = state.watcher.surface;
                     sf.visit = null;
                     sf.lastSleep = 0;

@@ -129,13 +129,14 @@ body.in-deep {
 #phase-deep .tooltip i { color: #8fa1b6; }
 
 .deep-btn-col {
-    right: 72px;
+    right: 40px;
+    width: 176px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: clamp(10px, 2.2vh, 22px);
 }
 /* the way back to the view we started from, offered only once it is needed */
 #deep-reset-view {
@@ -161,10 +162,10 @@ body.in-deep {
 .deep-clock .deep-unit { font-size: 9px; color: #3b4757; letter-spacing: 0.18em; text-align: center; }
 
 /* ---- what we hold -------------------------------------------------------- */
-/* clear of the button column (right: 72px, 56px wide): the advisor's feed is text now,
-   and text that runs under a row of buttons is text nobody can read */
+/* clear of the button column (right: 40px, 176px wide, its round buttons 56px in the middle):
+   the advisor's feed is text now, and text that runs under a row of buttons is text nobody can read */
 #deep-hold {
-    right: 148px;
+    right: 180px;
     top: 56px;
     display: flex;
     flex-direction: column;
@@ -293,7 +294,6 @@ body.in-deep #menu-btn i { color: #8fa1b6; }
     white-space: nowrap;
 }
 #phase-deep .deep-badge.hidden { display: none; }
-.deep-btn-col { gap: clamp(6px, 1.2vh, 16px); }
 
 /* ---- while the years run: the scene dims and nothing is clickable -------- */
 #phase-deep.is-sleeping #deep-scene,
@@ -689,25 +689,6 @@ body.in-deep #version-info { z-index: 1400; }
 /* a snap that held: the meter brightens once */
 #deep-watcher.is-held .deep-watcher-fill { animation: deep-held 600ms ease; }
 @keyframes deep-held { 0% { filter: brightness(1.8); } 100% { filter: none; } }
-/* capacity: what the machines spare, a sliver under the meter */
-.deep-watcher-cap {
-    position: relative;
-    width: 140px;
-    height: 2px;
-    margin-left: 44px;
-    border-radius: 9999px;
-    background: #1f242b;
-    overflow: hidden;
-}
-.deep-watcher-cap-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 0;
-    background: #8fa1b6;
-    transition: width 300ms linear;
-}
 /* the riddle: its slot is kept, so the Watcher never jumps when one comes */
 .deep-puzzle {
     display: flex;
@@ -724,19 +705,6 @@ body.in-deep #version-info { z-index: 1400; }
 }
 .deep-puzzle.is-on { visibility: visible; opacity: 1; }
 .deep-puzzle-q { font-size: 13px; color: #f4efe2; white-space: nowrap; }
-.deep-puzzle-in {
-    width: 64px;
-    padding: 2px 6px;
-    border: 0;
-    border-radius: 6px;
-    outline: none;
-    background: #2a2f36;
-    color: #f4efe2;
-    font-size: 13px;
-    text-align: right;
-    user-select: text;
-}
-.deep-puzzle-in:focus { background: #343a43; }
 .deep-puzzle-said { font-size: 12px; min-width: 26px; color: #b9b3a5; }
 .deep-puzzle.is-right .deep-puzzle-said { color: #b9d4a8; }
 .deep-puzzle.is-wrong .deep-puzzle-said { color: #d9a25f; }
@@ -767,72 +735,13 @@ body.in-deep #version-info { z-index: 1400; }
     100% { transform: scale(1); }
 }
 
-/* ---- v1.49.0: THE BUILD QUEUE ----------------------------------------------
-   Under the dig and room buttons: one mono row per order, "dig", "mine", "lv farm", each with
-   its own ring. A row overflows to the left, never into the window's edge. An order that waits
-   while the colony sleeps (no Scheduler yet) is dim. */
-.deep-queue {
-    width: 56px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 3px;
-    margin: -4px 0 2px;
-}
-.deep-queue[hidden] { display: none; }
-.deep-q-row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-    font-size: 10px;
-    line-height: 12px;
-    color: #9fb0c4;
-    cursor: default;
-}
-.deep-q-row svg { flex: 0 0 auto; }
-.deep-q-row circle { fill: none; stroke-width: 1.6; }
-.deep-q-row .track { stroke: #2b3442; }
-.deep-q-row .arc { stroke: #aab8c9; transform: rotate(-90deg); transform-origin: 6px 6px; transition: stroke-dashoffset 400ms linear; }
-.deep-q-row.is-waiting { color: #6b7a8d; }
-.deep-q-row.is-held { opacity: 0.45; }
-
-/* ---- v1.49.0: THE LADDER ---------------------------------------------------
-   Beside the Watcher, bottom up: the steps bought as small lit glyphs, and the next one teased,
-   greyed until it can be paid. Nothing further is shown. */
-.deep-ladder[hidden] { display: none; }
-.deep-ladder {
-    position: absolute;
-    right: calc(100% + 26px);
-    bottom: 0;
-    display: flex;
-    flex-direction: column-reverse;
-    align-items: center;
-    gap: 6px;
-}
-#phase-deep .btn.deep-ladder-btn {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background-color: #1a1f26;
-    color: #f4efe2;
-}
-#phase-deep .btn.deep-ladder-btn.is-bought { background-color: #2a2f36; color: #f4efe2; cursor: default; }
-#phase-deep .btn.deep-ladder-btn.is-bought:hover { transform: none; }
-#phase-deep .btn.deep-ladder-btn.is-next:not(.is-locked) { box-shadow: 0 0 0 1px rgba(244, 239, 226, 0.35); }
-#phase-deep .btn.deep-ladder-btn .tooltip { right: calc(100% + 10px); }
-.deep-cap-word { font-size: 11px; color: #8fa1b6; margin-right: 4px; }
-/* the second riddle card sits under the first */
-.deep-puzzle.is-second { margin-top: 0; }
-.deep-puzzle.is-second:not(.is-on) { display: none; }
-
 /* ---- v1.49.0: SURFACE ------------------------------------------------------
    Opposite the Watcher: a faint ring, its name, one line, and a game of rock, paper,
    scissors with chapter I's glyphs. It is fainter than the Watcher, and gone at the wake. */
 /* bottom right, on the Watcher's baseline: the top centre is the crust's ring, and a tall colony
    frames the ring close to the top of the window */
 #deep-surface {
-    right: 148px;
+    right: 232px;
     bottom: 34px;
     display: flex;
     flex-direction: column;
@@ -881,3 +790,289 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-replay-made { white-space: nowrap; }
 /* after the last wake-up the Watcher stays in the awake world, a little dimmer */
 #deep-watcher.is-whole .deep-watcher-name { letter-spacing: 0.5em; }
+
+/* ---- v1.51.0: THE BUTTON COLUMN IN THREE GROUPS ----------------------------------------
+   BUILD (dig and the four rooms) and GROW (level, automate, a longer sleep) are products: round.
+   ACT (sleep or wake, a scout party, the way up) are things the colony does: wide pills with a
+   word, so an action never looks like a room. A tiny mono word over each group. The column is as
+   wide as a pill, the round buttons centred over them; nothing that comes and goes (the queue)
+   lives in it any more. Spacing tightens on short windows before anything shrinks. */
+.deep-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(5px, 1vh, 10px);
+}
+.deep-group-word {
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: #3f4b5c;
+    line-height: 10px;
+    margin-bottom: 1px;
+    padding-left: 0.3em;
+}
+#phase-deep .btn.deep-pill {
+    width: 176px;
+    height: 40px;
+    padding: 0 16px;
+    justify-content: flex-start;
+    gap: 10px;
+}
+#phase-deep .btn.deep-pill:hover:not(.is-locked) { transform: translateY(-1px); }
+.deep-pill-text { font-size: 11px; letter-spacing: 0.04em; color: #c3cfdd; white-space: nowrap; }
+/* a pill's order under way (a scout party out) is a thin bar along its foot, not a ring */
+#phase-deep .btn.deep-pill .deep-build {
+    inset: auto 18px 5px 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: linear-gradient(90deg, #7d8fa5 var(--p, 0%), transparent 0);
+    mask: none;
+    -webkit-mask: none;
+}
+#phase-deep .btn.deep-pill .deep-caption { bottom: 12px; }
+/* the sun keeps its colour in its pill */
+#deep-wake-btn .deep-pill-text { color: #f2d98a; }
+#deep-reset-view { margin-top: 0; }
+@media (max-height: 820px) {
+    .deep-btn-col { gap: 8px; }
+    .deep-group { gap: 4px; }
+}
+@media (max-height: 740px) {
+    #phase-deep .deep-btn-col .btn:not(.deep-pill) { width: 48px; height: 48px; }
+    #phase-deep .btn.deep-pill { height: 34px; }
+}
+
+/* ---- v1.51.0: THE BUILD QUEUE, a strip along the bottom of the window ------------------
+   One mono line under the chapter label, "dig ◔ · dig ○ · mine ○", each order with its ring. It
+   is fixed there, so an order never moves a button, and it stays while the colony sleeps (an order
+   that waits for the wake is dim). A click takes the order back and returns its price. */
+#deep-queue {
+    left: 120px;
+    bottom: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0;
+    max-width: calc(100vw - 360px);
+    overflow: hidden;
+}
+#deep-queue[hidden] { display: none; }
+.deep-q-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    font: inherit;
+    font-size: 10px;
+    line-height: 12px;
+    white-space: nowrap;
+    color: #9fb0c4;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.deep-q-row:hover { background: #1e2733; color: #dbe4f0; }
+.deep-q-row:hover .deep-q-word { text-decoration: line-through; text-decoration-color: rgba(217, 162, 95, 0.8); }
+.deep-q-row + .deep-q-row::before { content: '·'; color: #3f4b5c; margin: 0 6px 0 -2px; }
+.deep-q-row svg { flex: 0 0 auto; }
+.deep-q-row circle { fill: none; stroke-width: 1.6; }
+.deep-q-row .track { stroke: #2b3442; }
+.deep-q-row .arc { stroke: #aab8c9; transform: rotate(-90deg); transform-origin: 6px 6px; transition: stroke-dashoffset 400ms linear; }
+.deep-q-row.is-waiting { color: #6b7a8d; }
+.deep-q-row.is-held { opacity: 0.45; }
+.deep-q-row.is-stuck { cursor: default; }
+
+/* ---- v1.51.0: THE LADDER YOU CAN SEE ----------------------------------------------------
+   Under the Watcher: the whole road as one thin line with a tick per rung (SYSTEM, HARDWARE,
+   BIOLOGICAL) and a filled trail, and one pill with the next step only. The rung being climbed and
+   the ones done are named bright; the next is named dim, readable, a teaser; one further has a
+   tick and no name. When BIOLOGICAL opens, the pill turns warm. */
+.deep-ladder[hidden] { display: none; }
+.deep-ladder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+.deep-ladder-line { position: relative; width: 300px; height: 22px; }
+.deep-ladder-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 4px;
+    height: 2px;
+    border-radius: 1px;
+    background: #262c34;
+    overflow: hidden;
+}
+.deep-ladder-trail {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: #f4efe2;
+    transition: width 600ms ease;
+}
+.deep-ladder-tick { position: absolute; top: 0; width: 2px; height: 10px; background: #3a414b; }
+.deep-ladder-tick > span {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    font-size: 8px;
+    letter-spacing: 0.24em;
+    white-space: nowrap;
+    color: #6d6a63;
+}
+.deep-ladder-tick.is-done, .deep-ladder-tick.is-open { background: #f4efe2; }
+.deep-ladder-tick.is-done > span { color: #8d877b; }
+.deep-ladder-tick.is-open > span { color: #f4efe2; }
+.deep-ladder-tick.is-tease > span { color: #6d6a63; }
+.deep-ladder-tick.is-far > span { visibility: hidden; }
+.deep-ladder-tick.is-bio.is-open, .deep-ladder-tick.is-bio.is-done { background: #d8a48a; }
+.deep-ladder-tick.is-bio.is-open > span { color: #e6b9a1; }
+.deep-ladder-pill {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 300px;
+    padding: 7px 18px 8px;
+    border: 0;
+    border-radius: 9999px;
+    background: #1f252d;
+    color: #f4efe2;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 0 0 1px rgba(244, 239, 226, 0.28);
+    transition: transform 0.2s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.deep-ladder-pill[hidden] { display: none; }
+.deep-ladder-pill > :not(.tooltip) { pointer-events: none; }
+.deep-ladder-pill:hover:not(.is-locked) { transform: translateY(-1px); background: #262d36; }
+.deep-ladder-pill.is-locked { cursor: default; background: #171b21; box-shadow: none; }
+.deep-pill-head { font-size: 11px; white-space: nowrap; color: #f4efe2; }
+.deep-pill-head .rung { font-size: 9px; letter-spacing: 0.24em; color: #b9b3a5; }
+.deep-pill-head .sep { color: #5d5a54; }
+.deep-pill-head .cost { color: #b9b3a5; }
+.deep-pill-sub { font-size: 10px; color: #8d877b; white-space: nowrap; padding-left: 0; }
+.deep-ladder-pill.is-missing .deep-pill-sub { color: #d9a25f; }
+.deep-ladder-pill.is-locked .deep-pill-head .name { color: #b9b3a5; }
+/* BIOLOGICAL: the pill turns warm, and the people it takes lead its line */
+.deep-ladder-pill.is-bio { background: #2b211d; box-shadow: 0 0 0 1px rgba(216, 164, 138, 0.5); }
+.deep-ladder-pill.is-bio.is-locked { background: #211a17; box-shadow: 0 0 0 1px rgba(216, 164, 138, 0.2); }
+.deep-ladder-pill.is-bio .rung { color: #e6b9a1; }
+.deep-ladder-pill.is-bio .cost { color: #e6b9a1; }
+#phase-deep .deep-ladder-pill .tooltip {
+    right: auto;
+    left: 50%;
+    top: auto;
+    bottom: calc(100% + 10px);
+    transform: translateX(-50%);
+}
+#phase-deep .deep-ladder-pill:hover .tooltip { opacity: 1; }
+.deep-step-name { display: block; font-size: 11px; letter-spacing: 0.2em; color: #f4efe2; margin-bottom: 4px; }
+
+/* ---- v1.51.0: THE LAMPS -------------------------------------------------------------
+   The lamp riddle is played on the lamps of the automated rooms themselves. While it runs the
+   lamps stop pulsing and stand still and dim, so a blink reads; the lamp that blinks is bright
+   and larger; the one that went out is black. A lamp clicked right flashes; a wrong one goes
+   amber. The card under the Watcher only says what is asked and how far along. */
+#deep-labels.is-lamp-game .deep-lbl-in.is-auto .pulse {
+    animation: none;
+    width: 12px;
+    height: 12px;
+    right: 2px;
+    top: 2px;
+    opacity: 0.3;
+    transform: none;
+    transition: opacity 90ms linear, transform 90ms linear, background-color 90ms linear;
+}
+#deep-labels.is-lamp-game .deep-lbl-in.lamp-lit .pulse { opacity: 0.85; }
+#deep-labels.is-lamp-game .deep-lbl-in.lamp-flash .pulse {
+    opacity: 1;
+    transform: scale(2.2);
+    background: #d9ffc4;
+    box-shadow: 0 0 14px rgba(185, 240, 155, 0.95);
+}
+#deep-labels.is-lamp-game .deep-lbl-in.lamp-off .pulse { opacity: 1; background: #05080b; box-shadow: 0 0 0 1px #2b3442; }
+#deep-labels.is-lamp-game .deep-lbl-in.lamp-wrong .pulse { opacity: 1; transform: scale(1.8); background: #d9a25f; box-shadow: 0 0 10px rgba(217, 162, 95, 0.8); }
+.deep-puzzle { min-height: 26px; padding: 5px 14px; }
+.deep-puzzle-q { font-size: 11px; letter-spacing: 0.2em; }
+
+/* ---- v1.51.0: ROCK, PAPER, SCISSORS, played out -----------------------------------------
+   Both fists shake for 0.6 s, Surface's throw turns face up, the losing glyph cracks and fades, the
+   winning one pulses once, and only then the line. A won word slides into the sentence letter by
+   letter. One-shot CSS animations, nothing loops. */
+.deep-rps-duel[hidden] { display: none; }
+.deep-rps-duel { display: flex; align-items: center; gap: 12px; height: 34px; }
+.deep-duel-vs { color: #5d5a54; font-size: 12px; }
+.deep-fist {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: rgba(26, 31, 38, 0.9);
+    color: #f4efe2;
+    perspective: 200px;
+}
+.deep-fist.is-it { background: transparent; }
+.deep-fist-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    backface-visibility: hidden;
+    transition: transform 260ms ease;
+}
+.deep-fist-face.is-back { background: rgba(26, 31, 38, 0.9); box-shadow: inset 0 0 0 1px rgba(185, 179, 165, 0.35); }
+.deep-fist-face.is-front { background: rgba(26, 31, 38, 0.9); color: #cfc9bb; transform: rotateY(180deg); }
+.deep-rps-duel.is-shaking .deep-fist { animation: deep-fist-pump 600ms ease-in-out; }
+.deep-rps-duel.is-shaking .deep-fist.is-it { animation-delay: 40ms; }
+@keyframes deep-fist-pump {
+    0%, 100% { transform: translateY(0); }
+    16% { transform: translateY(-6px); }
+    33% { transform: translateY(1px); }
+    50% { transform: translateY(-6px); }
+    66% { transform: translateY(1px); }
+    83% { transform: translateY(-6px); }
+}
+.deep-rps-duel.is-revealed .deep-fist-face.is-back { transform: rotateY(-180deg); }
+.deep-rps-duel.is-revealed .deep-fist-face.is-front { transform: rotateY(0deg); }
+.deep-fist.is-lost { animation: deep-fist-crack 420ms ease forwards; }
+@keyframes deep-fist-crack {
+    0% { opacity: 1; transform: none; filter: none; }
+    30% { transform: translateX(-2px) rotate(-8deg); }
+    60% { transform: translateX(2px) rotate(6deg); }
+    100% { opacity: 0.22; transform: translateY(3px) rotate(4deg); filter: grayscale(1); }
+}
+.deep-fist.is-lost::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 3px;
+    bottom: 3px;
+    width: 1px;
+    background: #0f141b;
+    transform: rotate(24deg);
+}
+.deep-fist.is-won { animation: deep-fist-win 460ms ease; }
+@keyframes deep-fist-win {
+    0% { transform: scale(1); box-shadow: none; }
+    45% { transform: scale(1.22); box-shadow: 0 0 12px rgba(244, 239, 226, 0.55); }
+    100% { transform: scale(1); box-shadow: none; }
+}
+.deep-surface-said.is-in { animation: deep-said-in 300ms ease; }
+@keyframes deep-said-in { from { opacity: 0; transform: translateY(3px); } }
+.deep-word-new { display: inline-block; }
+.deep-word-new > span { display: inline-block; animation: deep-letter-in 260ms ease both; }
+@keyframes deep-letter-in { from { opacity: 0; transform: translateX(8px); } }

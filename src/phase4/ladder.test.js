@@ -10,9 +10,10 @@ import {
 } from './deep.js';
 import {
     initialWatcher, normalizeWatcher, watchSleep, LADDER, RUNGS, nextStep, stepNeed, buyStep, has,
-    capacityMax, puzzleGain, puzzleSlots, recoverAwake, AWAKE_RECOVER_PER_MONTH, CAPACITY_MAX,
-    STABILITY_MAX, DRIFT_PER_SECOND, openPuzzle, puzzleDue, answerPuzzle, dormToTake, SPACE_LINE,
+    capacityMax, puzzleGain, recoverAwake, AWAKE_RECOVER_PER_MONTH, CAPACITY_MAX,
+    STABILITY_MAX, DRIFT_PER_SECOND, openPuzzle, puzzleDue, dormToTake, SPACE_LINE,
     wordCap, surfaceDue, openSurface, closeSurface, playSurface, REBOOT_TO, PUZZLE_GAIN,
+    snapGain, snap, SNAP_GAIN, SNAP_GAIN_DEEP, lampFactor, pressLamp,
 } from './watcher.js';
 import { SENTENCE, VISIT_AFTER_SECONDS, WIN_CAPACITY } from './surface.js';
 import { deserializeDeep, SCHEMA_VERSION } from './persistence.js';
@@ -159,10 +160,12 @@ describe('the ladder', () => {
         const a = { ...initialWatcher(), sleeps: 2 }, b = { ...initialWatcher(), sleeps: 2, bought: ['watchdog'] };
         watchSleep(a, { days: CRYO[1].days, tier: 1 }); watchSleep(b, { days: CRYO[1].days, tier: 1 });
         expect(STABILITY_MAX - b.stability).toBeCloseTo(0.75 * DRIFT_PER_SECOND[1], 9);
-        // Deep read: +25
-        expect(puzzleGain(w)).toBe(PUZZLE_GAIN);
+        // Deep read (v1.51.0): a snap gives +10, not +5
+        expect(snapGain(w)).toBe(SNAP_GAIN);
         buyAll(w, s, 3, slots);
-        expect(puzzleGain(w)).toBe(25);
+        expect(snapGain(w)).toBe(SNAP_GAIN_DEEP);
+        const snapper = { ...w, stability: 50, lastSnapAt: 0 };
+        expect(snap(snapper, 1e6)).toBe(SNAP_GAIN_DEEP);
         // Night vision: the food alarm at 27 days, not 30
         const lean = colony({ humans: 100, food: 0, rooms: { mine: 1, farm: 0, generator: 1, dorm: 1, cryo: 1 }, auto: { mine: 1, farm: 1, generator: 1, dorm: 1 }, minerals: 1e6 });
         const r = tickDay(JSON.parse(JSON.stringify(lean)), true);
@@ -173,10 +176,12 @@ describe('the ladder', () => {
         // Cooling: twice the pool
         buyAll(w, s, 2, slots);
         expect(capacityMax(w)).toBe(2 * CAPACITY_MAX);
-        // Second core: two riddles
-        expect(puzzleSlots(w)).toBe(1);
+        // Second core (v1.51.0): the lamps give double
+        expect(lampFactor(w)).toBe(1);
+        expect(puzzleGain(w)).toBe(PUZZLE_GAIN);
         buyAll(w, s, 1, slots);
-        expect(puzzleSlots(w)).toBe(2);
+        expect(lampFactor(w)).toBe(2);
+        expect(puzzleGain(w)).toBe(2 * PUZZLE_GAIN);
         // Sensor mast: better odds, half the scatter
         const day = 1000 * 365;
         const m = colony({ day, humans: 100, watcher: { bought: ['mast'] } });
@@ -190,21 +195,15 @@ describe('the ladder', () => {
         watchSleep(y, { days: CRYO[2].days, tier: 2, spare: 1e9 });
         expect(y.capacity).toBeCloseTo(3 * x.capacity, 9);
     });
-    test('the Second core opens a second riddle, and each card is answered on its own', () => {
-        const w = { ...initialWatcher(), sleeps: 3, capacity: 200, bought: LADDER.slice(0, 6).map((u) => u.id), nextPuzzleYears: 0 };
+    test('the Second core: one lamp event at a time still, and a solved one gives twice the stability', () => {
+        const w = { ...initialWatcher(), sleeps: 3, capacity: 200, stability: 40, bought: LADDER.slice(0, 6).map((u) => u.id), nextPuzzleYears: 0 };
         expect(puzzleDue(w, { asleep: true })).toBe(true);
-        openPuzzle(w, { chambers: 5 }, 1);
+        openPuzzle(w, [3, 5, 7], 1, { kind: 'lamps' });
         w.nextPuzzleYears = 0;
-        expect(puzzleDue(w, { asleep: true })).toBe(true);
-        openPuzzle(w, { chambers: 5 }, 1);
-        expect(w.puzzle).not.toBe(null);
-        expect(w.puzzle2).not.toBe(null);
-        w.nextPuzzleYears = 0;
-        expect(puzzleDue(w, { asleep: true })).toBe(false);
-        const second = w.puzzle2;
-        expect(answerPuzzle(w, second.answer, 1, 1).ok).toBe(true);
-        expect(w.puzzle2).toBe(null);
-        expect(w.puzzle).not.toBe(null);
+        expect(puzzleDue(w, { asleep: true })).toBe(false);          // one demand at a time
+        for (const lamp of w.puzzle.answer.slice()) pressLamp(w, lamp, 1);
+        expect(w.puzzle).toBe(null);
+        expect(w.stability).toBe(40 + 2 * PUZZLE_GAIN);
     });
 });
 

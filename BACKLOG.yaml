@@ -1121,6 +1121,9 @@ items:
       logic), and riddles that grow harder with the slept years. Slice 5 has one
       type: the next term of a seeded sequence.
     status: open
+    notes: |
+      v1.51.0: the riddles are gone (B143); the lamp events replace them. Kept
+      open as "more lamp variants", parked by the cut until Ola says it reads.
 
   - id: B118
     added: 2026-09-22
@@ -1294,4 +1297,92 @@ items:
       More riddle types and riddles that grow harder with the slept years
       (B117 carried forward, now with two cards and the brain tissue solving
       some of them).
+    status: open
+
+  - id: B140
+    added: 2026-09-28
+    source: "Ola, playtest of v1.50.0"
+    request: |
+      The build queue sits under the bed button and every new order shifts the
+      buttons.
+    status: done
+    resolved_in: "v1.51.0"
+    notes: |
+      A fixed mono strip along the bottom of the window under the chapter label,
+      "dig ◔ · dig ○ · mine ○", visible asleep; a click takes an order back and
+      returns its price; hidden when empty. The buttons never move for it.
+
+  - id: B141
+    added: 2026-09-28
+    source: "Ola, playtest of v1.50.0"
+    request: |
+      The right column is one long unclear row of buttons; actions (sleep,
+      scouts, go up) look like products (rooms).
+    status: done
+    resolved_in: "v1.51.0"
+    notes: |
+      Three groups under tiny mono words: BUILD, GROW (round), ACT (wide pills
+      with a word: "Sleep · 1 000 y/s", "Scout party", "Go up", "Wake"). Fits at
+      900 px.
+
+  - id: B142
+    added: 2026-09-28
+    source: "Ola, playtest of v1.50.0"
+    request: |
+      "I cannot see where I get the biological thing": the Watcher's upgrade
+      steps all look the same, the eye reads "same button again".
+    status: done
+    resolved_in: "v1.51.0"
+    notes: |
+      Per the cut (2026-09-28-chapter-iv-reduction.md): one line with three
+      ticks SYSTEM / HARDWARE / BIOLOGICAL and a trail, the next rung named as a
+      teaser, and ONE pill with the next step (warm and led by the people it
+      takes once BIOLOGICAL opens). Capacity only inside the pill. An advisor
+      line when a rung opens.
+
+  - id: B143
+    added: 2026-09-28
+    source: "Ola, playtest of v1.50.0"
+    request: |
+      The number-sequence riddles are very hard and a bit boring.
+    status: done
+    resolved_in: "v1.51.0"
+    notes: |
+      Riddles removed. The lamps are an occasional event (at most once in two
+      sleeps, never while Surface is there): repeat a blinked sequence by
+      clicking the rooms, or find the lamp that went out within 3 s. Below 35 a
+      lamp may lie once. Deep read now makes a snap +10, Second core makes the
+      lamps give double.
+
+  - id: B144
+    added: 2026-09-28
+    source: "Ola, playtest of v1.50.0"
+    request: |
+      Animate the rock paper scissors game with Surface.
+    status: done
+    resolved_in: "v1.51.0"
+    notes: |
+      Both fists shake 0.6 s, Surface's throw turns face up, the loser cracks,
+      the winner pulses, then the line; a won word slides in letter by letter.
+
+  - id: B145
+    added: 2026-09-28
+    source: "the cut (docs/superpowers/specs/2026-09-28-chapter-iv-reduction.md)"
+    request: |
+      In the sleep world, one demand at a time: Surface OR the lamps OR nothing.
+    status: done
+    resolved_in: "v1.51.0"
+    notes: |
+      watcher.js demand(): the lamps wait for Surface to leave (at the wake),
+      Surface waits while the lamps ask.
+
+  - id: B146
+    added: 2026-09-28
+    source: "the cut (docs/superpowers/specs/2026-09-28-chapter-iv-reduction.md), not in slice 8"
+    request: |
+      The rest of the cut: a biological step asks the player to pick the sector
+      (the arms light up as choices, the chosen arm turns warm, the H bar drops
+      with a red delta); the Watcher's glyph grows per biological step; the
+      voices ranked asleep (feed collapsed to one line, the replay strip five
+      seconds); drift and snap tuned so an attentive player holds 60 to 90.
     status: open

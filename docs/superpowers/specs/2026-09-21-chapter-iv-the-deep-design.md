@@ -753,3 +753,64 @@ Left (BACKLOG B132 to B135): more riddle types (B117), more Surface lines and a 
 tuning after Ola's playtest (the body's pace, the people cost the creches refill, the ladder's
 prices), and whether a sealed sector should also dim what it makes.
 
+
+## Built: slice 8 (v1.51.0)
+
+Ola after playing v1.50.0: the queue under the bed button moves every button when an order is
+placed; the number-sequence riddles are very hard and a bit boring; the right column is one long
+unclear row where actions look like rooms; "I cannot see where I get the biological thing", the
+Watcher's steps all look like the same button; and Surface's game should be animated. Mid-slice the
+cut in `2026-09-28-chapter-iv-reduction.md` changed items 3 and 4 (one pill, not a column of
+glyphs; no number riddles at all; the lamps as a rare event; one demand at a time). What was built:
+
+- **The queue strip** (index.js `drawQueue`, style-deep.css `#deep-queue`): a fixed mono line at
+  `left: 120px; bottom: 12px`, under the chapter label (there is no room left of the label: the
+  menu and pause buttons are there). Every order with its ring, dim when it waits for the wake. A
+  click calls deep.js `cancelOrder(s, job, { asleep })`: the job goes, the refund is
+  `nextPrice(kind, type)` once it is gone (the price the last order of that kind was paid), the next
+  order in its lane starts (awake, or asleep with the Scheduler). `digSpare()` refuses a dig that a
+  waiting room counts on.
+- **Three button groups** (index.html `.deep-group`): BUILD, GROW (level, automate, the longer
+  sleep, which now has the snowflake glyph and stays greyed while asleep instead of vanishing), ACT
+  (pills of 176 by 40 px: Cryo hall / "Sleep · 1 000 y/s", Wake, "Scout party · 2 y", Go up). The
+  column is 176 px wide at `right: 40px`; the counters moved to `right: 180px`, Surface to
+  `right: 232px`. Gaps are `clamp()`ed on the window height, and only below 740 px do the round
+  buttons shrink to 48 px. Measured at 1440 by 900: 701 px awake at iv-start, 815 px asleep at
+  iv-surface, the sleep button's rect unchanged through three orders and a take-back.
+- **The ladder you can see** (watcher.js `ladderLine`, `rungOpenLine`, LADDER `short`; index.js
+  `drawLadder`): a 300 px line with a tick at each rung's first step (0, 4/12, 8/12), the trail at
+  bought/12, tick states done / open / tease (named, dim) / far (unnamed); one pill with the next
+  step: rung, name, cost (people first for BIOLOGICAL, and the pill turns warm), then the step's
+  short effect and what it takes, or what is missing in the pill's own words ("needs 120 · 84 now",
+  "it is still growing"). Tooltip: the name in capitals, the price, the rung and the full effect.
+  The capacity sliver under the meter is gone. `RUNG_OPEN_LINES` go to the feed once.
+- **The lamps** (watcher.js): `lampSlots()` (automated room types, not the hall, not dark or taken
+  chambers); `makeLampPuzzle(seed, lamps, stability)`: `lampLength` = 3 + round(4 × (1 − s/100)),
+  no lamp twice in a row, and below `LIE_BELOW` (35) with `LIE_CHANCE` 0.5 one false blink inserted
+  at `lie` in `shown` but not in `answer`; `makeDarkPuzzle` (`out`, found within `DARK_MS` 3000);
+  `puzzleKind` (dark with `DARK_SHARE` 0.4). `puzzleDue` adds `demand(w)` (nothing else asking) and
+  `LAMP_EVERY_SLEEPS` 2 (`w.lampSleep`); an event needs two lamps. `pressLamp` (right: `at`++, the
+  last solves; wrong: ends, −`PUZZLE_WRONG`), `expireLamps`, `solvePuzzle` (−`PUZZLE_COST`
+  capacity, +`puzzleGain`). Surface's `surfaceDue` also waits on `demand()`. The phase plays it
+  (index.js `stepLamps`, on the frames and on the sleep timer, held while paused): a 0.9 s still,
+  then 460 ms on / 220 ms off per blink, then input; dark: 1.3 s all lit, then one out and a
+  countdown on the card. A click on the model goes to `scene.slotAt()` (plates carry their chamber
+  in `userData.slot`) and, when it lands on one of the event's lamps in the input phase, is an
+  answer instead of a snap. `scene.setLamps()` draws lit / flash / off / wrong on the label pulses;
+  `scene.visibleSlots()` keeps the event to lamps in view. The event goes at the wake, or with
+  Escape. `debug_deep('lamps' | 'dark')` forces one.
+- **New effects**: Deep read, `snapGain` 10 (was a riddle +25); Second core, `lampFactor` 2 on the
+  stability and the stars of a solved event (was a second card); Brain tissue plays the event
+  itself (`selfSolve`, the same rate).
+- **Rock, paper, scissors** (index.js `throwAtSurface`, `RPS_TIMING`): the rules settle at the
+  click (`playSurface`); the showing waits: `shake` 600 ms (both fists pump), `reveal` 300 ms (the
+  hidden throw turns face up), `settle` 380 ms (the loser cracks and fades, the winner pulses once),
+  then `line`: the result and, on a won word, the word sliding in letter by letter (70 ms apart).
+  Measured in the browser: throw, shake at once, revealed at 0.6 s, settled at 0.9 s, line at 1.3 s.
+- **Saves**: schema 5 unchanged. `normalizeWatcher` lets a number riddle and `puzzle2` go, keeps a
+  lamp event (from `at` 0), and fills `lampSleep`.
+
+**Simulation**: both lines unchanged, byte for byte (26m26s to year 802 701; `--watcher` 26m04s).
+
+Left: the rest of the cut (the sector as the player's choice, the Watcher's glyph growing with the
+body, the voices ranked asleep, drift and snap tuned for an attentive player), B146.
