@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.52.0 - 2026-09-28 (chapter IV, slice 9)
+
+### The cut: sanity is the snap, biological is a choice you can see, one voice at a time
+
+The rest of docs/superpowers/specs/2026-09-28-chapter-iv-reduction.md (items 1's tuning, 4 and 5, and the acceptance).
+
+- **The snap is enough.** The drift is flatter, `DRIFT_PER_SECOND` 0.9, 1.0, 1.05, 1.1, 1.15, 1.2, 1.3 a real second at Cryo I to VII (was 0.5 to 2.2). A snap now gives back 4.5 seconds of the tier's drift (`SNAP_COVERS`), times 1 + 6 x the share of the meter that is gone (`SNAP_SOFT_BONUS`): the softer the base, the harder it snaps back. So it scales with the tier and the meter finds its own level. Deep read: half as much again (`SNAP_DEEP` 1.5; was +10 for +5). The cooldown stays 4 s. Numbers (25 s sleeps, 20 s awake between, from a full meter, each tier on its own): a click every 12 s holds 71 to 89 at every tier (every 10 s: 78 to 93; every 15 s: 60 to 83); no clicks reboots in sleep 5 at Cryo I, 4 at II to VI, 3 at VII.
+- **The sim shows both**: "watcher (unattended ...)" gains the per-tier reboot sleep, and a new line "watcher (attentive: snap every 12 s)" keeps a second Watcher through the same run (stability 85 at the end, lowest 82, no reboots) and prints the per-tier band. The plain run and `--watcher` are unchanged, byte for byte in their first lines (26m26s to year 802 701; 26m04s to the last wake-up).
+- **Biological is a choice.** Buying a biological step pays its capacity and stars and then asks: the pill reads "Choose a sector to seal", the arms that can still be taken glow softly warm (the colour they will turn), the one under the cursor more, and the cursor is a crosshair. A click on any plate of an arm seals THAT sector: it turns warm and breathes, its walkers leave (dots walk in to the shaft and fade over 2 s), and the people it takes fall off the H bar with a red delta ("-1.4 k") that fades while the number rolls down. Escape puts the choice away and refunds nothing: the step waits and the pill keeps asking (a click on it asks again, also after a wake). A sealed plate says "part of the body" under the cursor. Rules in watcher.js (`sealCandidates`, `sealSector`, `w.sealing`, `buyStep(..., { choose })`); the simulation still lets the body pick (`nextSector`).
+- **The Watcher grows.** Its glyph changes with each biological step: a dot, a dot with a ring, a soft blob, a blob with a rim (CSS shapes, warm, `bodyGlyph()`).
+- **One voice at a time.** Asleep the advisor line is quiet and the feed shows only its last line (the first sleep's "Something stayed awake while they slept." is that line now); awake the feed shows three. The line of what woke the colony stays six seconds, then the advisor says where we stand again (the feed keeps it). The wake-up strip shows for five seconds (was eight). Surface's results stay inside its card.
+- `scripts/accept-iv-cut.mjs`: the acceptance, in headless Chrome over the DevTools protocol, no dependencies. From "IV · Surface": 60 s asleep, a real click on a plate every 12 s, never two demand cards, stability never under 60 (lowest 68), one voice asleep, the alarm line and the strip gone on time. From "IV · the body": buy, choose, Escape, choose again, click an arm: its 15 plates sealed, 1 379 people gone (a tenth), the red delta, the walkers, the glyph class `is-dot`, the tooltip, no console errors. `--shots DIR` saves screenshots.
+- Saves: no new schema; `normalizeWatcher` keeps a step waiting for its sector only when it is the next biological step.
+- No em-dashes left in index.html (four aria-labels).
+
 ## v1.51.0 - 2026-09-28 (chapter IV, slice 8)
 
 ### Chapter IV UX: queue strip, button groups, the ladder you can see, lamp events, animated rock paper scissors

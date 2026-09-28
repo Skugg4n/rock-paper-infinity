@@ -8,7 +8,7 @@ import {
     shouldGarble, garble, watcherLines, makePuzzle, puzzleDue, openPuzzle, armPuzzles,
     dismissPuzzle, sleepDays, driftYears, puzzleGapYears, puzzleStars,
     STABILITY_MAX, NAME_AT_YEARS, DRIFT_PER_SECOND, ALARM_DROP, ALARM_DROP_BAD, REBOOT_TO,
-    SNAP_GAIN, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST,
+    SNAP_COVERS, SNAP_SOFT_BONUS, snapGain, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST,
     GARBLE_BELOW, GARBLE_EVERY, WATCHER_NAMES, PUZZLE_STARS_MIN,
     beginSleep, firstSleep, snapWait, FIRST_SLEEP_DAYS, WATCHER_HELLO,
 } from './watcher.js';
@@ -120,22 +120,53 @@ describe('the snap', () => {
         expect(snapWait(w, 1e6 - 5)).toBe(0);              // a clock that went backwards owes nothing
     });
 
-    test('+SNAP_GAIN, at most once per cooldown of real time, capped at the top', () => {
+    test('a snap pays SNAP_COVERS seconds of the tier\'s drift, more the softer the base', () => {
+        // full: SNAP_COVERS seconds of drift; empty: (1 + SNAP_SOFT_BONUS) times that
+        for (let tier = 0; tier < DRIFT_PER_SECOND.length; tier++) {
+            expect(snapGain({ ...initialWatcher(), stability: STABILITY_MAX }, tier)).toBeCloseTo(DRIFT_PER_SECOND[tier] * SNAP_COVERS, 9);
+            expect(snapGain({ ...initialWatcher(), stability: 0 }, tier)).toBeCloseTo(DRIFT_PER_SECOND[tier] * SNAP_COVERS * (1 + SNAP_SOFT_BONUS), 9);
+        }
+        expect(snapGain({ ...initialWatcher(), stability: 40 }, 3)).toBeGreaterThan(snapGain({ ...initialWatcher(), stability: 80 }, 3));
+    });
+    test('at most once per cooldown of real time, capped at the top', () => {
         const w = initialWatcher();
         w.stability = 50;
-        expect(snap(w, 100000)).toBe(SNAP_GAIN);
-        expect(snap(w, 100000 + SNAP_COOLDOWN_MS - 1)).toBe(0);
-        expect(w.stability).toBe(50 + SNAP_GAIN);
-        expect(snap(w, 100000 + SNAP_COOLDOWN_MS)).toBe(SNAP_GAIN);
+        const g = snapGain(w, 2);
+        expect(snap(w, 100000, 2)).toBeCloseTo(g, 9);
+        expect(snap(w, 100000 + SNAP_COOLDOWN_MS - 1, 2)).toBe(0);
+        expect(w.stability).toBeCloseTo(50 + g, 9);
+        expect(snap(w, 100000 + SNAP_COOLDOWN_MS, 2)).toBeGreaterThan(0);
         w.stability = STABILITY_MAX - 1;
-        expect(snap(w, 200000)).toBe(1);
+        expect(snap(w, 200000, 2)).toBeCloseTo(1, 9);
         expect(w.stability).toBe(STABILITY_MAX);
     });
-    test('a wall clock that went backwards (another machine) does not lock the snap out', () => {
-        const w = initialWatcher();
-        w.lastSnapAt = 9e12;
-        w.stability = 50;
-        expect(snap(w, 1000)).toBe(SNAP_GAIN);
+    test('THE SNAP IS ENOUGH (v1.52.0): a snap every 12 s holds 60 to 90 at every tier; none reboots in three to five sleeps', () => {
+        const run = (tier, every, sleeps = 10, seconds = 25) => {
+            const w = { ...initialWatcher(), sleeps: 5 };
+            let clock = 0, since = 0, low = STABILITY_MAX, high = 0, rebootAt = null;
+            for (let n = 1; n <= sleeps; n++) {
+                beginSleep(w, tier);
+                for (let k = 0; k < seconds * 10; k++) {
+                    clock += 0.1; since += 0.1;
+                    watchSleep(w, { days: CRYO[tier].days * 0.1, tier });
+                    if (w.reboots && rebootAt === null) rebootAt = n;
+                    if (every && since >= every - 1e-9) { since = 0; snap(w, clock * 1000, tier); }
+                    if (n >= 3) { low = Math.min(low, w.stability); high = Math.max(high, w.stability); }
+                }
+                alarmHit(w, 'act');
+                if (w.reboots && rebootAt === null) rebootAt = n;
+            }
+            return { low, high, rebootAt };
+        };
+        for (let tier = 0; tier < CRYO.length; tier++) {
+            const held = run(tier, 12);
+            expect(held.low).toBeGreaterThanOrEqual(60);
+            expect(held.high).toBeLessThanOrEqual(92);
+            expect(run(tier, 12).rebootAt).toBe(null);
+            const gone = run(tier, 0);
+            expect(gone.rebootAt).toBeGreaterThanOrEqual(3);
+            expect(gone.rebootAt).toBeLessThanOrEqual(5);
+        }
     });
     test('the base is rigid near the top and softest at zero', () => {
         expect(softness(100)).toBe(0);

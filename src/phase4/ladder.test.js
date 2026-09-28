@@ -13,7 +13,7 @@ import {
     capacityMax, puzzleGain, recoverAwake, AWAKE_RECOVER_PER_MONTH, CAPACITY_MAX,
     STABILITY_MAX, DRIFT_PER_SECOND, openPuzzle, puzzleDue, dormToTake, SPACE_LINE,
     wordCap, surfaceDue, openSurface, closeSurface, playSurface, REBOOT_TO, PUZZLE_GAIN,
-    snapGain, snap, SNAP_GAIN, SNAP_GAIN_DEEP, lampFactor, pressLamp,
+    snapGain, snap, SNAP_DEEP, lampFactor, pressLamp,
 } from './watcher.js';
 import { SENTENCE, VISIT_AFTER_SECONDS, WIN_CAPACITY } from './surface.js';
 import { deserializeDeep, SCHEMA_VERSION } from './persistence.js';
@@ -160,12 +160,12 @@ describe('the ladder', () => {
         const a = { ...initialWatcher(), sleeps: 2 }, b = { ...initialWatcher(), sleeps: 2, bought: ['watchdog'] };
         watchSleep(a, { days: CRYO[1].days, tier: 1 }); watchSleep(b, { days: CRYO[1].days, tier: 1 });
         expect(STABILITY_MAX - b.stability).toBeCloseTo(0.75 * DRIFT_PER_SECOND[1], 9);
-        // Deep read (v1.51.0): a snap gives +10, not +5
-        expect(snapGain(w)).toBe(SNAP_GAIN);
+        // Deep read (v1.52.0): a snap gives half as much again
+        const before = snapGain({ ...w, stability: 50 }, 2);
         buyAll(w, s, 3, slots);
-        expect(snapGain(w)).toBe(SNAP_GAIN_DEEP);
+        expect(snapGain({ ...w, stability: 50 }, 2)).toBeCloseTo(SNAP_DEEP * before, 9);
         const snapper = { ...w, stability: 50, lastSnapAt: 0 };
-        expect(snap(snapper, 1e6)).toBe(SNAP_GAIN_DEEP);
+        expect(snap(snapper, 1e6, 2)).toBeCloseTo(SNAP_DEEP * before, 9);
         // Night vision: the food alarm at 27 days, not 30
         const lean = colony({ humans: 100, food: 0, rooms: { mine: 1, farm: 0, generator: 1, dorm: 1, cryo: 1 }, auto: { mine: 1, farm: 1, generator: 1, dorm: 1 }, minerals: 1e6 });
         const r = tickDay(JSON.parse(JSON.stringify(lean)), true);

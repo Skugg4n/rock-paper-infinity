@@ -125,7 +125,7 @@
                     <i data-lucide="copy" class="relative w-6 h-6 text-slate-600"></i>
                 </button>
                 <button id="mergeGameBoard" aria-label="Build factory" data-upgrade="mergeGameBoard" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="factory" class="relative w-6 h-6 text-slate-600"></i></button>
-                <button id="bank" aria-label="Build bank — advance to next phase" data-upgrade="bank" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="landmark" class="relative w-6 h-6 text-slate-600"></i></button>
+                <button id="bank" aria-label="Build bank: advance to next phase" data-upgrade="bank" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg"><i data-lucide="landmark" class="relative w-6 h-6 text-slate-600"></i></button>
             </div>
         </div>
 
@@ -233,7 +233,7 @@
                     <span id="supply-hint" class="font-mono text-[10px] sm:text-xs text-slate-400 tabular-nums"></span>
                 </div>
                 <!-- Silo: fill = seconds of food in stock. Click = hand harvest. -->
-                <button id="silo-btn" class="silo" aria-label="Food silo — click to hand harvest">
+                <button id="silo-btn" class="silo" aria-label="Food silo: click to hand harvest">
                     <div id="silo-fill" class="silo-fill" style="height: 0%;"></div>
                     <div class="tooltip">
                         <div class="effect"><span id="supply-production">+0</span>/s <i data-lucide='shopping-basket' class='w-4 h-4'></i></div>
@@ -292,7 +292,7 @@
                  <!-- III · WAR is chosen, like the bank in chapter I. Greyed from the
                       moment the competitor appears, open once they have razed a house. -->
                  <!-- Chapter III controls -->
-                 <button class="btn hidden" id="ship-btn" aria-label="Dig down — chapter IV">
+                 <button class="btn hidden" id="ship-btn" aria-label="Dig down: chapter IV">
                     <i data-lucide="shovel" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
                 </button>
@@ -330,7 +330,7 @@
                     <i data-lucide="shield" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
                 </button>
-                 <button class="btn hidden" id="war-btn" aria-label="Go to war — chapter III">
+                 <button class="btn hidden" id="war-btn" aria-label="Go to war: chapter III">
                     <i data-lucide="swords" class="w-7 h-7"></i>
                     <div class="tooltip"></div>
                 </button>
@@ -671,6 +671,9 @@
             <div class="deep-mono deep-surface-words" id="deep-surface-words"></div>
         </div>
 
+        <!-- v1.52.0: over a sealed plate, what it is now; nothing else says so -->
+        <div id="deep-body-tip" class="deep-mono" hidden>part of the body</div>
+
         <!-- v1.48.0: the snap's cooldown, a thin ring round the cursor while the base will not answer -->
         <div id="deep-snap-ring" hidden>
             <svg viewBox="0 0 36 36" width="36" height="36" aria-hidden="true">
@@ -704,7 +707,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.51.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.52.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

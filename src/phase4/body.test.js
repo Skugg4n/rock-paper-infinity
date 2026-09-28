@@ -10,6 +10,7 @@ import {
     peopleFor, BODY_GROW_SECONDS, watchSleep, driftFactor, selfSolve, autoSnapDue, bodyWhole, lastWake,
     ascendAlone, watcherName, openPuzzle, capacityMax, inBody, SOFT_FROM, SNAP_COOLDOWN_MS, puzzleGain,
     openSurface, NOBODY_LINE, GO_UP_ALONE,
+    sealCandidates, sealSector, choosingSector, bodyGlyph, BODY_GLYPHS,
 } from './watcher.js';
 import { initialDeepState, sleep, CRYO, resurfaceDay, canResurface, MIN_SLEEPERS } from './deep.js';
 import { SENTENCE, SENTENCE_LINE } from './surface.js';
@@ -170,5 +171,92 @@ describe('the save', () => {
         expect(back.state.watcher.bought).toEqual(HARDWARE);
         expect(back.state.ringWoke).toBe(false);
         expect(normalizeWatcher({ sealed: [2, 2, 9, -1, 'x'] }).sealed).toEqual([2]);
+    });
+});
+
+describe('the choice (v1.52.0): a biological step asks for a sector, and the player picks it', () => {
+    const slots = initialLayout({ rooms: { mine: 3, farm: 3, generator: 3, dorm: 6, cryo: 1 }, chambers: 16 }).slots;
+    test('paid, then waiting: the capacity and the stars go, the people and the sector wait', () => {
+        const s = late();
+        const w = s.watcher;
+        const out = buyStep(w, s, slots, { choose: true });
+        expect(out.pending).toBe(true);
+        expect(out.step.id).toBe('brain');
+        expect(w.capacity).toBe(200 - LADDER[8].cap);
+        expect(s.humans).toBe(2000);                      // nobody taken yet
+        expect(w.sealed).toEqual([]);
+        expect(w.bought).not.toContain('brain');
+        expect(choosingSector(w)).toBe(true);
+        // the pill keeps asking, and the step cannot be paid for twice
+        expect(stepNeed(w, s).missing).toBe('sector');
+        expect(buyStep(w, s, slots, { choose: true })).toBe(null);
+    });
+    test('the candidates: every unsealed sector with a chamber in it', () => {
+        const w = { ...initialWatcher(), sealed: [] };
+        expect(sealCandidates(w, slots)).toEqual([0, 1, 2, 3]);
+        expect(sealCandidates({ ...w, sealed: [2, 0] }, slots)).toEqual([1, 3]);
+        // two chambers dug: only the two arms that hold one
+        expect(sealCandidates(w, ['mine', 'farm'])).toEqual([0, 1]);
+        expect(sealCandidates({ ...w, sealed: [0, 1, 2, 3] }, slots)).toEqual([]);
+    });
+    test('THAT sector seals, and the step\'s people go', () => {
+        const s = late();
+        const w = s.watcher;
+        buyStep(w, s, slots, { choose: true });
+        expect(sealSector(w, s, slots, 7)).toBe(null);           // not a sector
+        const out = sealSector(w, s, slots, 2);
+        expect(out.sector).toBe(2);
+        expect(out.people).toBe(peopleFor(LADDER[8], { humans: 2000 }));
+        expect(s.humans).toBe(2000 - out.people);
+        expect(w.sealed).toEqual([2]);
+        expect(w.bought).toContain('brain');
+        expect(choosingSector(w)).toBe(false);
+        expect(w.grown).toBe(0);
+        // a sealed sector cannot be chosen again
+        w.grown = BODY_GROW_SECONDS; w.capacity = 200;
+        buyStep(w, s, slots, { choose: true });
+        expect(sealSector(w, s, slots, 2)).toBe(null);
+        expect(sealSector(w, s, slots, 0).sector).toBe(0);
+        expect(w.sealed).toEqual([2, 0]);
+        // nothing waits: nothing seals
+        expect(sealSector(w, s, slots, 1)).toBe(null);
+    });
+    test('some always stay under the ice, whatever happened while the choice waited', () => {
+        const s = late();
+        const w = s.watcher;
+        buyStep(w, s, slots, { choose: true });
+        s.humans = MIN_SLEEPERS;
+        const out = sealSector(w, s, slots, 1);
+        expect(out.people).toBe(0);
+        expect(s.humans).toBe(MIN_SLEEPERS);
+    });
+    test('without a choice (the simulation) the body takes the sector where they sleep, as before', () => {
+        const s = late();
+        const out = buyStep(s.watcher, s, slots);
+        expect(out.sector).toBe(nextSector(slots, []));
+        expect(out.pending).toBeUndefined();
+        expect(choosingSector(s.watcher)).toBe(false);
+    });
+    test('the Watcher\'s shape grows with the body: a dot, a ring, a blob, a rim', () => {
+        const s = late();
+        const w = s.watcher;
+        expect(bodyGlyph(w)).toBe('');
+        const shapes = [];
+        for (let k = 0; k < 4; k++) {
+            w.capacity = 200; w.grown = BODY_GROW_SECONDS;
+            buyStep(w, s, slots, { choose: true });
+            expect(bodyGlyph(w)).toBe(shapes.length ? shapes[shapes.length - 1] : '');   // a choice waiting changes nothing
+            sealSector(w, s, slots, sealCandidates(w, slots)[0]);
+            shapes.push(bodyGlyph(w));
+        }
+        expect(shapes).toEqual(['dot', 'ring', 'blob', 'rim']);
+        expect(BODY_GLYPHS.slice(1)).toEqual(shapes);
+    });
+    test('a save keeps a choice that waits, and lets go of one that cannot be', () => {
+        const w = { ...initialWatcher(), bought: HARDWARE.slice(), sealing: 'brain' };
+        expect(normalizeWatcher(w).sealing).toBe('brain');
+        expect(normalizeWatcher({ ...w, sealing: 'skin' }).sealing).toBe(null);
+        expect(normalizeWatcher({ ...w, bought: ['watchdog'] }).sealing).toBe(null);
+        expect(normalizeWatcher({ ...initialWatcher() }).sealing).toBe(null);
     });
 });

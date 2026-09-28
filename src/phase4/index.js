@@ -39,7 +39,7 @@ import {
     nextOrePrice, affordText, cryoReadyLine, consequence, span, rateWords,
     short, backIn, cryoNeed, offerFor, lowPoint, rewardShows,
 } from './readout.js';
-import { initialLayout, freeChamber, normalizeLayout } from './layout.js';
+import { initialLayout, freeChamber, normalizeLayout, sectorOf } from './layout.js';
 import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
 import { createCrust } from './crust.js';
 import { createReplay } from './replay.js';
@@ -52,6 +52,7 @@ import {
     playSurface, SPACE_LINE, peopleFor, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, GO_UP_ALONE, sealLine, BODY_GROW_SECONDS,
     lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, ladderLine, rungOpenLine, nextStep,
+    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE } from './surface.js';
 import { playChapterCard } from '../chapterCard.js';
@@ -69,6 +70,16 @@ const CLICK_PX = 6, CLICK_MS = 500;
 export const SLEEP_TIMING = { gather: 1.5, spin: 1.5, release: 1.2 };
 /** Asleep, the colony is advanced this often (ms); the frames roll the numbers in between. */
 const SLEEP_TICK_MS = 100;
+/**
+ * ONE VOICE AT A TIME (v1.52.0, the cut, item 5). Asleep, only the alarm line, Surface and the
+ * upgrade pill speak; the feed shows its last line only. Awake, the feed shows FEED_AWAKE lines.
+ * The line of what woke the colony stays ALARM_LINE_MS, then the advisor says where we stand.
+ */
+export const FEED_AWAKE = 3;
+export const FEED_ASLEEP = 1;
+export const ALARM_LINE_MS = 6000;
+/** The people a biological step takes: the red delta over the H bar, and the number rolling down. */
+const DROP_MS = { roll: 1200, fade: 2400 };
 
 let abortController = null;
 let dayInterval = null;
@@ -193,6 +204,8 @@ export function init() {
         watcher: document.getElementById('deep-watcher'),
         watcherName: document.getElementById('deep-watcher-name'),
         stabFill: document.getElementById('deep-stab-fill'),
+        pulse: document.querySelector('#deep-watcher .deep-watcher-pulse'),
+        bodyTip: document.getElementById('deep-body-tip'),
         stabVal: document.getElementById('deep-stab-val'),
         // v1.51.0: the lamps' one line under the Watcher (the riddle cards are gone)
         card: {
@@ -246,6 +259,7 @@ export function init() {
     // nothing is clickable. Asleep is not busy: the wake button is live the whole sleep.
     let busy = false;
     let advisorLine = '';           // what woke the colony, until the next purchase
+    let advisorUntil = 0;           // v1.52.0: an alarm line goes after ALARM_LINE_MS (0: it stays)
     let feed = [];                  // the advisor's last lines, oldest first
     let toldAbout = null;           // the conditions the last feed line was written about
     let hovering = null;            // { kind, type } of the button under the cursor, for the preview
@@ -394,7 +408,8 @@ export function init() {
         for (const c of COLUMN) {
             const h = Math.round(BAR_H * st[c].frac);
             ui.fills[c].style.height = `${h}px`;
-            ui.heads[c].textContent = st[c].head;
+            const dropping = c === 'H' && !!hDrop;      // the people the body took, rolling down
+            if (!dropping) ui.heads[c].textContent = st[c].head;
             ui.flowIn[c].textContent = flowText(fl[c].in, '+');
             ui.flowOut[c].textContent = flowText(fl[c].out, '-');
             const marked = c === low.column;
@@ -408,7 +423,9 @@ export function init() {
             } else {
                 g.classList.remove('is-on');
             }
-            if (ahead) {
+            if (dropping) {
+                // stepDrop() owns the delta while it shows
+            } else if (ahead) {
                 d.textContent = deltaText(ahead.delta[c], c);
                 d.classList.toggle('is-down', ahead.delta[c] < -0.5);
                 d.classList.add('is-on');
@@ -417,17 +434,19 @@ export function init() {
                 d.textContent = '';
             }
         }
-        ui.advisor.textContent = advisorLine
-            || (state.asleep
-                // the first sleep says one thing, once: what the label under the scene is
-                ? (firstSleep(state.watcher) ? WATCHER_HELLO
-                    : `Asleep: ${rateWords(CRYO[state.cryo].days)} a second. The hall wakes us if anything goes wrong.`)
-                : `Year ${group(cal.year)}. ${state.watcher.gone ? 'Nobody came out.' : low.line}`);
-        // the feed: the last five things worth saying, newest at the bottom
-        if (ui.feed.childElementCount !== feed.length
-            || (feed.length && ui.feed.lastElementChild.textContent !== feed[feed.length - 1])) {
+        if (advisorLine && advisorUntil && performance.now() > advisorUntil) { advisorLine = ''; advisorUntil = 0; }
+        // v1.52.0: asleep the advisor is quiet (the one line it has is the feed's last); the first
+        // sleep's WATCHER_HELLO goes to the feed
+        const advice = state.asleep ? ''
+            : (advisorLine || `Year ${group(cal.year)}. ${state.watcher.gone ? 'Nobody came out.' : low.line}`);
+        if (ui.advisor.textContent !== advice) ui.advisor.textContent = advice;
+        // the feed: the last things worth saying, newest at the bottom; three awake, one asleep
+        const shown = feed.slice(-(state.asleep ? FEED_ASLEEP : FEED_AWAKE));
+        if (ui.feed.childElementCount !== shown.length
+            || (shown.length && ui.feed.firstElementChild.textContent !== shown[0])
+            || (shown.length && ui.feed.lastElementChild.textContent !== shown[shown.length - 1])) {
             ui.feed.textContent = '';
-            for (const line of feed) {
+            for (const line of shown) {
                 const row = document.createElement('div');
                 row.className = 'deep-feed-line';
                 row.textContent = line;
@@ -611,6 +630,10 @@ export function init() {
                 if (ui.stabVal.textContent !== v) ui.stabVal.textContent = v;
                 ui.stabFill.style.width = `${(100 * w.stability / STABILITY_MAX).toFixed(1)}%`;
                 ui.watcher.classList.toggle('is-low', w.stability < 35);
+                // v1.52.0: the Watcher's shape grows with the body: a dot, a ring, a blob, a rim
+                const shape = bodyGlyph(w);
+                const cls = `deep-watcher-pulse${shape ? ` is-body is-${shape}` : ''}`;
+                if (ui.pulse && ui.pulse.className !== cls) ui.pulse.className = cls;
                 drawLadder();
             }
             drawLampCard();
@@ -644,6 +667,7 @@ export function init() {
             case 'dorm': return 'needs a dormitory to spare';
             case 'people': return 'needs more people: some must stay under the ice';
             case 'growing': return 'it is still growing';
+            case 'sector': return 'Choose a sector to seal';
             default: return '';
         }
     }
@@ -675,9 +699,13 @@ export function init() {
         const need = stepNeed(w, state);
         const bio = !!step.people;
         const missing = needWords(step, need);
+        // v1.52.0: paid for and waiting for its sector: the pill asks, and a click on it asks again
+        const asks = need.missing === 'sector';
         ui.pill.classList.toggle('is-bio', bio);
-        ui.pill.classList.toggle('is-locked', !!need.missing || busy);
-        ui.pill.classList.toggle('is-missing', !!missing);
+        ui.pill.classList.toggle('is-locked', (!!need.missing && !asks) || busy);
+        ui.pill.classList.toggle('is-missing', !!missing && !asks);
+        ui.pill.classList.toggle('is-asking', asks);
+        ui.pill.classList.toggle('is-choosing', asks && choosing);
         const set = (el, text) => { if (el.textContent !== text) el.textContent = text; };
         set(ui.pillRung, RUNGS[step.rung]);
         set(ui.pillName, step.name);
@@ -689,20 +717,27 @@ export function init() {
     }
     function buyLadder() {
         if (!state.asleep || busy || paused()) return;
-        const out = buyStep(state.watcher, state, layout.slots);
+        // v1.52.0: a biological step already paid for asks again for its sector
+        if (choosingSector(state.watcher)) { enterChoice(); return; }
+        const out = buyStep(state.watcher, state, layout.slots, { choose: true });
         if (!out) return;
         if (out.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
-        // a sector goes into the body: the advisor calls it maintenance, and the wake strip shows it
-        if (out.sector >= 0) {
-            feed = pushFeed(feed, [sealLine(out.sector, state.watcher.sealed.length - 1)]);
-            sealedThisSleep.push(out.sector);
+        if (out.pending) {
+            // BIOLOGICAL IS A CHOICE (v1.52.0): paid; now the arms light up and wait for a click
+            saveGame();
+            enterChoice();
+            return;
         }
+        afterStep(out.step);
+    }
+    /** What every step bought says and does after it, whichever way it was bought. */
+    function afterStep(step) {
         // v1.51.0: the last step of a rung opens the next one, and the advisor says so once
-        const opened = rungOpenLine(out.step.id);
+        const opened = rungOpenLine(step.id);
         if (opened) feed = pushFeed(feed, [opened]);
         // the skin: the sentence can be heard, now, whether Surface was here or not (and the
         // lamps go quiet for it: one demand at a time)
-        if (out.step.id === 'skin') {
+        if (step.id === 'skin') {
             const sf = state.watcher.surface;
             if (state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
             if (!sf.visit) openSurface(state.watcher);
@@ -713,6 +748,79 @@ export function init() {
         scene?.setState(state, layout);
         updateChrome();
         saveGame();
+    }
+
+    /* ---- THE CHOICE (v1.52.0) ------------------------------------------------------------
+       The cut, item 4: a biological step, once paid, asks for a sector. The pill reads "Choose a
+       sector to seal", the arms that can be taken glow, the cursor is a crosshair; a click on any
+       plate of an arm seals THAT sector: it turns warm and breathes, its walkers leave, and the
+       people it took fall off the H bar with a red delta. Escape puts the choice away and refunds
+       nothing: the step waits and the pill keeps asking. The rules are watcher.js's. */
+    let choosing = false;
+    let hoverSector = -1;
+    function enterChoice() {
+        if (!state.asleep || busy || state.watcher.gone || !choosingSector(state.watcher)) return;
+        choosing = true;
+        hoverSector = -1;
+        ui.sceneHost.classList.add('is-choosing');
+        scene?.setCandidates(sealCandidates(state.watcher, layout.slots), -1);
+        updateChrome();
+    }
+    function leaveChoice() {
+        if (!choosing) return;
+        choosing = false;
+        hoverSector = -1;
+        ui.sceneHost.classList.remove('is-choosing');
+        scene?.setCandidates(null);
+    }
+    /** The sector under the cursor, when it is one the body may take; else -1. */
+    function candidateAt(x, y) {
+        if (!scene) return -1;
+        const slot = scene.slotAt(x, y);
+        if (slot < 0) return -1;
+        const k = sectorOf(slot);
+        return sealCandidates(state.watcher, layout.slots).includes(k) ? k : -1;
+    }
+    function chooseSector(k) {
+        if (!choosing || !state.asleep || busy || paused()) return false;
+        const w = state.watcher;
+        const before = state.humans;
+        const out = sealSector(w, state, layout.slots, k);
+        if (!out) return false;
+        leaveChoice();
+        // the advisor calls it maintenance, and the wake strip shows it
+        feed = pushFeed(feed, [sealLine(out.sector, w.sealed.length - 1)]);
+        sealedThisSleep.push(out.sector);
+        if (out.people > 0) dropPeople(before, state.humans, out.people);
+        afterStep(out.step);
+        scene?.sealAnim(out.sector, out.people);
+        return true;
+    }
+    let hDrop = null;               // { from, to, text, t0 } while the people roll off the H bar
+    function dropPeople(from, to, n) {
+        hDrop = { from, to, text: `\u2212${formatCount(n)}`, t0: performance.now() };
+        const d = ui.deltas.H;
+        d.classList.remove('is-drop');
+        void d.offsetWidth;             // restart the one-shot fade
+        d.textContent = hDrop.text;
+        d.classList.add('is-on', 'is-down', 'is-drop');
+        stepDrop();
+    }
+    /** Once a frame while it shows: the number rolls down, the delta fades (CSS), then both let go. */
+    function stepDrop() {
+        if (!hDrop) return;
+        const t = performance.now() - hDrop.t0;
+        if (t >= DROP_MS.fade) {
+            hDrop = null;
+            ui.deltas.H.classList.remove('is-on', 'is-down', 'is-drop');
+            ui.deltas.H.textContent = '';
+            updateChrome();
+            return;
+        }
+        const k = Math.min(1, t / DROP_MS.roll);
+        const e = 1 - Math.pow(1 - k, 3);
+        const v = formatCount(Math.round(hDrop.from + (hDrop.to - hDrop.from) * e));
+        if (ui.heads.H.textContent !== v) ui.heads.H.textContent = v;
     }
 
     /* ---- SURFACE (v1.49.0): opposite the Watcher, only in the sleeps it comes in. One line,
@@ -995,7 +1103,7 @@ export function init() {
     }
 
     // --- buying: the price now, the thing itself in a few days ---------------
-    function bought() { advisorLine = ''; said.key = ''; }
+    function bought() { advisorLine = ''; advisorUntil = 0; said.key = ''; }
     /* Since v1.49.0 every order goes through the queue (deep.js `orderBuild`): paid now, at the
        price after the orders already on the books, started when its lane and its chamber are free.
        A room takes whichever chamber is empty the day it starts. */
@@ -1211,7 +1319,9 @@ export function init() {
         sleepSum = freshSum();
         sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
         sealedThisSleep.length = 0;
-        beginSleep(state.watcher, state.cryo);
+        // the first sleep says one thing, once, what the label under the scene is (v1.52.0: in the
+        // feed, the one line the sleep world shows)
+        if (beginSleep(state.watcher, state.cryo)) feed = pushFeed(feed, [WATCHER_HELLO]);
         // falling asleep: the first moment spins like the odometer it always was
         const before = snapshot();
         roll = { from: before, to: before, t0: performance.now(), dur: 0.05, ease: linear };
@@ -1275,7 +1385,7 @@ export function init() {
             endLamps({ ok: true, done: true, gained: w.stability - held, rebooted: false }, open.lamps.slice(), -1, open);
         }
         stepLamps();
-        if (autoSnapDue(state.watcher, Date.now())) { scene?.snap(); snapWatcher(state.watcher, Date.now()); }
+        if (autoSnapDue(state.watcher, Date.now())) { scene?.snap(); snapWatcher(state.watcher, Date.now(), state.cryo); }
         updateChrome();
         if (sleepTicks % 10 === 0) saveGame();
     }
@@ -1294,6 +1404,7 @@ export function init() {
         const w = state.watcher;
         closeSurface(w);                // Surface, and everything it said, is gone the moment they wake
         stopRps();
+        leaveChoice();                  // a step waiting for its sector waits for the next sleep
         // v1.51.0: the lamps are a thing of the dark: an event still open goes with the sleep
         if (w.puzzle) dismissPuzzle(w, state.cryo);
         lamp = null;
@@ -1307,6 +1418,7 @@ export function init() {
         feed = pushFeed(feed, said);
         // the reboot line is said once, in the feed; the advisor's line keeps saying where we stand
         advisorLine = alarm.kind === 'reboot' ? '' : `Year ${group(calendar(state.day).year)}. ${line}`;
+        advisorUntil = advisorLine ? performance.now() + ALARM_LINE_MS : 0;
         const t = sleepSum || freshSum();
         // lives lost in the ice are mourned: no one is born for a year after the wake (v1.48.0)
         if (t.died >= 0.5) mourn(state);
@@ -1352,6 +1464,7 @@ export function init() {
         const were = lastWake(w, state);
         feed = pushFeed(feed, [NOBODY_LINE]);
         advisorLine = `Year ${group(calendar(state.day).year)}. ${NOBODY_LINE}`;
+        advisorUntil = 0;
         state.stalled = {};
         if (roll?.done) clearTimeout(roll.done);
         roll = null;
@@ -1403,6 +1516,7 @@ export function init() {
             scene?.scoutsUp(out.lost);
             const line = ascentFailLine(out, formatCount);
             advisorLine = `Year ${group(calendar(state.day).year)}: ${line}`;
+            advisorUntil = 0;
             feed = pushFeed(feed, [line]);
             report = dryRun();
             recomputeGates();
@@ -1467,7 +1581,7 @@ export function init() {
         }
         scene?.snap();
         if (paused()) return;            // the base snaps; nothing is earned while time holds
-        if (snapWatcher(state.watcher, Date.now()) > 0) {
+        if (snapWatcher(state.watcher, Date.now(), state.cryo) > 0) {
             ui.watcher?.classList.remove('is-held');
             void ui.watcher?.offsetWidth;          // restart the one-shot
             ui.watcher?.classList.add('is-held');
@@ -1485,6 +1599,12 @@ export function init() {
         if (!p || e.button !== 0) return;
         if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > CLICK_PX || performance.now() - p.t > CLICK_MS) return;
         if (!scene || !scene.hitsBase(e.clientX, e.clientY)) return;
+        // v1.52.0: choosing a sector, a click on an arm the body may take seals it; nothing snaps
+        if (choosing) {
+            const k = candidateAt(e.clientX, e.clientY);
+            if (k >= 0) chooseSector(k);
+            return;
+        }
         // v1.51.0: while the lamps ask, a click on one of their rooms is an answer, not a snap
         if (state.asleep && lamp && pressSlot(scene.slotAt(e.clientX, e.clientY))) return;
         snapBase();
@@ -1496,8 +1616,22 @@ export function init() {
     function stepCursor() {
         const asleep = !!state.asleep;
         const over = asleep && !!pointer && !!scene && scene.hitsBase(pointer.x, pointer.y);
-        const wait = asleep ? snapWait(state.watcher, Date.now()) : 0;
+        const wait = asleep && !choosing ? snapWait(state.watcher, Date.now()) : 0;
         ui.sceneHost.classList.toggle('is-over-base', over && wait <= 0);
+        // v1.52.0: choosing, the arm under the cursor glows a little more
+        if (choosing) {
+            const k = pointer && over ? candidateAt(pointer.x, pointer.y) : -1;
+            if (k !== hoverSector) { hoverSector = k; scene?.setCandidates(sealCandidates(state.watcher, layout.slots), k); }
+        }
+        // a sealed plate says what it is now, and nothing else does
+        const sealed = (state.watcher.sealed || []).length > 0;
+        const slot = sealed && pointer && scene && !choosing ? scene.slotAt(pointer.x, pointer.y) : -1;
+        const body = slot >= 0 && inBody(state.watcher, slot);
+        if (ui.bodyTip) {
+            if (ui.bodyTip.hidden === body) ui.bodyTip.hidden = !body;
+            if (body) ui.bodyTip.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 12}px)`;
+        }
+        stepDrop();
         if (!ui.snapRing) return;
         const on = asleep && !!pointer && wait > 0;
         ui.snapRing.hidden = !on;
@@ -1508,7 +1642,10 @@ export function init() {
 
     /** Escape lets the lamps go (no cost; the next event is still two sleeps away). */
     document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape' || !state.asleep || !state.watcher.puzzle) return;
+        if (e.key !== 'Escape' || !state.asleep) return;
+        // v1.52.0: Escape puts the choice away; nothing is refunded, the step waits, the pill asks
+        if (choosing) { leaveChoice(); updateChrome(); return; }
+        if (!state.watcher.puzzle) return;
         dismissPuzzle(state.watcher, state.cryo);
         lamp = null;
         updateChrome();
@@ -1662,6 +1799,9 @@ export function init() {
         get lamp() { return lamp ? { kind: lamp.p.kind, phase: lamp.phase, t: lamp.t, at: lamp.p.at || 0 } : null; },
         pressSlot: (slot) => pressSlot(slot),
         get rps() { return rps ? { stage: rps.stage, log: rps.log.slice() } : (rpsLast ? { stage: 'done', log: rpsLast.slice() } : null); },
+        // v1.52.0, for the tests: the choice of a sector, and the people rolling off the H bar
+        get choosing() { return choosing; },
+        get hDrop() { return hDrop ? { text: hDrop.text, from: hDrop.from, to: hDrop.to } : null; },
     };
     let debugOn = false;
     try { debugOn = window.location.search.includes('debug') || localStorage.getItem(DEBUG_KEY) === '1'; } catch { /* ignore */ }

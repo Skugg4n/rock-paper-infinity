@@ -22,7 +22,7 @@ import {
 } from '../src/phase4/deep.js';
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, NAME_AT_YEARS, recoverAwake,
-  LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake,
+  LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake, snap,
 } from '../src/phase4/watcher.js';
 import { THROWS } from '../src/phase4/surface.js';
 
@@ -44,6 +44,11 @@ const s = initialDeepState();
 // measured on. What it says is how an unattended Watcher would fare over the whole chapter.
 const w = initialWatcher();
 let named = null, lowest = 100, capFullAt = null;
+// v1.52.0: the same Watcher kept by an ATTENTIVE player, who clicks the base every SNAP_EVERY real
+// seconds of sleep (the clock runs on across sleeps). Reported only, like the unattended one.
+const SNAP_EVERY = 12;
+const w2 = initialWatcher();
+let lowest2 = 100, snapClock = 0;
 // v1.49.0: the Watcher's ladder, bought by the --watcher player only
 const WATCHER = process.argv.includes('--watcher');
 const WATCHER_HOLD = 20;           // real seconds a sleep the player stays under for the next step's capacity
@@ -164,6 +169,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
   if (summaryWeakest) { r.weakest = summaryWeakest; summaryWeakest = null; }
   real += 1;
   recoverAwake(w, 1);                   // v1.49.0: awake, the Watcher rests
+  recoverAwake(w2, 1);
   if (!starsDay0 && r.stars > 0) starsDay0 = r.stars;   // the first day the colony makes stars at all
   starsDayEnd = r.stars;
   weakAwake[r.weakest]++;
@@ -184,6 +190,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
     const hist = { M: 0, F: 0, E: 0, H: 0 };
     let alarm = null, slept = 0, died = 0, held = 0;
     beginSleep(w, s.cryo);
+    beginSleep(w2, s.cryo);
     // one real second of sleep at a time, until something wakes the colony
     while (real < REAL_CAP) {
       const rate = CRYO[s.cryo].days;
@@ -192,6 +199,12 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
       real += spent; sleepReal += spent;
       if (watchSleep(w, { days: sum.days, tier: s.cryo, spare: sum.spare }).named) named = { real, year: s.day / DAYS_PER_YEAR };
       if (sum.alarm) alarmHit(w, sum.alarm.kind);
+      w2.bought = w.bought.slice();                       // the --watcher player's ladder counts for both
+      watchSleep(w2, { days: sum.days, tier: s.cryo, spare: sum.spare });
+      snapClock += spent;
+      while (snapClock >= SNAP_EVERY) { snapClock -= SNAP_EVERY; snap(w2, sleepReal * 1000, s.cryo); }
+      if (sum.alarm) alarmHit(w2, sum.alarm.kind);
+      lowest2 = Math.min(lowest2, w2.stability);
       if (WATCHER) {
         // Surface, when it comes: a throw at random
         if (surfaceDue(w, slept + sum.days, rate)) { openSurface(w); playSurface(w, THROWS[Math.floor(rng() * 3)]); surfaceGames++; }
@@ -250,7 +263,38 @@ if (WATCHER) {
     : 'biological ending (--watcher)  never');
   console.log(`the ring (--watcher)  ${ringAt === null ? 'not reached' : `reached at ${fmt(ringAt)}, the player stayed down`}`);
 }
-console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (${NAME_AT_YEARS} slept y)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}`);
+/*
+ * v1.52.0: THE SNAP IS ENOUGH, checked where it matters. The greedy player above sleeps about a
+ * second a sleep, so its sleeps say little about the Watcher. A human sleeps longer: here, each
+ * tier on its own, from a full meter, sleeps of REF_SLEEP real seconds with REF_AWAKE seconds
+ * awake between them, each ended by a plain alarm (an order landing, -2). Unattended: the sleep
+ * in which the system first reboots. Attentive: the lowest and highest stability from the third
+ * sleep on (the meter has settled by then), snapping every SNAP_EVERY seconds.
+ */
+const REF_SLEEP = 25, REF_AWAKE = 20, REF_SLEEPS = 10;
+function refTier(tier, every) {
+  const r = { ...initialWatcher(), sleeps: 5 };
+  let clock = 0, since = 0, low = 100, high = 0, rebootAt = null;
+  for (let n = 1; n <= REF_SLEEPS; n++) {
+    beginSleep(r, tier);
+    for (let k = 0; k < REF_SLEEP * 10; k++) {
+      clock += 0.1; since += 0.1;
+      watchSleep(r, { days: CRYO[tier].days * 0.1, tier });
+      if (every && since >= every - 1e-9) { since = 0; snap(r, clock * 1000, tier); }
+      if (n >= 3) { low = Math.min(low, r.stability); high = Math.max(high, r.stability); }
+    }
+    alarmHit(r, 'act');
+    if (r.reboots && rebootAt === null) rebootAt = n;
+    recoverAwake(r, REF_AWAKE);
+    clock += REF_AWAKE;
+  }
+  return { low, high, rebootAt };
+}
+const TIERS = CRYO.map((_, i) => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][i] || String(i + 1));
+const absent = CRYO.map((_, t) => `${TIERS[t]} ${refTier(t, 0).rebootAt ?? 'never'}`).join(' ');
+const held = CRYO.map((_, t) => { const h = refTier(t, SNAP_EVERY); return `${TIERS[t]} ${Math.round(h.low)}-${Math.round(h.high)}`; }).join(' ');
+console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (${NAME_AT_YEARS} slept y)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}  |  ${REF_SLEEP} s sleeps from full, first reboot in sleep: ${absent}`);
+console.log(`watcher (attentive: snap every ${SNAP_EVERY} s)  stability ${Math.round(w2.stability)} at the end, lowest ${Math.round(lowest2)}, ${w2.reboots} reboots  |  ${REF_SLEEP} s sleeps, held (low-high from the third sleep): ${held}`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

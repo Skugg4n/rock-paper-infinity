@@ -29,15 +29,19 @@ export const NAME_AT_YEARS = 100;
  * years are scaled by the tier, so a real second of sleep costs about the same at a month a
  * second as at a hundred thousand years a second, a little more the deeper the sleep:
  * DRIFT_PER_SECOND points per real second at each tier.
+ *
+ * v1.52.0 (the cut: sanity IS the snap): flatter than before (0.5 to 2.2), so that the same
+ * attention holds at every tier and an absent Watcher reboots in three to five sleeps of about
+ * half a minute wherever it is on the ladder (scripts/sim-phase4.mjs, the two watcher lines).
  */
-export const DRIFT_PER_SECOND = [0.5, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2];
+export const DRIFT_PER_SECOND = [0.9, 1.0, 1.05, 1.1, 1.15, 1.2, 1.3];
 /**
  * THE FIRST SLEEP TEACHES, IT DOES NOT PUNISH (v1.48.0). The overnight playtest: the first sleep
  * opened on a riddle nobody had been told about, a meter nobody had seen drained, and the first
  * wake a new player got was "Woke: the system rebooted." Now, in the first sleep, the meter does
  * not drift, alarms do not jolt it and no riddle comes; the advisor says one line,
  * WATCHER_HELLO, and the sleep ends on a plain alarm at the latest after FIRST_SLEEP_DAYS.
- * The drift starts with the second sleep, gently at Cryo I (half a point a second).
+ * The drift starts with the second sleep, at Cryo I (half a point a second; 0.9 since v1.52.0).
  */
 export const WATCHER_HELLO = 'Something stayed awake while they slept.';
 export const FIRST_SLEEP_DAYS = DAYS_PER_YEAR;
@@ -55,11 +59,21 @@ const NO_DROP = ['manual', 'debug', 'reboot', 'first'];
 /** At zero the system reboots: the colony wakes, and the meter comes back at this. */
 export const REBOOT_TO = 40;
 
-/** THE SNAP. A click on the base: the structure snaps back, and a little stability with it,
- *  at most once in SNAP_COOLDOWN_MS of real time. */
-export const SNAP_GAIN = 5;
-/** With Deep read (v1.51.0) a snap gives this instead. */
-export const SNAP_GAIN_DEEP = 10;
+/**
+ * THE SNAP. A click on the base: the structure snaps back, and stability with it, at most once in
+ * SNAP_COOLDOWN_MS of real time.
+ *
+ * v1.52.0: the snap is the whole idle mechanic (the cut), so it is tuned to be enough. A snap gives
+ * back SNAP_COVERS seconds of this tier's drift, and more the softer the base has gone: times
+ * (1 + SNAP_SOFT_BONUS x the share of the meter that is gone). So it scales with the tier, and the
+ * meter finds its own level: a Watcher that snaps every T seconds settles where one snap pays for
+ * T seconds of drift. Every 10 s that is about 78, every 12 s 71, every 15 s 60 (the low point,
+ * just before the snap; it peaks a snap higher, 93, 89 and 83), at every tier alike. Deep read
+ * gives SNAP_DEEP times as much.
+ */
+export const SNAP_COVERS = 4.5;
+export const SNAP_SOFT_BONUS = 6;
+export const SNAP_DEEP = 1.5;
 export const SNAP_COOLDOWN_MS = 4000;
 
 /** Below this the base starts to soften; at zero it is as soft as it gets. */
@@ -112,6 +126,7 @@ export function initialWatcher() {
         surface: initialSurface(),
         saidSpace: false,       // "We needed the space.", said once
         sealed: [],             // the sectors the body has taken, 0 to 3, in order (v1.50.0)
+        sealing: null,          // a biological step paid for, waiting for the player to choose its sector (v1.52.0)
         grown: 0,               // real seconds of sleep since the body last grew
         gone: false,            // the last wake-up has come: nobody came out
     };
@@ -129,6 +144,9 @@ export function normalizeWatcher(w) {
     out.surface = normalizeSurface(had.surface);
     out.sealed = Array.isArray(had.sealed) ? [...new Set(had.sealed.filter((x) => Number.isInteger(x) && x >= 0 && x < SECTORS))] : [];
     out.gone = !!had.gone;
+    // v1.52.0: a step waiting for its sector is the next biological step, or nothing
+    const due = LADDER[out.bought.length];
+    out.sealing = due && due.rung === 2 && had.sealing === due.id && out.sealed.length < SECTORS ? due.id : null;
     out.stability = clamp(Number.isFinite(out.stability) ? out.stability : STABILITY_MAX, 0, STABILITY_MAX);
     out.capacity = clamp(Number.isFinite(out.capacity) ? out.capacity : 0, 0, capacityMax(out));
     out.sleptYears = Math.max(0, Number.isFinite(out.sleptYears) ? out.sleptYears : 0);
@@ -218,13 +236,14 @@ export function snapWait(w, now) {
  * A click on the base. The snap itself is the scene's; this is what it gives back.
  * @param {object} w - mutated
  * @param {number} now - wall clock, ms
- * @returns {number} the stability gained: snapGain(w), or 0 inside the cooldown
+ * @param {number} [tier] - the cryo tier the colony sleeps at (the snap scales with its drift)
+ * @returns {number} the stability gained: snapGain(w, tier), or 0 inside the cooldown
  */
-export function snap(w, now) {
+export function snap(w, now, tier = 0) {
     if (now - (w.lastSnapAt || 0) < SNAP_COOLDOWN_MS && now >= (w.lastSnapAt || 0)) return 0;
     w.lastSnapAt = now;
     const before = w.stability;
-    w.stability = Math.min(STABILITY_MAX, w.stability + snapGain(w));
+    w.stability = Math.min(STABILITY_MAX, w.stability + snapGain(w, tier));
     return w.stability - before;
 }
 
@@ -527,7 +546,7 @@ export const RUNGS = ['SYSTEM', 'HARDWARE', 'BIOLOGICAL'];
 export const LADDER = [
     { id: 'watchdog', rung: 0, name: 'Watchdog', icon: 'shield', does: 'Stability drifts 25 % slower.', short: 'stability drifts slower', cap: 20, stars: 2e4 },
     { id: 'scheduler', rung: 0, name: 'Scheduler', icon: 'list-ordered', does: 'The build queue runs while they sleep.', short: 'the queue runs while they sleep', cap: 30, stars: 2e5 },
-    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'A snap gives +10 stability, not +5.', short: 'a snap gives +10', cap: 40, stars: 5e6 },
+    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'A snap gives half as much again.', short: 'a snap holds more', cap: 40, stars: 5e6 },
     { id: 'nightvision', rung: 0, name: 'Night vision', icon: 'moon', does: 'Alarms come 10 % later.', short: 'alarms come later', cap: 50, stars: 5e7 },
     { id: 'cooling', rung: 1, name: 'Cooling', icon: 'fan', does: 'Capacity holds twice as much.', short: 'capacity holds twice as much', cap: 60, stars: 5e8, ore: 1e6, beds: 1 },
     { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'The lamps give twice as much.', short: 'the lamps give double', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
@@ -583,9 +602,16 @@ export const capacityMax = (w) => CAPACITY_MAX * (has(w, 'cooling') ? 2 : 1);
 export const capacityGain = (w) => (has(w, 'reactor') ? 3 : 1);
 /** The drift, slowed: a quarter slower with the Watchdog, and half that again with the spinal fluid. */
 export const driftFactor = (w) => (has(w, 'watchdog') ? 0.75 : 1) * (has(w, 'spinal') ? 0.5 : 1);
-/** A riddle's worth: +25 with Deep read. */
-/** A snap's worth: +10 with Deep read (v1.51.0; it made a riddle worth +25 before the riddles went). */
-export const snapGain = (w) => (has(w, 'deepread') ? SNAP_GAIN_DEEP : SNAP_GAIN);
+/**
+ * A snap's worth (v1.52.0): SNAP_COVERS seconds of the tier's drift, more the softer the base, and
+ * half as much again with Deep read (v1.51.0 made it +10 for +5; before that it was a riddle's +25).
+ * @param {object} w
+ * @param {number} [tier]
+ */
+export function snapGain(w, tier = 0) {
+    const gone = 1 - clamp((w && Number.isFinite(w.stability)) ? w.stability : STABILITY_MAX, 0, STABILITY_MAX) / STABILITY_MAX;
+    return DRIFT_PER_SECOND[tierOf(tier)] * SNAP_COVERS * (1 + SNAP_SOFT_BONUS * gone) * (has(w, 'deepread') ? SNAP_DEEP : 1);
+}
 /** What a lamp event gives, times this: twice with the Second core (v1.51.0; it opened a second
  *  riddle card before). The stability and the machine's wins alike. */
 export const lampFactor = (w) => (has(w, 'secondcore') ? 2 : 1);
@@ -607,6 +633,8 @@ function sparedDorms(s) {
 export function stepNeed(w, s) {
     const step = nextStep(w);
     if (!step) return null;
+    // v1.52.0: paid for, and waiting for the player to choose the sector it takes
+    if (w.sealing && w.sealing === step.id) return { step, missing: 'sector' };
     let missing = '';
     if (w.capacity < step.cap) missing = 'capacity';
     else if ((s.stars || 0) < step.stars) missing = 'stars';
@@ -636,26 +664,30 @@ export function dormToTake(s, slots) {
 
 /**
  * Buy the next step. The phase checks that the colony sleeps; this checks the price.
+ *
+ * A BIOLOGICAL step (v1.52.0) is a choice: with `choose`, the capacity and the stars are paid and
+ * the step waits in `w.sealing` until the player picks the sector it takes (`sealSector`); the
+ * people go then. Without it (the simulation, the older tests) the body takes `nextSector()` at once.
  * @param {object} w - mutated
  * @param {object} s - the colony, mutated (stars, ore, the dormitory taken)
  * @param {(string|null)[]} slots - the layout, for which dormitory is taken
- * @returns {{step:object, slot:number, firstSpace:boolean, sector:number, people:number}|null} null when it cannot be bought
+ * @param {{choose?:boolean}} [o]
+ * @returns {{step:object, slot:number, firstSpace:boolean, sector:number, people:number, pending?:boolean}|null} null when it cannot be bought
  */
-export function buyStep(w, s, slots) {
+export function buyStep(w, s, slots, { choose = false } = {}) {
     const need = stepNeed(w, s);
     if (!need || need.missing) return null;
     const { step } = need;
     w.capacity -= step.cap;
     s.stars -= step.stars;
     if (step.ore) s.minerals -= step.ore;
-    let slot = -1, firstSpace = false, sector = -1, people = 0;
+    const sector = -1, people = 0;
+    let slot = -1, firstSpace = false;
     if (step.people) {
-        people = peopleFor(step, s);
-        s.humans -= people;
-        sector = nextSector(slots, w.sealed || []);
-        // the sector's rooms keep producing as they did, the dormitories too: they are part of
-        // the body now, and the creches refill what the body took. The cost shows at the last wake.
-        if (sector >= 0) w.sealed = (w.sealed || []).concat([sector]);
+        w.sealing = step.id;
+        if (choose) return { step, slot, firstSpace, sector, people, pending: true };
+        const out = sealSector(w, s, slots, nextSector(slots, w.sealed || []));
+        return out ? { ...out, slot, firstSpace } : { step, slot, firstSpace, sector, people };
     }
     if (step.beds) {
         slot = dormToTake(s, slots);
@@ -666,11 +698,70 @@ export function buyStep(w, s, slots) {
     }
     w.bought = (w.bought || []).concat([step.id]);
     w.grown = 0;
-    if (step.id === 'skin') w.surface.words = SENTENCE.length;     // heard, not won
     return { step, slot, firstSpace, sector, people };
 }
 /** The line the advisor says, once, the first time the Watcher takes a dormitory. */
 export const SPACE_LINE = 'We needed the space.';
+
+/* ---- THE CHOICE (v1.52.0) ---------------------------------------------------------------
+   The cut, item 4: "BIOLOGICAL has no picture and no choice." Now a biological step, once paid
+   for, asks for a sector; the arms of the base that can still be taken light up; the player
+   clicks one and THAT sector seals, and the people go. Escape puts the choice away without a
+   refund: the step waits, and the pill keeps asking. */
+
+/**
+ * The sectors the body may take now: the unsealed ones that hold a chamber (a sector with no
+ * chamber dug in it has no plate to click), or every unsealed one when none does.
+ * @param {object} w
+ * @param {(string|null)[]} slots
+ * @returns {number[]} 0 to 3, in order
+ */
+export function sealCandidates(w, slots) {
+    const sealed = new Set((w && w.sealed) || []);
+    const open = [];
+    for (let k = 0; k < SECTORS; k++) if (!sealed.has(k)) open.push(k);
+    const dug = new Set((slots || []).map((_, i) => sectorOf(i)));
+    const held = open.filter((k) => dug.has(k));
+    return held.length ? held : open;
+}
+/** Is a step paid for and waiting for its sector? */
+export const choosingSector = (w) => !!(w && w.sealing);
+
+/**
+ * The player chose: the waiting biological step takes this sector and its people.
+ * @param {object} w - mutated
+ * @param {object} s - the colony, mutated (humans)
+ * @param {(string|null)[]} slots
+ * @param {number} sector - 0 to 3, one of sealCandidates()
+ * @returns {{step:object, sector:number, people:number}|null} null when nothing waits or the sector cannot be taken
+ */
+export function sealSector(w, s, slots, sector) {
+    const step = nextStep(w);
+    if (!step || !step.people || w.sealing !== step.id) return null;
+    if (!sealCandidates(w, slots).includes(sector)) return null;
+    // its share of the colony as it is now; some always stay under the ice
+    const people = Math.max(0, Math.min(peopleFor(step, s), Math.floor((s.humans || 0) - MIN_SLEEPERS)));
+    s.humans -= people;
+    // the sector's rooms keep producing as they did, the dormitories too: they are part of the
+    // body now, and the creches refill what the body took. The cost shows at the last wake.
+    w.sealed = (w.sealed || []).concat([sector]);
+    w.sealing = null;
+    w.bought = (w.bought || []).concat([step.id]);
+    w.grown = 0;
+    if (step.id === 'skin') w.surface.words = SENTENCE.length;     // heard, not won
+    return { step, sector, people };
+}
+
+/**
+ * THE WATCHER'S SHAPE (v1.52.0): the glyph grows with the body, one shape per biological step
+ * taken: a dot, a dot with a ring, a soft blob, a blob with a rim. Before the body it is the
+ * pulse it always was ('').
+ */
+export const BODY_GLYPHS = ['', 'dot', 'ring', 'blob', 'rim'];
+export function bodyGlyph(w) {
+    const n = ((w && w.bought) || []).filter((id) => LADDER.some((u) => u.id === id && u.rung === 2)).length;
+    return BODY_GLYPHS[Math.min(BODY_GLYPHS.length - 1, n)];
+}
 
 /* ---- Surface, as the Watcher keeps it (v1.49.0) --------------------------- */
 

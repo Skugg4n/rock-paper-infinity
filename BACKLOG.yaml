@@ -1385,4 +1385,45 @@ items:
       with a red delta); the Watcher's glyph grows per biological step; the
       voices ranked asleep (feed collapsed to one line, the replay strip five
       seconds); drift and snap tuned so an attentive player holds 60 to 90.
+    status: done
+    resolved_in: "v1.52.0"
+    notes: |
+      Drift flattened to 0.9..1.3 a real second; a snap gives 4.5 s of the
+      tier's drift times (1 + 6 x the share of the meter gone), x1.5 with Deep
+      read. Sim, 25 s sleeps: a snap every 12 s holds 71 to 89 at every tier,
+      none reboots in sleep 3 to 5. Buying a biological step waits in
+      w.sealing; the arms glow, a click on a plate seals that sector, the
+      people fall off the H bar with a red delta, its walkers leave; Escape
+      keeps the purchase. The Watcher's glyph: dot, ring, blob, rim. Asleep:
+      the advisor is quiet, the feed shows one line (three awake), the strip
+      five seconds, the alarm line six. Browser check: scripts/accept-iv-cut.mjs.
+
+  - id: B150
+    added: 2026-09-28
+    source: "slice 9 (v1.52.0), Claude"
+    request: |
+      The lamps' own card ("LAMPS · YOUR TURN") is still text under the Watcher
+      while asleep. It was kept as the lamps' demand card (Surface has its own),
+      but the cut lists only the alarm line, Surface and the pill. Decide with
+      Ola: keep it, or make it glyph-only.
+    status: open
+
+  - id: B151
+    added: 2026-09-28
+    source: "slice 9 (v1.52.0), Claude"
+    request: |
+      The Watcher's tuning assumes a human sleeps about 25 real seconds with 20
+      awake between (the sim's greedy player sleeps about one). Measure real
+      sleep lengths in Ola's next playtest and retune DRIFT_PER_SECOND if an
+      absent player reboots much sooner or later than in three to five sleeps.
+    status: open
+
+  - id: B152
+    added: 2026-09-28
+    source: "slice 9 (v1.52.0), Claude"
+    request: |
+      At the first biological step all four sectors are candidates, so the
+      glow warms the whole base and only the hovered arm stands out. Playtest
+      whether the choice reads; if not, glow only the arms themselves (the
+      cells next to the landing) or add a sector number on hover.
     status: open

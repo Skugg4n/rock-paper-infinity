@@ -143,7 +143,7 @@ export const CHECKPOINTS = [
         clearAll();
         // Deep into the sleeps (v1.46.0): asleep at a century a second, the Watcher named, its
         // stability at 55 (the base has begun to soften), the machines' capacity full, and a
-        // riddle a few seconds away. Left alone, the meter reaches zero in about half a minute
+        // riddle a few seconds away. Left alone, the meter reaches zero in about fifty seconds (v1.52.0)
         // and the system reboots.
         const deep = initialDeepState({ salvage: 1500, doom0: 85 });
         const day = 5000 * DAYS_PER_YEAR;

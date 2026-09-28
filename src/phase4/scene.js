@@ -38,6 +38,13 @@ const BODY = 0xc9b8ad;
 const BREATH_RATE = 0.8;        // radians a second: a breath every eight seconds
 const BREATH_SCALE = 0.012;     // how far a sector swells, as a share of its distance from the shaft
 const BREATH_RISE = 0.035;      // and how far it rises, in world units
+/* THE CHOICE (v1.52.0). While a biological step waits for its sector, the plates of the sectors it
+   may take glow softly warm (the colour they will turn), the one under the cursor a little more.
+   The chosen sector seals and its walkers leave: dots on its plates walk in to the shaft and fade,
+   over LEAVE_SECONDS. */
+const CANDIDATE = 0x3a2418;     // the glow, added to the plate's own colour
+const LEAVE_SECONDS = 2;
+const MAX_LEAVERS = 48;
 const PEOPLE = 0xffffff;
 const PEOPLE_SIZE = 0.085;
 
@@ -245,6 +252,9 @@ export function createScene(container, opts = {}) {
 
     const plateMat = soften(new THREE.MeshLambertMaterial({ color: PLATE }));
     const bodyMat = soften(new THREE.MeshLambertMaterial({ color: BODY }));
+    // v1.52.0: a sector the body may take, and the one under the cursor
+    const candMat = soften(new THREE.MeshLambertMaterial({ color: PLATE, emissive: CANDIDATE }));
+    const hoverMat = soften(new THREE.MeshLambertMaterial({ color: PLATE, emissive: CANDIDATE }));
     const crustMat = new THREE.MeshLambertMaterial({ color: CRUST });
     const rubbleMat = new THREE.MeshLambertMaterial({ color: RUBBLE });
     const holeMat = new THREE.MeshBasicMaterial({ color: ROCK });
@@ -317,10 +327,24 @@ export function createScene(container, opts = {}) {
     scene.add(scoutMesh);
     let outings = [];               // { dir:'up'|'down', k, dur, dots:[{ path, pathAt, delay }] }
 
+    // ---- v1.52.0: the walkers of a sector the body took, leaving it ----
+    const leavePos = new Float32Array(MAX_LEAVERS * 3);
+    const leaveGeo = new THREE.BufferGeometry();
+    leaveGeo.setAttribute('position', new THREE.BufferAttribute(leavePos, 3));
+    leaveGeo.setDrawRange(0, 0);
+    const leaveMat = new THREE.PointsMaterial({ color: PEOPLE, size: PEOPLE_SIZE, transparent: true, opacity: 1 });
+    const leaveMesh = new THREE.Points(leaveGeo, leaveMat);
+    leaveMesh.frustumCulled = false;
+    scene.add(leaveMesh);
+    let leaving = null;             // { k, dots:[{ from, to, delay }] }
+    let candidates = [];            // the sectors glowing as choices
+    let candHover = -1;
+
     // ---- what the current build left behind ----
     let world = new THREE.Group();
     scene.add(world);
     let solids = [];        // what a label can hide behind
+    let plates = [];        // every chamber's slab, with its slot and sector (v1.52.0)
     let labels = [];        // { obj, inner, kind, key }
     let nodes = [];         // the walk graph
     let floors = [];        // { y, doors: [], nodes: [] }
@@ -356,7 +380,7 @@ export function createScene(container, opts = {}) {
         world.removeFromParent();
         world = new THREE.Group();
         scene.add(world);
-        solids = []; nodes = []; floors = []; folk = []; digLabel = null; machine = null;
+        solids = []; nodes = []; floors = []; folk = []; digLabel = null; machine = null; plates = [];
         bodyGroups = []; into = null;
         march = null;
         lampKey = '';
@@ -473,8 +497,12 @@ export function createScene(container, opts = {}) {
                 const r = isHub ? R_HUB : R_ROOM;
                 const prnd = plateSeed(fi, c.x, c.z);
                 const plate = addPlate(cx, y, cz);
-                // v1.51.0: a plate knows its chamber, so a click on it can answer the lamps
+                // v1.51.0: a plate knows its chamber, so a click on it can answer the lamps; v1.52.0:
+                // and its sector, so a click can choose it for the body
                 plate.userData.slot = Number.isInteger(c.slot) ? c.slot : -1;
+                plate.userData.sector = Number.isInteger(c.slot) ? c.sector : -1;
+                plate.userData.body = !!c.body;
+                if (!isHub) plates.push(plate);
 
                 // the ring
                 const span = 2 * r + LANE_W;
@@ -722,8 +750,58 @@ export function createScene(container, opts = {}) {
             nodes.forEach((n, i) => { if (n.floor === fi && n.adj.length) floor.nodes.push(i); });
         });
 
+        paintCandidates();
         framing(plan);
         opts.onLabels?.();
+    }
+
+    /** The plates of the sectors on offer glow; the rest are what they were (v1.52.0). */
+    function paintCandidates() {
+        const on = new Set(candidates);
+        for (const m of plates) {
+            const k = m.userData.sector;
+            if (m.userData.body) continue;
+            m.material = on.has(k) ? (k === candHover ? hoverMat : candMat) : plateMat;
+        }
+    }
+    /** One frame of the glow: a slow, soft breath of warmth on the candidates. */
+    function stepCandidates() {
+        if (!candidates.length) return;
+        const a = 0.55 + 0.45 * Math.sin(softClock * 2.2);
+        candMat.emissive.setHex(CANDIDATE).multiplyScalar(1.1 + 1.1 * a);
+        hoverMat.emissive.setHex(CANDIDATE).multiplyScalar(3.4);
+    }
+    /** The walkers of sector k leave it: dots on its plates walk in to the shaft and fade out. */
+    function startLeaving(k, people) {
+        const own = plates.filter((m) => m.userData.sector === k);
+        if (!own.length) return 0;
+        const n = Math.min(MAX_LEAVERS, Math.max(8, Math.round(people || 0)));
+        const dots = [];
+        const at = new THREE.Vector3();
+        for (let i = 0; i < n; i++) {
+            const m = own[Math.floor(rnd() * own.length)];
+            m.getWorldPosition(at);
+            const from = new THREE.Vector3(at.x + (rnd() - 0.5) * PLATE_W * 0.8, at.y + WALK_Y, at.z + (rnd() - 0.5) * PLATE_W * 0.8);
+            // in along the arm, toward the landing and the shaft on its floor
+            const to = new THREE.Vector3(at.x * 0.35, at.y + WALK_Y, at.z * 0.35);
+            dots.push({ from, to, delay: rnd() * 0.35 });
+        }
+        leaving = { k, t: 0, dots };
+        return n;
+    }
+    function stepLeaving(dt) {
+        if (!leaving) { if (leaveGeo.drawRange.count) leaveGeo.setDrawRange(0, 0); return; }
+        leaving.t += dt;
+        const k = leaving.t / LEAVE_SECONDS;
+        leaving.dots.forEach((d, i) => {
+            const u = Math.max(0, Math.min(1, (k - d.delay) / (1 - d.delay)));
+            p3.lerpVectors(d.from, d.to, u);
+            leavePos[i * 3] = p3.x; leavePos[i * 3 + 1] = p3.y; leavePos[i * 3 + 2] = p3.z;
+        });
+        leaveMat.opacity = Math.max(0, Math.min(1, 1.6 * (1 - k)));
+        leaveGeo.setDrawRange(0, leaving.dots.length);
+        leaveGeo.attributes.position.needsUpdate = true;
+        if (k >= 1) { leaving = null; leaveGeo.setDrawRange(0, 0); }
     }
 
     const FIT_MARGIN = 1.14;        // air around the colony so nothing touches the window's edge
@@ -1214,6 +1292,8 @@ export function createScene(container, opts = {}) {
             stepOutings(dt);
             stepSoft(dt);
             stepBreath(dt);
+            stepCandidates();
+            stepLeaving(dt);
             controls.update();
             updateLabels();
             renderer.render(scene, camera);
@@ -1288,6 +1368,38 @@ export function createScene(container, opts = {}) {
             return Number.isInteger(slot) ? slot : -1;
         },
         /**
+         * THE CHOICE (v1.52.0): these sectors glow as the body's candidates, `hover` a little more;
+         * null or [] puts the plates back.
+         * @param {number[]|null} sectors
+         * @param {number} [hover]
+         */
+        setCandidates(sectors, hover = -1) {
+            const list = Array.isArray(sectors) ? sectors.slice() : [];
+            const h = list.includes(hover) ? hover : -1;
+            if (list.join(',') === candidates.join(',') && h === candHover) return;
+            candidates = list;
+            candHover = h;
+            paintCandidates();
+        },
+        /** The sector just sealed: its walkers leave it over LEAVE_SECONDS. Returns how many dots. */
+        sealAnim(sector, people) { return startLeaving(sector, people); },
+        /**
+         * Where a chamber's plate is on the screen (its top, in client pixels), for the tests, or
+         * null when it is behind something or off the window.
+         * @param {number} slot
+         * @returns {{x:number, y:number}|null}
+         */
+        screenOfSlot(slot) {
+            const m = plates.find((p) => p.userData.slot === slot);
+            if (!m) return null;
+            const r = renderer.domElement.getBoundingClientRect();
+            m.getWorldPosition(tmp);
+            tmp.y += PLATE_H / 2;
+            const ndc = tmp.clone().project(camera);
+            if (Math.abs(ndc.x) > 0.98 || Math.abs(ndc.y) > 0.98 || ndc.z > 1) return null;
+            return { x: r.left + (ndc.x + 1) / 2 * r.width, y: r.top + (1 - ndc.y) / 2 * r.height };
+        },
+        /**
          * THE LAMPS (v1.51.0). While a lamp event runs the lamps on the automated rooms stop
          * pulsing and stand dim; `lit` are lit steady, `flash` blinks bright, `off` is dark,
          * `wrong` goes amber. null: the lamps pulse as they always did.
@@ -1356,6 +1468,7 @@ export function createScene(container, opts = {}) {
             scoutGeo.dispose(); scoutMesh.material.dispose();
             outings = [];
             plateMat.dispose(); bodyMat.dispose(); rockMat.dispose(); laneMat.dispose();
+            candMat.dispose(); hoverMat.dispose(); leaveGeo.dispose(); leaveMat.dispose();
             crustMat.dispose(); rubbleMat.dispose(); holeMat.dispose();
             renderer.dispose();
             renderer.domElement.remove();
@@ -1370,6 +1483,11 @@ export function createScene(container, opts = {}) {
                 body: bodyGroups.filter(Boolean).length, bodyPlates: bodyGroups.reduce((a, g) => a + (g ? g.children.filter((o) => o.isMesh && o.material === bodyMat && o.geometry === plateGeo).length : 0), 0),
                 whole, breath: bodyGroups.map((g) => (g ? +g.position.y.toFixed(4) : null)),
                 scouts: outings.map((o) => ({ dir: o.dir, dots: o.dots.length, k: o.k })),
+                // v1.52.0: the choice and the leaving
+                candidates: candidates.slice(), candHover,
+                candPlates: plates.filter((m) => m.material === candMat || m.material === hoverMat).length,
+                bodySectors: bodyGroups.map((g, k) => (g ? k : -1)).filter((k) => k >= 0),
+                leaving: leaving ? { sector: leaving.k, dots: leaving.dots.length, t: leaving.t } : null,
             };
         },
         /** Test hook: where the scout dots stand right now (the first `n` of the buffer). */

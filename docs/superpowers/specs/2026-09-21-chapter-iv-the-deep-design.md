@@ -814,3 +814,63 @@ glyphs; no number riddles at all; the lamps as a rare event; one demand at a tim
 
 Left: the rest of the cut (the sector as the player's choice, the Watcher's glyph growing with the
 body, the voices ranked asleep, drift and snap tuned for an attentive player), B146.
+
+
+## Built: slice 9 (v1.52.0)
+
+The rest of the cut (`2026-09-28-chapter-iv-reduction.md`): item 1's tuning, items 4 and 5, and the
+acceptance.
+
+- **Sanity is the snap** (watcher.js). `DRIFT_PER_SECOND` flattened to 0.9, 1.0, 1.05, 1.1, 1.15,
+  1.2, 1.3 (was 0.5 to 2.2), so the same attention holds at every tier. `snapGain(w, tier)` =
+  `DRIFT_PER_SECOND[tier]` x `SNAP_COVERS` (4.5) x (1 + `SNAP_SOFT_BONUS` (6) x (1 - stability/100))
+  x `SNAP_DEEP` (1.5) with Deep read. A snap pays for 4.5 s of drift on a rigid base and up to 31.5 s
+  on a gone one, so a Watcher that snaps every T seconds settles where one snap pays for T seconds:
+  every 10 s about 78, every 12 s 71, every 15 s 60 (the low point before the snap; the peak is a
+  snap higher, 93, 89, 83). The cooldown stays 4 s. `snap(w, now, tier)` takes the tier; the phase
+  passes `state.cryo`, the Nervous system too.
+- **The sim** prints both watcher lines. The unattended one is the greedy run as before, plus
+  "25 s sleeps from full, first reboot in sleep: I 5 II 4 III 4 IV 4 V 4 VI 4 VII 3". The attentive
+  one keeps a second Watcher through the same run, snapping every 12 s of sleep (85 at the end,
+  lowest 82, 0 reboots), plus the band per tier at 25 s sleeps: 71-86 at I to 71-89 at VII. The
+  reference sleep (25 s asleep, 20 s awake, each ended by a plain alarm, -2) is an assumption: the
+  greedy player sleeps about a second, which says nothing about a human (B151). `watcher.test.js`
+  holds the targets: every 12 s stays in 60 to 92 and never reboots; none reboots in sleep 3 to 5.
+- **Biological is a choice** (watcher.js `buyStep(w, s, slots, { choose })`, `sealCandidates`,
+  `sealSector`, `choosingSector`, `w.sealing`). With `choose` a biological step is paid in capacity
+  and stars and waits in `w.sealing`; `stepNeed` then says `missing: 'sector'`. The candidates are
+  the unsealed sectors with a chamber dug in them. `sealSector` takes the step's people as the
+  colony stands at the click (never below MIN_SLEEPERS), seals that sector, buys the step and resets
+  the growth. Without `choose` (the sim, the older tests) the body takes `nextSector()` at once, as
+  before. `normalizeWatcher` keeps `sealing` only when it is the next biological step.
+- **The picture** (index.js, scene.js). The pill reads "Choose a sector to seal" (warm, `is-asking`);
+  a click on it enters the choice (again after Escape or a wake). Choosing: `scene.setCandidates()`
+  gives the candidate plates a soft warm emissive that breathes slowly (the hovered arm stronger),
+  the scene host gets `is-choosing` (a crosshair everywhere over the model), and a click on any plate
+  (`slotAt` then `sectorOf`) of a candidate seals it; clicks do not snap while choosing. Then: the
+  rebuild draws the sector in BODY and breathing (slice 7), `scene.sealAnim()` walks up to 48 dots
+  from its plates in to the landing and fades them over 2 s, and the H bar shows the red delta
+  ("-1.4 k", U+2212 on screen, `is-drop`, a 2.4 s CSS fade) while the head number rolls down over
+  1.2 s (`stepDrop`, per frame). Escape leaves the choice, nothing refunded. A sealed plate shows
+  "part of the body" beside the cursor (`#deep-body-tip`, awake and asleep).
+- **The Watcher's shape** (`bodyGlyph`, `BODY_GLYPHS`): '' before the body, then `is-dot`, `is-ring`,
+  `is-blob`, `is-rim` on `.deep-watcher-pulse`, warm, CSS only.
+- **Voices, ranked** (index.js `FEED_AWAKE` 3, `FEED_ASLEEP` 1, `ALARM_LINE_MS` 6000; replay.js
+  `REPLAY_MS` 5000). Asleep the advisor line is empty and the feed shows its last line (WATCHER_HELLO
+  goes into the feed at the first sleep); the upgrade pill, Surface's card and the lamps' card (the
+  one demand) are the other texts. The wake line stays six seconds as the advisor's line, then the
+  advisor says where we stand. The strip shows five seconds from when it appears. The result of a
+  game with Surface was already inside its card. Awake is otherwise unchanged.
+- **Acceptance** (`scripts/accept-iv-cut.mjs`, headless Chrome over CDP with Node's WebSocket, its
+  own static server; exit 0 when all hold). Run at 1440 x 900: from "IV · Surface", 60 s asleep, 234
+  samples, a real mouse click on a plate every 12 s (5 clicks, 5 snaps), never two demand cards
+  (Surface on screen 228 samples, the lamps 0), stability lowest 68.0, the feed never more than one
+  line asleep, the advisor silent asleep; a test alarm: the wake line at once, the strip 1.6 s later
+  for 5 s, the line gone after 6 s. From "IV · the body": the pill buys Brain tissue and asks, four
+  sectors glow (60 plates), Escape keeps the purchase, the pill asks again, a click on chamber 56
+  seals sector 3 (15 of 15 plates in the body), 13 791 to 12 412 people (a tenth), "-1.4 k" in red,
+  48 walkers leave, the glyph goes from `deep-watcher-pulse` to `is-body is-dot`, the tooltip reads
+  "part of the body", no console errors.
+
+Left: B150 (the lamps' card is text while asleep: keep or glyph-only), B151 (measure real sleep
+lengths and retune the drift), B152 (does the choice read when all four sectors glow at once).

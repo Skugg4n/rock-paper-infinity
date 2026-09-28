@@ -12,13 +12,14 @@
  *   3. which column was the weakest, and for how much of the sleep, as four
  *      small bars from the sleep report's histogram.
  *
- * It is on screen for a few seconds, or until the player clicks anything.
+ * It is on screen for five seconds at the wake-up (v1.52.0: one voice at a time), or until the
+ * player clicks anything.
  */
 
 import { ROOMS, COLUMN } from './deep.js';
 import { ROOM_ICON } from './scene.js';
 
-export const REPLAY_MS = 8000;
+export const REPLAY_MS = 5000;
 const BAR_H = 18;              // the histogram's tallest bar, in CSS pixels
 
 /**
