@@ -1,5 +1,5 @@
 /* eslint-env jest */
-import { coastPath, rng } from './islands.js';
+import { coastPath, coastPoints, rng } from './islands.js';
 
 describe('islands', () => {
     test('rng is deterministic and in [0,1)', () => {
@@ -23,6 +23,16 @@ describe('islands', () => {
             expect(nums[i + 1]).toBeGreaterThanOrEqual(100 - 60);
             expect(nums[i + 1]).toBeLessThanOrEqual(300 + 60);
         }
+    });
+
+    test('bumps only go outward: no vertex lies inside the unbumped outline', () => {
+        const rect = { x: 50, y: 50, w: 300, h: 150 };
+        const base = coastPoints(rect, { pad: 40, points: 24, wobble: 0, seed: 9 });
+        const bumped = coastPoints(rect, { pad: 40, points: 24, wobble: 0.4, seed: 9 });
+        const cx = 200, cy = 125;
+        bumped.forEach((p, i) => {
+            expect(Math.hypot(p.x - cx, p.y - cy)).toBeGreaterThanOrEqual(Math.hypot(base[i].x - cx, base[i].y - cy) - 1e-9);
+        });
     });
 
     test('same seed gives the same coast, different seed a different one', () => {

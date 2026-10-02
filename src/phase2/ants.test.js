@@ -1,5 +1,6 @@
 /* eslint-env jest */
 import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge } from './ants.js';
+import { boatCourse } from './ants.js';
 
 describe('ants', () => {
     test('antCount grows with the square root and is capped', () => {
@@ -119,5 +120,21 @@ describe('ants', () => {
         const p = streetPath(a, b, 10);
         const vertical = p.filter(pt => pt.x === 235); // gap left of the source
         expect(vertical.length).toBe(2);
+    });
+});
+
+describe('boatCourse', () => {
+    const from = { x: 0, y: 0 }, to = { x: 100, y: 0 };
+    test('starts at from and ends at to', () => {
+        expect(boatCourse(from, to, 0)).toEqual({ x: 0, y: 0 });
+        const end = boatCourse(from, to, 1);
+        expect(Math.abs(end.x - 100)).toBeLessThan(1e-9);
+        expect(Math.abs(end.y)).toBeLessThan(1e-9);
+    });
+    test('bends to one side in the middle and is eased (slow at the ends)', () => {
+        const mid = boatCourse(from, to, 0.5);
+        expect(Math.abs(mid.y)).toBeGreaterThan(1);
+        expect(boatCourse(from, to, 0.1).x).toBeLessThan(10);
+        expect(boatCourse(from, to, 0.9).x).toBeGreaterThan(90);
     });
 });

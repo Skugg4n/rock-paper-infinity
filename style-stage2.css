@@ -651,7 +651,7 @@ body.tilt #city-area {
 .enemy-tile.enemy-razed, .enemy-factory.enemy-razed { opacity: 0.25 !important; filter: grayscale(1) brightness(0.6); transform: none !important; }
 #competitor-island .enemy-rocket { display: none; }
 #competitor-island.enemy-left .enemy-rocket { display: flex; opacity: 1; transform: none; }
-#competitor-island.enemy-left .enemy-factory, #competitor-island.enemy-left .enemy-tile:not(.enemy-rocket) { opacity: 0.45 !important; }
+#competitor-island.enemy-left .enemy-factory, #competitor-island.enemy-left .enemy-civil, #competitor-island.enemy-left .enemy-tile:not(.enemy-rocket) { opacity: 0.45 !important; }
 /* Board first (quiet), then ignition (the glow builds, a tremble), then a long climb; it fades only near the top. */
 @keyframes rocket-leave { 0% { transform: translateY(0); opacity: 1; } 12% { transform: translateY(-14px); opacity: 1; } 78% { opacity: 1; } 100% { transform: translateY(-820px) scale(0.85); opacity: 0; } }
 @keyframes rocket-tremble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(1px, -1px); } 50% { transform: translate(-1px, 1px); } 75% { transform: translate(1px, 1px); } }
@@ -682,12 +682,12 @@ body.tilt #city-area {
     z-index: 12;
 }
 /* Enemy tiles show damage like ours */
-.enemy-factory, .enemy-tile { background-color: color-mix(in srgb, #f8fafc calc(var(--hp, 1) * 100%), #94a3b8); }
+.enemy-factory, .enemy-tile, .enemy-civil { background-color: color-mix(in srgb, #f8fafc calc(var(--hp, 1) * 100%), #94a3b8); }
 /* The launch: a glow under the rocket, then it climbs, then rubble */
 #competitor-island.enemy-launch .enemy-rocket { display: flex; opacity: 1; transform: none; box-shadow: 0 0 0 0 rgba(180, 83, 9, 0); transition: box-shadow 2500ms ease; }
 #competitor-island.enemy-ignite .enemy-rocket { box-shadow: 0 22px 40px -4px rgba(180, 83, 9, 0.85), 0 0 30px 6px rgba(251, 146, 60, 0.35); animation: rocket-tremble 120ms linear infinite; }
 #competitor-island.enemy-left .enemy-rocket { box-shadow: 0 26px 48px -2px rgba(180, 83, 9, 0.95), 0 0 40px 10px rgba(251, 146, 60, 0.45); animation: rocket-leave 10000ms cubic-bezier(0.6, 0, 0.9, 0.4) 200ms both; }
-#competitor-island.enemy-rubble .enemy-factory, #competitor-island.enemy-rubble .enemy-tile:not(.enemy-rocket) { opacity: 0.35 !important; background: #64748b !important; filter: none; transform: none !important; }
+#competitor-island.enemy-rubble .enemy-factory, #competitor-island.enemy-rubble .enemy-civil, #competitor-island.enemy-rubble .enemy-tile:not(.enemy-rocket) { opacity: 0.35 !important; background: #64748b !important; filter: none; transform: none !important; }
 #competitor-island.enemy-rubble .enemy-rocket { display: none; }
 /* The way down: a hole dug in the plate, everyone walks into it */
 .building-slot.deep-hatch { background: radial-gradient(circle at 50% 50%, #020617 0 26%, #1e293b 34%, #475569 48%, #94a3b8 62%); transition: background 1500ms ease; box-shadow: inset 0 6px 14px rgba(2, 6, 23, 0.55); }
@@ -745,12 +745,52 @@ body.tilt #city-area {
     100% { transform: scale(1); }
 }
 
-/* Enemy competitor island: light tiles like ours, a cooler tint, so they read
-   against the island blob and the water */
-.enemy-factory {
+/* The neighbour's island (B191): equal tiles in a 4 × 2 grid, a cooler tint than
+   ours so they read against the island and the water. Everything is revealed by
+   the stage classes; nothing is drawn with a line. */
+.enemy-factory, .enemy-tile, .enemy-civil {
+    width: 52px;
+    height: 52px;
     background: #f8fafc;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 4px 8px rgba(15, 23, 42, 0.10);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 1.5s ease-in, transform 1.5s ease-out, background-color 1200ms ease;
 }
+@media (min-width: 640px) {
+    .enemy-factory, .enemy-tile, .enemy-civil { width: 64px; height: 64px; }
+}
+#competitor-island.competitor-stage-1 .enemy-stage-1,
+#competitor-island .enemy-stage-1,
+#competitor-island.competitor-stage-2 .enemy-stage-2,
+#competitor-island.competitor-stage-3 .enemy-stage-3,
+#competitor-island.competitor-stage-4 .enemy-stage-4,
+#competitor-island.competitor-stage-5 .enemy-stage-5 {
+    opacity: 1;
+    transform: none;
+}
+/* From stage 4 the factory makes arms: the anvil replaces the chimneys */
+#competitor-island .enemy-armed { opacity: 0; transition: opacity 1200ms ease; }
+#competitor-island.competitor-stage-4 .enemy-factory .enemy-base { opacity: 0; transition: opacity 1200ms ease; }
+#competitor-island.competitor-stage-4 .enemy-factory .enemy-armed { opacity: 1; }
+#competitor-island.competitor-stage-4 .enemy-factory { background: #e2e8f0; }
+/* The pier: from the island's north-east corner out into the water, from stage 5.
+   The boat (ants.js) lies at its end. */
+#competitor-island .enemy-pier {
+    position: absolute;
+    right: 18px;
+    top: -68px;
+    width: 10px;
+    height: 76px;
+    border-radius: 4px;
+    background: #94a3b8;
+    opacity: 0;
+    transition: opacity 1500ms ease-in;
+}
+@media (min-width: 640px) { #competitor-island .enemy-pier { right: 22px; top: -78px; height: 86px; } }
+#competitor-island.competitor-stage-5 .enemy-pier { opacity: 1; }
+/* The rampart: a band inside the shore when they fortify (islands.js setRampart) */
+#islands-svg .island.rampart { fill: #c3ccd8; }
 
 #competitor-island {
     opacity: 0;
@@ -759,22 +799,6 @@ body.tilt #city-area {
 
 #competitor-island.visible {
     opacity: 1;
-}
-
-/* The competitor builds up in stages before III·WAR */
-.enemy-tile {
-    background: #f8fafc;
-    box-shadow: 0 4px 8px rgba(15, 23, 42, 0.10);
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity 1.5s ease-in, transform 1.5s ease-out;
-}
-#competitor-island.competitor-stage-2 .enemy-stage-2,
-#competitor-island.competitor-stage-3 .enemy-stage-3,
-#competitor-island.competitor-stage-4 .enemy-stage-4,
-#competitor-island.competitor-stage-5 .enemy-stage-5 {
-    opacity: 1;
-    transform: none;
 }
 
 /* =========================================================

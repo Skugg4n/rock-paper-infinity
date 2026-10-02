@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.62.0 - 2026-10-03 (chapter II, the neighbour)
+
+### The neighbour settles, fortifies, builds a shipyard, and comes by boat
+
+Ola on mockup 2 (`docs/mockups/neighbour-2.html`): "precis så där". Design: `docs/superpowers/specs/2026-10-02-neighbour-design.md` (B191).
+
+- **The islands hold their houses.** The coast's bumps only go outward and the islands have more margin, so no plate hangs over the water any more.
+- **Their island is a town**, a 4 × 2 grid revealed one stage a minute as before: a house; then houses, a store and a factory; then a watchtower and a radar, and the coast hardens to a rampart; then a barracks, the factory shows an anvil and the rampart widens; then the shipyard, a pier and a boat.
+- **Watchmen do what watchmen do.** From the fortification they walk their coast in pairs; from the barracks some stand on the shore that faces us; from the shipyard two wait by the pier. Nobody drills on a field. Their civilians stroll between the houses, fewer as the town turns to war.
+- **The raid comes by boat.** The watchmen walk to the pier and board, the boat crosses to the beach nearest the house, they go ashore in pairs and up the street, stand on the house until it is razed, go back, and the boat sails home. Nobody walks on the water. Our people near the house hurry indoors and stay in until the boat has gone; we have no soldiers in this chapter.
+- **A beat before the swords.** The house falls, the boat goes home, four seconds of nothing, and then the swords arrive with a pop. The card for III is drawn out like the card for II.
+- **For the war** (unchanged for now): the five targets keep their classes and order (tower, radar, shipyard, barracks, factory), `onIsland`, `launchWave` and `launchStrike` are untouched, and the boat is a building block (`sailBoat`) the war can use for its landings.
+- Tests: coast bumps never cut inward; the boat's course starts and ends where it should.
+
 ## v1.61.0 - 2026-10-02 (chapter IV, the voice in the night)
 
 ### Chapter IV: Surface's voice and gifts (step 2 of the tree and bio design)

@@ -1764,7 +1764,8 @@ items:
       that show weapons and an arms industry, fortifications; last a
       shipyard. They gather, and from the shipyard they attack by a boat
       that takes them to where they will strike.
-    status: open
+    status: done
+    resolved_in: v1.62.0
     notes: |
       Mockup first: docs/mockups/neighbour-1.html (moving: five stages, the squad drilling,
       the raid by boat, islands that hold their plates). Ola judges it, then build.

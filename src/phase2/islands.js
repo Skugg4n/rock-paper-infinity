@@ -35,7 +35,16 @@ export function rng(seed) {
  * @param {number} [opts.seed=7]
  * @returns {string} SVG path data
  */
-export function coastPath(rect, { pad = 28, points = 18, wobble = 0.28, seed = 7 } = {}) {
+/**
+ * The vertices of a coast: a superellipse-ish outline around the rect (with
+ * padding) with seeded bumps. Bumps only go outward, so the coast never cuts
+ * in toward the plates: an island holds its houses (Ola 2026-10-02).
+ *
+ * @param {{x:number,y:number,w:number,h:number}} rect
+ * @param {object} [opts] - see coastPath
+ * @returns {Array<{x:number,y:number}>}
+ */
+export function coastPoints(rect, { pad = 28, points = 18, wobble = 0.28, seed = 7 } = {}) {
     const rand = rng(seed);
     const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
     const rx = rect.w / 2 + pad, ry = rect.h / 2 + pad;
@@ -47,9 +56,14 @@ export function coastPath(rect, { pad = 28, points = 18, wobble = 0.28, seed = 7
         const k = 0.72; // 1 = ellipse, lower = boxier
         const ex = Math.sign(c) * Math.pow(Math.abs(c), k);
         const ey = Math.sign(s) * Math.pow(Math.abs(s), k);
-        const bump = 1 + (rand() * 2 - 1) * wobble * (pad / Math.min(rx, ry));
+        const bump = 1 + rand() * wobble * (pad / Math.min(rx, ry));
         pts.push({ x: cx + ex * rx * bump, y: cy + ey * ry * bump });
     }
+    return pts;
+}
+
+export function coastPath(rect, opts = {}) {
+    const pts = coastPoints(rect, opts);
     const n = pts.length;
     const P = (i) => pts[(i + n) % n];
     let d = `M ${P(0).x.toFixed(1)} ${P(0).y.toFixed(1)}`;
@@ -71,25 +85,54 @@ export function coastPath(rect, { pad = 28, points = 18, wobble = 0.28, seed = 7
  * @param {HTMLElement} opts.target - element the island encloses (grid / island tiles)
  * @param {string} opts.id - path id
  * @param {object} [opts.shape] - coastPath options
+ * @param {boolean} [opts.rampart=false] - the island can be fortified: a band inside
+ *        the shore (`.rampart`) with the land drawn again inside it; see setRampart
  */
-export function createIsland({ svg, area, target, id, shape = {} }) {
-    let path = svg.querySelector(`#${id}`);
-    if (!path) {
-        path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('id', id);
-        path.setAttribute('class', 'island');
-        svg.appendChild(path);
-    }
+export function createIsland({ svg, area, target, id, shape = {}, rampart = false }) {
+    const make = (pid, cls) => {
+        let el = svg.querySelector(`#${pid}`);
+        if (!el) {
+            el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            el.setAttribute('id', pid);
+            el.setAttribute('class', cls);
+            svg.appendChild(el);
+        }
+        return el;
+    };
+    const path = make(id, 'island');
+    const band = rampart ? make(`${id}-rampart`, 'island rampart') : null;
+    const inner = rampart ? make(`${id}-inner`, 'island') : null;
     let lastKey = '';
+    let level = 0;           // 0 none, 1 narrow, 2 wide
+    let lastRect = null;
+    const innerPad = () => (shape.pad ?? 28) - (level === 2 ? 8 : 4);
+    function drawInner() {
+        if (!band || !lastRect) return;
+        const on = level > 0;
+        band.classList.toggle('is-visible', on);
+        inner.classList.toggle('is-visible', on);
+        if (!on) return;
+        band.setAttribute('d', coastPath(lastRect, shape));
+        inner.setAttribute('d', coastPath(lastRect, { ...shape, pad: innerPad() }));
+    }
     function update(visible) {
         path.classList.toggle('is-visible', !!visible);
-        if (!visible) return;
+        if (!visible) { band?.classList.remove('is-visible'); inner?.classList.remove('is-visible'); return; }
         const rect = layoutRect(target, area);
         const key = `${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.w)},${Math.round(rect.h)}`;
-        if (key === lastKey) return;
+        if (key === lastKey) { drawInner(); return; }
         lastKey = key;
+        lastRect = rect;
         svg.setAttribute('viewBox', `0 0 ${area.offsetWidth} ${area.offsetHeight}`);
         path.setAttribute('d', coastPath(rect, shape));
+        drawInner();
     }
-    return { update, path };
+    /** How fortified the island is: 0 none, 1 a narrow band inside the shore, 2 a wide one. */
+    function setRampart(next) {
+        const n = Math.max(0, Math.min(2, next | 0));
+        if (n === level) return;
+        level = n;
+        drawInner();
+    }
+    return { update, path, setRampart };
 }

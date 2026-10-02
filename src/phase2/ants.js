@@ -2,8 +2,9 @@
  * Ants: the people of chapter II as small dark-blue dots walking the streets
  * between the plates (home → store/factory → home), cars as bigger, faster dots
  * once the car is researched, and the competitor's red dots on their island.
- * At the war threshold the red dots cross over and take one of our outer
- * houses; that is the opening of III·WAR.
+ * The neighbour's watchmen walk their coast; when the city is complete they
+ * board the boat, cross the water, raze one of our outer houses and sail home.
+ * That is the opening of III·WAR (B191: nobody walks on the water).
  *
  * Rendering is a canvas overlay (`#ants-canvas`) over the city area; the
  * simulation reads building slot rectangles from the DOM once a second. Pure
@@ -198,6 +199,24 @@ export function onIsland(path, seg, t = 0) {
     if (!path || path.crossFrom === undefined || path.ourCoast === undefined) return true;
     return seg + t >= Math.max(path.crossFrom, path.ourCoast) - 1e-9;
 }
+/**
+ * Where a boat is at k (0-1) of its course from `from` to `to`: a straight
+ * line with a gentle bend to one side, eased at both ends. The bend keeps the
+ * hull from looking like a dot on a wire.
+ * @param {{x:number,y:number}} from
+ * @param {{x:number,y:number}} to
+ * @param {number} k
+ * @param {number} [bend=0.08] - sideways bow as a share of the distance
+ * @returns {{x:number,y:number}}
+ */
+export function boatCourse(from, to, k, bend = 0.08) {
+    const kk = Math.max(0, Math.min(1, k));
+    const e = kk < 0.5 ? 2 * kk * kk : 1 - Math.pow(-2 * kk + 2, 2) / 2;
+    const dx = to.x - from.x, dy = to.y - from.y, L = Math.hypot(dx, dy) || 1;
+    const side = Math.sin(e * Math.PI) * bend * L;
+    return { x: from.x + dx * e - dy / L * side, y: from.y + dy * e + dx / L * side };
+}
+
 /** Reverses a crossPath, keeping its markers pointing at the same places. */
 export function reversePath(path) {
     const r = [...path].reverse();
@@ -214,17 +233,23 @@ export function reversePath(path) {
  * @param {HTMLCanvasElement} opts.canvas
  * @param {HTMLElement} opts.area - the city container the canvas covers
  * @param {function(): Array<{el: Element, building: object}>} opts.getSlots
- * @param {function(): Element[]} opts.getEnemyTiles - visible enemy tiles
+ * @param {function(): Element[]} opts.getEnemyTiles - visible enemy tiles the war can target (five, in DOM order)
  * @param {function(): number} opts.getGap - street width in px
+ * @param {function(): Element[]} [opts.getCivilTiles] - their visible civil tiles (houses, store): walked between, never targets
+ * @param {function(): Element|null} [opts.getTown] - the element that holds all their tiles (their island's bounding box)
+ * @param {function(): Element|null} [opts.getPier] - their pier; the boat lies at its end
  */
-export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
+export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getCivilTiles = () => [], getTown = () => null, getPier = () => null }) {
     const ctx = canvas.getContext('2d');
     const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const ants = [];
     const enemies = [];
     let rects = [];          // { rect, building, el }
     let enemyRects = [];
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [] };
+    let civilRects = [];     // their civil tiles (walked between, never targets)
+    let townRect = null;     // their whole island's tiles
+    let pierRect = null;
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [], war: false };
     let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
     const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
@@ -237,7 +262,6 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     let raf = null;
     let lastMeasure = 0;
     let lastT = 0;
-    let attack = null;       // { target, arrived, needed, onDone }
     let dpr = 1;
     // War visuals: waves (red dots marching), strikes (blue dots marching),
     // arcs (shells/missiles through the air) and short-lived effects.
@@ -245,13 +269,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     const effects = [];      // { type: 'arc'|'flash'|'tracer', ... }
     let combat = false;      // tracers on when a melee wave is on our island
 
-    const COLORS = { person: '#1e3a8a', car: '#172554', enemy: '#b91c1c' };
+    const COLORS = { person: '#1e3a8a', car: '#172554', enemy: '#b91c1c', watchman: '#7f1d1d' };
     // px per second. A village of 2–4 dots must feel alive, a full city calm:
     // people run at 32 with few dots and settle toward 18 with many.
     const SPEED = { person: 18, car: 46, enemy: 20 };
     const personSpeed = () => 18 + 14 * (1 - Math.min(1, ants.length / 30));
     const speedOf = (kind) => (kind === 'person' ? personSpeed() : SPEED[kind]);
-    const RADIUS = { person: 2.2, car: 3.2, enemy: 2.4 };
+    const RADIUS = { person: 2.2, car: 3.2, enemy: 2.4, watchman: 2.6 };
 
     let layoutKey = '';
     function measure() {
@@ -285,6 +309,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             }
         }
         enemyRects = getEnemyTiles().map(el => layoutRect(el, area));
+        civilRects = getCivilTiles().map(el => layoutRect(el, area));
+        const town = getTown(); townRect = town ? layoutRect(town, area) : null;
+        const pier = getPier(); pierRect = pier ? layoutRect(pier, area) : null;
         dpr = window.devicePixelRatio || 1;
         const w = area.offsetWidth, h = area.offsetHeight;
         if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
@@ -305,7 +332,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         const x = Math.min(...enemyRects.map(r => r.x)), y = Math.min(...enemyRects.map(r => r.y));
         return { x, y, w: Math.max(...enemyRects.map(r => r.x + r.w)) - x, h: Math.max(...enemyRects.map(r => r.y + r.h)) - y };
     };
-    const cross = (from, dst) => crossPath(from, dst, getGap(), gridBox(), theirBox() || from);
+    const townBox = () => townRect || theirBox();
+    const cross = (from, dst) => crossPath(from, dst, getGap(), gridBox(), townBox() || from);
     const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0 && !r.building.razed);
     const works = () => rects.filter(r => WORK.has(r.building.type) && !r.building.razed);
 
@@ -330,10 +358,12 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         return ant;
     }
 
+    const theirTiles = () => [...enemyRects, ...civilRects];
     function newEnemyTrip(e) {
-        if (enemyRects.length < 1) return false;
-        const from = e.at ?? pick(enemyRects);
-        const others = enemyRects.filter(r => r !== from);
+        const tiles = theirTiles();
+        if (tiles.length < 1) return false;
+        const from = e.at ?? pick(tiles);
+        const others = tiles.filter(r => r !== from);
         const to = others.length ? pick(others) : from;
         e.path = streetPath(from, to, Math.max(6, getGap() / 2));
         e.seg = 0; e.t = 0; e.at = to; e.wait = 0;
@@ -349,11 +379,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
         while (ants.length < want) { const a = spawnAnt(state.carUnlocked && Math.random() < 0.3 ? 'car' : 'person'); if (!a) break; ants.push(a); }
         if (ants.length > want) ants.length = want;
         if (state.carUnlocked) ants.forEach(a => { if (a.kind === 'person' && Math.random() < 0.02) a.kind = 'car'; });
-        // Enemies: none until the island has stood a while, then a few per stage
+        // Their civilians: none until the island has stood a while; a lived-in
+        // town at stage 2, fewer as it turns to war (the watchmen take over).
         const enemiesOut = state.enemyStage >= 1 && (state.enemyTicks || 0) >= ENEMY_DELAY_S;
-        const wantEnemies = enemiesOut ? 3 + state.enemyStage * 3 : 0;
-        while (enemies.length < wantEnemies && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; e.t = Math.random(); enemies.push(e); }
+        const wantEnemies = enemiesOut ? [0, 2, 6, 5, 3, state.war ? 4 : 2][Math.min(5, state.enemyStage)] : 0;
+        while (enemies.length < wantEnemies && theirTiles().length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; e.t = Math.random(); enemies.push(e); }
         if (enemies.length > wantEnemies) enemies.length = wantEnemies;
+        reconcileWatchmen();
     }
 
     function stepDot(d, dt, speed, onArrive) {
@@ -376,18 +408,25 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function step(dt, now = performance.now()) {
         clock += dt;
         if (now - lastMeasure > 1000) { measure(); reconcile(); reconcileGuards(); lastMeasure = now; }
-        for (const a of ants) stepDot(a, dt, speedOf(a.kind), (d) => {
-            if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetPath(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
-            if (!newTrip(d)) d.wait = 1;
-        });
+        // The raid is coming ashore: our people near the house hurry into the
+        // nearest building and stay in until the boat has left. Nobody fights.
+        const scare = raidAlarm();
+        for (const a of ants) {
+            const afraid = scare && a.kind === 'person' && Math.hypot((pos(a)?.x ?? 1e9) - scare.x, (pos(a)?.y ?? 1e9) - scare.y) < 170;
+            stepDot(a, dt, speedOf(a.kind) * (afraid ? 2.4 : 1), (d) => {
+                if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetPath(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
+                if (afraid) { d.wait = 1; return; }      // stays in
+                if (!newTrip(d)) d.wait = 1;
+            });
+        }
         for (const e of enemies) {
             if (withdrawing) stepDot(e, dt, SPEED.enemy * 1.5, (d) => {
                 if (d.at !== withdrawing.rect) { const from = d.at?.rect ?? d.at ?? withdrawing.rect; d.path = (from.x !== undefined && from.w !== undefined) ? streetPath(from, withdrawing.rect, Math.max(6, getGap() / 2)) : null; d.seg = 0; d.t = 0; d.at = withdrawing.rect; d.wait = Math.random() * 0.5; d.razing = false; d.homeBound = false; }
             });
-            else if (attack) stepDot(e, dt, SPEED.enemy * 2, (d) => arriveAttack(d));
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });
         }
-        if (attack?.done && enemies.every(e => e.settled)) { attack = null; enemies.forEach(e => { e.settled = false; }); }
+        stepWatchmen(dt);
+        stepRaid(dt);
         stepWar(dt);
         draw();
         drawWar();
@@ -421,65 +460,232 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
             else ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
             ctx.fill();
         }
+        // their watchmen, and the ones standing on the house they are razing
+        for (const m of watchmen) {
+            if (m.hidden) continue;
+            const p = watchPos(m); if (!p) continue;
+            ctx.beginPath(); ctx.fillStyle = COLORS.watchman; ctx.globalAlpha = 0.95;
+            ctx.arc(p.x, p.y, RADIUS.watchman, 0, Math.PI * 2); ctx.fill();
+        }
+        drawBoat();
         ctx.globalAlpha = 1;
     }
 
-    // --- War opening -------------------------------------------------------
-    function arriveAttack(e) {
-        if (!attack) return;
-        if (attack.done) {
-            // Raid over: walk home to the island once, then wander there again.
-            if (e.settled) { if (!newEnemyTrip(e)) e.wait = 1; return; }
-            if (e.homeBound) { e.homeBound = false; e.razing = false; e.settled = true; e.at = pick(enemyRects); e.path = null; e.wait = 0.5; return; }
-            const from = e.at?.rect ?? e.at ?? attack.target.rect;
-            const home = pick(enemyRects);
-            e.path = reversePath(cross(home, from));
-            e.seg = 0; e.t = 0; e.at = home; e.homeBound = true; e.razing = false; e.wait = 0.2 + Math.random();
-            return;
+    // --- The neighbour's watchmen -------------------------------------------
+    // From stage 3 they walk the coast of their island in pairs; from stage 4
+    // some stand on the shore that faces us; from stage 5 two wait by the pier.
+    // They are the ones who raid. Not the war's `guards` (ours, below).
+    const watchmen = [];      // { id, duty: 'patrol'|'watch'|'pier', s, k, walk, hidden, x, y }
+    let watchSeq = 0;
+    const WATCH_SPEED = 16;   // px/s along the coast
+    const townRing = () => { const b = townBox(); return b ? coastRing(b, Math.max(6, getGap() / 2)) : null; };
+    const watchmenAt = (stage) => [0, 0, 0, 4, 8, 10][Math.max(0, Math.min(5, stage))];
+    function dutyOf(i, stage) {
+        if (stage >= 5 && i >= 8) return 'pier';
+        if (stage >= 4 && i >= 4 && i < 7) return 'watch';
+        return 'patrol';
+    }
+    /** Where a watchman stands or walks right now. */
+    function watchPos(m) {
+        if (m.walk?.path) return pos(m.walk);
+        if (m.x !== undefined && (m.walk || raid)) return { x: m.x, y: m.y };
+        const R = townRing(); if (!R) return null;
+        if (m.duty === 'pier' && pierRect) return { x: pierRect.x + pierRect.w / 2 + (m.id % 2 ? -7 : 7), y: pierRect.y + pierRect.h + 7 };
+        const p = ringPoint(R, m.s);
+        return { x: p.x, y: p.y + (m.duty === 'watch' ? Math.sin(clock * 2 + m.id) * 0.6 : 0) };
+    }
+    function reconcileWatchmen() {
+        if (raid || withdrawing || enemiesGone) return;
+        const R = townRing();
+        const out = state.enemyStage >= 1 && (state.enemyTicks || 0) >= ENEMY_DELAY_S;
+        const want = out && R ? watchmenAt(state.enemyStage) : 0;
+        const P = R ? ringLength(R) : 1;
+        while (watchmen.length < want) {
+            const i = watchmen.length;
+            // pairs walk together: the same spot on the ring, seven px apart
+            watchmen.push({ id: watchSeq++, s: (Math.floor(i / 2) * 0.37 * P + (i % 2) * 7) % P, walk: null, hidden: false });
         }
-        if (e.at === attack.target) {
-            if (!e.arrivedFlag) { e.arrivedFlag = true; attack.arrived++; }
-            e.wait = 1.5 + Math.random(); e.razing = true; // a moment on the plate, visibly
-            if (attack.arrived >= attack.needed) {
-                attack.done = true;
-                // The house is razed: a burnt plate, icon gone, nothing left.
-                // Scorched earth is what chapter III is about (vision.md).
-                attack.target.el.querySelector('.building')?.classList.add('razed');
-                const razed = attack.target.building;
-                enemies.forEach(x => { x.wait = Math.min(x.wait, 1.5 + Math.random()); });
-                const done = attack;
-                setTimeout(() => { done.onDone?.(razed); }, 1500);
-                // clear the raid once everyone is home (checked in step)
-            }
-            return;
+        if (watchmen.length > want) watchmen.length = want;
+        watchmen.forEach((m, i) => {
+            m.duty = dutyOf(i, state.enemyStage);
+            if (m.duty === 'watch') m.k = i - 4;
+        });
+    }
+    function stepWatchmen(dt) {
+        const R = townRing(); if (!R) return;
+        const P = ringLength(R);
+        for (const m of watchmen) {
+            if (raid) continue;                            // the raid moves them
+            if (m.duty === 'patrol') m.s = (m.s + WATCH_SPEED * dt) % P;
+            else if (m.duty === 'watch') m.s = R.w * (0.3 + 0.2 * (m.k ?? 0));   // the north side: the shore that faces us
         }
-        // route from wherever the enemy is (its island tile) across the water to the target
-        const from = e.at?.rect ?? e.at ?? pick(enemyRects);
-        e.path = cross(from, attack.target.rect);
-        e.seg = 0; e.t = 0; e.at = attack.target; e.wait = 0.2 + Math.random() * 1.5;
     }
 
+    // --- The boat ---------------------------------------------------------------
+    // One hull, drawn from above, moored at the end of their pier from stage 5.
+    // `sailBoat` is the shared building block: it carries `boat.aboard` dots
+    // from one point to another over `seconds`, with the heading along the
+    // course and a wake while it moves. The war can use it for its landings.
+    const boat = { x: 0, y: 0, angle: -Math.PI / 2, aboard: 0, shown: 0, trip: null, moored: true };
+    const dockPoint = () => (pierRect ? { x: pierRect.x + pierRect.w / 2, y: pierRect.y - 10 } : null);
+    function sailBoat(from, to, seconds, onArrive) {
+        boat.trip = { from, to, seconds, t: 0, onArrive };
+        boat.moored = false;
+    }
+    function stepBoat(dt) {
+        const dock = dockPoint();
+        if (boat.moored && dock) { boat.x = dock.x; boat.y = dock.y; boat.angle = -Math.PI / 2; }
+        const want = state.enemyStage >= 5 && !enemiesGone && dock ? 1 : 0;
+        boat.shown += (want - boat.shown) * Math.min(1, dt * 1.2);
+        const trip = boat.trip; if (!trip) return;
+        trip.t += dt;
+        const k = Math.min(1, trip.t / trip.seconds);
+        const p = boatCourse(trip.from, trip.to, k), q = boatCourse(trip.from, trip.to, Math.min(1, k + 0.01));
+        if (Math.hypot(q.x - p.x, q.y - p.y) > 0.01) boat.angle = Math.atan2(q.y - p.y, q.x - p.x);
+        boat.x = p.x; boat.y = p.y;
+        if (k >= 1) { boat.trip = null; trip.onArrive?.(); }
+    }
+    function drawBoat() {
+        if (boat.shown < 0.02) return;
+        ctx.save();
+        ctx.translate(boat.x, boat.y); ctx.rotate(boat.angle + Math.PI / 2); ctx.globalAlpha = boat.shown;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.10)'; ctx.beginPath(); ctx.ellipse(2, 3, 9, 17, 0, 0, Math.PI * 2); ctx.fill();   // its shadow on the water
+        ctx.fillStyle = '#475569';
+        ctx.beginPath(); ctx.moveTo(0, -18); ctx.bezierCurveTo(9, -8, 8, 10, 6, 15); ctx.lineTo(-6, 15); ctx.bezierCurveTo(-8, 10, -9, -8, 0, -18); ctx.fill();
+        ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.ellipse(0, 1, 4.5, 10.5, 0, 0, Math.PI * 2); ctx.fill();            // the deck
+        for (let i = 0; i < Math.min(boat.aboard, 12); i++) {
+            ctx.fillStyle = COLORS.watchman; ctx.beginPath(); ctx.arc(i % 2 ? 2.1 : -2.1, -7 + Math.floor(i / 2) * 3.4, 1.6, 0, Math.PI * 2); ctx.fill();
+        }
+        if (boat.trip) { ctx.globalAlpha = 0.45 * boat.shown; ctx.fillStyle = '#eef3f8'; ctx.beginPath(); ctx.moveTo(-5, 16); ctx.lineTo(0, 36); ctx.lineTo(5, 16); ctx.fill(); }   // the wake
+        ctx.restore();
+    }
+
+    // --- The raid (the war's opening) ------------------------------------------
+    // The watchmen walk the coast to the pier and board; the boat crosses to the
+    // beach nearest the target; they go ashore in pairs and up the streets, stand
+    // on the house until it is razed, go back, and the boat sails home; they return
+    // to their posts. `onRazed(building)` fires as the plate goes dark, `onOver()`
+    // when they are home again.
+    let raid = null;
+    const RAID_WALK = 44, RAID_SAIL_S = 4.6;
+    /** Walks a path at `speed`; true once the end is reached (the walker is then at `w.end`). */
+    function advance(w, dt, speed) {
+        if (!w.path) return true;
+        if (w.wait > 0) { w.wait -= dt; return false; }
+        let left = speed * dt;
+        while (left > 0) {
+            const p0 = w.path[w.seg], p1 = w.path[w.seg + 1];
+            if (!p1) break;
+            const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+            const remain = (1 - w.t) * len;
+            if (left >= remain) { left -= remain; w.seg++; w.t = 0; if (w.seg >= w.path.length - 1) break; }
+            else { w.t += left / len; left = 0; }
+        }
+        if (w.seg >= w.path.length - 1) { w.end = w.path[w.path.length - 1]; w.path = null; return true; }
+        return false;
+    }
+    const pairDelay = (i, step = 0.3) => Math.floor(i / 2) * step;
     /**
-     * Starts the war opening: every enemy dot marches to our outermost house
-     * (bottom-right-most populated housing plate). Resolves via onDone once
-     * enough have arrived and the house is marked captured.
+     * Where the boat lies for a landing: the landing point pushed out past the
+     * beach into the water. The coast road is just outside the plates; the
+     * island's shore lies about ISLAND_PAD further out (islands.js, index.js).
      */
-    function startAttack(onDone) {
-        if (attack) return false;
+    const ISLAND_PAD = 48;
+    function offshore(land) {
+        const g = gridBox(), cx = g.x + g.w / 2, cy = g.y + g.h / 2;
+        const dx = land.x - cx, dy = land.y - cy, L = Math.hypot(dx, dy) || 1;
+        const out = ISLAND_PAD + 14;
+        return { x: land.x + dx / L * out, y: land.y + dy / L * out };
+    }
+    function startAttack(onRazed, onOver) {
+        if (raid) return false;
         measure();
         const targets = homes();
-        if (!targets.length || !enemyRects.length) return false;
+        const R = townRing(), dock = dockPoint();
+        if (!targets.length || !enemyRects.length || !R || !pierRect || !dock) return false;
         const target = targets.reduce((best, r) => (r.rect.y + r.rect.x > best.rect.y + best.rect.x ? r : best), targets[0]);
-        while (enemies.length < 8 && enemyRects.length) { const e = { kind: 'enemy', at: null }; if (!newEnemyTrip(e)) break; enemies.push(e); }
-        attack = { target, arrived: 0, needed: Math.min(5, enemies.length), onDone, done: false };
-        enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.2; e.arrivedFlag = false; e.homeBound = false; e.razing = false; e.settled = false; });
+        while (watchmen.length < 6) watchmen.push({ id: watchSeq++, duty: 'patrol', s: Math.random() * ringLength(R), walk: null, hidden: false });
+        const route = cross(pierRect, target.rect);
+        const land = route[route.land];
+        const pierFoot = { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h + 4 };
+        const sPier = ringCoord(R, pierFoot);
+        raid = { phase: 'muster', target, route, land, shore: offshore(land), dock, t: 0, arrived: 0, needed: Math.min(5, watchmen.length), onRazed, onOver, razed: false };
+        watchmen.forEach((m, i) => {
+            const from = watchPos(m) || ringPoint(R, m.s);
+            m.hidden = false; m.aboard = false; m.x = from.x; m.y = from.y; m.home = m.duty === 'patrol' ? m.s : (m.duty === 'watch' ? R.w * (0.3 + 0.2 * (m.k ?? 0)) : sPier);
+            m.walk = { path: [from, ...ringWalk(R, ringCoord(R, from), sPier).slice(1), pierFoot, dock], seg: 0, t: 0, wait: pairDelay(i) };
+        });
+        boat.aboard = 0;
         return true;
     }
-    const raiding = () => !!attack;
+    /** Where the danger is while the boat is at our coast; null when there is none. */
+    function raidAlarm() {
+        if (!raid) return null;
+        if (raid.phase === 'cross' && boat.trip && boat.trip.t / boat.trip.seconds > 0.55) return raid.land;
+        if (raid.phase === 'ashore' || raid.phase === 'raze' || raid.phase === 'back') return raid.land;
+        return null;
+    }
+    function stepRaid(dt) {
+        stepBoat(dt);
+        const r = raid; if (!r) return;
+        r.t += dt;
+        const walkAll = (speed, onDone) => {
+            for (const m of watchmen) {
+                if (!m.walk) continue;
+                const was = m.walk.wait > 0;
+                const done = advance(m.walk, dt, speed);
+                if (was && m.walk.wait <= 0 && m.aboard) { m.aboard = false; m.hidden = false; boat.aboard = Math.max(0, boat.aboard - 1); }   // steps off the boat
+                const p = m.walk.path ? pos(m.walk) : m.walk.end;
+                if (p) { m.x = p.x; m.y = p.y; }
+                if (done) { m.walk = null; onDone?.(m); }
+            }
+        };
+        const allDone = () => watchmen.every(m => !m.walk);
+        if (r.phase === 'muster') {
+            walkAll(RAID_WALK, (m) => { m.hidden = true; m.aboard = true; boat.aboard++; });
+            if (allDone()) { r.phase = 'cross'; sailBoat(r.dock, r.shore, RAID_SAIL_S, () => {
+                r.phase = 'ashore'; boat.angle = -Math.PI / 2 + Math.atan2(r.land.y - r.shore.y, r.land.x - r.shore.x) + Math.PI / 2;
+                const streets = r.route.slice(r.route.land + 1);
+                watchmen.forEach((m, i) => { m.walk = { path: [r.shore, r.land, ...streets], seg: 0, t: 0, wait: pairDelay(i, 0.26) }; m.side = i % 2 ? 3 : -3; });
+            }); }
+        } else if (r.phase === 'ashore') {
+            walkAll(RAID_WALK, (m) => { m.razing = true; r.arrived++; });
+            if (r.arrived >= r.needed && !r.razed) {
+                r.razed = true; r.phase = 'raze'; r.t = 0;
+                // The house is razed: a burnt plate, icon gone, nothing left.
+                // Scorched earth is what chapter III is about (vision.md).
+                r.target.el.querySelector('.building')?.classList.add('razed');
+                const razed = r.target.building, cb = r.onRazed;
+                setTimeout(() => { cb?.(razed); }, 1500);
+            }
+        } else if (r.phase === 'raze') {
+            if (r.t > 2.6) {
+                r.phase = 'back';
+                const back = [...r.route.slice(r.route.land + 1)].reverse().concat([r.land, r.shore]);
+                watchmen.forEach((m, i) => { m.razing = false; m.walk = { path: [{ x: m.x, y: m.y }, ...back.slice(1)], seg: 0, t: 0, wait: pairDelay(i, 0.22) }; });
+            }
+        } else if (r.phase === 'back') {
+            walkAll(RAID_WALK, (m) => { m.hidden = true; m.aboard = true; boat.aboard++; });
+            if (allDone()) { r.phase = 'home'; sailBoat(r.shore, r.dock, RAID_SAIL_S, () => {
+                r.phase = 'dismiss'; boat.moored = true;
+                const R = townRing(), pierFoot = { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h + 4 }, sPier = ringCoord(R, pierFoot);
+                watchmen.forEach((m, i) => {
+                    const walkHome = m.duty === 'pier' ? [pierFoot] : ringWalk(R, sPier, m.home ?? m.s);
+                    m.walk = { path: [r.dock, pierFoot, ...walkHome], seg: 0, t: 0, wait: pairDelay(i, 0.26) };
+                    if (m.duty === 'patrol') m.s = m.home ?? m.s;
+                });
+            }); }
+        } else if (r.phase === 'dismiss') {
+            walkAll(RAID_WALK, (m) => { m.x = undefined; m.y = undefined; });
+            if (allDone()) { const cb = r.onOver; raid = null; cb?.(); }
+        }
+    }
+    const raiding = () => !!raid;
     /** The enemy pulls every dot back to `tileEl` (its rocket). onDone when all are there. */
     function withdraw(tileEl, onDone) {
         measure();
-        attack = null;
+        raid = null; boat.trip = null; boat.moored = true;
+        watchmen.length = 0;      // they board the rocket with everyone else
         const rect = layoutRect(tileEl, area);
         withdrawing = { rect, onDone };
         enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.5; e.razing = false; e.homeBound = false; });
@@ -679,6 +885,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
                 const p = pos(e); if (!p) continue;
                 for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, false); }
             }
+            for (const m of watchmen) {
+                if (m.hidden || raid) continue;
+                const p = watchPos(m); if (!p) continue;
+                for (const d of ourDots) { fight(p, d, state.enemyTier, COLORS.enemy, false); }
+            }
         }
         // their wave on our island: the guards at the coast fight it (our people are civilians)
         stepGuards(dt);
@@ -803,12 +1014,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     }
     function nearestEnemy(p, maxD) {
         let best = null, bd = maxD * maxD;
-        for (const e of enemies) {
-            if (!enemyAtHome(e)) continue;
-            const q = pos(e); if (!q) continue;
-            const d2 = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
-            if (d2 < bd) { bd = d2; best = q; }
-        }
+        const consider = (q) => { if (!q) return; const d2 = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d2 < bd) { bd = d2; best = q; } };
+        for (const e of enemies) { if (enemyAtHome(e)) consider(pos(e)); }
+        for (const m of watchmen) { if (!m.hidden && !raid) consider(watchPos(m)); }
         return best;
     }
     /** A point `dist` px from p toward q (inland, when q is on the island). */
@@ -870,5 +1078,5 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap }) {
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, _debug: () => ({ guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, attack: !!attack, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, sailBoat, _debug: () => ({ raid: raid?.phase, boat: { x: Math.round(boat.x), y: Math.round(boat.y), aboard: boat.aboard, shown: +boat.shown.toFixed(2), trip: !!boat.trip }, watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

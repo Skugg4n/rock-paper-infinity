@@ -271,25 +271,24 @@
             <!-- Ants: people (and cars, and the enemy) walking the streets between the plates -->
             <canvas id="ants-canvas" aria-hidden="true"></canvas>
             <div id="land-grid" class="grid grid-cols-5 gap-1 sm:gap-4"></div>
-            <div id="competitor-island" class="hidden mt-24 sm:mt-28 flex justify-center items-end gap-3">
-                <div class="enemy-factory relative w-24 h-24 rounded-xl flex items-center justify-center">
-                    <i data-lucide="factory" class="w-12 h-12 text-slate-500"></i>
+            <!-- The neighbour's island (chapter II, B191): a 4 × 2 town revealed one stage
+                 a minute (competitor-stage-N). The five war targets keep the classes the
+                 war reads (.enemy-tile / .enemy-factory, DOM order tower, radar, shipyard,
+                 barracks, factory); the civil tiles are .enemy-civil and never targets.
+                 The rocket is kept for the war's end. -->
+            <div id="competitor-island" class="hidden mt-24 sm:mt-28 relative">
+                <div class="enemy-grid grid grid-cols-4 gap-2 sm:gap-3">
+                    <div class="enemy-tile enemy-stage-3 relative rounded-xl flex items-center justify-center" aria-label="Their watchtower"><i data-lucide="castle" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-civil enemy-stage-1 relative rounded-xl flex items-center justify-center" aria-label="Their house"><i data-lucide="home" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-tile enemy-stage-3 relative rounded-xl flex items-center justify-center" aria-label="Their radar"><i data-lucide="radar" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-tile enemy-stage-5 relative rounded-xl flex items-center justify-center" aria-label="Their shipyard"><i data-lucide="ship" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-tile enemy-stage-4 relative rounded-xl flex items-center justify-center" aria-label="Their barracks"><i data-lucide="tent" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-civil enemy-stage-2 relative rounded-xl flex items-center justify-center" aria-label="Their house"><i data-lucide="home" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-civil enemy-stage-2 relative rounded-xl flex items-center justify-center" aria-label="Their store"><i data-lucide="store" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
+                    <div class="enemy-factory enemy-stage-2 relative rounded-xl flex items-center justify-center" aria-label="Their factory"><i data-lucide="factory" class="enemy-base w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i><i data-lucide="anvil" class="enemy-armed absolute w-7 h-7 sm:w-8 sm:h-8 text-slate-600"></i></div>
+                    <div class="enemy-tile enemy-rocket relative rounded-xl flex items-center justify-center" aria-label="Their rocket"><i data-lucide="rocket" class="w-7 h-7 sm:w-8 sm:h-8 text-slate-500"></i></div>
                 </div>
-                <div class="enemy-tile enemy-stage-2 relative w-16 h-16 rounded-xl flex items-center justify-center">
-                    <i data-lucide="warehouse" class="w-8 h-8 text-slate-500"></i>
-                </div>
-                <div class="enemy-tile enemy-stage-3 relative w-16 h-16 rounded-xl flex items-center justify-center">
-                    <i data-lucide="radar" class="w-8 h-8 text-slate-500"></i>
-                </div>
-                <div class="enemy-tile enemy-stage-4 relative w-16 h-16 rounded-xl flex items-center justify-center">
-                    <i data-lucide="building-2" class="w-8 h-8 text-slate-500"></i>
-                </div>
-                <div class="enemy-tile enemy-stage-5 relative w-20 h-20 rounded-xl flex items-center justify-center">
-                    <i data-lucide="ship" class="w-9 h-9 text-slate-500"></i>
-                </div>
-                <div class="enemy-tile enemy-rocket relative w-16 h-16 rounded-xl flex items-center justify-center">
-                    <i data-lucide="rocket" class="w-8 h-8 text-slate-500"></i>
-                </div>
+                <div class="enemy-pier" aria-hidden="true"></div>
             </div>
         </div>
 
@@ -726,7 +725,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.61.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.62.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

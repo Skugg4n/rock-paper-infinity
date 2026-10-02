@@ -542,7 +542,7 @@ export function init() {
                   ww.enemyTileHp = ww.enemyTileHp || [0, 0, 0, 0, 0].map(() => ENEMY_TILE_HP);
                   ww.enemyTileHp[pickIdx] = r.tileHpLeft;
                   ww.scorchTheirs += tier.scorch * 3;
-                  const names = ['factory', 'warehouse', 'radar', 'tower', 'shipyard'];
+                  const names = ['tower', 'radar', 'shipyard', 'barracks', 'factory'];   // enemyTileEls() in DOM order (index.html)
                   const fell = Math.min(force, Math.round(Math.min(force * strikeRatio, enemyDefenceAtImpact) / strikeRatio));
                   const story = `${force} ${tier.id} struck; ${fell} fell to their defence`;
                   if (r.razed) {
@@ -777,8 +777,9 @@ export function init() {
           // Ants: people and cars on the streets, the enemy on its island
           // Islands: our coast appears when the land is full, theirs with the competitor
           _islands = {
-              ours: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.landGrid, id: 'island-ours', shape: { pad: 34, points: 22, wobble: 0.3, seed: 11 } }),
-              enemy: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.competitorIsland, id: 'island-enemy', shape: { pad: 30, points: 16, wobble: 0.35, seed: 5 } }),
+              // Pads large enough that no plate hangs over the water (B191)
+              ours: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.landGrid, id: 'island-ours', shape: { pad: 48, points: 22, wobble: 0.3, seed: 11 } }),
+              enemy: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.competitorIsland.querySelector('.enemy-grid') || ui.competitorIsland, id: 'island-enemy', shape: { pad: 50, points: 16, wobble: 0.3, seed: 5 }, rampart: true }),
           };
           _islands.enemy.path.classList.add('enemy');
           function updateIslands() {
@@ -789,6 +790,9 @@ export function init() {
               ui.phaseCity.classList.toggle('has-water', oursVisible || enemyVisible);
               _islands.ours.update(oursVisible);
               _islands.enemy.update(enemyVisible);
+              // They fortify: the coast hardens to a rampart at stage 3, wider at 4
+              const stage = gameState.competitorSpawned ? (gameState.competitorStage || 1) : 0;
+              _islands.enemy.setRampart(stage >= 4 ? 2 : stage >= 3 ? 1 : 0);
           }
 
           // Debug hook: rpiAnts.step(0.05) advances by 50 ms when the loop is idle
@@ -799,6 +803,11 @@ export function init() {
               getEnemyTiles: () => ui.competitorIsland.classList.contains('visible')
                   ? [...ui.competitorIsland.querySelectorAll('.enemy-factory, .enemy-tile')].filter(el => getComputedStyle(el).opacity !== '0')
                   : [],
+              getCivilTiles: () => ui.competitorIsland.classList.contains('visible')
+                  ? [...ui.competitorIsland.querySelectorAll('.enemy-civil')].filter(el => getComputedStyle(el).opacity !== '0')
+                  : [],
+              getTown: () => ui.competitorIsland.querySelector('.enemy-grid'),
+              getPier: () => ui.competitorIsland.querySelector('.enemy-pier'),
               getGap: () => parseFloat(getComputedStyle(ui.landGrid).columnGap) || 8,
           });
 
@@ -1200,12 +1209,15 @@ export function init() {
                   airDefence: gameState.war?.air || 0,
                   guardsOff: !!gameState.war?.enemyLeft || !!gameState.shipChosen,
                   hitEdges: gameState.war?.hitEdges || [],
+                  war: !!gameState.war?.active,
               });
 
               // Raids. The competitor waits until our city is complete (everything
-              // bought) and its own capital stands (stage 3+), then razes one outer
-              // house, walks home, and comes back every RAID_INTERVAL until the
-              // player chooses WAR. (WAR_POP is only a safety net.)
+              // bought) and its own capital stands (stage 3+), then comes by boat,
+              // razes one outer house, sails home, and comes back every
+              // RAID_INTERVAL until the player chooses WAR. (WAR_POP is only a
+              // safety net.) We are defenceless; the swords arrive only after the
+              // boat has gone and a beat of nothing (Ola 2026-10-02).
               const capitalReady = gameState.competitorSpawned && (gameState.competitorStage || 1) >= 3;
               const complete = cityComplete() || gameState.population >= WAR_POP * 4;
               if (complete && !skipGrowth) gameState.completeTicks = (gameState.completeTicks || 0) + 1;
@@ -1214,11 +1226,20 @@ export function init() {
               if (ready && _ants && !_ants.raiding() && sinceRaid >= RAID_INTERVAL_MS) {
                   const onRazed = (building) => {
                       if (building) { building.razed = true; building.population = 0; }
-                      gameState.warReady = true;
                       saveGameState();
                       updateAllUI();
                   };
-                  if (_ants.startAttack(onRazed)) gameState.lastRaidAt = Date.now();
+                  const onOver = () => {
+                      if (gameState.warReady || gameState.warChosen || signal.aborted) return;
+                      setTimeout(() => {
+                          if (signal.aborted || gameState.warChosen) return;
+                          gameState.warReady = true;
+                          saveGameState();
+                          updateAllUI();
+                          arrive(ui.warBtn);
+                      }, 4000);
+                  };
+                  if (_ants.startAttack(onRazed, onOver)) gameState.lastRaidAt = Date.now();
               }
 
               if (!skipGrowth) warTick();
@@ -1363,7 +1384,8 @@ export function init() {
               saveGameState();
               // The chapter turns, but the game goes on: the war is played on this map.
               // Slow and dark: black, then III, then WAR; a click or 5 s ends it; a beat; the camera lowers.
-              playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, hold: 5000, onMidpoint: () => startWar() })
+              // Drawn out like the card for II: black, a rest, III, a rest, WAR, the hold.
+              playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, pause: 1400, hold: 5000, onMidpoint: () => startWar() })
                   .then(() => setTimeout(() => document.body.classList.add('tilt'), 1500));
           }, { signal });
           /** One click buys a tenth of your arms' worth of units (at least one). */
