@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.60.0 - 2026-10-02 (chapter IV, the skill tree)
+
+### Chapter IV: the skill tree, mechanical state (step 1 of the tree and bio design)
+
+Ola, 2026-10-02: a skill tree, a mechanic the game has not had; mechanical and square; some nodes many levels, some single; branches unlock branches; some greyed for a long time that only Surface can open. Built from docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md, look per mockup 10 (B170 to B173).
+
+- **One button, TREE, in the column** where the GROW group was. It opens a full-screen dark panel over the dimmed colony: a circuit board with square nodes, traces at right angles, mono labels and level pips; bought nodes are filled plates, what can be bought is outlined bright, locked is dim, and Surface's nodes are dashed with a hollow ring and no price ("not ours to open"). Escape or the same button closes it; the game keeps ticking underneath, awake or asleep. A badge on the button counts what can be bought right now.
+- **One fixed info box under the board**, no floating tooltips: the node's name in capitals, its level, the next price, what it does, and either how long until it is affordable or why it is locked, in plain words.
+- **Hover life**: the trace from the root to the node lights in order, the node lifts a pixel, its pips tick once. A click buys one level; shift-click as many as can be paid.
+- **Everything the old buttons sold is in the tree, at the same prices and with the same effects**: Seam, Yield, Output and Beds are the room types' levels; Drill, Farm and Generator automation and Creche are their automation; Cryo I to VII a chain with the same gates and reasons; the Watcher's eight SYSTEM and HARDWARE steps a branch that appears after the first sleep; the four biological steps a plain branch after them, still asking for a sector. A level or an automation is still an order in the build queue with its ring.
+- **Gone**: the level and automate buttons, the longer-sleep button, the Watcher's pill and its three-tick line. A biological step waiting for its sector says so in one line under the stability meter. Before the hall, the sleep pill reads "Sleep", "needs Cryo I", and a click opens the tree.
+- **The way up**: the early attempt is gone. The button is a greyed teaser, "survival 85 % needed", until the colony's own estimate reaches 85; then it opens, as before.
+- **Not built yet, shown locked**: Deep seam, Hydroponics, Hands and The machine: feed (no rule behind them yet), and Surface's five nodes (step 2).
+- **Save**: schema 6. Old saves keep every level, automation, cryo tier and Watcher step; the tree reads them where they always were.
+- **Balance**: the simulation and the scripted player buy through the tree. Bought that way the runs are byte-identical, except that the simulated player now digs the cryo hall's own chamber, as the game always did: 25m03s to the ring (was 26m26s), the biological ending at 23m45s (was 26m04s).
+
 ## v1.59.5 - 2026-10-02 (chapter I, narrow windows)
 
 ### The star tracker counts instead of drawing when there is no room

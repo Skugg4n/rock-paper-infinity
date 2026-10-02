@@ -13,13 +13,18 @@
  *     the stars are saved for it; further off than that, the level button is bought when it is
  *     lit (it says why too), which is what makes the stars grow;
  *   - ORE FOLLOWS THE DOT: a room of the kind the dot marks, or the chamber to put it in.
+ *
+ * deep-tree (step 1): the level, automation and cryo buttons are gone; the player buys those on
+ * the skill tree (tree.js), and `press()` does it the same way: the node Cryo I's reason names, the
+ * level node of the room type the offer picks. Rooms and chambers are still the BUILD buttons.
  */
 
 import {
     tickDay, sleepTrouble, ordersDone, CRYO, ROOM_FOR_COLUMN, roomCost, digCost, levelCost,
-    automationCost, freeChambers, buildPending,
+    automationCost, freeChambers, buildPending, startBuild,
 } from './deep.js';
 import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js';
+import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
 
 /** "Affordable in N days": a player waits for the goal when N is under this, a minute of play. */
 export const SAVE_DAYS = 60;
@@ -82,4 +87,34 @@ export function decide(state, view = screen(state)) {
         }
     }
     return out;
+}
+
+/**
+ * Do what `decide()` chose, the way the screen does it: levels, automations and the cryo hall on
+ * the tree, rooms and chambers on the BUILD buttons.
+ * @param {object} state - mutated
+ * @param {{kind:string, type?:string}} a
+ * @param {ReturnType<typeof screen>} [view] - the screen the choice was read off (its cryo reason)
+ * @returns {boolean} false when the purchase could not be made
+ */
+export function press(state, a, view = null) {
+    const ctx = { need: view ? view.need : undefined, starsPerDay: view ? view.report.stars : 0 };
+    if (a.kind === 'cryo') return !!treeBuy(state, cryoNode(state.cryo + 1), ctx);
+    if (a.kind === 'level') return !!treeBuy(state, LEVEL_NODE[a.type], ctx);
+    if (a.kind === 'auto') return !!treeBuy(state, AUTO_NODE[a.type], ctx);
+    if (a.kind === 'room') {
+        const price = roomCost(a.type, state.rooms[a.type] || 0);
+        if (state.minerals < price) return false;
+        state.minerals -= price;
+        startBuild(state, 'room', { type: a.type });
+        return true;
+    }
+    if (a.kind === 'dig') {
+        const price = digCost(state.chambers);
+        if (state.minerals < price) return false;
+        state.minerals -= price;
+        startBuild(state, 'dig');
+        return true;
+    }
+    return false;
 }

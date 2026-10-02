@@ -1666,3 +1666,62 @@ items:
     status: done
     resolved_in: v1.59.5
     notes: "Done for chapter I's star tracker. A wider pass over small screens in chapters II to IV is not done."
+
+  - id: B170
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 1)"
+    request: |
+      The skill tree, mechanical state: a pure tree definition (nodes, branches, grid, levels,
+      costs, prerequisites, Surface-locked nodes) and the tree panel, per mockup 10: square nodes,
+      90 degree traces, pips, the fixed info box, the hover life, click buys one, shift-click many,
+      a badge on the tree button.
+    status: done
+    resolved_in: deep-tree (version at merge)
+    notes: "src/phase4/tree.js (rules, tested in tree.test.js) and src/phase4/tree-view.js (the panel). The tree reads the existing state; schema 6 adds only state.tree.opened for step 2."
+
+  - id: B171
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 1)"
+    request: |
+      Remove what the tree replaces: the level and automate buttons, the cryo longer-sleep button,
+      the Watcher's pill and its three-tick line. Sleep and the scout party stay in ACT; the build
+      queue stays.
+    status: done
+    resolved_in: deep-tree (version at merge)
+    notes: "A biological step waiting for its sector now asks in one line under the stability meter (it was the pill)."
+
+  - id: B172
+    added: 2026-10-02
+    source: "chat 2026-10-02 (Ola's direction: put the early attempt away)"
+    request: |
+      The ascent button: no early attempt. A greyed teaser, "survival 85 % needed", until the
+      colony's estimate reaches 85; then it opens (the human ending, unchanged).
+    status: done
+    resolved_in: deep-tree (version at merge)
+
+  - id: B173
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 1)"
+    request: |
+      The scripted player (policy.js) and scripts/sim-phase4.mjs buy through tree.js; the
+      acceptance script opens the tree and buys a node.
+    status: done
+    resolved_in: deep-tree (version at merge)
+    notes: "Byte-identical runs through the tree, except the sim now digs the cryo hall's own chamber as the game does: plain 25m03s (was 26m26s), --watcher biological ending 23m45s (was 26m04s)."
+
+  - id: B174
+    added: 2026-10-02
+    source: "deep-tree step 1 (open question)"
+    request: |
+      Four nodes of the design have no rule behind them yet and stand locked ("Not open yet."):
+      Deep seam, Hydroponics, Hands and The machine: feed. Each needs a rule and a sim pass.
+    status: open
+    notes: "Mapping chosen for step 1: Beds = dormitory level, Creche = dormitory automation (four levels), Hands has no neutral mapping. The machine: feed belongs with step 3 (the machine)."
+
+  - id: B175
+    added: 2026-10-02
+    source: "deep-tree step 1 (open question)"
+    request: |
+      The design gives Seam, Yield, Output and Beds ten levels; the simulated run buys up to 18 of a
+      room type, so the tree draws 20 to change nothing. Decide the real cap (a balance change).
+    status: open

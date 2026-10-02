@@ -165,7 +165,7 @@ describe('the save', () => {
         old.watcher = { ...initialWatcher(), bought: HARDWARE.slice() };
         delete old.watcher.sealed; delete old.watcher.gone; delete old.watcher.grown;
         const back = deserializeDeep(JSON.stringify({ schemaVersion: 4, state: old, layout: { slots: ['mine', 'farm', 'generator', 'dorm'] } }));
-        expect(SCHEMA_VERSION).toBe(5);
+        expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(5);
         expect(back.state.watcher.sealed).toEqual([]);
         expect(back.state.watcher.gone).toBe(false);
         expect(back.state.watcher.bought).toEqual(HARDWARE);

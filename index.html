@@ -564,22 +564,13 @@
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
             </div>
-            <div class="deep-group" id="deep-group-grow">
-                <span class="deep-group-word deep-mono">GROW</span>
-                <button class="btn" id="deep-level-btn" aria-label="Level a room type">
-                    <i data-lucide="chevrons-up" class="w-7 h-7"></i>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <button class="btn" id="deep-auto-btn" aria-label="Automate a room type">
-                    <i data-lucide="repeat" class="w-7 h-7"></i>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <button class="btn hidden has-caption" id="deep-cryo-up" aria-label="A longer sleep">
-                    <i data-lucide="snowflake" class="w-7 h-7"></i>
-                    <span class="deep-badge deep-mono" id="deep-cryo-up-badge"></span>
-                    <span class="deep-caption deep-mono" id="deep-cryo-up-caption"></span>
+            <!-- deep-tree: the level, automate and longer-sleep buttons moved into the skill tree.
+                 One button opens it; the badge counts what can be bought now -->
+            <div class="deep-group" id="deep-group-tree">
+                <span class="deep-group-word deep-mono">TREE</span>
+                <button class="btn" id="deep-tree-btn" aria-label="The tree">
+                    <i data-lucide="network" class="w-7 h-7"></i>
+                    <span class="deep-badge deep-mono hidden" id="deep-tree-badge"></span>
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
             </div>
@@ -587,7 +578,7 @@
                 <span class="deep-group-word deep-mono">ACT</span>
                 <button class="btn deep-pill is-locked has-caption" id="deep-cryo-btn" aria-label="Sleep">
                     <i data-lucide="snowflake" class="w-5 h-5"></i>
-                    <span class="deep-pill-text deep-mono" id="deep-cryo-text">Cryo hall</span>
+                    <span class="deep-pill-text deep-mono" id="deep-cryo-text">Sleep</span>
                     <span class="deep-caption deep-mono" id="deep-cryo-caption"></span>
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
@@ -602,9 +593,10 @@
                     <span class="deep-build"></span>
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
-                <button class="btn deep-pill" id="deep-ascend-btn" aria-label="Go up">
+                <button class="btn deep-pill is-locked has-caption" id="deep-ascend-btn" aria-label="Go up">
                     <i data-lucide="arrow-up-from-line" class="w-5 h-5"></i>
                     <span class="deep-pill-text deep-mono">Go up</span>
+                    <span class="deep-caption deep-mono" id="deep-ascend-caption"></span>
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
             </div>
@@ -617,6 +609,30 @@
              label: "dig ◔ · dig ○ · mine ○". It never moves the buttons; a click on an order takes it
              back and returns its price; empty, it is not there -->
         <div class="deep-chrome deep-queue deep-mono" id="deep-queue" hidden></div>
+
+        <!-- deep-tree: THE SKILL TREE, a full-screen dark panel over the dimmed colony. The board is
+             drawn by src/phase4/tree-view.js; one fixed info box under it says what the hovered
+             node is (no floating tooltips). Escape or the tree button closes it; the game ticks on -->
+        <div class="deep-tree" id="deep-tree" hidden>
+            <div class="deep-tree-stage">
+                <svg class="deep-tree-board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The tree"></svg>
+                <div class="deep-tree-foot">
+                    <div class="deep-tree-legend deep-mono">
+                        <span><i class="lg lg-bought"></i>bought</span>
+                        <span><i class="lg lg-buy"></i>can buy</span>
+                        <span><i class="lg lg-lock"></i>locked</span>
+                        <span><i class="lg lg-surface"></i>not ours to open</span>
+                    </div>
+                    <div class="deep-tree-info deep-mono is-empty" id="deep-tree-info">
+                        <div class="ib-row"><span class="ib-name"></span><span class="ib-lvl"></span></div>
+                        <div class="ib-cost"></div>
+                        <div class="ib-eff"></div>
+                        <div class="ib-x"></div>
+                        <div class="ib-empty">› <span class="ib-caret"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- v1.47.0: what stays awake while the colony sleeps. Only in the sleep world: a slow
              pulse, a name, a meter, now and then the lamps, and (v1.51.0) the ladder as one pill -->
@@ -635,21 +651,9 @@
                 <span class="deep-mono deep-puzzle-q" id="deep-puzzle-q"></span>
                 <span class="deep-mono deep-puzzle-said" id="deep-puzzle-said"></span>
             </div>
-            <!-- v1.51.0: the ladder you can see. The whole road as a line with three ticks and a
-                 trail, and one pill with the next step -->
-            <div class="deep-ladder" id="deep-ladder" hidden>
-                <div class="deep-ladder-line">
-                    <span class="deep-ladder-track"><span class="deep-ladder-trail" id="deep-ladder-trail"></span></span>
-                    <span class="deep-ladder-tick" data-rung="0"><span class="deep-mono">SYSTEM</span></span>
-                    <span class="deep-ladder-tick" data-rung="1"><span class="deep-mono">HARDWARE</span></span>
-                    <span class="deep-ladder-tick" data-rung="2"><span class="deep-mono">BIOLOGICAL</span></span>
-                </div>
-                <button class="deep-ladder-pill" id="deep-ladder-pill" aria-label="The next step">
-                    <span class="deep-pill-head deep-mono"><span class="rung" id="deep-pill-rung"></span><span class="sep"> · </span><span class="name" id="deep-pill-name"></span><span class="sep"> · </span><span class="cost" id="deep-pill-cost"></span></span>
-                    <span class="deep-pill-sub deep-mono" id="deep-pill-sub"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-            </div>
+            <!-- deep-tree: the Watcher's steps are bought in the tree. A biological step paid for and
+                 waiting for its sector says so here; a click asks again -->
+            <button class="deep-watcher-ask deep-mono" id="deep-watcher-ask" hidden>BIOLOGICAL · Choose a sector to seal</button>
         </div>
 
         <!-- v1.49.0: Surface, opposite the Watcher, only in some sleeps. A line, and a game.
@@ -717,7 +721,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.59.5</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.60.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">
