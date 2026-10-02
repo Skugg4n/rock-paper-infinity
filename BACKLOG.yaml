@@ -1778,6 +1778,12 @@ items:
       to boats on its own branch. Keep stable for WAR: the onIsland(path, seg, t) contract
       (it gates all fighting and losses) and the `losses` / `onImpact` arguments of
       launchWave and launchStrike. Tell WAR when the boat exists.
+      Ola on mockup 1: islands better, but keep the game's wobbly coast; soldiers drilling at
+      the back looks odd; the wall bars look like health bars; the whole island should be the
+      defence; the soldiers' behaviour should be levelled up and made relevant. Mockup 2
+      (docs/mockups/neighbour-2.html): wobbly coasts with outward bumps only, a rampart band
+      inside the shore instead of walls, guards that patrol the coast in pairs, watchers on the
+      shore facing us, our people run indoors when the boat lands. We have no soldiers in II.
 
   - id: B177
     added: 2026-10-02
