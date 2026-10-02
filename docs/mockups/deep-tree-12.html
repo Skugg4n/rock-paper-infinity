@@ -11,14 +11,14 @@
    docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md): A WITH C, mycelium with
    sinew and blood vessels, grown over a machine.
    - mycelium: fine pale threads creep along the copper traces and across them; organs are
-     clusters of nodules, and a level is a nodule that has fruited
+     knots of fibre; a level is a denser, tighter knot and one more feeding artery
    - sinew: striated muscle bellies between silver tendons; tendons hook round the won squares
      and pull, and in the fusion the muscle visibly contracts and draws two squares together
    - vessels: arteries branching into capillaries carry the pulse, in arterial red only
    - overgrown squares stay visible under the threads; MYELIN DRILL is two squares pulled into
      one knot; ORGANOID CELL is the fusion on a loop (?t=7 holds a still)
    Hard rules: no bilateral symmetry, no horns, no gauges or ticks, nothing digital, no eyes,
-   no beige. Level is fruiting, swelling or bundle thickness. STATIC: every number is by hand.
+   no beige. Level is the knot (denser, tighter, one more feeding artery) or bundle thickness. STATIC: every number is by hand.
    THE BOARD is unchanged: rock #0a0d12, plate #d5dbe3, white #ffffff on what can be bought.
    THE VOICE keeps Surface's tone #cfc9bb; once Biological begins its threads run red. */
 
@@ -645,7 +645,7 @@ function legend() {
 /* ---------------------------------------------------------------- the tissue: mycelium, sinew and vessels
    Grown over a machine. Fine hyphae creep along the copper and across it; tendons and striated
    muscle hook round the won squares and pull; arteries and capillaries carry the pulse. Nothing
-   mirrored, nothing ruled. Level is how many nodules have fruited, or how swollen a sac is. */
+   mirrored, nothing ruled. Level is the knot: denser, tighter fibre and one feeding artery a level. */
 const HYC = '#b9c4ca';                         // hyphae: cold, pale
 const MUS = ['#4a3039', '#5b3b46', '#6a4652', '#3f2932'];   // muscle: dark, blood under the cold
 const MUS_DK = '#170d11', TENDON = '#a9b2b9', ART = '#2c1219', ART_CORE = '#7d1f2e', STAIN = '#0c1013';
@@ -743,31 +743,11 @@ function alongTrace(pts, r, out, n, w) {
         hypha(x + (r() - 0.5) * 3, y + (r() - 0.5) * 3, ang, 6 + Math.floor(r() * 12), 1, r, out, w || 0.6);
     }
 }
-/* a nodule; fruited, it has a leaning stalk and a cap that is never round */
+/* a nodule: a small dark knot of thread, no cap, nothing on top */
 function nodule(x, y, r, seed, fruit, R, i) {
     let h = '<g class="pip" style="--i:' + (i || 0) + '">';
-    if (fruit) {
-        const lean = (R() - 0.3) * 1.4, len = r * (2.2 + R() * 1.4);
-        const top = [x + Math.sin(lean) * len, y - Math.cos(lean) * len];
-        const stalk = wob([[x, y], [x + Math.sin(lean) * len * 0.5 + (R() - 0.5) * 4, y - len * 0.5], top], 1.2, seed, 8);
-        h += '<path d="' + ribbon(stalk, function (t) { return r * (0.9 - 0.45 * t); }) + '" fill="#5b666d"/>';
-        h += '<path d="' + blob(top[0] + r * 0.2, top[1], r * 1.5, 0.55, seed + 1, 9, 1.25, 0.62) + '" fill="#9aa5ab" stroke="#1a2024" stroke-width="0.8"/>';
-        h += '<path d="' + blob(top[0] + r * 0.4, top[1] + r * 0.35, r * 0.95, 0.5, seed + 2, 8, 1.2, 0.35) + '" fill="#2a3237"/>';
-        h += '<path d="' + blob(top[0] - r * 0.25, top[1] - r * 0.35, r * 0.4, 0.6, seed + 3, 7, 1.6, 0.5) + '" fill="#ffffff" opacity="0.35"/>';
-        h += '<path class="beat" d="' + blob(x, y + 1, r * 0.75, 0.5, seed + 4, 8) + '" style="fill:' + PULSE + ';animation-delay:-' + ((seed % 9) * 0.5) + 's"/>';
-    } else {
-        h += '<path d="' + blob(x, y, r, 0.6, seed, 8, 1.1, 0.85) + '" fill="#232a2f" stroke="#59646b" stroke-width="0.6"/>';
-        h += '<path d="' + blob(x - r * 0.3, y - r * 0.3, r * 0.3, 0.6, seed + 5, 6) + '" fill="#ffffff" opacity="0.25"/>';
-    }
-    return h + '</g>';
-}
-/* a swollen sac: how full it is shows how far it has grown */
-function sac(x, y, r, seed, swell, i) {
-    const rr = r * (0.55 + 0.6 * swell);
-    let h = '<g class="pip" style="--i:' + (i || 0) + '">';
-    h += '<path d="' + blob(x, y, rr, 0.25, seed, 11, 1.1, 0.95) + '" fill="#0a0c0f" stroke="#59646b" stroke-width="0.7"/>';
-    if (swell > 0.5) h += '<path class="beat" d="' + blob(x + rr * 0.1, y + rr * 0.25, rr * 0.6, 0.4, seed + 1, 9, 1.2, 0.6) + '" style="fill:' + PULSE + ';animation-delay:-' + (seed % 7) * 0.6 + 's" opacity="0.7"/>';
-    h += '<path d="' + blob(x - rr * 0.35, y - rr * 0.4, rr * 0.32, 0.5, seed + 2, 7, 1.5, 0.6) + '" fill="#ffffff" opacity="0.35"/>';
+    h += '<path d="' + blob(x, y, r, 0.6, seed, 8, 1.1, 0.85) + '" fill="#232a2f" stroke="#59646b" stroke-width="0.6"/>';
+    h += '<path d="' + blob(x - r * 0.3, y - r * 0.3, r * 0.3, 0.6, seed + 5, 6) + '" fill="#ffffff" opacity="0.25"/>';
     return h + '</g>';
 }
 /* an artery, branching into capillaries; tMax lets it be still growing */
@@ -831,15 +811,35 @@ function band(P, w, seed) {
     return '<path d="' + ribbon(pts, function (t) { return w * (0.7 + 0.3 * Math.sin(t * 3 + seed)); }) + '" fill="#9ea8af"/>' +
         '<path d="' + poly(pts) + '" fill="none" stroke="#ffffff" stroke-width="0.6" opacity="0.45" transform="translate(-0.4,-0.6)"/>';
 }
-/* a knot of fibre: loops wound round each other, each tilted its own way */
-function knot(x, y, scale, seed, r) {
-    let h = '<path d="' + blob(x, y, 15 * scale, 0.5, seed, 10, 1.2, 0.9) + '" fill="#141319"/>';
-    for (let k = 0; k < 14; k++) {
-        const pts = blobPts(x + (r() - 0.5) * 6 * scale, y + (r() - 0.5) * 5 * scale, (7 + r() * 9) * scale, 0.5, seed + k * 3, 9, 1 + r() * 0.6, 0.5 + r() * 0.5);
-        h += '<path d="' + closedPath(pts) + '" transform="rotate(' + (r() * 180).toFixed(1) + ' ' + x + ' ' + y + ')" fill="none" stroke="' + MUS[k % 4] + '" stroke-width="' + ((1 + r() * 1.4) * scale).toFixed(2) + '"/>';
+/* a knot of fibre: loops wound round each other, each tilted its own way. Its level (frac,
+   0 to 1) is how dense and how tight it is: more loops, wound closer, thicker */
+function knot(x, y, scale, seed, r, frac) {
+    const f = frac === undefined ? 0.6 : frac;
+    const loops = 6 + Math.round(18 * f), tight = 1 - 0.36 * f;
+    let h = '<path d="' + blob(x, y, 15 * scale * (0.82 + 0.18 * f), 0.5, seed, 10, 1.2, 0.9) + '" fill="#141319"/>';
+    for (let k = 0; k < loops; k++) {
+        const pts = blobPts(x + (r() - 0.5) * 6 * scale * tight, y + (r() - 0.5) * 5 * scale * tight, (7 + r() * 9) * scale * tight, 0.5, seed + k * 3, 9, 1 + r() * 0.6, 0.5 + r() * 0.5);
+        h += '<path d="' + closedPath(pts) + '" transform="rotate(' + (r() * 180).toFixed(1) + ' ' + x + ' ' + y + ')" fill="none" stroke="' + MUS[k % 4] + '" stroke-width="' + ((0.9 + r() * 1.2 + 0.9 * f) * scale).toFixed(2) + '"/>';
     }
-    h += '<path class="beat" d="' + blob(x + 2, y + 1, 4 * scale, 0.6, seed + 99, 8) + '" style="fill:' + PULSE + '" opacity="0.85"/>';
+    h += '<path class="beat" d="' + blob(x + 2, y + 1, (2.5 + 3 * f) * scale, 0.6, seed + 99, 8) + '" style="fill:' + PULSE + '" opacity="' + (0.4 + 0.5 * f).toFixed(2) + '"/>';
     return h;
+}
+/* the arteries that feed a knot: one per level, each from its own side (never below, where the
+   label is), the pulse stronger the higher the level */
+function feeders(x, y, n, frac, reach, seed) {
+    const out = [];
+    const R = rng(seed);
+    for (let i = 0; i < n; i++) {
+        const a = -Math.PI * 0.5 + (i % 2 ? 1 : -1) * (0.35 + 0.42 * Math.ceil(i / 2) + R() * 0.2) + (R() - 0.5) * 0.3;
+        const L = reach * (1.15 + R() * 0.5);
+        const e = [x + Math.cos(a) * L, y + Math.sin(a) * L];
+        const m = [x + Math.cos(a + (R() - 0.5) * 0.5) * L * 0.55, y + Math.sin(a + (R() - 0.5) * 0.5) * L * 0.55];
+        const g = [];
+        vein([e, m, [x + Math.cos(a) * reach * 0.35, y + Math.sin(a) * reach * 0.35]], 1.8 + 2.4 * frac, seed * 3 + i, 3, g, R, 1, false);
+        g.push(pulseOn(poly(wob([e, m, [x, y]], 1, seed + i, 8)), (1.2 + 2.2 * frac).toFixed(2), (6.5 - 3.5 * frac).toFixed(2), i * 0.9, 'pulse'));
+        out.push('<g class="pip" style="--i:' + i + '">' + g.join('') + '</g>');
+    }
+    return out.join('');
 }
 
 /* the ground the growth spreads over: a wet stain, then threads everywhere on it */
@@ -902,7 +902,7 @@ function overgrow(st, id, sid, k) {
     const vs = [];
     vein([[n.x + 34, n.y - 14], [n.x + 16, n.y - 6], [n.x + 4, n.y - 10]], 2.4, 80 + k, 3, vs, r);
     h += vs.join('');
-    h += nodule(n.x + 12, n.y + 10, 3.6, 90 + k * 7, k % 2 === 0, r, 0) + nodule(n.x + 4, n.y + 15, 2.8, 95 + k * 7, false, r, 1);
+    h += nodule(n.x + 12, n.y + 10, 3.6, 90 + k * 7, false, r, 0) + nodule(n.x + 4, n.y + 15, 2.8, 95 + k * 7, false, r, 1);
     h += '</g>';
     texts.forEach(function (t) { h += t; });
     return h;
@@ -930,8 +930,7 @@ function hybridSvg(st, sid) {
     h += bundle([[H_.x + 4, H_.y - 46], [H_.x + 28, H_.y - 20], [H_.x + 26, H_.y + 18], [H_.x + 6, H_.y + 46]], 22, 12, 85, r, true);
     h += band([[H_.x + 14, H_.y - 34], [H_.x + 2, H_.y - 46], [H_.x - 12, H_.y - 50]], 6, 86);
     h += band([[H_.x + 16, H_.y + 32], [H_.x + 4, H_.y + 46], [H_.x - 12, H_.y + 50]], 6, 87);
-    h += '<g class="node" data-id="hybrid">' + knot(H_.x + 4, H_.y, 1.2, 88, r);
-    h += nodule(H_.x - 6, H_.y - 4, 4.5, 89, true, r, 0) + nodule(H_.x + 12, H_.y + 6, 4, 90, true, r, 1) + nodule(H_.x + 2, H_.y + 12, 3, 91, false, r, 2) + '</g>';
+    h += '<g class="node" data-id="hybrid">' + feeders(H_.x + 4, H_.y, 2, 0.85, 30, 89) + knot(H_.x + 4, H_.y, 1.2, 88, r, 0.85) + '</g>';
     h += text(H_.x + 44, H_.y + 4, H_.name, { c: '#d9dad3', ls: '0.08em', w: 700 });
     return h;
 }
@@ -952,7 +951,7 @@ function vessels() {
     return out.join('');
 }
 
-/* an organ of the body: a cluster of nodules on a knot of fibre; fruited nodules are its level */
+/* an organ of the body: a knot of fibre, fed by its arteries; nothing on top of it */
 function bioNode(id) {
     const b = BIO[id];
     const r = rng(1000 + id.length * 97 + Math.round(b.x));
@@ -961,34 +960,11 @@ function bioNode(id) {
     if (open) {
         h += '<path class="breathe-o" d="' + blob(b.x, b.y, b.r * 1.55, 0.3, 77 + b.x, 12, 1.15, 0.95) + '" fill="none" stroke="#e8ecef" stroke-width="1" opacity="0.7"/>';
     }
-    if (b.kind === 'vat') {
-        // vats: sacs, the grown ones swollen dark with the pulse in them
-        h += knot(b.x, b.y + 4, 0.7, 31 + b.x, r);
-        for (let i = 0; i < b.max; i++) {
-            const a = i * 2.4 + 0.3, d = 7 + i * 2.1;
-            h += sac(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.8, 6.5, 40 + i * 13, i < b.lvl ? 1 : 0.15, i);
-        }
-    } else if (b.max === 1) {
-        // one-off organs: a knot, swollen and fruited once grown
-        const sc = (b.kind === 'core' ? 1.75 : 1.15) * (live ? 1 : 0.75);
-        h += knot(b.x, b.y, sc, 51 + b.x, r);
-        if (live) {
-            const n = b.kind === 'core' ? 4 : 2;
-            for (let i = 0; i < n; i++) {
-                const a = i * 2.2 - 1.2, d = 6 + i * 4;
-                h += nodule(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.7 - 4, b.kind === 'core' ? 5 : 4, 60 + i * 9 + b.x, true, r, i);
-            }
-        } else {
-            h += nodule(b.x + 3, b.y - 2, 3.5, 66 + b.x, false, r, 0);
-        }
-    } else {
-        // levelled organs: a nodule for every level, the bought ones fruited
-        h += knot(b.x, b.y + 3, 0.75 + b.lvl * 0.06, 71 + b.x, r);
-        for (let i = 0; i < b.max; i++) {
-            const a = i * 2.4 + 0.5, d = 5 + i * 1.9;
-            h += nodule(b.x + Math.cos(a) * d * 1.15, b.y + Math.sin(a) * d * 0.8, i < b.lvl ? 3.8 : 2.8, 80 + i * 11 + b.x, i < b.lvl, r, i);
-        }
-    }
+    // the level is the knot: denser and tighter as it grows, and one feeding artery per level
+    const frac = b.lvl / b.max;
+    const sc = b.kind === 'core' ? 1.6 : b.max === 1 ? 1.1 : 1.0;
+    h += feeders(b.x, b.y, b.lvl, frac, b.r * (b.kind === 'core' ? 2.1 : 1.8), 61 + Math.round(b.x));
+    h += knot(b.x, b.y, sc * (0.78 + 0.22 * frac), 51 + Math.round(b.x), r, frac);
     if (b.sf) {
         const rx = b.x + b.r * 1.25, ry = b.y - b.r * 1.1;
         h += b.sf === 'f'
@@ -1220,11 +1196,8 @@ document.querySelectorAll('svg.board[data-state]').forEach(render);
         }
         if (fuse > 0) {
             s += '<g opacity="' + fuse.toFixed(3) + '">';
-            s += knot(C[0], C[1] + 4, 0.6 + 1.4 * fuse, 940, rng(940));
-            if (fuse > 0.5) {
-                const rn = rng(941);
-                s += nodule(C[0] - 10, C[1] - 6, 7, 941, true, rn, 0) + nodule(C[0] + 14, C[1] + 2, 6, 942, true, rn, 1) + nodule(C[0] + 2, C[1] + 16, 5, 943, true, rn, 2);
-            }
+            if (fuse > 0.5) s += feeders(C[0], C[1] + 4, 2, fuse, 46, 941);
+            s += knot(C[0], C[1] + 4, 0.6 + 1.4 * fuse, 940, rng(940), 0.3 + 0.6 * fuse);
             s += text(C[0], C[1] + 104, 'ORGANOID CELL', { a: 'middle', c: '#d9dad3', ls: '0.1em', s: 13, w: 700 });
             s += '</g>';
         }
