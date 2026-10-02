@@ -14,7 +14,7 @@
 import {
     COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, outputMultiplier, upkeepFor, BIRTH_FOOD,
     FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, cryoLabel, group, digCost, roomCost,
-    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending, buildEta,
+    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending, buildEta, CREW_ORDER, ordersDone,
 } from './deep.js';
 import { ROOM_WORD, ROOM_WORDS, foodDaysLeft } from './advisor.js';
 
@@ -73,7 +73,9 @@ export function ledger(column, state, report) {
         const used = ROOMS.reduce((a, t) => a + report.draw[t], 0);
         return `Energy: ${n(report.energySpare)} spare. +${n(report.energyMade)} made, -${n(used)} used a day.`;
     }
-    if (asleep) return `People: ${n(state.humans)} asleep in the ice. Beds for ${n(report.capacity)}.`;
+    // deep-fix: the beds the body took with its people are said, so a lower count reads as a cost
+    const held = report.bodyBeds >= 0.5 ? ` ${n(report.bodyBeds)} beds went to the body.` : '';
+    if (asleep) return `People: ${n(state.humans)} asleep in the ice. Beds for ${n(report.capacity)}.${held}`;
     const onDuty = ROOMS.filter((t) => report.crew[t] > 0.5);
     const busy = onDuty.reduce((a, t) => a + report.crew[t], 0);
     // a fully automated colony has nobody on a shift at all, and "0 on duty in nothing"
@@ -81,7 +83,7 @@ export function ledger(column, state, report) {
     const duty = onDuty.length
         ? `${n(busy)} on duty in the ${list(onDuty.map((t) => ROOM_WORD[t]))}.`
         : 'Nobody on duty; the rooms run themselves.';
-    return `People: ${n(report.hands)} free of ${n(report.awake)} awake. ${duty} Beds for ${n(report.capacity)}.`;
+    return `People: ${n(report.hands)} free of ${n(report.awake)} awake. ${duty} Beds for ${n(report.capacity)}.${held}`;
 }
 
 /** Days the larder feeds the colony awake: the food store in the only unit that means anything. */
@@ -287,6 +289,63 @@ export function cryoNeed(tier, { state, trouble = null, planned = null, starsPer
     return null;
 }
 
+/**
+ * THE WHOLE ROAD TO A CRYO TIER (deep-fix). The overnight playtest of v1.66.0: "Cryo I moves the
+ * goalpost three times": the one reason (cryoNeed) named the generators, then the farms, then the
+ * mines, one at a time, and it felt like the game lied twice. Now everything the tier needs is
+ * listed at once, each with a tick once it is done:
+ *   "needs: generators automated ✓, farms automated, mines automated, 15 k ★"
+ * In order: enough people (only when there are too few); every room type a crew runs, which stops
+ * the moment everyone lies down, so each one must be automated (an automation on order says so);
+ * what a dry run of the sleep still meets once all of those are in (ore, spare power, food), each
+ * patched on the copy so the next one shows too; and the price.
+ *
+ * @param {number} tier - index into CRYO
+ * @param {object} state
+ * @param {object} [o]
+ * @param {number} [o.maxSteps] - the dry runs' budget
+ * @returns {{items:{key:string, text:string, done:boolean, ordered?:boolean}[], text:string, done:number, total:number, open:boolean}|null}
+ *          null past the chain. `open`: everything done, nothing to wait for (the tier can be bought).
+ */
+export function cryoRoad(tier, state, { maxSteps = 4000 } = {}) {
+    if (!CRYO[tier]) return null;
+    const days = CRYO[tier].days;
+    const items = [];
+    if ((state.humans || 0) < MIN_SLEEPERS) items.push({ key: 'few', text: `${MIN_SLEEPERS} people`, done: false });
+    // the colony as it will stand once every order on the books is built
+    const base = ordersDone(state);
+    const live = (s, t) => (s.rooms[t] || 0) - ((s.dark && s.dark[t]) || 0) - ((s.taken && s.taken[t]) || 0);
+    const trial = JSON.parse(JSON.stringify(base));
+    trial.probes = [];
+    for (const t of CREW_ORDER) {
+        if (!(ROOM[t].crew > 0) || !(live(base, t) > 0)) continue;
+        const built = (state.auto[t] || 0) > 0;
+        const ordered = !built && (base.auto[t] || 0) > 0;
+        items.push({ key: `auto-${t}`, text: `${ROOM_WORDS[t]} automated`, done: built, ordered });
+        trial.auto[t] = Math.max(1, trial.auto[t] || 0);
+    }
+    // what the sleep still meets with every room automated: each found, then patched on the copy
+    const seen = new Set();
+    for (let i = 0; i < 5; i++) {
+        const t = sleepTrouble(trial, days, maxSteps);
+        if (!t || t.kind === 'few') break;
+        if (t.kind === 'stall' && t.why !== 'fuel') { trial.auto[t.type] = Math.max(1, trial.auto[t.type] || 0); continue; }
+        const key = t.kind === 'stall' ? 'ore' : t.kind;
+        if (seen.has(key)) break;
+        seen.add(key);
+        if (key === 'ore') { items.push({ key, text: 'more ore', done: false }); trial.minerals = 1e300; } else if (key === 'energy') {
+            items.push({ key, text: 'spare power', done: false });
+            trial.rooms.generator = Math.max(1, trial.rooms.generator || 0) * 4;
+            trial.minerals = 1e300;
+        } else if (key === 'food') { items.push({ key, text: `food for ${cryoLabel(days)}`, done: false }); trial.food = 1e300; } else break;
+    }
+    const price = CRYO[tier].cost;
+    items.push({ key: 'stars', text: `${short(price)} ★`, done: (state.stars || 0) >= price });
+    const done = items.filter((x) => x.done).length;
+    const text = `needs: ${items.map((x) => `${x.text}${x.done ? ' ✓' : x.ordered ? ' (ordered)' : ''}`).join(', ')}`;
+    return { items, text, done, total: items.length, open: done === items.length };
+}
+
 /** The room type a column is fixed by, and the column's name in a "why". */
 const COLUMN_NOUN = { M: 'ore', F: 'food', E: 'energy', H: 'free hands' };
 
@@ -396,8 +455,9 @@ function crewShort(report) {
  */
 export const rewardShows = (counter, reward) => reward > 0 && short((counter || 0) + reward) !== short(counter || 0);
 
-/** What the advisor says the day a longer sleep is there to be had. */
-export const cryoReadyLine = (tier) => `${cryoName(tier)} is ready: ${rateWords(CRYO[tier].days)} a second.`;
+/** What the advisor says, once, the day a longer sleep can be bought. deep-fix: "Cryo II is ready"
+ *  read as if it were already bought (the playtest of v1.66.0); it is something to buy. */
+export const cryoReadyLine = (tier) => `${cryoName(tier)} can be bought: ${rateWords(CRYO[tier].days)} a second.`;
 
 /**
  * What a purchase costs the colony to RUN and what it gives back, in one sentence.

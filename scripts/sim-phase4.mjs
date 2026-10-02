@@ -33,6 +33,7 @@ import {
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, recoverAwake,
   LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake, snap,
+  lookDue,
 } from '../src/phase4/watcher.js';
 import { THROWS, beats, counter, visitDue, TYPE_MS, NIGHTS } from '../src/phase4/surface.js';
 // deep-tree (step 1): every level, automation, cryo tier and Watcher step is bought ON THE TREE,
@@ -275,7 +276,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
   if (n === 0 && s.cryo >= 0 && waitDays(r) > WAIT_DAYS && s.humans >= MIN_SLEEPERS && !sleepTrouble(s, CRYO[s.cryo].days)) {
     real += SLEEP_SECONDS;
     const hist = { M: 0, F: 0, E: 0, H: 0 };
-    let alarm = null, slept = 0, died = 0, held = 0;
+    let alarm = null, slept = 0, died = 0, held = 0, lookClock = 0;
     beginSleep(w, s.cryo);
     beginSleep(w2, s.cryo);
     // deep-voice: is Surface due in this sleep? Then the player stays under for it
@@ -286,7 +287,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
       const rate = CRYO[s.cryo].days;
       const sum = sleep(s, rate, { alarms: true, slots: slots(), rng });
       const spent = sum.days / rate;
-      real += spent; sleepReal += spent;
+      real += spent; sleepReal += spent; lookClock += spent;
       earned += sum.stars; earnedAt.push([real, earned]);
       if (sum.days > 0) onCurve(sum.stars / sum.days);
       watchSleep(w, { days: sum.days, tier: s.cryo, spare: sum.spare });
@@ -319,6 +320,8 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
       if (sum.alarm) { alarm = sum.alarm.kind; break; }
       // v1.48.0: the first sleep ends on a plain alarm after a year, whatever else happens
       if (firstSleep(w) && slept >= FIRST_SLEEP_DAYS) { alarm = 'first'; break; }
+      // deep-fix: at Cryo I and II a sleep nothing else ends wakes for a look, once Surface has gone
+      if (lookDue(w, s.cryo, lookClock)) { alarm = 'look'; break; }
       // the --watcher player stays under a while longer when the next step waits only on capacity
       const waitsOnCapacity = WATCHER && ['capacity', 'growing'].includes(stepNeed(w, s)?.missing) && held < WATCHER_HOLD;
       if (waitsOnCapacity && wantsToWake()) { held += spent; continue; }

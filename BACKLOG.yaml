@@ -2044,3 +2044,98 @@ items:
       feed on waking; (4) Surface's line now sits higher, over the colony's lower plates, to make room
       for the game under it.
     status: open
+
+  - id: B230
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (docs/playtests/2026-10-03-chapter-iv-overnight.md, B5)"
+    request: |
+      "Cryo I moves the goalpost three times." Every cryo tier lists its whole road at once, a tick on
+      each part done: "Cryo I needs: generators automated ✓, farms automated, mines automated, 15 k ★",
+      on the tree's node and under the sleep pill. Later tiers add what the sleep still meets (more ore,
+      spare power, food for N y) before the price.
+    status: done
+    resolved_in: deep-fix (version at merge)
+    notes: "readout.js cryoRoad (dry runs, each trouble patched on the copy so the next one shows); tree.js nodeStatus; index.js caption; fix.test.js; acceptance section 0."
+
+  - id: B231
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (B4, B15)"
+    request: |
+      Nothing is bought blind. The tree's top edge shows ore and stars with their day's flow, asleep the
+      capacity too, live. Every node's effect line carries before and after numbers from a dry run on a
+      copy: "Automation output ×3: ore 576 → 1 728 a day", "Sleepers eat nothing: food 563 d → ∞ while
+      asleep", "Automated rooms need no upkeep crew: power drawn 457 → 93 a day, ore burned 77 → 15 a day".
+    status: done
+    resolved_in: deep-fix (version at merge)
+    notes: "tree.js effectLine (worked out for the hovered node only); tree-view.js drawBalances; index.html #deep-tree-bal; acceptance sections 0, V, 1."
+
+  - id: B232
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (C2)"
+    request: |
+      People taken stay gone. A biological step takes its people AND their share of the beds, for good
+      (the sector's dormitories belong to the body: deep.js bodyKeep), and the colony mourns them. The H
+      bar's red delta now matches a count that stays lower; the ledger says "N beds went to the body".
+    status: done
+    resolved_in: deep-fix (version at merge)
+    notes: "deep.js bodyTakes, tickDay capacity; watcher.js sealSector; index.js wake mourns the body's people; acceptance section 2 (10 s later, people and beds still lower)."
+
+  - id: B233
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (B18, B20, D)"
+    request: |
+      The madness is felt. The base softens from the first points under 80 (k^0.7, not k^1.2); under 50
+      the Watcher's letters drift and the year's digits stutter; under 35 the "next:" line is garbled as
+      the wake lines are. The sector choice is a demand in the scheduler (watcher.js demand 'sector'):
+      while it waits no Surface and no lamps come, a visit already there is not shown, and while the
+      player chooses the meter holds.
+    status: done
+    resolved_in: deep-fix (version at merge)
+    notes: "watcher.js softness, textMadness, demand, watchSleep hold; index.js stutter, drawName, stepMadness; acceptance sections W and D."
+
+  - id: B234
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (B2, B6, B8, B10, C1)"
+    request: |
+      Small fixes: the machine's hover says the games and the energy fed in the readouts' short form
+      ("The machine plays 243 games a day on 1 energy. Each win is a star: +81/d."); "Cryo II can be
+      bought" once, kept in the save; a wake line is not repeated in the feed under the advisor; at Cryo
+      I and II a sleep nothing else ends wakes after 90 real seconds, "Woke: a look at the colony."; the
+      TREE button answers through the walk into the hall (gifts and feed can be bought there).
+    status: done
+    resolved_in: deep-fix (version at merge)
+    notes: "machine.js machineSays; readout.js cryoReadyLine; watcher.js lookDue (sim-phase4 keeps the same clock); style-deep.css is-busy; acceptance sections M, F, 1."
+
+  - id: B235
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (B18, rest)"
+    request: |
+      The sector choice is still hard to SEE: at "IV · the body" the candidate arms are a faint warm tint
+      on a tall tower drawn small. Light the arms strongly while choosing (and perhaps frame the camera on
+      them). Not done in deep-fix (scene.js look, for Ola's eye first).
+    status: open
+
+  - id: B236
+    added: 2026-10-03
+    source: "overnight playtest of v1.66.0 (not in deep-fix)"
+    request: |
+      Left from the report: B1 one button that digs and builds a room; B3 point at Feed first; B7 the
+      level sentence (partly: the effect line now reads "Doubles every farm: food 14 → 28 a day"); B9 the
+      wake strip without numbers; B12 "cap" named and shown; B13 Surface's line over the bright plates;
+      B14 one throw a visit; B16 huge numbers standing still and mixed notation ("8.7 B" next to "8e15");
+      B17 buy rules (asleep or awake) differ with no sign; B19 node and reason names differ; C3 the stale
+      "next:" in a closed tree; C4 the version label under the menu button.
+    status: open
+
+  - id: B237
+    added: 2026-10-03
+    source: "deep-fix (for Ola's eye)"
+    request: |
+      Decisions taken in deep-fix, to overrule: (1) the look wake comes every 90 real seconds at Cryo I
+      and II only, waits for Surface's game (at most 30 s more) and costs no stability; (2) the body takes
+      the beds as a SHARE of the colony's beds (people taken over the beds at the time), so a later dorm
+      level does not give them back; (3) the madness in the text starts at 50: letters up to 4 px off,
+      tilting under 25, the year showing a wrong digit or the year before for a tenth to a quarter of a
+      second; (4) an effect line shows at most three changed quantities, chosen per node; (5) the cryo
+      road's later parts (ore, power, food) are found by patching the copy one trouble at a time.
+    status: open

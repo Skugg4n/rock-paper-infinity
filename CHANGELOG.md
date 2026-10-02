@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased (deep-fix)
+
+### Chapter IV: the overnight playtest of v1.66.0, fixed (B230 to B237)
+
+docs/playtests/2026-10-03-chapter-iv-overnight.md, in the order it asked.
+
+- **Cryo I shows its whole road.** The tree's node and the sleep pill's caption list everything at once, a tick on each part done: "Cryo I needs: generators automated ✓, farms automated, mines automated, 15 k ★". Later tiers add what the sleep still meets (more ore, spare power, food) before the price. The goalpost no longer moves.
+- **Balances in the tree.** The tree's top edge shows ore and stars with their flow, asleep the capacity, live. Every node's effect line carries before and after numbers from a dry run on a copy: "Automation output ×3: ore 576 → 1 728 a day", "Sleepers eat nothing: food 563 d → ∞ while asleep", "Doubles every mine: ore 12 → 24 a day, ★ 81 → 73 a day".
+- **People taken stay gone.** A biological step takes its people and their share of the beds, for good: the sector's dormitories belong to the body. The colony mourns them. The red delta on the H bar now matches a count that stays lower; the ledger says how many beds went to the body.
+- **The madness is felt.** The base softens from the first points under 80, more as it falls. Under 50 the Watcher's letters drift and the year's digits stutter; under 35 the "next:" line loses or repeats a word, as the wake lines do. The sector choice is the one demand: no Surface game and no lamps while it waits, and the meter holds while the player chooses.
+- **Small fixes.** The machine's hover says the games: "The machine plays 243 games a day on 1 energy. Each win is a star: +81/d." "Cryo II can be bought" (not "is ready"), said once. A wake line is not repeated in the feed under the advisor. At Cryo I and II a sleep nothing else ends wakes after 90 s: "Woke: a look at the colony." The TREE button answers through the walk into the hall.
+- **Acceptance** (scripts/accept-iv-cut.mjs): the road at once, the balances, a gift's arrow with two numbers, people and beds still lower 10 s after a seal, the TREE button 0.5 s after Sleep, no second demand while a sector is chosen, the meter holding, the letters drifting at 20.
+- Sims: plain 24m47s (unchanged), --watcher 27m40s to 27m26s.
+
 ## v1.66.0 - 2026-10-03 (chapter IV, focus in the night)
 
 ### Chapter IV: focus in the night (step 3b, from Ola's playtest of v1.61.0)

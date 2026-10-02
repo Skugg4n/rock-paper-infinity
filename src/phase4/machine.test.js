@@ -151,11 +151,14 @@ describe('what the player sees', () => {
         expect(fed.throws).toBeGreaterThan(starved.throws);
     });
 
-    test('its hover reads what it plays on, live', () => {
-        expect(machineSays(40)).toBe('The machine plays. 40 energy a day. Each win is a star.');
-        expect(machineSays(3.71)).toBe('The machine plays. 3.7 energy a day. Each win is a star.');
-        expect(machineSays(2.3e9)).toBe('The machine plays. 2.3 B energy a day. Each win is a star.');
-        expect(machineSays(0)).toBe('The machine plays. 0 energy a day. Each win is a star.');
+    test('its hover reads what it plays on, live, in the readouts\' short form (deep-fix)', () => {
+        // the playtest of v1.66.0: "1 energy a day" next to "+81/d" stars; the games say how
+        expect(machineSays({ fed: 1.0, games: 243, stars: 81 })).toBe('The machine plays 243 games a day on 1 energy. Each win is a star: +81/d.');
+        expect(machineSays({ fed: 2.3e9, games: 6.1e10, stars: 2.03e10 })).toBe('The machine plays 61 B games a day on 2.3 B energy. Each win is a star: +20 B/d.');
+        expect(machineSays({ fed: 0.3, games: 81, stars: 27 })).toBe('The machine plays 81 games a day on less than 1 energy. Each win is a star: +27/d.');
+        expect(machineSays(0)).toBe('The machine plays 0 games a day on 0 energy. Each win is a star: +0/d.');
+        // a bare number is the energy fed; the games and the stars are the rule's
+        expect(machineSays(1)).toBe(machineSays({ fed: 1, games: gamesFor(1), stars: starsFor(1) }));
     });
 
     test('asleep its lamp keeps the automated rooms\' rhythm', () => {

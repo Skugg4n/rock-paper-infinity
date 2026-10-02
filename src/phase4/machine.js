@@ -14,7 +14,7 @@
  * spare energy it may draw, the less it slows.
  */
 
-import { feedShare, FEED_MAX } from './deep.js';
+import { feedShare, FEED_MAX, gamesFor, starsFor } from './deep.js';
 import { short } from './readout.js';
 
 /** Throws a second at its fastest: past this every arm is a blur. */
@@ -52,14 +52,20 @@ export function machineTempo(report, { asleep = false, feed = 0 } = {}) {
 }
 
 /**
- * The machine's hover: what it plays on, live.
- * @param {number} fed - energy fed a day
+ * The machine's hover: what it plays on, live. deep-fix: the playtest of v1.66.0 read "1 energy a
+ * day" next to "+81/d" stars and asked how one energy makes 81 stars. So it says the games too, and
+ * every number in the readouts' own short form: "The machine plays 243 games a day on 1 energy.
+ * Each win is a star: +81/d."
+ * @param {{fed?:number, games?:number, stars?:number}|number} r - the day's report (or the energy fed)
  * @returns {string}
  */
-export function machineSays(fed) {
-    const v = Math.max(0, fed || 0);
-    const n = v > 0 && v < 9.95 ? String(Math.round(v * 10) / 10) : short(v);
-    return `The machine plays. ${n} energy a day. Each win is a star.`;
+export function machineSays(r) {
+    const o = typeof r === 'number' ? { fed: r } : (r || {});
+    const fed = Math.max(0, o.fed || 0);
+    const games = Number.isFinite(o.games) ? Math.max(0, o.games) : gamesFor(fed);
+    const stars = Number.isFinite(o.stars) ? Math.max(0, o.stars) : starsFor(fed);
+    const energy = fed > 0 && Math.round(fed) < 1 ? 'less than 1' : short(fed);
+    return `The machine plays ${short(games)} ${Math.round(games) === 1 ? 'game' : 'games'} a day on ${energy} energy. Each win is a star: +${short(stars)}/d.`;
 }
 
 /**

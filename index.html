@@ -613,6 +613,10 @@
              drawn by src/phase4/tree-view.js; one fixed info box under it says what the hovered
              node is (no floating tooltips). Escape or the tree button closes it; the game ticks on -->
         <div class="deep-tree" id="deep-tree" hidden>
+            <!-- deep-fix: the money while shopping, live at the panel's top edge -->
+            <div class="deep-tree-bal deep-mono" id="deep-tree-bal">
+                <span class="tb-ore"></span><span class="tb-stars"></span><span class="tb-cap" hidden></span>
+            </div>
             <div class="deep-tree-stage">
                 <svg class="deep-tree-board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The tree"></svg>
                 <div class="deep-tree-foot">

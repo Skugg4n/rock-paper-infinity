@@ -37,7 +37,7 @@ import {
 import {
     ledger, buySentence, preview, deltaText, stocks, flows, flowText, previewStocks,
     nextOrePrice, affordText, cryoReadyLine, consequence, span, rateWords,
-    short, backIn, cryoNeed, lowPoint, rewardShows,
+    short, backIn, cryoNeed, lowPoint, rewardShows, cryoRoad,
 } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout, sectorOf } from './layout.js';
 import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
@@ -52,7 +52,7 @@ import {
     playSurface, SPACE_LINE, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, GO_UP_ALONE, sealLine, BODY_GROW_SECONDS,
     lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, rungOpenLine,
-    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody,
+    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, LOOK_EVERY_S, LOOK_TIERS, lookDue,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS } from './surface.js';
 import {
@@ -91,6 +91,7 @@ export const NEXT_LINE_MS = 5000;
 export const GAME_AFTER_LINE_MS = 1000;
 /** The people a biological step takes: the red delta over the H bar, and the number rolling down. */
 const DROP_MS = { roll: 1200, fade: 2400 };
+
 
 let abortController = null;
 let dayInterval = null;
@@ -280,6 +281,7 @@ export function init() {
     let sleepSum = null;            // the whole sleep, added up chunk by chunk, for the wake-up strip
     let lastSleepAt = 0;
     let sleepTicks = 0;
+    let lookClock = 0;              // deep-fix: real seconds of this sleep, for the look at Cryo I and II
     // what a dry run says would wake a sleep: today (`hall`, `current`, `next`), and once every
     // order on the books is built (`plannedHall`, `plannedNext`), which is what the player still has to buy
     let gates = { hall: null, current: null, next: null, plannedHall: null, plannedNext: null };
@@ -329,7 +331,7 @@ export function init() {
      *  their own, sixty times a second, and must touch nothing else. */
     function drawClock(day) {
         const cal = calendar(day);
-        ui.year.textContent = group(cal.year);
+        ui.year.textContent = stutter(group(cal.year));
         ui.month.textContent = cal.month;
         ui.dayOfMonth.textContent = cal.day;
     }
@@ -340,6 +342,68 @@ export function init() {
         ui.stars.textContent = formatCount(v.stars);
     }
     const snapshot = () => ({ day: state.day, ore: state.minerals, stars: state.stars });
+
+    /* ---- THE MADNESS IS FELT (deep-fix) ------------------------------------------------------
+       The overnight playtest of v1.66.0: "The madness is a number." Asleep, under 50 the year's
+       digits stutter now and then (a digit off by one, or the year before, for a moment) and the
+       Watcher's letters drift one by one, more the lower the meter. Under 35 the lines lose or
+       repeat a word (watcher.js garble). The rules never change; only what is shown. */
+    let stuttered = null;           // { text, until } while the year shows wrong
+    let yearShown = '';
+    function stutter(text) {
+        const now = performance.now();
+        const mad = state.asleep ? textMadness(state.watcher.stability) : 0;
+        if (!(mad > 0)) { stuttered = null; yearShown = text; return text; }
+        if (stuttered && now < stuttered.until) return stuttered.text;
+        stuttered = null;
+        if (Math.random() < 0.035 * mad) {
+            const digits = [...text].map((c, i) => (/\d/.test(c) ? i : -1)).filter((i) => i >= 0);
+            let wrong = yearShown && yearShown !== text ? yearShown : text;
+            if (wrong === text && digits.length) {
+                const i = digits[Math.floor(Math.random() * digits.length)];
+                const d = (Number(text[i]) + (Math.random() < 0.5 ? 9 : 1)) % 10;
+                wrong = text.slice(0, i) + d + text.slice(i + 1);
+            }
+            stuttered = { text: wrong, until: now + 90 + 160 * mad };
+            return wrong;
+        }
+        yearShown = text;
+        return text;
+    }
+    /** The Watcher's name as letters, so each can drift; drawn again only when the name changes. */
+    function drawName(name) {
+        const el = ui.watcherName;
+        if (!el || el.dataset.name === name) return;
+        el.dataset.name = name;
+        el.textContent = '';
+        for (const ch of name) {
+            const sp = document.createElement('span');
+            sp.textContent = ch;
+            el.appendChild(sp);
+        }
+    }
+    let drifting = false;
+    /** Once a frame: each letter of the name off its place by a little, more as the meter falls. */
+    function stepMadness(now) {
+        const el = ui.watcherName;
+        if (!el) return;
+        const mad = state.asleep && !state.watcher.gone ? textMadness(state.watcher.stability) : 0;
+        if (!(mad > 0)) {
+            if (drifting) { for (const sp of el.children) sp.style.transform = ''; drifting = false; }
+            return;
+        }
+        drifting = true;
+        const t = now / 1000;
+        const a = 0.6 + 3.4 * mad;           // px at most
+        let i = 0;
+        for (const sp of el.children) {
+            const k = i++ * 1.7;
+            const x = a * Math.sin(t * (0.9 + 0.13 * k) + k) * 0.6;
+            const y = a * Math.sin(t * (1.3 + 0.07 * k) + 2.1 * k);
+            const r = mad > 0.5 ? (mad - 0.5) * 16 * Math.sin(t * 0.7 + k) : 0;
+            sp.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${r.toFixed(1)}deg)`;
+        }
+    }
 
     /** What a tier sleeps, per second, for the badge: "1 y/s". */
     const rateLabel = (tier) => `${cryoLabel(CRYO[tier].days)}/s`;
@@ -367,7 +431,10 @@ export function init() {
     }
     /** What the tree is told about the colony today: the next cryo tier's one reason (kept once a
      *  colony day, never per frame), the stars a day for "affordable in", and whether it sleeps. */
-    const treeCtx = () => ({ need: needFor(), starsPerDay: report.stars, asleep: !!state.asleep });
+    const treeCtx = () => ({ need: needFor(), road: roadNow, starsPerDay: report.stars, orePerDay: report.parts.M, asleep: !!state.asleep });
+    /** deep-fix: the whole road to the next cryo tier (readout.js cryoRoad), kept once a colony day
+     *  with the gates; the tree's node and the sleep pill's caption both read it. */
+    let roadNow = null;
 
     /**
      * The tooltip of a purchase: the price, what it does, and then either what is still
@@ -403,7 +470,7 @@ export function init() {
         ui.starsDay.textContent = formatCount(report.stars);
         // deep-machine: the machine's tempo IS the stars a day; its hover says what it plays on
         scene?.setMachine(machineTempo(report, { asleep: !!state.asleep, feed: state.feed }), !!state.asleep);
-        machineText = machineSays(report.fed);
+        machineText = machineSays(report);
 
         // THE BARS ARE STORES (B056): each on its own scale, the weakest FLOW marked with the dot.
         // Under each, what comes in and what goes out in a day. Hovering a purchase draws a ghost
@@ -457,8 +524,10 @@ export function init() {
         const advice = state.asleep ? ''
             : (advisorLine || `Year ${group(cal.year)}. ${state.watcher.gone ? 'Nobody came out.' : low.line}`);
         if (ui.advisor.textContent !== advice) ui.advisor.textContent = advice;
-        // the feed: the last things worth saying, newest at the bottom; three awake, one asleep
-        const shown = feed.slice(-(state.asleep ? FEED_ASLEEP : FEED_AWAKE));
+        // the feed: the last things worth saying, newest at the bottom; three awake, one asleep.
+        // deep-fix: a line the advisor is saying is not said again right under it
+        const unsaid = advice ? feed.filter((l) => !advice.endsWith(l)) : feed;
+        const shown = unsaid.slice(-(state.asleep ? FEED_ASLEEP : FEED_AWAKE));
         if (ui.feed.childElementCount !== shown.length
             || (shown.length && ui.feed.firstElementChild.textContent !== shown[0])
             || (shown.length && ui.feed.lastElementChild.textContent !== shown[shown.length - 1])) {
@@ -523,7 +592,9 @@ export function init() {
         if (owns) setCaption(ui.cryoCaption, state.humans < MIN_SLEEPERS ? `needs ${MIN_SLEEPERS} people` : '');
         if (state.asleep) {
             ui.wakeBtn.classList.toggle('is-locked', busy);
-            setTooltip(ui.wakeBtn, says('Wake the colony.') + note(`${cryoName(tier)}: ${rateWords(CRYO[tier].days)} a second.`));
+            setTooltip(ui.wakeBtn, says('Wake the colony.') + note(`${cryoName(tier)}: ${rateWords(CRYO[tier].days)} a second.`)
+                + note(tier < LOOK_TIERS && !firstSleep(state.watcher)
+                    ? `If nothing wakes them first, they wake for a look in ${Math.max(1, Math.ceil(LOOK_EVERY_S - lookClock))} s.` : ''));
         } else if (gone) {
             // nobody is left to sleep
         } else if (owns) {
@@ -538,10 +609,12 @@ export function init() {
         } else {
             // deep-tree: the hall is bought in the tree (Cryo I); the reason it cannot be yet is the
             // node's, and the same words
-            setCaption(ui.cryoCaption, `needs ${cryoName(0)}`);
+            // deep-fix: the whole road at once, a tick on each part done
+            const road = roadNow;
+            setCaption(ui.cryoCaption, road && !road.open ? `${cryoName(0)} ${road.text}` : `needs ${cryoName(0)}`);
             ui.cryoBtn.classList.add('is-locked');
             setTooltip(ui.cryoBtn, says(`Sleep needs a cryo hall: ${cryoName(0)}, in the tree.`)
-                + note(need ? need.long : '', 'is-missing'));
+                + note(road && !road.open ? `${cryoName(0)} ${road.text}.` : (need ? need.long : ''), 'is-missing'));
         }
         // ---- scout parties: people up the shaft, for a reading of the sky ----
         // Everything about a party is on the button before it goes (v1.45.0): who, how long, the
@@ -621,8 +694,7 @@ export function init() {
             ui.watcher.hidden = !asleep && !w.gone;
             ui.watcher.classList.toggle('is-whole', !!w.gone);
             if (asleep || w.gone) {
-                const name = watcherName(w);
-                if (ui.watcherName.textContent !== name) ui.watcherName.textContent = name;
+                drawName(watcherName(w));
                 const stab = Math.round(w.stability);
                 const v = String(stab);
                 if (ui.stabVal.textContent !== v) ui.stabVal.textContent = v;
@@ -672,15 +744,21 @@ export function init() {
     /** A node clicked. The tree says whether it can be bought; the phase does the rest: the layout,
      *  the faults a purchase clears, the feed, the sector a biological step asks for. */
     function buyNode(id, many = false) {
-        if (busy || paused()) return false;
+        if (paused()) return false;
         const n = NODE_BY_ID[id];
         if (!n) return false;
+        // deep-fix: the tree is open through the walk into the hall; what is paid at once and needs
+        // no one awake or asleep (Surface's gifts, the machine's feed) can be bought in it too
+        if (busy && !(n.kind === 'surface' || n.kind === 'feed')) return false;
         if (n.kind === 'watcher' || n.kind === 'bio') {
             const out = treeBuy(state, id, { ...treeCtx(), slots: layout.slots, choose: true });
             if (!out) return false;
             // a biological step paid for and waiting for its sector: the tree closes, the arms light
             if (out.choose || (out.step && out.step.pending)) {
                 if (out.step?.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
+                // deep-fix: the sector is the one demand now: the lamps go quiet, Surface waits
+                if (state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
+                surfaceKey = '';
                 saveGame();
                 closeTree();
                 enterChoice();
@@ -829,7 +907,8 @@ export function init() {
     function drawSurface() {
         if (!ui.surface) return;
         const sf = state.watcher.surface;
-        const v = state.asleep ? sf.visit : null;
+        // deep-fix: while a sector waits to be chosen, that is the one demand: a visit already here is not shown
+        const v = state.asleep && !choosingSector(state.watcher) ? sf.visit : null;
         ui.surface.hidden = !v;
         drawVoice(v);
         if (!v) { surfaceKey = ''; return; }
@@ -1078,7 +1157,7 @@ export function init() {
     }
 
     /** The dry runs behind the cryo buttons. Once a colony day, never per frame. */
-    let readyTold = state.cryo;       // the highest tier the advisor has called ready
+    let readyTold = Math.max(state.cryo ?? -1, Number.isFinite(state.cryoTold) ? state.cryoTold : -1);   // the highest tier the advisor has called buyable
     function recomputeGates() {
         if (state.asleep) return;
         const owns = state.cryo >= 0;
@@ -1091,10 +1170,14 @@ export function init() {
             plannedHall: owns ? null : sleepTrouble(planned, CRYO[0].days),
             plannedNext: owns && nextDays ? sleepTrouble(planned, nextDays) : null,
         };
-        // the day a longer sleep can be had, the advisor says so once: "Cryo IV is ready: a century a second."
+        // deep-fix: the whole road to the next tier, every part at once
         const want = state.cryo + 1;
+        roadNow = CRYO[want] && want <= CRYO_TOP ? cryoRoad(want, state) : null;
+        // the day a longer sleep can be bought, the advisor says so once: "Cryo IV can be bought: a
+        // century a second." (deep-fix: kept in the save, so a reload does not say it again)
         if (CRYO[want] && want <= CRYO_TOP && want > readyTold && !needFor(want)) {
             readyTold = want;
+            state.cryoTold = want;
             feed = pushFeed(feed, [cryoReadyLine(want)]);
         }
     }
@@ -1286,7 +1369,7 @@ export function init() {
         placeBuilt(sum.built);
         addToSum(sum);
         // the Watcher counts the years, drifts, and banks what the machines spared
-        sum.watch = watchSleep(state.watcher, { days: sum.days, tier: state.cryo, spare: sum.spare });
+        sum.watch = watchSleep(state.watcher, { days: sum.days, tier: state.cryo, spare: sum.spare, hold: choosing });
         report = dryRun();
         scene?.setState(state, layout);
         return sum;
@@ -1309,6 +1392,7 @@ export function init() {
         sleepSum = freshSum();
         sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
         sealedThisSleep.length = 0;
+        lookClock = 0;
         nightAtSleep = state.watcher.surface.night | 0;
         // the first sleep says one thing, once, what the label under the scene is (v1.52.0: in the
         // feed, the one line the sleep world shows)
@@ -1357,9 +1441,13 @@ export function init() {
         const sum = sleepChunk(days);
         rollTo(snapshot(), SLEEP_TICK_MS / 1000 + 0.02);
         sleepTicks++;
-        // the first sleep ends on a plain alarm after a year, never on a reboot (v1.48.0)
+        lookClock += dt;
+        // the first sleep ends on a plain alarm after a year, never on a reboot (v1.48.0); deep-fix:
+        // at Cryo I and II a sleep nothing else ends wakes for a look, once nothing asks on screen
+        const look = !choosing && !hDrop && !rps && lookDue(state.watcher, state.cryo, lookClock);
         const woke = alarmOf(sum)
-            || (firstSleep(state.watcher) && sleepSum && sleepSum.days >= FIRST_SLEEP_DAYS ? { kind: 'first' } : null);
+            || (firstSleep(state.watcher) && sleepSum && sleepSum.days >= FIRST_SLEEP_DAYS ? { kind: 'first' } : null)
+            || (look ? { kind: 'look' } : null);
         if (woke) { wake(woke).catch((e) => console.error('the deep: the wake broke', e)); return; }
         // ONE DEMAND AT A TIME (v1.51.0): the lamps now and then (never over an alarm, never while
         // Surface is here, at most once in two sleeps), and in some sleeps, a few seconds in,
@@ -1413,10 +1501,13 @@ export function init() {
         // deep-night: a sleep that brought no night, with one still to come, says what it waits for,
         // once, in the alarm line's place when that has had its time
         nextLine = (w.surface.night | 0) === nightAtSleep && nightAhead(state) ? nightNext(state, { asleep: false }).text : '';
+        // deep-fix: low, the "next:" line is said slightly wrong too, as the wake lines are
+        if (nextLine) nextLine = watcherLines(w, [nextLine])[0];
         if (nextLine && !advisorLine) { advisorLine = nextLine; advisorUntil = performance.now() + NEXT_LINE_MS; nextLine = ''; }
         const t = sleepSum || freshSum();
-        // lives lost in the ice are mourned: no one is born for a year after the wake (v1.48.0)
-        if (t.died >= 0.5) mourn(state);
+        // lives lost in the ice are mourned: no one is born for a year after the wake (v1.48.0); deep-fix:
+        // and the people the body took in this sleep, whose year went by under the ice
+        if (t.died >= 0.5 || sealedThisSleep.length) mourn(state);
         const ran = {};
         for (const r of ROOMS) ran[r] = t.days > 0 ? (t.ranDays[r] || 0) / t.days : 1;
         state.stalled = stalledRooms(state, { ran });
@@ -1663,7 +1754,8 @@ export function init() {
         saveGame();
     }, { signal });
     ui.ask.addEventListener('click', () => { if (!busy && !paused()) enterChoice(); }, { signal });
-    ui.treeBtn.addEventListener('click', () => { if (!busy) toggleTree(); }, { signal });
+    // deep-fix: the TREE button answers through the walk into the hall (it was dead for 2.5 s)
+    ui.treeBtn.addEventListener('click', () => toggleTree(), { signal });
     for (const b of ui.rpsBtns) b.addEventListener('click', () => throwAtSurface(b.dataset.throw), { signal });
 
     // a click puts a button's tooltip away until the cursor leaves it (v1.48.0: the snowflake's
@@ -1761,6 +1853,7 @@ export function init() {
         stepCursor();
         stepVoice();
         stepLamps();
+        stepMadness(now);
         // paused, the scene still draws (and the camera still turns by hand), but nobody walks
         // and the base's jitter holds still
         scene?.step(paused() ? 0 : dt);
@@ -1817,6 +1910,9 @@ export function init() {
         get treeLog() { return treeView ? treeView.log : []; },
         // deep-night, for the tests: the night log's last line, and what the next night waits for now
         get treeLogNext() { return treeView ? treeView.logNext : ''; },
+        // deep-fix, for the tests: the balances at the tree's top edge, and the road to the next tier
+        get treeBalances() { return treeView ? treeView.balances : ''; },
+        get road() { return roadNow; },
         get nightNext() { return nightNext(state); },
         openTree: () => openTree(),
         closeTree: () => closeTree(),

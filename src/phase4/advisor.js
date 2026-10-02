@@ -114,7 +114,7 @@ export const DESCENT_LINE = 'The surface will heal. Not in our lifetimes. We dig
 export const ALARM_GLYPH = {
     food: 'wheat', energy: 'zap', stall: 'triangle-alert', few: 'user-minus', scouts: 'radar',
     estimate: 'sunrise', surface: 'sunrise', act: 'check', manual: 'sun', debug: 'bell', reboot: 'power',
-    first: 'sunrise', nobody: 'user-x',
+    first: 'sunrise', nobody: 'user-x', look: 'eye',
 };
 /** A stalled room shows its own glyph instead: the mine that stopped, not a warning sign. */
 export const alarmGlyph = (alarm, roomIcon = {}) => (alarm?.kind === 'stall' && roomIcon[alarm.type])
@@ -206,6 +206,9 @@ export function alarmLine(alarm) {
     case 'nobody':
         // v1.50.0: the last wake-up. The body is whole; nobody came out.
         return 'Woke: nobody came out.';
+    case 'look':
+        // deep-fix: at Cryo I and II a sleep that nothing else ends wakes for a look (index.js LOOK_EVERY_S)
+        return 'Woke: a look at the colony.';
     default:
         return 'Woke: the hall was opened by hand.';
     }

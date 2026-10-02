@@ -1298,3 +1298,41 @@ body.in-deep #version-info { z-index: 1400; }
 /* the one line under the Watcher: where the sleep world stands */
 .deep-watcher-arc { font-size: 10px; letter-spacing: 0.22em; color: #8d877b; line-height: 12px; }
 .deep-watcher-arc:empty { display: none; }
+
+/* ---- deep-fix: the overnight playtest of v1.66.0 ----------------------------------------------
+   THE MONEY WHILE SHOPPING: the balances at the top edge of the tree, live (ore and stars with their
+   day's flow, asleep the capacity too). Every price in the tree is in these. */
+.deep-tree-bal {
+    position: absolute;
+    top: 8px;
+    left: 40px;
+    right: 256px;
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: #d5dbe3;
+    white-space: nowrap;
+    pointer-events: none;
+}
+.deep-tree-bal .tb-stars { color: #ffffff; font-weight: 700; }
+.deep-tree-bal .tb-cap[hidden] { display: none; }
+.deep-tree-stage { top: 34px; }
+/* the effect line carries its numbers: two rows when it needs them */
+.deep-tree-info { height: 116px; }
+.deep-tree-info .ib-eff {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+/* the whole road to Cryo I under the sleep pill: it may wrap, growing upward */
+#phase-deep #deep-cryo-caption { white-space: normal; width: 300px; text-align: right; }
+/* THE TREE BUTTON IS LIVE THROUGH THE WALK INTO THE HALL: the rest of the column waits */
+#phase-deep.is-busy .deep-btn-col #deep-tree-btn { pointer-events: auto; }
+#phase-deep.is-busy #deep-tree-btn:not(.is-locked) { opacity: 1; }
+/* THE MADNESS IS FELT: under 50 the Watcher's letters drift one by one (index.js stepMadness) */
+.deep-watcher-name { white-space: pre; }
+.deep-watcher-name > span { display: inline-block; will-change: transform; }

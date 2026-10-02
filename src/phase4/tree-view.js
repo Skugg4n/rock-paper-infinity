@@ -17,11 +17,17 @@
  *
  * deep-night (step 3b): under the lines, the sentence as far as it is known (it is no longer on
  * screen between visits), and a last line that says what the next night waits for.
+ *
+ * deep-fix: the balances live at the top edge of the panel (ore, stars, and asleep the capacity), so
+ * nothing is bought blind, and the info box's effect line carries its before and after numbers
+ * (tree.js effectLine, a dry run on a copy), worked out only for the node under the cursor.
  */
 
 import {
     NODES, NODE_BY_ID, BOARD, NODE, ROOT_SIZE, TAGS, BRANCHES, tracePath, chainTo, nodeStatus, nightLog, nightNext,
+    effectLine,
 } from './tree.js';
+import { capacityMax } from './watcher.js';
 import { sentenceShown } from './surface.js';
 import { short } from './readout.js';
 
@@ -65,6 +71,13 @@ const poly = (pts) => `M ${pts.map((p) => `${p[0]} ${p[1]}`).join(' L ')}`;
  */
 export function createTreeView(host, { state, ctx, onBuy }) {
     const svg = host.querySelector('svg.deep-tree-board');
+    // deep-fix: the balances at the top edge
+    const bal = {
+        ore: host.querySelector('.deep-tree-bal .tb-ore'),
+        stars: host.querySelector('.deep-tree-bal .tb-stars'),
+        cap: host.querySelector('.deep-tree-bal .tb-cap'),
+    };
+    let effect = { key: '', text: '' };      // the hovered node's effect line, worked out once a change
     const info = {
         box: host.querySelector('.deep-tree-info'),
         name: host.querySelector('.deep-tree-info .ib-name'),
@@ -255,8 +268,25 @@ export function createTreeView(host, { state, ctx, onBuy }) {
             }
         }
         for (const b of BRANCHES) tagEls[b].style.display = shownBranch[b] ? '' : 'none';
+        drawBalances(s, c);
         drawLog(s);
         writeInfo(hoverId);
+    }
+
+    /** The money while shopping: ore and stars with their day's flow, and asleep the capacity. */
+    const rate = (v) => (Number.isFinite(v) && Math.abs(v) >= 0.5 ? ` ${v >= 0 ? '+' : '-'}${short(Math.abs(v))}/d` : '');
+    let balText = '';
+    function drawBalances(s, c) {
+        const set = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
+        const ore = `ORE ${short(s.minerals || 0)}${rate(c.orePerDay)}`;
+        const stars = `★ ${short(s.stars || 0)}${rate(c.starsPerDay)}`;
+        const w = s.watcher;
+        const cap = s.asleep && w ? `CAPACITY ${Math.floor(w.capacity || 0)} / ${capacityMax(w)}` : '';
+        set(bal.ore, ore);
+        set(bal.stars, stars);
+        set(bal.cap, cap);
+        if (bal.cap) bal.cap.hidden = !cap;
+        balText = [ore, stars, cap].filter(Boolean).join(' · ');
     }
 
     /** THE NIGHT LOG: drawn again only when a line is added (or a node it ties to shows). */
@@ -344,7 +374,11 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         else if (st.price) cost = `next ${st.priceText}`;
         else if (st.level >= st.max || st.level + st.ordered >= st.max) cost = st.ordered ? 'on order' : 'bought';
         set(info.cost, cost);
-        set(info.eff, st.does);
+        // deep-fix: the effect line with its numbers, from a dry run on a copy (the hovered node only)
+        const s = state();
+        const key = `${id}|${Math.floor(s.day || 0)}|${st.level}|${st.ordered}|${s.asleep ? 1 : 0}|${st.opened ? 1 : 0}|${Math.round(s.humans || 0)}`;
+        if (effect.key !== key) effect = { key, text: effectLine(s, id) };
+        set(info.eff, effect.text || st.does);
         let x = '';
         let cls = '';
         if (st.status === 'surface') { x = st.reason; }        // "Not ours to open."
@@ -409,6 +443,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         get log() { return logged.slice(); },
         /** For the tests: the log's last line, what the next night waits for ('' when there is none). */
         get logNext() { return loggedNext; },
+        /** For the tests: the balances at the top edge, as drawn. */
+        get balances() { return balText; },
         get hovered() { return hoverId; },
         destroy() { ac.abort(); },
     };

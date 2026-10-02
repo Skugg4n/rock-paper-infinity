@@ -13,7 +13,7 @@
  * energy and the wall clock; the tests hand it numbers.
  */
 
-import { CRYO, DAYS_PER_YEAR, BAD_ALARMS, MIN_SLEEPERS } from './deep.js';
+import { CRYO, DAYS_PER_YEAR, BAD_ALARMS, MIN_SLEEPERS, bodyTakes } from './deep.js';
 import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS, nightGift } from './surface.js';
 import { sectorOf, SECTORS } from './layout.js';
 
@@ -49,10 +49,31 @@ const tierOf = (tier) => Math.max(0, Math.min(CRYO.length - 1, tier | 0));
 /** Slept years a point of stability lasts at this tier. */
 export const driftYears = (tier) => CRYO[tierOf(tier)].days / DAYS_PER_YEAR / DRIFT_PER_SECOND[tierOf(tier)];
 
+/** deep-fix: at Cryo I and II (tiers under LOOK_TIERS) a sleep that nothing else ends wakes for a
+ *  look after LOOK_EVERY_S real seconds ("Woke: a look at the colony."), so a sleep with no alarm
+ *  still has an end (the playtest of v1.66.0 slept three minutes at Cryo I with nothing to wake it).
+ *  It costs the meter nothing. index.js and scripts/sim-phase4.mjs keep the clock. */
+export const LOOK_EVERY_S = 90;
+export const LOOK_TIERS = 2;
+/** A visit from Surface whose game is still to be played holds the look back, at most this long. */
+export const LOOK_HOLD_S = 30;
+/**
+ * Is the look due? At Cryo I or II, past the first sleep, LOOK_EVERY_S real seconds into this sleep,
+ * nothing else asking (a sector to choose, the lamps), and Surface's game played (or held long enough).
+ * @param {object} w - the Watcher
+ * @param {number} tier - the colony's cryo tier
+ * @param {number} seconds - real seconds of this sleep
+ */
+export function lookDue(w, tier, seconds) {
+    if (!(tier < LOOK_TIERS) || firstSleep(w) || !(seconds >= LOOK_EVERY_S) || w.sealing || w.puzzle) return false;
+    const v = w.surface && w.surface.visit;
+    return !v || !!v.result || seconds >= LOOK_EVERY_S + LOOK_HOLD_S;
+}
+
 /** An alarm is a jolt: a bad one costs more than good news. The hand and the reboot cost nothing. */
 export const ALARM_DROP_BAD = 6;
 export const ALARM_DROP = 2;
-const NO_DROP = ['manual', 'debug', 'reboot', 'first'];
+const NO_DROP = ['manual', 'debug', 'reboot', 'first', 'look'];
 
 /** At zero the system reboots: the colony wakes, and the meter comes back at this. */
 export const REBOOT_TO = 40;
@@ -178,17 +199,20 @@ export const sleepDays = (seconds, tierDays, paused = false) => (paused ? 0 : Ma
  * machines spare.
  *
  * @param {object} w - the Watcher, mutated
- * @param {{days:number, tier:number, spare?:number}} slept - days slept, the tier they were
- *        slept at, and the spare energy summed over those days (sleep()'s `sum.spare`)
+ * @param {{days:number, tier:number, spare?:number, hold?:boolean}} slept - days slept, the tier they
+ *        were slept at, the spare energy summed over those days (sleep()'s `sum.spare`), and `hold`
+ *        (deep-fix): no drift for these days, while the player chooses a sector
  * @returns {{rebooted:boolean, named:boolean}} rebooted: stability hit zero and came back at
  *          REBOOT_TO (the phase wakes the colony); named: always false since deep-voice (the label
  *          changes on Surface's first night, openSurface)
  */
-export function watchSleep(w, { days, tier, spare = 0 }) {
+export function watchSleep(w, { days, tier, spare = 0, hold = false }) {
     const d = Math.max(0, days || 0);
     const years = d / DAYS_PER_YEAR;
     w.sleptYears += years;
-    if (!firstSleep(w)) w.stability = Math.max(0, w.stability - years * driftFactor(w) / driftYears(tier));
+    // deep-fix: `hold`, while a sector is being chosen, the meter holds (a click there seals, it
+    // does not snap: the playtest fell from 51 to 6 and rebooted right after the seal)
+    if (!firstSleep(w) && !hold) w.stability = Math.max(0, w.stability - years * driftFactor(w) / driftYears(tier));
     const k = capacityGain(w);
     const cap = k * CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
     w.grown = (w.grown || 0) + d / CRYO[tierOf(tier)].days;       // the body grows only in the dark
@@ -244,11 +268,20 @@ export function snap(w, now, tier = 0) {
     return w.stability - before;
 }
 
-/** How soft the base is, 0 (rigid) to 1 (as soft as it gets), from the stability. */
+/** How soft the base is, 0 (rigid) to 1 (as soft as it gets), from the stability.
+ *  deep-fix: the overnight playtest of v1.66.0 saw the base rigid at 42 and wavering only near 5
+ *  (the curve was k^1.2, a third of the way at 42). Now it is felt from the first points under
+ *  SOFT_FROM and grows as the meter falls: a fifth of the way at 70, half at 50, four fifths at 20. */
+export const SOFT_CURVE = 0.7;
 export function softness(stability) {
     const k = clamp((SOFT_FROM - stability) / SOFT_FROM, 0, 1);
-    return Math.pow(k, 1.2);
+    return Math.pow(k, SOFT_CURVE);
 }
+/** deep-fix: under this the madness reaches the text: the Watcher's letters drift and the year's
+ *  digits stutter (index.js). Under GARBLE_BELOW the lines themselves lose or repeat a word. */
+export const DRIFT_TEXT_BELOW = 50;
+/** How far gone the text is, 0 (at DRIFT_TEXT_BELOW and over) to 1 (at zero). */
+export const textMadness = (stability) => clamp((DRIFT_TEXT_BELOW - stability) / DRIFT_TEXT_BELOW, 0, 1);
 
 /* ---- the feed goes slightly wrong ---------------------------------------- */
 
@@ -404,8 +437,12 @@ export function makePuzzle(seed, lamps = [], { kind = null, stability = STABILIT
     return k === 'dark' ? makeDarkPuzzle(seed, lamps) : makeLampPuzzle(seed, lamps, stability);
 }
 
-/** THE SCHEDULER: what is asking for the player now. Surface, or the lamps, or nothing; never two. */
+/** THE SCHEDULER: what is asking for the player now. A sector to seal, Surface, or the lamps, or
+ *  nothing; never two. deep-fix: a biological step paid for and waiting for its sector comes first
+ *  (the playtest of v1.66.0 had Surface's game on screen while it chose); while it waits neither
+ *  Surface nor the lamps may come, and a visit already there is not shown (index.js). */
 export function demand(w) {
+    if (w && w.sealing) return 'sector';
     if (w && w.surface && w.surface.visit) return 'surface';
     if (w && w.puzzle) return 'lamps';
     return null;
@@ -739,8 +776,10 @@ export function sealSector(w, s, slots, sector) {
     // its share of the colony as it is now; some always stay under the ice
     const people = Math.max(0, Math.min(peopleFor(step, s), Math.floor((s.humans || 0) - MIN_SLEEPERS)));
     s.humans -= people;
-    // the sector's rooms keep producing as they did, the dormitories too: they are part of the
-    // body now, and the creches refill what the body took. The cost shows at the last wake.
+    // the sector's rooms keep producing as they did: they are part of the body now. deep-fix: the
+    // people taken take their beds with them (deep.js bodyTakes), so the creches cannot grow them
+    // back in the next second, and the colony mourns them
+    bodyTakes(s, people);
     w.sealed = (w.sealed || []).concat([sector]);
     w.sealing = null;
     w.bought = (w.bought || []).concat([step.id]);

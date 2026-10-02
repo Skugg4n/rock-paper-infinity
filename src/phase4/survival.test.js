@@ -189,6 +189,6 @@ describe('every number in one short form', () => {
         expect(cryoGateShort(1, { kind: 'energy', pct: 80 })).toBe('needs spare power');
         expect(cryoGateShort(2, null, { stars: 0 })).toBe(`needs ${short(CRYO[2].cost)} stars`);
         expect(cryoGateShort(2, null, { stars: CRYO[2].cost })).toBe('');
-        expect(cryoReadyLine(3)).toBe('Cryo IV is ready: a century a second.');
+        expect(cryoReadyLine(3)).toBe('Cryo IV can be bought: a century a second.');
     });
 });
