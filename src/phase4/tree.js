@@ -32,14 +32,16 @@
 
 import {
     CRYO, CRYO_TOP, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
-    tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedCost, feedShare,
+    tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedCost, feedShare, ROOMS, BIRTH_FOOD,
+    FOOD_ALARM_DAYS, NIGHT_VISION_LATE, scoutOdds, isQueued, MIN_SLEEPERS,
 } from './deep.js';
 import { NIGHTS, nightsSaid, visitDue } from './surface.js';
 import {
     LADDER, RUNGS, has as watcherHas, nextStep, stepNeed, buyStep, peopleFor, firstSleep,
+    DRIFT_PER_SECOND, driftFactor, snapGain, capacityMax, capacityGain, puzzleGain, CAPACITY_PER_SECOND,
 } from './watcher.js';
-import { affordText, buySentence, cryoNeed, rateWords, short } from './readout.js';
-import { ROOM_WORD } from './advisor.js';
+import { affordText, buySentence, cryoNeed, cryoRoad, rateWords, short } from './readout.js';
+import { ROOM_WORD, ROOM_WORDS } from './advisor.js';
 
 export const BOARD = { w: 1000, h: 730 };
 export const NODE = 36;
@@ -479,9 +481,15 @@ export function nodeStatus(state, id, ctx = {}) {
     else status = 'locked';
     const top = level + orders >= n.max;
     const price = top || (n.kind === 'surface' && !isOpen) || n.kind === 'teaser' || n.kind === 'root' ? null : priceOf(state, id);
+    // deep-fix: the next cryo tier lists its whole road at once, a tick on each part done
+    let reason = can.reason;
+    if (n.kind === 'cryo' && status === 'locked' && (can.kind === 'gate' || can.kind === 'afford')) {
+        const road = ctx.road !== undefined ? ctx.road : cryoRoad(n.tier, state);
+        if (road && road.items.length) reason = `${cryoName(n.tier)} ${road.text}`;
+    }
     return {
         id, visible, status, level, max: n.max, ordered: orders, price, priceText: priceText(price),
-        reason: can.reason, kind: can.kind, does: doesOf(state, id), name: n.name.replace(/\n/g, ' '),
+        reason, kind: can.kind, does: doesOf(state, id), name: n.name.replace(/\n/g, ' '),
         // deep-voice: a gift Surface has opened, and the line that opened it
         opened: isOpen, quote: isOpen ? quoteOf(id) : '',
     };
@@ -506,6 +514,145 @@ export function doesOf(state, id) {
     if (!step) return '';
     if (n.kind === 'bio') return `${RUNGS[step.rung]}: ${step.does} Takes ${short(peopleFor(step, state))} people and seals a sector you choose.`;
     return `${RUNGS[step.rung]}: ${step.does}`;
+}
+
+/* ---- BEFORE AND AFTER (deep-fix) -------------------------------------------------------------
+   The overnight playtest of v1.66.0: "Gifts are bought blind." Every node's effect line now says
+   what it does in numbers worked out by a dry run on a copy of the colony: the day as it is (every
+   order on the books built) against the same day with this level, automation, gift or step in place.
+   "Automation output ×3: ore 576 → 1 728 a day." Nothing here is estimated. */
+
+/** "576 → 1 728" */
+export const arrow = (a, b) => `${short(a)} → ${short(b)}`;
+const dayOf = (c, asleep) => {
+    const r = tickDay(c, asleep);
+    const drawn = ROOMS.reduce((a, t) => a + r.draw[t], 0);
+    const net = r.food - r.eaten - r.born * BIRTH_FOOD;
+    return {
+        ore: r.minerals, food: r.food, energy: r.energyMade, drawn, burned: r.fuel, beds: r.capacity,
+        hands: r.hands, stars: r.stars, eaten: r.eaten,
+        // how long the larder lasts at this day's flow (asleep: under the ice)
+        cover: net >= 0 ? Infinity : Math.max(0, c.food) / -net,
+    };
+};
+const QTY = {
+    ore: ['ore', ' a day'], food: ['food', ' a day'], energy: ['energy', ' a day'], drawn: ['power drawn', ' a day'],
+    burned: ['ore burned', ' a day'], beds: ['beds', ''], hands: ['free hands', ''], stars: ['★', ' a day'],
+};
+/** The quantities that change, in the order asked, at most `max` of them. */
+function changed(a, b, keys, max = 3) {
+    const out = [];
+    for (const k of keys) {
+        if (out.length >= max) break;
+        const x = a[k], y = b[k];
+        if (!Number.isFinite(x) || !Number.isFinite(y) || short(x) === short(y)) continue;
+        out.push(`${QTY[k][0]} ${arrow(x, y)}${QTY[k][1]}`);
+    }
+    return out.join(', ');
+}
+/** The colony as it will stand with every order built: a deep copy. */
+const copyOf = (state) => { const c = ordersDone(state); c.probes = []; return c; };
+const PRIMARY = { mine: 'ore', farm: 'food', generator: 'energy', dorm: 'beds' };
+const lead = (s) => String(s || '').replace(/[.\s]+$/, '');
+
+/**
+ * The node's effect line with its numbers: "Doubles every mine: ore 576 → 1 152 a day, ★ 81 → 95
+ * a day." '' when the node has nothing to say (a teaser, the root, a node at its top).
+ * @param {object} state
+ * @param {string} id
+ * @returns {string}
+ */
+export function effectLine(state, id) {
+    const n = NODE_BY_ID[id];
+    if (!n || n.kind === 'root' || n.kind === 'teaser') return '';
+    if (n.kind === 'surface' && !opened(state, id)) return '';
+    const level = levelOf(state, id) + orderedOf(state, id);
+    if (level >= n.max) return '';
+    const asleep = !!state.asleep;
+    const say = (head, nums) => (nums ? `${lead(head)}: ${nums}.` : `${lead(head)}.`);
+    try {
+        if (n.kind === 'level' || n.kind === 'auto' || n.kind === 'feed') {
+            const base = copyOf(state);
+            const next = copyOf(state);
+            const t = n.type;
+            if (n.kind === 'level') next.level[t] = (next.level[t] || 0) + 1;
+            else if (n.kind === 'auto') next.auto[t] = (next.auto[t] || 0) + 1;
+            else next.feed = levelOf(state, id) + 1;
+            const a = dayOf(base, asleep), b = dayOf(next, asleep);
+            if (n.kind === 'feed') return say(`The machine draws ${Math.round(100 * feedShare(next.feed))} % of the spare energy`, changed(a, b, ['stars']));
+            const keys = [PRIMARY[t], 'stars', 'hands', 'drawn'];
+            const head = n.kind === 'level' ? `Doubles every ${ROOM_WORD[t]}`
+                : (base.auto[t] || 0) === 0 ? `Runs the ${ROOM_WORDS[t]} without people` : `Triples what the ${ROOM_WORDS[t]} make`;
+            return say(head, changed(a, b, keys));
+        }
+        if (n.kind === 'cryo') {
+            const now = state.cryo ?? -1;
+            const from = now >= 0 ? `${rateWords(CRYO[now].days)}` : 'nothing';
+            return say(n.tier === 0 ? 'A cryo hall, dug with its own chamber' : 'A longer sleep',
+                `a second of sleep is ${from} → ${rateWords(CRYO[n.tier].days)}`);
+        }
+        if (n.kind === 'surface') {
+            if (id === 'question') return say('Opens BIOLOGICAL', `the body's steps 0 → ${LADDER.filter((u) => u.rung === 2).length}`);
+            if (id === 'longcount') {
+                const now = Math.max(0, state.cryo ?? 0);
+                return say(n.does, `a second of sleep is ${rateWords(CRYO[now].days)} → ${rateWords(CRYO[CRYO_TOP + 1].days)}`);
+            }
+            const base = copyOf(state);
+            const next = copyOf(state);
+            next.tree = { ...(next.tree || {}), bought: [...((next.tree && next.tree.bought) || []), id] };
+            if (id === 'cold') {
+                // the gift is for the sleep: measured under the ice, awake or not
+                const a = dayOf(base, true), b = dayOf(next, true);
+                const days = (v) => (Number.isFinite(v) ? `${short(v)} d` : '∞');
+                const nums = Number.isFinite(a.cover)
+                    ? `food ${days(a.cover)} → ${days(b.cover)} while asleep`
+                    : `sleepers eat ${arrow(a.eaten, b.eaten)} food a day`;
+                return say('Sleepers eat nothing', nums);
+            }
+            const a = dayOf(base, asleep), b = dayOf(next, asleep);
+            if (id === 'quiet') return say('Automated rooms need no upkeep crew', changed(a, b, ['drawn', 'burned', 'stars']));
+            return say('Automation output ×3', changed(a, b, ['ore', 'food', 'energy', 'stars']));
+        }
+        if (n.kind === 'watcher') {
+            const w = state.watcher || {};
+            const after = { ...w, bought: [...(w.bought || []), n.step] };
+            const tier = Math.max(0, state.cryo ?? 0);
+            const step = LADDER.find((u) => u.id === n.step);
+            const head = `${RUNGS[step.rung]}: ${step.does}`;
+            const per = (x) => (Math.round(x * 100) / 100).toString();
+            switch (n.step) {
+            case 'watchdog': case 'spinal':
+                return say(head, `stability drift ${per(DRIFT_PER_SECOND[tier] * driftFactor(w))} → ${per(DRIFT_PER_SECOND[tier] * driftFactor(after))} a second`);
+            case 'scheduler': {
+                const held = (state.builds || []).filter((j) => isQueued(j)).length;
+                return say(head, `orders waiting for the wake ${held} → 0`);
+            }
+            case 'deepread': return say(head, `a snap +${Math.round(snapGain(w, tier))} → +${Math.round(snapGain(after, tier))}`);
+            case 'nightvision': return say(head, `the food alarm at ${FOOD_ALARM_DAYS} → ${Math.round(FOOD_ALARM_DAYS * (1 - NIGHT_VISION_LATE))} days left`);
+            case 'cooling': return say(head, `capacity holds ${capacityMax(w)} → ${capacityMax(after)}`);
+            case 'secondcore': return say(head, `a lamp event +${puzzleGain(w)} → +${puzzleGain(after)} stability`);
+            case 'mast': {
+                const a = scoutOdds(state), b = scoutOdds({ ...state, watcher: after });
+                return say(head, `a reading ± ${a.scatter} → ± ${b.scatter} %, back with a reading ${a.pct.reading} → ${b.pct.reading} %`);
+            }
+            case 'reactor': return say(head, `capacity up to ${CAPACITY_PER_SECOND * capacityGain(w)} → ${CAPACITY_PER_SECOND * capacityGain(after)} a second`);
+            default: return say(head, '');
+            }
+        }
+        if (n.kind === 'bio') {
+            const step = LADDER.find((u) => u.id === n.step);
+            const take = peopleFor(step, state);
+            const humans = state.humans || 0;
+            const beds = dayOf(JSON.parse(JSON.stringify(state)), asleep).beds;
+            const held = Math.max(beds, humans, 1);
+            const people = Math.max(0, Math.min(take, Math.floor(humans - MIN_SLEEPERS)));
+            return say(`${RUNGS[step.rung]}: ${step.does} Takes ${short(people)} people and their beds, for good`,
+                `people ${arrow(humans, humans - people)}, beds ${arrow(beds, beds * (1 - people / held))}`);
+        }
+    } catch {
+        return '';
+    }
+    return '';
 }
 
 /** How many nodes can be bought right now: the badge on the tree button. */

@@ -241,6 +241,32 @@ export function mourn(s) {
 /** Is the colony mourning today? */
 export const mourning = (s) => (s.mournUntil ?? -Infinity) > (s.day || 0);
 
+/**
+ * PEOPLE TAKEN STAY GONE (deep-fix). The overnight playtest of v1.66.0: a biological step took
+ * 2.9 k people off the H bar, and within the same half second the creches had grown them back, so
+ * the drop on screen was the only cost. Now the people the body takes take their BEDS with them:
+ * the sector's dormitories belong to the body. `bodyKeep` is the share of the colony's beds still
+ * its own (1 with no body), and every bed the dormitories make is counted through it, for good.
+ * The colony mourns them too (no one is born for a year).
+ */
+export const bodyKeep = (s) => (Number.isFinite(s && s.bodyKeep) ? clamp(s.bodyKeep, 0.02, 1) : 1);
+/**
+ * The body has taken `people` (already gone from `s.humans`): their share of the beds goes with
+ * them, measured against the beds as they stood (or the people, when there were more of them).
+ * @param {object} s - state, mutated (bodyKeep, mournUntil)
+ * @param {number} people
+ * @returns {number} the beds taken
+ */
+export function bodyTakes(s, people) {
+    if (!(people > 0)) return 0;
+    let beds = 0;
+    try { beds = tickDay(JSON.parse(JSON.stringify(s)), !!s.asleep).capacity; } catch { beds = 0; }
+    const held = Math.max(beds, (s.humans || 0) + people, 1);
+    s.bodyKeep = bodyKeep(s) * Math.max(0.02, 1 - people / held);
+    mourn(s);
+    return beds * people / held;
+}
+
 /* ---------------------------------------------------------------------------
  * SURVIVAL, ONE WORD EVERYWHERE (v1.45.0). Ola, after playing v1.44.0:
  * "Scout party returned surface 93 %... what? Whole? Broken?" The rules count
@@ -913,7 +939,9 @@ export function tickDay(s, asleep = false) {
     s.minerals += mined; s.food += grown;
     // People eat, and grow toward the beds as long as the larder holds. Asleep nobody eats,
     // but the creches keep running, slower, on the food the automated farms bring in.
-    const capacity = live('dorm') * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
+    const beds = live('dorm') * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
+    // deep-fix: the beds the body took with its people stay the body's (bodyTakes below)
+    const capacity = beds * bodyKeep(s);
     // the ice takes its share first, and the creches then fill the beds it emptied
     const died = asleep ? s.humans * cryoDeathRate(s) : 0;
     s.humans -= died;
@@ -958,7 +986,7 @@ export function tickDay(s, asleep = false) {
         crew[t] = s.auto[t] > 0 ? 0 : live(t) * ROOM[t].crew * upkeep(t) * staff[t];
         rooms[t] = live(t);
     }
-    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, fed, games, hands, born, died, starving, stars, weakest, parts, capacity, staff, power, draw, crew, eaten: eat, awake, live: rooms };
+    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, fed, games, hands, born, died, starving, stars, weakest, parts, capacity, bodyBeds: beds - capacity, staff, power, draw, crew, eaten: eat, awake, live: rooms };
 }
 
 /* ---------------------------------------------------------------------------

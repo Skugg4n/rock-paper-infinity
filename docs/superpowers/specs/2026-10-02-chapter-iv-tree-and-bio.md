@@ -512,3 +512,54 @@ the line, a second later; the Watcher's line reads "night 1 of 6"; within 2 s of
 back; the tree's log ends with "next: after Cryo II"; a second sleep woken with no night says "Year 1.
 Woke: a test alarm.", then "next: after Cryo II", then the advisor's own line. All checks hold, no
 console errors.
+
+## Built: deep-fix, the overnight playtest of v1.66.0
+
+Opus, 2026-10-03, from docs/playtests/2026-10-03-chapter-iv-overnight.md. No balance constant moved;
+two rules changed (the body's beds, the look wake), the rest is what the player sees.
+
+**The road at once** (`readout.js cryoRoad`). A cryo tier's node and, before the hall, the sleep pill's
+caption list every part: enough people (only when short), each crewed room type automated (built ✓, on
+order "(ordered)"), what a dry run of the sleep still meets with all of those in (more ore, spare power,
+food for the tier), each trouble patched on the copy so the next one shows, and the price with its tick.
+`canBuy` keeps its one reason for the rules; only `nodeStatus` (the info box) says the road. Kept once a
+colony day with the gates.
+
+**Numbers in the tree** (`tree.js effectLine`, `tree-view.js drawBalances`). The panel's top edge: ore
+and stars with their day's flow, asleep the capacity. The info box's effect line is the node's sentence
+and up to three quantities that change, before → after, from a day run on two copies (every order on the
+books built; with and without the level, automation, feed, gift). Cold storage is measured under the ice;
+the Watcher's steps from their own rules (drift, snap, capacity, the alarm, the scouts' odds); a
+biological step says the people and the beds it takes. Worked out for the hovered node only.
+
+**The body keeps what it takes** (`deep.js bodyKeep`, `bodyTakes`). `state.bodyKeep` (1 with no body)
+multiplies every bed the dormitories make. A step that takes N people multiplies it by (1 - N / the beds
+then), so the creches have nowhere to put them back, and mourns. No schema change (a missing field is 1).
+
+**The madness in the text** (`watcher.js softness`, `textMadness`; `index.js stutter`, `stepMadness`). The
+base's softness is k^0.7 of the way from 80 (was k^1.2). Under 50 the Watcher's name is drawn as letters
+that drift (up to 4 px, tilting under 25) and the year, now and then, shows a digit off by one or the year
+before for 0.1 to 0.25 s. Under 35 the wake's "next:" line goes through `watcherLines` like the alarm line.
+
+**The sector is a demand** (`watcher.js demand`). A paid biological step waiting for its sector is the
+scheduler's first demand: Surface and the lamps cannot come, a visit already there is not drawn until the
+seal, an open lamp event is let go when the step is paid, and `watchSleep(..., { hold })` holds the meter
+while the player is choosing.
+
+**Small fixes.** `machineSays(report)`: games, energy fed and stars in `short()`. `cryoReadyLine`: "can
+be bought", told once and kept in the save (`state.cryoTold`). The feed leaves out the line the advisor is
+saying. `lookDue`: at Cryo I and II, past the first sleep, 90 real seconds into a sleep with nothing else
+asking, "Woke: a look at the colony." (no stability cost; Surface's unplayed game holds it at most 30 s);
+the simulation keeps the same clock. The TREE button is live while the phase is busy; gifts and feed can
+be bought in the walk.
+
+| run | before | after |
+|---|---|---|
+| plain, to year 802 701 | 24m47s | **24m47s** (seeds 2, 3: 24m44s, 24m56s) |
+| --watcher, biological ending | 27m40s | **27m26s** (seeds 2, 3: 23m07s, 27m14s) |
+
+**Acceptance** (`scripts/accept-iv-cut.mjs`): sections 0 (balances, Seam's numbers, Cryo I's road on the
+node and the caption), M (the new hover), V (Quiet hands' arrow), F (TREE 0.5 s after Sleep), W (letters
+drift and the base soft at 20), 1 (capacity on the balances asleep; the feed does not repeat the advisor),
+D (Surface visiting, a step bought: no second demand while choosing, the meter holds), 2 (people and beds
+still lower 10 s after the seal). All checks hold, no console errors.

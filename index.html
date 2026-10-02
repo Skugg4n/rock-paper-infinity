@@ -613,6 +613,10 @@
              drawn by src/phase4/tree-view.js; one fixed info box under it says what the hovered
              node is (no floating tooltips). Escape or the tree button closes it; the game ticks on -->
         <div class="deep-tree" id="deep-tree" hidden>
+            <!-- deep-fix: the money while shopping, live at the panel's top edge -->
+            <div class="deep-tree-bal deep-mono" id="deep-tree-bal">
+                <span class="tb-ore"></span><span class="tb-stars"></span><span class="tb-cap" hidden></span>
+            </div>
             <div class="deep-tree-stage">
                 <svg class="deep-tree-board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The tree"></svg>
                 <div class="deep-tree-foot">
@@ -738,7 +742,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.66.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.67.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">
