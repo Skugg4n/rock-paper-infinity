@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.58.0 - 2026-10-02 (chapter I's end, and the factory in the city)
+
+### The factory: boards all the way down
+
+Direction C of `docs/mockups/factory-1.html`, chosen by Ola (B163).
+
+- **The nine boards turn out to be tiles of a larger board.** When the factory is built the boards stay where they are and each becomes a board of nine games: 81 cells. A cell flickers when a game is played, goes dark with a star when it is won, and every few seconds a wave of wins crosses the whole thing. The conveyor belt, the yellow stars, the smoke and the small box are gone.
+- **Building it**: the cells arrive from the middle outward.
+- **Collapsing the foam** shows as a wave of wins from the middle (was: the box popped).
+- **It runs on the game's own loop**, so it stands still when the game is paused.
+- **The hand buttons step back in the factory too.**
+- **The factory in the city** (chapter II) is one tile of the same thing: a small board of nine cells that a win crosses as a diagonal wave. The little conveyor there is gone as well.
+- **Fix**: the star tracker's hundred gem placeholders no longer widen into the boards when there are five gems or fewer.
+- New `src/phase1/factory-view.js` (`createFactoryView`, `cellPosition`), tested in `factory-view.test.js`.
+
 ## v1.57.0 - 2026-10-02 (chapter I → II)
 
 ### The change to CAPITAL takes its time, and the city opens

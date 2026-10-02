@@ -183,7 +183,6 @@ input[type=range]:focus-visible {
            tall however narrow it got. Keep that, but never taller than its row. */
         min-height: min(12rem, (100cqh - (var(--board-rows, 1) - 1) * 1rem) / var(--board-rows, 1));
     }
-    #game-board-container > #meta-board { max-width: 100cqmin; max-height: 100cqmin; }
 }
 
 .computer-result-icon,
@@ -255,118 +254,35 @@ input[type=range]:focus-visible {
     animation: materialize-content 1.2s ease-out forwards;
 }
 
-#meta-board {
-    border: none;
-    background-color: #fff;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    overflow: hidden;
+/* The factory (chapter I's end, factory-view.js): boards all the way down.
+   The nine boards stay where they are and become tiles of nine games each.
+   A cell flickers when a game is played, goes dark with a star when it is
+   won, and waves of wins cross the whole thing. No colour, nothing flies. */
+#game-board-container > .game-board.factory-tile {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: clamp(3px, 0.7vmin, 9px);
+    padding: clamp(6px, 1.3vmin, 16px);
+    min-height: 0;
+    /* the board was a centred flex column; the cells fill their tracks */
+    place-items: stretch;
+    place-content: stretch;
 }
-.meta-active { animation: none; }
-
-/* Factory animation — contained inside #meta-board */
-.factory-center-icon {
-    width: 48px;
-    height: 48px;
-    position: relative;
-    z-index: 2;
-    flex-shrink: 0;
-    color: #334155;
+.factory-cell {
+    border-radius: 22%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition: background 0.5s ease, transform 0.5s ease;
 }
-@media (min-width: 640px) {
-    .factory-center-icon { width: 64px; height: 64px; }
-}
-
-.factory-animation {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: 1;
-}
-
-/* RPS icons: conveyor belt, right → center */
-.factory-rps-icon {
-    position: absolute;
-    right: 6%;
-    top: 50%;
-    width: 16px;
-    height: 16px;
-    color: #94a3b8;
-    opacity: 0;
-    animation: convey-in 3.6s linear infinite;
-}
-@media (min-width: 640px) {
-    .factory-rps-icon { width: 20px; height: 20px; }
-}
-@keyframes convey-in {
-    0%    { transform: translate(0, -50%); opacity: 0; }
-    5%    { transform: translate(0, -50%); opacity: 0.7; }
-    43%   { transform: translate(-100px, -50%) scale(0.7); opacity: 0.7; }
-    43.1% { opacity: 0; }
-    100%  { opacity: 0; }
-}
-@media (min-width: 640px) {
-    @keyframes convey-in {
-        0%    { transform: translate(0, -50%); opacity: 0; }
-        5%    { transform: translate(0, -50%); opacity: 0.7; }
-        43%   { transform: translate(-130px, -50%) scale(0.7); opacity: 0.7; }
-        43.1% { opacity: 0; }
-        100%  { opacity: 0; }
-    }
-}
-
-/* Star icons: conveyor belt, center → left */
-.factory-star-icon {
-    position: absolute;
-    left: 44%;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    color: #b8860b;
-    opacity: 0;
-    animation: convey-out 3.6s linear infinite;
-}
-@media (min-width: 640px) {
-    .factory-star-icon { width: 18px; height: 18px; }
-}
-@keyframes convey-out {
-    0%    { transform: translate(0, -50%); opacity: 0; }
-    50%   { transform: translate(0, -50%); opacity: 0; }
-    50.1% { transform: translate(0, -50%); opacity: 0.8; }
-    93%   { transform: translate(-100px, -50%); opacity: 0.8; }
-    93.1% { opacity: 0; }
-    100%  { opacity: 0; }
-}
-@media (min-width: 640px) {
-    @keyframes convey-out {
-        0%    { transform: translate(0, -50%); opacity: 0; }
-        50%   { transform: translate(0, -50%); opacity: 0; }
-        50.1% { transform: translate(0, -50%); opacity: 0.8; }
-        93%   { transform: translate(-130px, -50%); opacity: 0.8; }
-        93.1% { opacity: 0; }
-        100%  { opacity: 0; }
-    }
-}
-
-/* Subtle smoke puffs */
-.factory-smoke-puff {
-    position: absolute;
-    top: 18%;
-    left: 48%;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #cbd5e1;
-    opacity: 0;
-    animation: smoke-drift 3.6s ease-out infinite;
-}
-@keyframes smoke-drift {
-    0%    { transform: translate(0, 0) scale(0.5); opacity: 0; }
-    10%   { transform: translate(0, 0) scale(0.6); opacity: 0.3; }
-    60%   { transform: translate(4px, -12px) scale(1.2); opacity: 0.3; }
-    60.1% { opacity: 0; }
-    100%  { opacity: 0; }
-}
+.factory-cell svg { width: 60%; height: 60%; fill: currentColor; opacity: 0; transition: opacity 0.5s ease; }
+.factory-cell.play { background: #cbd5e1; transition-duration: 0.05s; }
+.factory-cell.won { background: #0f172a; transform: scale(1.08); transition-duration: 0.08s; }
+.factory-cell.won svg { opacity: 1; transition-duration: 0.08s; }
+.factory-cell.cell-arrive { animation: slot-plopp 340ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
 .rate-paused {
     opacity: 0.35;

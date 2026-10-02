@@ -8,7 +8,7 @@ export const MODULE_PATHS = [
   'index.html', 'main.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'roman.js',
   'src/chapterCard.js', 'src/checkpoints.js', 'src/constants.js', 'src/deepGate.js', 'src/gamePhase.js',
   'src/icons.js', 'src/modules.js', 'src/perf.js', 'src/save-export.js', 'src/version.js',
-  'src/phase1/cost-visual.js', 'src/phase1/countdown.js', 'src/phase1/index.js',
+  'src/phase1/cost-visual.js', 'src/phase1/countdown.js', 'src/phase1/factory-view.js', 'src/phase1/index.js',
   'src/phase1/persistence.js', 'src/phase1/rates.js', 'src/phase1/rendering.js',
   'src/phase1/upgrade-dashes.js', 'src/phase1/upgrades-config.js',
   'src/phase2/ants.js', 'src/phase2/buildings-config.js', 'src/phase2/economy.js',

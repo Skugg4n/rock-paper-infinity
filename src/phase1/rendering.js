@@ -65,7 +65,9 @@ export function renderWinTracker(refs, starBalance, totalStarsEarned, { hero = f
     if (gems > 0 || showGemPlaceholders) {
         const container = document.createElement('div');
         container.className = 'grid grid-cols-10 gap-1 items-center';
-        const gemTemplate = gems > 5 ? gemMediumTemplate : gemLargeTemplate;
+        // With the hundred placeholders the grid must stay narrow (large gems
+        // widen its columns into the boards), so use the medium gem there.
+        const gemTemplate = gems > 5 || showGemPlaceholders ? gemMediumTemplate : gemLargeTemplate;
         const totalSlots = showGemPlaceholders ? 100 : gems;
         for (let i = 0; i < totalSlots; i++) {
             const slot = document.createElement('div');

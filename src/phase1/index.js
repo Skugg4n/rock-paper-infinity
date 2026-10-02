@@ -10,6 +10,7 @@ import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber, helperCounters } from "./persistence.js";
 import { createUpgrades } from "./upgrades-config.js";
+import { createFactoryView, FACTORY_TILES } from "./factory-view.js";
 import { setupDashes, updateDashes, updateProgressDashes, PROGRESS_DASHES } from "./upgrade-dashes.js";
 import { mountSaveButtons } from "../save-export.js";
 import {
@@ -97,6 +98,7 @@ const resetBtn = document.getElementById('reset-btn');
         let lastTotalStarsEarned = -1;
         let gameBoards = [];
         let isMetaBoardActive = false;
+        let factoryView = null;
         let starMultiplier = 1;
         let quantumFoam = 0;
         let foamCollapses = 0;
@@ -211,9 +213,9 @@ function scheduleUIUpdate() {
             adjustBoardLayout();
         }
         
-        function adjustBoardLayout() {
+        function adjustBoardLayout(force = false) {
             const count = gameBoards.length;
-            if (isMetaBoardActive) return;
+            if (isMetaBoardActive && !force) return;
 
             let cols = 1;
             if (count > 1) cols = 2;
@@ -230,53 +232,20 @@ function scheduleUIUpdate() {
             }
         }
 
+        /**
+         * The factory: the nine boards turn out to be tiles of a larger board
+         * (factory-view.js). They stay where they are; only what is in them
+         * changes, so the factory grows out of what the player built.
+         */
         function mergeToMetaBoard(fromLoad = false) {
             isMetaBoardActive = true;
             if (!fromLoad) starMultiplier *= 10;
-            gameBoards.forEach(board => board.element.style.display = 'none');
-
-            let metaBoard = document.getElementById('meta-board');
-            if (!metaBoard) {
-                metaBoard = document.createElement('div');
-                metaBoard.id = 'meta-board';
-                metaBoard.className = 'rounded-2xl w-48 h-48 sm:w-72 sm:h-72 flex justify-center items-center relative';
-
-                // Conveyor belt animation (inside the box, behind factory icon)
-                const anim = document.createElement('div');
-                anim.className = 'factory-animation';
-
-                // RPS icons: enter from right, move toward center
-                ['gem', 'file-text', 'scissors', 'gem'].forEach((name, i) => {
-                    const icon = getIcon(name, 'factory-rps-icon');
-                    icon.style.animationDelay = `${i * 0.9}s`;
-                    anim.appendChild(icon);
-                });
-
-                // Star icons: emerge from center, exit to left
-                for (let i = 0; i < 4; i++) {
-                    const icon = getIcon('star', 'factory-star-icon');
-                    icon.style.animationDelay = `${i * 0.9}s`;
-                    anim.appendChild(icon);
-                }
-
-                // Subtle smoke puffs
-                for (let i = 0; i < 2; i++) {
-                    const puff = document.createElement('div');
-                    puff.className = 'factory-smoke-puff';
-                    puff.style.animationDelay = `${i * 1.8}s`;
-                    anim.appendChild(puff);
-                }
-
-                metaBoard.appendChild(anim);
-                metaBoard.appendChild(getIcon('factory', 'factory-center-icon'));
-
-                gameBoardContainer.innerHTML = '';
-                gameBoardContainer.className = 'pointer-events-none flex-grow grid grid-cols-1 items-center justify-center justify-items-center';
-                gameBoardContainer.style.setProperty('--board-cols', 1);
-                gameBoardContainer.style.setProperty('--board-rows', 1);
-                gameBoardContainer.appendChild(metaBoard);
-            }
-            metaBoard.style.display = 'flex';
+            while (gameBoards.length < FACTORY_TILES) createGameBoard();
+            adjustBoardLayout(true);
+            gameBoardContainer.classList.add('pointer-events-none', 'is-factory');
+            factoryView?.destroy();
+            factoryView = createFactoryView(gameBoards.map(board => board.element));
+            if (!fromLoad) factoryView.arrive();
 
             quantumFoamContainer.classList.remove('hidden');
         }
@@ -525,8 +494,8 @@ const uiState = {
             const showReserve = batteriesBought > 0 || reserveEnergy > 0;
             const cloverVisible = upgrades.autoPlay.purchased && !isMetaBoardActive;
             const cloverEvergreen = upgrades.luck.purchased;
-            // While the machine plays, the hand buttons step back.
-            const handsRest = !!autoPlayInterval && !isMetaBoardActive;
+            // While the machine plays (the factory too), the hand buttons step back.
+            const handsRest = !!autoPlayInterval;
 
             const wins = Math.floor(totalWins);
             const gamesChanged = games !== uiState.gamesPlayed || wins !== uiState.totalWins;
@@ -700,6 +669,8 @@ const uiState = {
             quantumFoamContainer.classList.add('hidden');
             quantumFoamContainer.classList.remove('is-locked');
             gameBoards = [];
+            factoryView?.destroy();
+            factoryView = null;
             gameBoardContainer.className = 'pointer-events-none flex-grow grid grid-cols-1 items-center justify-center gap-4';
             gameBoardContainer.innerHTML = '';
             for (const key in upgrades) {
@@ -856,6 +827,7 @@ const uiState = {
 
             if (isMetaBoardActive) {
                 quantumFoam = Math.min(MAX_QUANTUM_FOAM, quantumFoam + gamesToPlay);
+                factoryView?.tick();
             }
 
             if (!isMetaBoardActive) {
@@ -877,11 +849,8 @@ const uiState = {
             quantumFoam = 0;
             foamCollapses++;
             
-            const metaBoard = document.getElementById('meta-board');
-            if(metaBoard) {
-                metaBoard.classList.add('pop-item');
-                setTimeout(() => metaBoard.classList.remove('pop-item'), 500);
-            }
+            // The collapse shows as a wave of wins from the middle of the factory.
+            factoryView?.wave(4, 4);
             scheduleUIUpdate();
         }
 
@@ -990,6 +959,7 @@ const uiState = {
             stopClover();
             clearTimeout(heroTimer);
             heroTimer = null;
+            factoryView?.destroy();
             if (passiveInterval) {
                 clearInterval(passiveInterval);
                 passiveInterval = null;

@@ -1557,7 +1557,8 @@ items:
       is a factory that makes stars out of rock, paper, scissors; today it is
       a lame placeholder for something cleaner, cooler and mightier. Come up
       with something new.
-    status: open
+    status: done
+    resolved_in: v1.58.0
     notes: "Mockups first: docs/mockups/factory-1.html (three directions). Ola picks, then build."
 
   - id: B164
