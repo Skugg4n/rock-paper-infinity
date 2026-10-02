@@ -12,7 +12,7 @@
  */
 
 import {
-    COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, roomMultiplier, upkeepMultiplier, BIRTH_FOOD,
+    COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, outputMultiplier, upkeepFor, BIRTH_FOOD,
     FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, cryoLabel, group, digCost, roomCost,
     freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending, buildEta,
 } from './deep.js';
@@ -167,7 +167,7 @@ export function backIn(days) {
 /** What a tier sleeps in a second, the way a person says it: "a month", "a century". */
 const RATE_WORDS = {
     30: 'a month', 365: 'a year', 3650: 'ten years', 36500: 'a century', 365000: 'a thousand years',
-    3650000: 'ten thousand years', 36500000: 'a hundred thousand years',
+    3650000: 'ten thousand years', 36500000: 'a hundred thousand years', 365000000: 'a million years',
 };
 export const rateWords = (days) => RATE_WORDS[days] || span(days);
 
@@ -417,7 +417,8 @@ export function buySentence(kind, type, state) {
             : `Triples what the ${ROOM_WORDS[type]} make; they draw more power for it.`;
     }
     const after = kind === 'level' ? lvl + 1 : lvl;
-    const mult = roomMultiplier(after, auto), up = upkeepMultiplier(after, auto);
+    // deep-voice: with Surface's gifts (the relay, quiet hands) as the rules count them
+    const mult = outputMultiplier(state, type, after, auto), up = upkeepFor(state, type, after, auto);
     const made = ROOM[type].out * mult;
     const hands = auto > 0 ? 0 : ROOM[type].crew * up;
     const power = ROOM[type].energy * up;

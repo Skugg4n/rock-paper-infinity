@@ -1137,7 +1137,7 @@ body.in-deep #version-info { z-index: 1400; }
     grid-row: 1;
     position: relative;
     width: 100%;
-    height: 84px;
+    height: 100px;          /* deep-voice: five rows, the last the line that opened a gift */
     box-sizing: border-box;
     padding: 10px 16px;
     background: #0a0d12;
@@ -1176,3 +1176,60 @@ body.in-deep #version-info { z-index: 1400; }
     .deep-tree-foot { grid-template-columns: 0 1fr 0; }
     .deep-tree-legend { display: none; }
 }
+
+/* ---- deep-voice: SURFACE'S VOICE ------------------------------------------------------------
+   Step 2 of docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md, mockup 12 tab "the
+   voice". A night's line types itself low in the dark, centred over the Watcher, in a larger and
+   warmer mono than anything else (Surface's tone #cfc9bb), and stays until the colony wakes. It is
+   never clicked: no box, no button, no pointer events. The caret blinks only while it types. */
+.deep-voice {
+    left: 50%;
+    bottom: 168px;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: min(760px, calc(100vw - 32px));
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 22px;
+    line-height: 30px;
+    letter-spacing: 0.02em;
+    color: #cfc9bb;
+    text-shadow: 0 0 18px rgba(207, 201, 187, 0.18);
+    pointer-events: none;
+    user-select: none;
+    z-index: 13;
+}
+.deep-voice[hidden] { display: none; }
+.deep-voice-rest { visibility: hidden; }
+/* the caret takes no width: the whole line is laid out from the first letter and never moves */
+.deep-voice-caret {
+    display: none;
+    width: 0.55em;
+    height: 0.95em;
+    margin-right: -0.55em;
+    vertical-align: -0.12em;
+    background: #cfc9bb;
+}
+.deep-voice.is-typing .deep-voice-caret { display: inline-block; animation: deep-voice-caret 1s steps(1) infinite; }
+@keyframes deep-voice-caret { 50% { opacity: 0; } }
+@media (max-width: 760px) {
+    .deep-voice { font-size: 17px; line-height: 24px; bottom: 150px; }
+}
+/* the tree button after a night in which Surface opened a node: a small warm ring in its corner,
+   still (no loop), until the tree is looked at */
+#phase-deep #deep-tree-btn.has-night::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 7px;
+    height: 7px;
+    box-sizing: border-box;
+    border-radius: 9999px;
+    border: 1.5px solid #cfc9bb;
+    background: rgba(207, 201, 187, 0.35);
+    pointer-events: none;
+}
+/* the info box: the line that opened a gift, in Surface's tone */
+.deep-tree-info .ib-q { color: #cfc9bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deep-tree-board .tt-log text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }

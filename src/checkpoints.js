@@ -175,13 +175,17 @@ export const CHECKPOINTS = [
     { id: 'iv-surface', label: 'IV · Surface', apply: () => {
         clearAll();
         // Deep in the ladder (v1.49.0): asleep at a century a second, SYSTEM bought and half of
-        // HARDWARE (Cooling, the Second core: two dormitories taken), the sentence half known, and
-        // Surface due in this sleep, a few seconds in. The Sensor mast is next and can be paid.
+        // HARDWARE (Cooling, the Second core: two dormitories taken), the sentence half known. The
+        // Sensor mast is next and can be paid.
+        // deep-voice: Surface has said three lines (nights 1 to 3) and Lossless relay and Cold
+        // storage are bought. Its next line is night 4, which opens Quiet hands: Surface has already
+        // come in this sleep, so debug_deep('night') brings it now, or it comes by itself in the
+        // next sleep, a few seconds in. The stars are there to buy Quiet hands the moment it opens.
         const deep = initialDeepState({ salvage: 1500, doom0: 85 });
         const day = 6000 * DAYS_PER_YEAR;
         const slept = 5800;
         Object.assign(deep, {
-            day, minerals: 3.0e8, food: 2.0e6, stars: 6.0e14, humans: 120,
+            day, minerals: 3.0e8, food: 2.0e6, stars: 8.0e15, humans: 120,
             chambers: 29, rooms: { mine: 8, farm: 6, generator: 6, dorm: 6, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
@@ -192,8 +196,9 @@ export const CHECKPOINTS = [
                 ...initialWatcher(), stage: 1, stability: 70, capacity: 160, sleptYears: slept, seed: 5, sleeps: 40,
                 nextPuzzleYears: slept + puzzleGapYears(3), saidSpace: true,
                 bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore'],
-                surface: { ...initialSurface(), visits: 6, words: 4, lastSleep: 39, wins: 4, losses: 1, lastYou: 'rock' },
+                surface: { ...initialSurface(), visits: 6, words: 4, lastSleep: 40, wins: 4, losses: 1, lastYou: 'rock', night: 3, toLine: 0 },
             },
+            tree: { opened: ['lossless', 'cold'], bought: ['lossless', 'cold'], unseen: false },
         });
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
@@ -203,6 +208,8 @@ export const CHECKPOINTS = [
         // Late (v1.50.0): asleep at a thousand years a second, SYSTEM and HARDWARE bought (four
         // dormitories taken), the pool full, stars and people enough for the whole BIOLOGICAL
         // rung. Buy it, watch the sectors seal, wake: nobody comes out. Then go up alone.
+        // deep-voice: Surface has said all six lines; its gifts are bought but Long count, which
+        // waits for Cryo VII. The question is answered, so BIOLOGICAL is open.
         const deep = initialDeepState({ salvage: 1500, doom0: 85 });
         const day = 300000 * DAYS_PER_YEAR;
         const slept = 290000;
@@ -218,8 +225,9 @@ export const CHECKPOINTS = [
                 ...initialWatcher(), stage: 1, stability: 60, capacity: 200, sleptYears: slept, seed: 11, sleeps: 70, grown: BODY_GROW_SECONDS,
                 nextPuzzleYears: slept + puzzleGapYears(4), saidSpace: true,
                 bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore', 'mast', 'reactor'],
-                surface: { ...initialSurface(), visits: 30, words: 8, lastSleep: 69, wins: 10, losses: 9, lastYou: 'paper' },
+                surface: { ...initialSurface(), visits: 30, words: 8, lastSleep: 69, wins: 10, losses: 9, lastYou: 'paper', night: 6, toLine: 0 },
             },
+            tree: { opened: ['lossless', 'cold', 'quiet', 'longcount', 'question'], bought: ['lossless', 'cold', 'quiet', 'question'], unseen: false },
         });
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');

@@ -628,6 +628,7 @@
                         <div class="ib-cost"></div>
                         <div class="ib-eff"></div>
                         <div class="ib-x"></div>
+                        <div class="ib-q"></div>
                         <div class="ib-empty">› <span class="ib-caret"></span></div>
                     </div>
                 </div>
@@ -664,7 +665,6 @@
                 <span class="deep-surface-glyph"></span>
                 <span class="deep-mono deep-surface-name">SURFACE</span>
             </div>
-            <div class="deep-mono deep-surface-line" id="deep-surface-line"></div>
             <div class="deep-surface-rps" id="deep-surface-rps">
                 <button class="deep-rps-btn" data-throw="rock" aria-label="Rock"><i data-lucide="gem" class="w-4 h-4"></i></button>
                 <button class="deep-rps-btn" data-throw="paper" aria-label="Paper"><i data-lucide="file-text" class="w-4 h-4"></i></button>
@@ -681,6 +681,11 @@
             <div class="deep-mono deep-surface-said" id="deep-surface-said"></div>
             <div class="deep-mono deep-surface-words" id="deep-surface-words"></div>
         </div>
+
+        <!-- deep-voice: Surface's line of the night. It types itself low in the dark, in a larger,
+             warmer mono than anything else, and stays until the colony wakes; nothing on it is
+             clicked. Awake it lives in the tree's night log -->
+        <div class="deep-chrome deep-voice" id="deep-voice" hidden aria-live="polite"><span id="deep-voice-text"></span><span class="deep-voice-caret"></span><span class="deep-voice-rest" id="deep-voice-rest"></span></div>
 
         <!-- v1.52.0: over a sealed plate, what it is now; nothing else says so -->
         <div id="deep-body-tip" class="deep-mono" hidden>part of the body</div>

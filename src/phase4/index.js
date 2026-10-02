@@ -28,7 +28,7 @@ import {
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
     ASCENT_MIN_PEOPLE, ordersDone, mourn,
     orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep,
-    cancelOrder, digSpare,
+    cancelOrder, digSpare, nextCryo, CRYO_TOP,
 } from './deep.js';
 import {
     conditions, advisorLines, pushFeed, DESCENT_LINE, alarmLine, alarmGlyph,
@@ -54,7 +54,7 @@ import {
     lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, rungOpenLine,
     sealCandidates, sealSector, choosingSector, bodyGlyph, inBody,
 } from './watcher.js';
-import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE } from './surface.js';
+import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS } from './surface.js';
 import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, buyableCount, normalizeTree } from './tree.js';
 import { createTreeView } from './tree-view.js';
 import { playChapterCard } from '../chapterCard.js';
@@ -222,7 +222,10 @@ export function init() {
         fistIt: document.getElementById('deep-fist-it'),
         fistItFront: document.getElementById('deep-fist-it-front'),
         surface: document.getElementById('deep-surface'),
-        surfaceLine: document.getElementById('deep-surface-line'),
+        // deep-voice: Surface's line of the night, typed low in the dark
+        voice: document.getElementById('deep-voice'),
+        voiceText: document.getElementById('deep-voice-text'),
+        voiceRest: document.getElementById('deep-voice-rest'),
         surfaceSaid: document.getElementById('deep-surface-said'),
         surfaceWords: document.getElementById('deep-surface-words'),
         rpsBtns: [...document.querySelectorAll('#deep-surface .deep-rps-btn')],
@@ -327,7 +330,7 @@ export function init() {
     const rateLabel = (tier) => `${cryoLabel(CRYO[tier].days)}/s`;
     /** What the stars are for next, named, for "toward Cryo II". */
     function starGoal() {
-        const next = CRYO[state.cryo + 1];
+        const next = nextCryo(state);
         return next ? cryoName(state.cryo + 1) : 'the next level';
     }
     const tierDays = () => CRYO[Math.max(0, state.cryo)].days;
@@ -338,7 +341,7 @@ export function init() {
      * @param {number} [tier] - index into CRYO; the next one by default
      */
     function needFor(tier = state.cryo + 1) {
-        if (!CRYO[tier]) return null;
+        if (!CRYO[tier] || tier > CRYO_TOP) return null;     // the tier past VII is Surface's gift
         const hall = tier === 0;
         return cryoNeed(tier, {
             state,
@@ -477,7 +480,12 @@ export function init() {
         const badge = canNow > 0 ? String(canNow) : '';
         if (ui.treeBadge.textContent !== badge) ui.treeBadge.textContent = badge;
         ui.treeBadge.classList.toggle('hidden', !badge);
+        // deep-voice: after a night in which Surface opened a node, a quiet mark until the tree is looked at
+        if (treeView?.isOpen() && state.tree?.unseen) state.tree.unseen = false;    // opened while looking at it
+        const night = !!(state.tree && state.tree.unseen);
+        ui.treeBtn.classList.toggle('has-night', night);
         setTooltip(ui.treeBtn, says('The tree: levels, automation, cryo, and what stays awake.')
+            + note(night ? 'Something was opened in the night.' : '')
             + note(canNow ? `${canNow} can be bought now.` : 'Nothing can be bought just now.'));
         treeView?.refresh();
 
@@ -624,8 +632,10 @@ export function init() {
         pointer = null;                 // the cursor is over the board now, not the base
         leaveChoice();
         ui.root.classList.add('is-tree-open');
+        if (state.tree) state.tree.unseen = false;      // the night's mark: seen
         treeView.open();
         updateChrome();
+        saveGame();
     }
     function closeTree() {
         if (!treeView || !treeView.isOpen()) return;
@@ -684,7 +694,7 @@ export function init() {
         if (step.id === 'skin') {
             const sf = state.watcher.surface;
             if (state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
-            if (!sf.visit) openSurface(state.watcher);
+            if (!sf.visit) openSurface(state.watcher, state);
             else sf.visit.line = SENTENCE_LINE;
             surfaceKey = '';
         }
@@ -794,13 +804,13 @@ export function init() {
         const sf = state.watcher.surface;
         const v = state.asleep ? sf.visit : null;
         ui.surface.hidden = !v;
+        drawVoice(v);
         if (!v) { surfaceKey = ''; return; }
         const r = v.result;
         const stage = rps ? rps.stage : (r ? 'line' : 'open');
         const key = `${sf.visits}|${stage}|${sf.words}|${v.line}`;
         if (key === surfaceKey) return;
         surfaceKey = key;
-        ui.surfaceLine.textContent = v.line;
         ui.surface.classList.toggle('is-played', !!r);
         const said = !!r && stage === 'line';
         ui.surfaceSaid.textContent = said ? r.text : '';
@@ -833,6 +843,39 @@ export function init() {
             delete ui.duel.dataset.icons;
         }
         scheduleIconRefresh();
+    }
+    /* ---- THE VOICE (deep-voice) ---------------------------------------------------------
+       A night's line types itself, letter by letter (TYPE_MS a letter), low in the dark, in a larger
+       and warmer mono than anything else, and stays until the colony wakes. Nothing on it can be
+       clicked. Awake it is gone: the tree's night log keeps it. The caret shows only while it types. */
+    let voice = null;               // { key, text, t0 } of the line on screen
+    function drawVoice(v) {
+        if (!ui.voice) return;
+        const line = v && v.line ? v.line : '';
+        if (!line) {
+            if (voice) { voice = null; ui.voiceText.textContent = ''; ui.voiceRest.textContent = ''; }
+            if (!ui.voice.hidden) ui.voice.hidden = true;
+            return;
+        }
+        const key = `${state.watcher.surface.visits}|${line}`;
+        if (!voice || voice.key !== key) {
+            voice = { key, text: line, t0: performance.now() };
+            ui.voiceText.textContent = '';
+            ui.voiceRest.textContent = line;        // held in place, unseen, so the line never moves as it types
+            ui.voice.classList.add('is-typing');
+        }
+        if (ui.voice.hidden) ui.voice.hidden = false;
+        stepVoice();
+    }
+    /** Once a frame while a line is typing: one more letter every TYPE_MS. */
+    function stepVoice() {
+        if (!voice) return;
+        const n = Math.min(voice.text.length, Math.floor((performance.now() - voice.t0) / TYPE_MS));
+        if (ui.voiceText.textContent.length !== n) {
+            ui.voiceText.textContent = voice.text.slice(0, n);
+            ui.voiceRest.textContent = voice.text.slice(n);
+        }
+        if (n >= voice.text.length && ui.voice.classList.contains('is-typing')) ui.voice.classList.remove('is-typing');
     }
     function stopRps() {
         for (const t of rpsTimers) clearTimeout(t);
@@ -994,7 +1037,7 @@ export function init() {
     function recomputeGates() {
         if (state.asleep) return;
         const owns = state.cryo >= 0;
-        const nextDays = CRYO[state.cryo + 1]?.days;
+        const nextDays = nextCryo(state)?.days;
         const planned = (owns && !nextDays) ? null : ordersDone(state);
         gates = {
             hall: owns ? null : sleepTrouble(state, CRYO[0].days),
@@ -1005,7 +1048,7 @@ export function init() {
         };
         // the day a longer sleep can be had, the advisor says so once: "Cryo IV is ready: a century a second."
         const want = state.cryo + 1;
-        if (CRYO[want] && want > readyTold && !needFor(want)) {
+        if (CRYO[want] && want <= CRYO_TOP && want > readyTold && !needFor(want)) {
             readyTold = want;
             feed = pushFeed(feed, [cryoReadyLine(want)]);
         }
@@ -1276,7 +1319,7 @@ export function init() {
         // an event whose lamp went away (a dormitory taken, a chamber gone dark) goes quietly
         if (w.puzzle && w.puzzle.lamps.some((sl) => !lampsNow().includes(sl))) { dismissPuzzle(w, state.cryo); lamp = null; }
         if (puzzleDue(w, { asleep: true, alarmPending: busy })) openPuzzle(w, lampsInView(), state.cryo);
-        if (sleepSum && surfaceDue(w, sleepSum.days, CRYO[state.cryo].days)) openSurface(w);
+        if (sleepSum && surfaceDue(w, sleepSum.days, CRYO[state.cryo].days)) { openSurface(w, state); surfaceKey = ''; }
         // the body at work (v1.50.0): the lamps answer themselves now and then, the snap comes by itself
         const open = w.puzzle;
         const held = w.stability;
@@ -1653,6 +1696,7 @@ export function init() {
         lastFrame = now;
         if (roll) drawCounters(rollingValue(now));
         stepCursor();
+        stepVoice();
         stepLamps();
         // paused, the scene still draws (and the camera still turns by hand), but nobody walks
         // and the base's jitter holds still
@@ -1698,7 +1742,13 @@ export function init() {
         get hDrop() { return hDrop ? { text: hDrop.text, from: hDrop.from, to: hDrop.to } : null; },
         // deep-tree, for the tests: the panel, and what each node was last drawn from
         get treeOpen() { return !!treeView?.isOpen(); },
+        // deep-voice, for the tests: the line on screen as it types
+        get voice() {
+            return voice ? { text: voice.text, typed: ui.voiceText.textContent, shown: !ui.voice.hidden,
+                typing: ui.voice.classList.contains('is-typing') } : null;
+        },
         get treeDrawn() { return treeView ? treeView.drawn : {}; },
+        get treeLog() { return treeView ? treeView.log : []; },
         openTree: () => openTree(),
         closeTree: () => closeTree(),
     };
@@ -1730,7 +1780,19 @@ export function init() {
                     const sf = state.watcher.surface;
                     sf.visit = null;
                     sf.lastSleep = 0;
-                    openSurface(state.watcher);
+                    openSurface(state.watcher, state);
+                    surfaceKey = '';
+                }
+            } else if (what === 'night') {
+                // deep-voice: Surface's next line now, in this sleep, whatever the pacing says
+                if (state.asleep) {
+                    if (state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
+                    stopRps();
+                    const sf = state.watcher.surface;
+                    sf.visit = null;
+                    sf.lastSleep = 0;
+                    openSurface(state.watcher, state, { force: true });
+                    surfaceKey = '';
                 }
             } else if (what === 'ladder') {
                 // the price of the next step, handed over: capacity, stars, ore

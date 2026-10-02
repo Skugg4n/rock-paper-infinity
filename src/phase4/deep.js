@@ -100,14 +100,47 @@ export const CRYO = [
     { id: 'cryo-i',   days: 30,       cost: 1.5e4 },
     { id: 'cryo-ii',  days: 365,      cost: 5.0e5 },
     { id: 'cryo-iii', days: 3650,     cost: 1.2e8 },
-    { id: 'cryo-iv',  days: 36500,    cost: 2.0e12 },
-    { id: 'cryo-v',   days: 365000,   cost: 2.0e14 },
-    { id: 'cryo-vi',  days: 3650000,  cost: 2.0e16 },
-    { id: 'cryo-vii', days: 36500000, cost: 2.0e18 },
+    { id: 'cryo-iv',  days: 36500,    cost: 1.0e13 },
+    { id: 'cryo-v',   days: 365000,   cost: 1.0e15 },
+    { id: 'cryo-vi',  days: 3650000,  cost: 3.0e17 },
+    { id: 'cryo-vii', days: 36500000, cost: 3.0e19 },
+    // deep-voice: LONG COUNT, Surface's gift (night 5), a tier beyond VII. It is never bought on the
+    // chain: the gift's node in the tree buys it (tree.js), once Cryo VII stands. A million years a second.
+    { id: 'cryo-viii', days: 365000000, cost: 1.0e20, gift: 'longcount' },
 ];
+/** The top of the chain the colony buys tier by tier: Cryo VII. The tier past it is Surface's gift. */
+export const CRYO_TOP = 6;
+/** The next tier on the chain, or null at its top (Long count is a gift, not the next tier). */
+export const nextCryo = (s) => ((s.cryo ?? -1) < CRYO_TOP ? CRYO[(s.cryo ?? -1) + 1] : null);
 /** "Cryo I" to "Cryo VII": what a sentence calls a tier. */
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 export const cryoName = (tier) => `Cryo ${ROMAN[tier] || tier + 1}`;
+
+/* ---------------------------------------------------------------------------
+ * SURFACE'S GIFTS (deep-voice, step 2 of docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md).
+ * Surface opens a node in the tree on some nights; once bought (tree.js), the gift is a rule here.
+ * The save keeps them in `state.tree.bought`; with none bought every number below is what it was.
+ *   lossless   LOSSLESS RELAY   an automated room makes LOSSLESS times as much
+ *   cold       COLD STORAGE     sleepers eat nothing
+ *   quiet      QUIET HANDS      an automated room's upkeep (the power it draws, the fuel it burns)
+ *                               no longer grows with its levels: it runs as a level-0 room would
+ *   longcount  LONG COUNT       the tier past Cryo VII (CRYO[7])
+ *   question   THE QUESTION     opens BIOLOGICAL (tree.js)
+ * ------------------------------------------------------------------------ */
+export const LOSSLESS = 3;
+/** Has Surface's gift `id` been bought? */
+export const gift = (s, id) => !!(s && s.tree && Array.isArray(s.tree.bought) && s.tree.bought.includes(id));
+/** What a room of type `t` makes, times its base output: its level and automation, and the relay. */
+export function outputMultiplier(s, t, level = s.level[t] || 0, auto = s.auto[t] || 0) {
+    return roomMultiplier(level, auto) * (auto > 0 && gift(s, 'lossless') ? LOSSLESS : 1);
+}
+/** What a room of type `t` costs to run, times its base upkeep: Quiet hands keeps an automated
+ *  room's at its level-0 draw. */
+export function upkeepFor(s, t, level = s.level[t] || 0, auto = s.auto[t] || 0) {
+    return upkeepMultiplier(auto > 0 && gift(s, 'quiet') ? 0 : level, auto);
+}
+/** The share of a ration a sleeper eats: none with Cold storage. */
+export const sleepFood = (s) => (gift(s, 'cold') ? 0 : SLEEP_FOOD);
 /** Thousands are grouped with a space, never a comma: the counter reads the same in every locale. */
 export const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 /**
@@ -784,6 +817,8 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         mournUntil: null,                   // no one is born until this day (a year after deaths)
         shaftOpen: false,                   // the rubble at the top of the shaft up, cleared by the first party
         cryo: -1, doom0,
+        // deep-voice: the tree's memory (tree.js normalizeTree): Surface's nodes opened and bought
+        tree: { opened: [], bought: [], unseen: false },
     };
 }
 
@@ -795,8 +830,10 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
  */
 export function tickDay(s, asleep = false) {
     const awake = asleep ? 0 : s.humans;
-    const mult = (t) => roomMultiplier(s.level[t], s.auto[t]);
-    const upkeep = (t) => upkeepMultiplier(s.level[t], s.auto[t]);
+    // deep-voice: the gifts (Lossless relay, Quiet hands) are read here; without them these are
+    // roomMultiplier and upkeepMultiplier exactly
+    const mult = (t) => outputMultiplier(s, t);
+    const upkeep = (t) => upkeepFor(s, t);
     // Rooms a monster has taken make nothing and need nothing until they are cleared. With
     // none taken this is s.rooms[t] exactly, so the whole economy is the one the sim balanced.
     // Since v1.49.0 the rooms the Watcher took (`taken`) are gone from the colony the same way.
@@ -840,7 +877,7 @@ export function tickDay(s, asleep = false) {
     const died = asleep ? s.humans * cryoDeathRate(s) : 0;
     s.humans -= died;
     const demand = s.humans * FOOD_PER_HUMAN;        // what the colony eats, or will eat when it wakes
-    const eat = asleep ? demand * SLEEP_FOOD : demand;
+    const eat = asleep ? demand * sleepFood(s) : demand;
     let born = 0, starving = false;
     if (s.food >= eat) {
         s.food -= eat;
@@ -936,7 +973,7 @@ export function troubleIn(s, r) {
         return { kind: 'energy', pct };
     }
     // what the sleepers eat beyond what the farms bring in while everyone is under
-    const need = s.humans * FOOD_PER_HUMAN * SLEEP_FOOD - r.food;
+    const need = s.humans * FOOD_PER_HUMAN * sleepFood(s) - r.food;
     if (need > 0) {
         const days = s.food / need;
         if (days < foodAlarmDays(s)) return { kind: 'food', days: Math.floor(days) };

@@ -17,7 +17,9 @@
  *   watcher  the Watcher's SYSTEM and HARDWARE steps, bought asleep with capacity and stars.
  *   bio      the four biological steps, kept as they work today (a sector is chosen) until the
  *            biological step of the design is built.
- *   surface  greyed, with a hollow ring: only Surface opens them. Not buyable in step 1.
+ *   surface  greyed, with a hollow ring: only Surface opens them. Since deep-voice (step 2) a
+ *            night of Surface's script opens one (`state.tree.opened`): the ring fills, it has a
+ *            price in stars, and once bought (`state.tree.bought`) it is a rule in deep.js.
  *   teaser   a node of the design with no rule behind it yet (Deep seam, Hydroponics, Hands,
  *            The machine: feed). Shown locked; never buyable until a later step gives it a rule.
  *
@@ -26,9 +28,10 @@
  */
 
 import {
-    CRYO, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
-    tickDay, sleepTrouble, ordersDone,
+    CRYO, CRYO_TOP, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
+    tickDay, sleepTrouble, ordersDone, gift,
 } from './deep.js';
+import { NIGHTS, nightsSaid } from './surface.js';
 import {
     LADDER, RUNGS, has as watcherHas, nextStep, stepNeed, buyStep, peopleFor, firstSleep,
 } from './watcher.js';
@@ -94,7 +97,7 @@ export const NODES = [
     { id: 'hands', branch: 'HABITAT', x: 140, y: 195, kind: 'teaser', name: 'HANDS', max: 6, parent: 'creche',
         does: 'What a pair of hands is worth.' },
     { id: 'quiet', branch: 'HABITAT', x: 140, y: 90, lab: 't', kind: 'surface', name: 'QUIET\nHANDS', max: 1, parent: 'hands',
-        does: 'Automated rooms need no upkeep crew.' },
+        does: 'Automated rooms need no upkeep crew: they draw and burn as at level 0.' },
 
     // CRYO: a chain, root to VII, right to left
     ...ROMAN.map((r, i) => ({
@@ -133,8 +136,36 @@ export const NODE_BY_ID = Object.fromEntries(NODES.map((n) => [n.id, n]));
 /** The node that sells a level or an automation of a room type: LEVEL_NODE.mine is 'seam'. */
 export const LEVEL_NODE = { mine: 'seam', farm: 'yield', generator: 'output', dorm: 'beds' };
 export const AUTO_NODE = { mine: 'drill', farm: 'farmauto', generator: 'genauto', dorm: 'creche' };
-/** The node of a cryo tier (0 is Cryo I, the hall). */
-export const cryoNode = (tier) => `cryo-${(ROMAN[tier] || '').toLowerCase()}`;
+/** The node of a cryo tier (0 is Cryo I, the hall; the tier past VII is Surface's Long count). */
+export const cryoNode = (tier) => (tier > CRYO_TOP ? 'longcount' : `cryo-${(ROMAN[tier] || '').toLowerCase()}`);
+
+/**
+ * SURFACE'S GIFTS (deep-voice). The price of each in stars, set so that it is about a minute of
+ * play at the point Surface opens it (the night's tier, scripts/sim-phase4.mjs): the stars a day
+ * there, times sixty. Long count is the tier past Cryo VII and costs what one more tier would.
+ */
+export const GIFT_PRICE = {
+    lossless: 1.0e8,
+    cold: 1.0e10,
+    quiet: 5.0e15,
+    longcount: CRYO[CRYO_TOP + 1].cost,
+    question: 1.0e17,
+};
+/** What a gift needs besides its price: Long count stands on Cryo VII. */
+const GIFT_NEEDS = { longcount: CRYO_TOP };
+/** Has Surface opened this node? */
+export const opened = (state, id) => !!(state.tree && Array.isArray(state.tree.opened) && state.tree.opened.includes(id));
+/** The line that opened a node, or ''. */
+export const quoteOf = (id) => NIGHTS.find((x) => x.gives === id)?.line || '';
+/** The night log: every line Surface has said, in order, and the node each one ties to. */
+export const nightLog = (state) => nightsSaid(state.watcher && state.watcher.surface);
+/** BIOLOGICAL is open once The question is bought; a colony that already owns a biological step
+ *  (a save from before deep-voice) keeps it open. */
+export function bioOpen(state) {
+    if (gift(state, 'question')) return true;
+    const w = state.watcher;
+    return !!(w && ((w.bought || []).some((id) => LADDER.some((u) => u.id === id && u.rung === 2)) || w.sealing));
+}
 /** The node of a Watcher step (its id in watcher.js's LADDER is the node's id too). */
 export const STEP_NODE = Object.fromEntries(NODES.filter((n) => n.step).map((n) => [n.step, n.id]));
 
@@ -156,12 +187,14 @@ export function chainTo(id) {
 
 /* ---------------------------------------------------------------- reading the colony */
 
-/** The tree's own memory in the save (schema 6): only what Surface has opened (step 2). */
-export const initialTree = () => ({ opened: [] });
+/** The tree's own memory in the save: what Surface has opened (schema 6), and since schema 7 the
+ *  gifts bought and whether a node was opened since the tree was last looked at (the mark). */
+export const initialTree = () => ({ opened: [], bought: [], unseen: false });
 export function normalizeTree(t) {
     const had = t && typeof t === 'object' ? t : {};
-    const opened = Array.isArray(had.opened) ? had.opened.filter((id) => NODE_BY_ID[id]?.kind === 'surface') : [];
-    return { ...initialTree(), opened: [...new Set(opened)] };
+    const ok = (a) => (Array.isArray(a) ? [...new Set(a.filter((id) => NODE_BY_ID[id]?.kind === 'surface'))] : []);
+    const open = ok(had.opened);
+    return { ...initialTree(), opened: open, bought: ok(had.bought).filter((id) => open.includes(id)), unseen: !!had.unseen };
 }
 
 /**
@@ -180,7 +213,7 @@ export function levelOf(state, id) {
         case 'auto': return (state.auto && state.auto[n.type]) || 0;
         case 'cryo': return (state.cryo ?? -1) >= n.tier ? 1 : 0;
         case 'watcher': case 'bio': return watcherHas(state.watcher, n.step) ? 1 : 0;
-        case 'surface': return 0;
+        case 'surface': return gift(state, id) ? 1 : 0;
         default: return 0;
     }
 }
@@ -207,7 +240,9 @@ export function watcherBranchOpen(state) {
 export function nodeVisible(state, id) {
     const n = NODE_BY_ID[id];
     if (!n) return false;
-    if (n.branch === 'WATCHER' || n.branch === 'BIOLOGICAL') return watcherBranchOpen(state);
+    if (n.branch === 'WATCHER') return watcherBranchOpen(state);
+    // deep-voice: BIOLOGICAL grows out of The question
+    if (n.branch === 'BIOLOGICAL') return watcherBranchOpen(state) && bioOpen(state);
     return true;
 }
 
@@ -223,6 +258,7 @@ export function priceOf(state, id) {
         return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
     }
     if (n.kind === 'cryo') return CRYO[n.tier] ? { currency: 'stars', stars: CRYO[n.tier].cost } : null;
+    if (n.kind === 'surface') return GIFT_PRICE[id] ? { currency: 'stars', stars: GIFT_PRICE[id] } : null;
     if (n.kind === 'watcher' || n.kind === 'bio') {
         const step = LADDER.find((u) => u.id === n.step);
         if (!step) return null;
@@ -249,7 +285,7 @@ export function priceText(price) {
  *  has not already got it. The phase passes its own, which it keeps once a colony day. */
 export function cryoNeedNow(state, starsPerDay = null) {
     const tier = (state.cryo ?? -1) + 1;
-    if (!CRYO[tier]) return null;
+    if (!CRYO[tier] || tier > CRYO_TOP) return null;
     const days = CRYO[tier].days;
     const perDay = starsPerDay ?? tickDay(JSON.parse(JSON.stringify(state)), false).stars;
     // as the phase reads it: the colony as it stands, and as it will once every order is built
@@ -285,13 +321,20 @@ export function canBuy(state, id, ctx = {}) {
     const n = NODE_BY_ID[id];
     const no = (kind, reason) => ({ ok: false, reason, kind });
     if (!n || n.kind === 'root') return no('bought', '');
-    if (n.kind === 'surface') return no('surface', 'Not ours to open.');
+    if (n.kind === 'surface' && !opened(state, id)) return no('surface', 'Not ours to open.');
     if (n.kind === 'teaser') return no('teaser', 'Not open yet.');
     const asleep = ctx.asleep ?? !!state.asleep;
     const lvl = levelOf(state, id) + orderedOf(state, id);
     if (lvl >= n.max) return no('bought', '');
     if (state.watcher && state.watcher.gone) return no('mode', 'Nobody is left to build it.');
     const perDay = ctx.starsPerDay || 0;
+
+    // Surface's gifts: bought awake or asleep, with stars, once opened (and Long count on Cryo VII)
+    if (n.kind === 'surface') {
+        if (GIFT_NEEDS[id] !== undefined && (state.cryo ?? -1) < GIFT_NEEDS[id]) return no('prereq', `Needs ${cryoName(GIFT_NEEDS[id])} first.`);
+        const miss = affordText({ price: GIFT_PRICE[id], have: state.stars || 0, perDay });
+        return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
+    }
 
     if (n.kind === 'level' || n.kind === 'auto') {
         if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
@@ -350,17 +393,20 @@ export function nodeStatus(state, id, ctx = {}) {
     const orders = orderedOf(state, id);
     const visible = nodeVisible(state, id);
     const can = canBuy(state, id, ctx);
+    const isOpen = n.kind === 'surface' && opened(state, id);
     let status;
-    if (n.kind === 'surface') status = 'surface';
+    if (n.kind === 'surface' && !isOpen) status = 'surface';
     else if (n.kind === 'root' || level >= n.max) status = 'bought';
     else if (can.ok) status = 'buyable';
     else if (can.kind === 'bought') status = 'bought';      // the last levels are on order
     else status = 'locked';
     const top = level + orders >= n.max;
-    const price = top || n.kind === 'surface' || n.kind === 'teaser' || n.kind === 'root' ? null : priceOf(state, id);
+    const price = top || (n.kind === 'surface' && !isOpen) || n.kind === 'teaser' || n.kind === 'root' ? null : priceOf(state, id);
     return {
         id, visible, status, level, max: n.max, ordered: orders, price, priceText: priceText(price),
         reason: can.reason, kind: can.kind, does: doesOf(state, id), name: n.name.replace(/\n/g, ' '),
+        // deep-voice: a gift Surface has opened, and the line that opened it
+        opened: isOpen, quote: isOpen ? quoteOf(id) : '',
     };
 }
 
@@ -368,7 +414,7 @@ export function nodeStatus(state, id, ctx = {}) {
 export function doesOf(state, id) {
     const n = NODE_BY_ID[id];
     if (!n) return '';
-    if (n.kind === 'surface') return '. . .';
+    if (n.kind === 'surface' && !opened(state, id)) return '. . .';
     if (n.does) return n.does;
     if (n.kind === 'level' || n.kind === 'auto') return buySentence(n.kind, n.type, state);
     if (n.kind === 'cryo') return `A sleep: ${rateWords(CRYO[n.tier].days)} a second.${n.tier === 0 ? ' A cryo hall, dug with its own chamber.' : ''}`;
@@ -382,7 +428,7 @@ export function doesOf(state, id) {
 export function buyableCount(state, ctx = {}) {
     let k = 0;
     for (const n of NODES) {
-        if (n.kind === 'root' || n.kind === 'surface' || n.kind === 'teaser' || !nodeVisible(state, n.id)) continue;
+        if (n.kind === 'root' || n.kind === 'teaser' || !nodeVisible(state, n.id)) continue;
         if (canBuy(state, n.id, ctx).ok) k++;
     }
     return k;
@@ -410,6 +456,15 @@ export function buy(state, id, ctx = {}) {
         state.stars -= price;
         const job = orderBuild(state, n.kind, { type: n.type });
         return { id, kind: n.kind, type: n.type, price, job };
+    }
+    if (n.kind === 'surface') {
+        const price = GIFT_PRICE[id];
+        state.stars -= price;
+        state.tree = normalizeTree(state.tree);
+        state.tree.bought.push(id);
+        // Long count IS the tier past Cryo VII: the colony sleeps at it from now on
+        if (id === 'longcount') state.cryo = CRYO_TOP + 1;
+        return { id, kind: 'gift', gift: id, price };
     }
     if (n.kind === 'cryo') {
         const price = CRYO[n.tier].cost;

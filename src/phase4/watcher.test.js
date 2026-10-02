@@ -7,10 +7,10 @@ import {
     initialWatcher, normalizeWatcher, watcherName, watchSleep, alarmHit, snap, softness,
     shouldGarble, garble, watcherLines, makePuzzle, puzzleDue, openPuzzle, armPuzzles,
     dismissPuzzle, sleepDays, driftYears, puzzleGapYears, puzzleStars,
-    STABILITY_MAX, NAME_AT_YEARS, DRIFT_PER_SECOND, ALARM_DROP, ALARM_DROP_BAD, REBOOT_TO,
+    STABILITY_MAX, DRIFT_PER_SECOND, ALARM_DROP, ALARM_DROP_BAD, REBOOT_TO,
     SNAP_COVERS, SNAP_SOFT_BONUS, snapGain, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST,
     GARBLE_BELOW, GARBLE_EVERY, WATCHER_NAMES, PUZZLE_STARS_MIN,
-    beginSleep, firstSleep, snapWait, FIRST_SLEEP_DAYS, WATCHER_HELLO,
+    beginSleep, firstSleep, snapWait, FIRST_SLEEP_DAYS, WATCHER_HELLO, openSurface,
 } from './watcher.js';
 import { CRYO, DAYS_PER_YEAR, initialDeepState, sleep, tickDay } from './deep.js';
 import { deserializeDeep, serializeDeep, SCHEMA_VERSION } from './persistence.js';
@@ -41,15 +41,18 @@ describe('the drift', () => {
         expect(watchSleep(w, { days: 1, tier: 0 }).rebooted).toBe(false);
     });
 
-    test('the label changes once, quietly, at NAME_AT_YEARS slept years', () => {
-        const w = initialWatcher();
+    test('the label changes once, quietly, on Surface\'s first night (deep-voice), never with the years', () => {
+        const w = { ...initialWatcher(), sleeps: 2 };
         expect(watcherName(w)).toBe('SYSTEM AWAKE');
-        expect(watchSleep(w, { days: (NAME_AT_YEARS - 1) * DAYS_PER_YEAR, tier: 6 }).named).toBe(false);
+        expect(watchSleep(w, { days: 1e6 * DAYS_PER_YEAR, tier: 6 }).named).toBe(false);
         expect(watcherName(w)).toBe(WATCHER_NAMES[0]);
-        expect(watchSleep(w, { days: 2 * DAYS_PER_YEAR, tier: 6 }).named).toBe(true);
+        const s = { ...initialDeepState(), cryo: 0, watcher: w };
+        const v = openSurface(w, s);
+        expect(v.night).toBe(1);
+        expect(v.line).toBe('Everyone is sleeping, but us.');
         expect(watcherName(w)).toBe('THE WATCHER');
-        expect(watchSleep(w, { days: 1e6, tier: 6 }).named).toBe(false);
         expect(w.stage).toBe(1);
+        expect(s.tree.opened).toEqual([]);              // night 1 opens nothing
     });
 
     test('alarms are steps down: a bad one more than good news, the hand nothing', () => {

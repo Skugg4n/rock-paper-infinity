@@ -14,15 +14,13 @@
  */
 
 import { CRYO, DAYS_PER_YEAR, BAD_ALARMS, MIN_SLEEPERS } from './deep.js';
-import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS } from './surface.js';
+import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS, nightGift } from './surface.js';
 import { sectorOf, SECTORS } from './layout.js';
 
 export const STABILITY_MAX = 100;
-/** What the label reads, in order. It moves on once and never back. */
+/** What the label reads, in order. It moves on once and never back: deep-voice, on Surface's first
+ *  night ("Everyone is sleeping, but us."). Until v1.60 it was after a century of slept years. */
 export const WATCHER_NAMES = ['SYSTEM AWAKE', 'THE WATCHER'];
-/** Slept years before the label changes: a century, longer than anyone who came down would
- *  have lived awake. In the simulated run that is about minute 18, halfway through the sleeps. */
-export const NAME_AT_YEARS = 100;
 
 /**
  * THE DRIFT. Stability falls with slept years: one point per `driftYears(tier)` years. The
@@ -34,7 +32,7 @@ export const NAME_AT_YEARS = 100;
  * attention holds at every tier and an absent Watcher reboots in three to five sleeps of about
  * half a minute wherever it is on the ladder (scripts/sim-phase4.mjs, the two watcher lines).
  */
-export const DRIFT_PER_SECOND = [0.9, 1.0, 1.05, 1.1, 1.15, 1.2, 1.3];
+export const DRIFT_PER_SECOND = [0.9, 1.0, 1.05, 1.1, 1.15, 1.2, 1.3, 1.4];       // the last: Long count (deep-voice)
 /**
  * THE FIRST SLEEP TEACHES, IT DOES NOT PUNISH (v1.48.0). The overnight playtest: the first sleep
  * opened on a riddle nobody had been told about, a meter nobody had seen drained, and the first
@@ -183,7 +181,8 @@ export const sleepDays = (seconds, tierDays, paused = false) => (paused ? 0 : Ma
  * @param {{days:number, tier:number, spare?:number}} slept - days slept, the tier they were
  *        slept at, and the spare energy summed over those days (sleep()'s `sum.spare`)
  * @returns {{rebooted:boolean, named:boolean}} rebooted: stability hit zero and came back at
- *          REBOOT_TO (the phase wakes the colony); named: the label changed on this slice
+ *          REBOOT_TO (the phase wakes the colony); named: always false since deep-voice (the label
+ *          changes on Surface's first night, openSurface)
  */
 export function watchSleep(w, { days, tier, spare = 0 }) {
     const d = Math.max(0, days || 0);
@@ -194,9 +193,7 @@ export function watchSleep(w, { days, tier, spare = 0 }) {
     const cap = k * CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
     w.grown = (w.grown || 0) + d / CRYO[tierOf(tier)].days;       // the body grows only in the dark
     w.capacity = Math.min(capacityMax(w), w.capacity + Math.min(cap, k * Math.max(0, spare) * CAPACITY_K));
-    let named = false;
-    if (w.stage === 0 && w.sleptYears >= NAME_AT_YEARS) { w.stage = 1; named = true; }
-    return { rebooted: rebootIfSpent(w), named };
+    return { rebooted: rebootIfSpent(w), named: false };
 }
 
 /** At zero: the system reboots. True when it did. */
@@ -780,8 +777,31 @@ export function surfaceDue(w, sleptDays, tierDays) {
     if (firstSleep(w) || demand(w) || !visitDue(w.surface, w.sleeps || 0)) return false;
     return sleptDays >= VISIT_AFTER_SECONDS * Math.max(1, tierDays);
 }
-/** Surface appears. With the skin receptors its line is the whole sentence, heard at last. */
-export const openSurface = (w) => openVisit(w.surface, w.sleeps || 0, { whole: has(w, 'skin') });
+/**
+ * Surface appears. With the skin receptors its line is the whole sentence, heard at last. When the
+ * visit is a NIGHT (surface.js NIGHTS), the first one names the Watcher, and nights 2 to 6 open
+ * their gift in the colony's tree (`s.tree.opened`) and mark the tree button (`s.tree.unseen`).
+ * @param {object} w - mutated
+ * @param {object|null} [s] - the colony (its cryo tier paces the nights; its tree takes the gift)
+ * @param {{force?:boolean}} [o] - force: the next line now (the debug hook)
+ * @returns {object} the visit
+ */
+export function openSurface(w, s = null, { force = false } = {}) {
+    const v = openVisit(w.surface, w.sleeps || 0, { whole: has(w, 'skin'), tier: s ? s.cryo ?? -1 : -1, force });
+    if (v.night === 1 && (w.stage | 0) === 0) w.stage = 1;
+    const g = v.night ? nightGift(v.night) : null;
+    if (g && s) openGift(s, g);
+    return v;
+}
+/** Surface has opened a node of the tree: it is buyable from now on (tree.js), and the tree
+ *  button carries a mark until the tree is next opened. */
+export function openGift(s, id) {
+    s.tree = s.tree && typeof s.tree === 'object' ? s.tree : {};
+    s.tree.opened = Array.isArray(s.tree.opened) ? s.tree.opened : [];
+    s.tree.bought = Array.isArray(s.tree.bought) ? s.tree.bought : [];
+    if (!s.tree.opened.includes(id)) s.tree.opened.push(id);
+    s.tree.unseen = true;
+}
 /** The colony wakes: Surface is gone. */
 export const closeSurface = (w) => closeVisit(w.surface);
 

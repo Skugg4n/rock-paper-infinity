@@ -315,7 +315,7 @@ describe('the ascent is a decision, not a countdown', () => {
 describe('cryo: the badge, and what a press is worth', () => {
     test('every tier reads as a length of time, months first and then years', () => {
         expect(CRYO.map((c) => cryoLabel(c.days)))
-            .toEqual(['1 m', '1 y', '10 y', '100 y', '1 000 y', '10 000 y', '100 000 y']);
+            .toEqual(['1 m', '1 y', '10 y', '100 y', '1 000 y', '10 000 y', '100 000 y', '1 000 000 y']);   // the last: Long count
         expect(cryoLabel(0)).toBe('1 m');
         expect(cryoLabel(3650000)).toBe('10 000 y');
         expect(group(1234567)).toBe('1 234 567');   // spaces, never commas

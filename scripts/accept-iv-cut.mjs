@@ -28,6 +28,13 @@
 //    Surface's nodes greyed with the hollow ring.
 // 2. the biological step is bought on the tree's BIOLOGICAL branch, and the line under the meter
 //    asks for the sector (it was the pill).
+// deep-voice (step 2 of the tree): Surface's voice and its gifts.
+// V. From "IV · Surface" (three lines said, Lossless relay and Cold storage bought): force a
+//    night (debug_deep('night')): the line types itself letter by letter and stays, the game with
+//    Surface beside it, no lamps; the tree button carries the night's mark. Wake: the line is gone
+//    from the screen; in the tree's night log it is the fourth line, with its dotted thread to
+//    Quiet hands, whose ring is filled and which can be bought; buying it changes the rule's
+//    output (the generators burn less ore, the rooms draw less power).
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -197,6 +204,77 @@ try {
     for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.level.mine')) < 1; i++) await sleepMs(250);
     check((await evaluate('rpiDeep.state.level.mine')) === 1, 'the order lands: the mines are at level 1, Seam reads 1');
 
+    // ================= V. IV · Surface: the voice in the night, the gift in the tree ==================
+    await jump('iv-surface');
+    const v0 = await evaluate(`({ night: rpiDeep.state.watcher.surface.night, voice: !document.getElementById('deep-voice').hidden,
+        mark: document.getElementById('deep-tree-btn').classList.contains('has-night') })`);
+    check(v0.night === 3 && !v0.voice && !v0.mark, `IV · Surface: three lines said (${v0.night}), no line on screen, no mark on the tree button`);
+    await evaluate('debug_deep("night")');
+    await sleepMs(250);
+    const v1 = await evaluate(`({ v: rpiDeep.voice, card: !document.getElementById('deep-surface').hidden,
+        lamps: document.getElementById('deep-puzzle').classList.contains('is-on'),
+        pe: getComputedStyle(document.getElementById('deep-voice')).pointerEvents,
+        mark: document.getElementById('deep-tree-btn').classList.contains('has-night'),
+        size: parseFloat(getComputedStyle(document.getElementById('deep-voice')).fontSize),
+        feedSize: parseFloat(getComputedStyle(document.getElementById('deep-feed')).fontSize),
+        night: rpiDeep.state.watcher.surface.night, opened: rpiDeep.state.tree.opened.slice() })`);
+    check(v1.night === 4 && v1.opened.includes('quiet'), `the forced night is night 4 and opens Quiet hands (${v1.opened.join(', ')})`);
+    check(!!v1.v && v1.v.shown && v1.v.typing && v1.v.typed.length > 0 && v1.v.typed.length < v1.v.text.length && v1.v.text.startsWith(v1.v.typed),
+        `the line types itself: "${v1.v?.typed}" of "${v1.v?.text}"`);
+    check(v1.card && !v1.lamps, `the game with Surface shares the screen with it (card ${v1.card}), the lamps do not (${v1.lamps})`);
+    check(v1.pe === 'none' && v1.size > v1.feedSize, `nothing on the line can be clicked (pointer-events ${v1.pe}); its mono is larger (${v1.size} px against the feed's ${v1.feedSize})`);
+    check(v1.mark, 'the tree button carries the night\'s mark');
+    await shot('V-1-the-voice-typing');
+    await sleepMs(Math.ceil(v1.v.text.length * 35) + 2500);
+    const v2 = await evaluate(`({ v: rpiDeep.voice, asleep: rpiDeep.state.asleep })`);
+    check(v2.asleep && v2.v && v2.v.shown && !v2.v.typing && v2.v.typed === v2.v.text, `the line is whole and stays while they sleep: "${v2.v?.typed}"`);
+    await shot('V-2-the-voice-stays');
+    await evaluate('debug_deep("alarm")');
+    for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.asleep')); i++) await sleepMs(100);
+    await sleepMs(2200);
+    const v3 = await evaluate(`({ asleep: rpiDeep.state.asleep, voice: !document.getElementById('deep-voice').hidden, v: rpiDeep.voice })`);
+    check(!v3.asleep && !v3.voice && !v3.v, `awake, the line is gone from the screen (shown ${v3.voice})`);
+    const fuel0 = await evaluate('({ fuel: rpiDeep.report.fuelWanted, need: rpiDeep.report.energyNeed, stars: rpiDeep.state.stars })');
+    const tbv = await centre('#deep-tree-btn');
+    await click(tbv.x, tbv.y);
+    await sleepMs(500);
+    const v4 = await evaluate(`(() => { const d = rpiDeep.treeDrawn;
+        return { open: rpiDeep.treeOpen, log: rpiDeep.treeLog,
+            threads: [...document.querySelectorAll('#deep-tree path.log-thread')].map((p) => p.dataset.to),
+            lines: [...document.querySelectorAll('#deep-tree .tt-log text.log-line')].map((t) => t.textContent).join(' '),
+            quiet: d.quiet && { status: d.quiet.status, opened: d.quiet.opened, price: d.quiet.priceText },
+            ring: !!document.querySelector('#deep-tree g.tn[data-id="quiet"] circle.gift-ring'),
+            mark: document.getElementById('deep-tree-btn').classList.contains('has-night') }; })()`);
+    const last = v4.log[v4.log.length - 1];
+    check(v4.open && v4.log.length === 4 && last && last.n === 4 && last.to === 'quiet' && last.thread,
+        `the night log holds the four lines, the last tied to Quiet hands: ${v4.log.map((l) => `${l.n}>${l.to}${l.thread ? '' : '(no thread)'}`).join(' ')}`);
+    check(v4.lines.includes('What use are they?') && v4.threads.includes('quiet') && v4.threads.includes('lossless'),
+        `the log's text and its dotted threads are drawn (threads to ${v4.threads.join(', ')})`);
+    check(!!v4.quiet && v4.quiet.status === 'buyable' && v4.quiet.opened && v4.ring, `Quiet hands: ring filled (${v4.ring}), ${v4.quiet?.status} at ${v4.quiet?.price}`);
+    check(!v4.mark, 'opening the tree takes the mark away');
+    const quietAt = await nodeAt('quiet');
+    await mouse('mouseMoved', quietAt.x, quietAt.y);
+    await sleepMs(250);
+    const iq = await evaluate(`document.querySelector('#deep-tree-info .ib-q').textContent`);
+    check(iq.includes('Your humans. What use are they?'), `the info box quotes the line that opened it: ${iq}`);
+    await shot('V-3-the-night-log');
+    const longAt = await centre('#deep-tree g.tn[data-id="longcount"] rect[stroke-dasharray]');
+    await mouse('mouseMoved', longAt.x, longAt.y);
+    await sleepMs(200);
+    const il = await info();
+    check(il.x === 'Not ours to open.', `a node Surface has not opened says "${il.x}"`);
+    await mouse('mouseMoved', quietAt.x, quietAt.y);
+    await sleepMs(100);
+    await click(quietAt.x, quietAt.y);
+    await sleepMs(400);
+    const fuel1 = await evaluate(`({ fuel: rpiDeep.report.fuelWanted, need: rpiDeep.report.energyNeed, stars: rpiDeep.state.stars,
+        bought: rpiDeep.state.tree.bought.slice(), status: rpiDeep.treeDrawn.quiet.status })`);
+    check(fuel1.bought.includes('quiet') && fuel1.status === 'bought' && fuel0.stars - fuel1.stars > 4e15,
+        `a click buys Quiet hands (${fuel1.status}, ${(fuel0.stars - fuel1.stars).toPrecision(2)} stars paid)`);
+    check(fuel1.fuel < fuel0.fuel / 4 && fuel1.need < fuel0.need, `the rule's output changes: the generators burn ${fuel0.fuel.toPrecision(3)} to ${fuel1.fuel.toPrecision(3)} ore a day, the rooms draw ${fuel0.need.toPrecision(3)} to ${fuel1.need.toPrecision(3)} energy`);
+    await key('Escape');
+    await sleepMs(200);
+
     // ================= 1. IV · Surface: one demand at a time, the snap holds ==================
     await jump('iv-surface');
     // the tree asleep: the WATCHER branch, the steps bought, Surface's nodes greyed
@@ -208,11 +286,14 @@ try {
             && !!document.querySelector('#deep-tree g.tn[data-id="' + id + '"] rect[stroke-dasharray]');
         return { open: rpiDeep.treeOpen, watcher: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore', 'mast', 'reactor'].map((id) => d[id].visible && d[id].status),
             surface: ['lossless', 'cold', 'longcount', 'quiet', 'question'].map((id) => d[id].status + (ring(id) ? '+ring' : '')),
+            gifts: ['lossless', 'cold'].map((id) => d[id].status + (document.querySelector('#deep-tree g.tn[data-id="' + id + '"] circle.gift-ring') ? '+filled' : '')),
             seam: d.seam.reason }; })()`);
     await shot('1-the-tree-asleep');
     check(t1.open && t1.watcher.slice(0, 6).every((x) => x === 'bought') && t1.watcher[6] && t1.watcher[6] !== 'bought',
         `from IV · Surface the WATCHER branch shows: ${t1.watcher.join(', ')}`);
-    check(t1.surface.every((x) => x === 'surface+ring'), `Surface's nodes greyed with the hollow ring: ${t1.surface.join(', ')}`);
+    // deep-voice: Lossless relay and Cold storage are bought; the other three still wait for Surface
+    check(t1.surface.slice(2).every((x) => x === 'surface+ring'), `Surface's unopened nodes greyed with the hollow ring: ${t1.surface.join(', ')}`);
+    check(t1.gifts.every((x) => x === 'bought+filled'), `its gifts bought, the ring filled: ${t1.gifts.join(', ')}`);
     check(t1.seam === 'The colony is asleep: wake it to buy.', `asleep, a level says why not: "${t1.seam}"`);
     await key('Escape');
     await sleepMs(300);
