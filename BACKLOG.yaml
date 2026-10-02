@@ -1462,6 +1462,27 @@ items:
     status: done
     resolved_in: v1.54.0
 
+  - id: B156
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      Chapter I: on a desktop window lower than about 900 px the player
+      controls are pushed below the viewport (at 1280x800 the board is 640x640
+      and #player-controls-container sits at y=800; body cannot scroll). The
+      board, the grids of 2 to 9 boards and the factory's #meta-board should
+      shrink to fit the height that is left, so the footer with the clover and
+      the controls is always inside the window. Square and centred. Do not
+      change the phone layout.
+    status: done
+    resolved_in: v1.55.1
+    notes: |
+      Measured in the browser at 1280x700, 1280x800, 1280x960 and 375x812 with
+      1, 2, 5 and 9 boards and the factory, and again on top of v1.55.0 (the
+      five first stars, six buttons in the row). Phone identical except nine boards
+      (was 4 px past the edge, now fits). Seen on the way, left as it is: on a
+      phone the boards of a 2 to 9 grid are taller than wide (104x192 with
+      five), because the two icon slots hold them 12rem tall.
+
   - id: B157
     added: 2026-10-02
     source: "chat 2026-10-02 (playtest of v1.54.0)"

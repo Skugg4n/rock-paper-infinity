@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.55.1 - 2026-10-02 (chapter I)
+
+### The board fits the window
+
+- **The controls never leave the window.** In a desktop window lower than about 900 px the board stayed as tall as the column was wide (640 px) and pushed rock, paper, scissors, recharge and auto-play below the edge, where the page cannot scroll. The board now takes the smaller of the width and the height that is left: 544 px at 1280x800 and 444 px at 1280x700, 640 px as before at 1280x960. Still square and centred.
+- **The grids too.** Two, four and up to nine boards size from the grid's shape (`--board-cols` and `--board-rows`, set in `adjustBoardLayout()`), so nine boards are 171 px each at 1280x800 and 137 px at 1280x700, a tight grid in the middle. The factory's box shrinks the same way in a very low window.
+- **Phones are unchanged** where the width is the limit (375x812 with 1, 2 and 5 boards and the factory measured the same to the pixel). One case moves: nine boards on a 375x812 phone used to push the controls 4 px past the bottom edge; the boards are now 180 px tall instead of 192 and everything fits.
+- How: `#game-board-container` is a size container (`container-type: size`, `min-height: 0`) and a board's width is `min()` of its share of `100cqw` and `100cqh`, in style.css. Browsers without container units keep the old layout. The board lost `transition-all`, which animated nothing before but would now animate every resize.
+- **The five first stars** (v1.55.0) sit in the strip between the board and the buttons and keep 28 px to both, also when the board fills the height.
+- Backlog B156.
+
 ## v1.55.0 - 2026-10-02 (chapter I, after Ola's playtest of v1.54.0)
 
 ### The first five stars, the clover in the row, the battery when it is needed

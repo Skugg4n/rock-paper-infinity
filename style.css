@@ -162,6 +162,30 @@ input[type=range]:focus-visible {
 
 #player-zone { position: relative; z-index: 10; }
 
+/* The boards fit the height that is left (B156), so the footer with the
+   controls never leaves the window. The container is a size container; a
+   board's side is the smaller of what the width and the height allow for the
+   grid (--board-cols x --board-rows, set in adjustBoardLayout; gap-4 = 1rem).
+   Where the width is the limit (phones) this is the same size as before.
+   Browsers without container units keep the old width-only layout. */
+@supports (width: 1cqh) {
+    #game-board-container {
+        min-height: 0;
+        container-type: size;
+        grid-template-columns: repeat(var(--board-cols, 1), auto);
+    }
+    #game-board-container > .game-board {
+        width: min(
+            (100cqw - (var(--board-cols, 1) - 1) * 1rem) / var(--board-cols, 1),
+            (100cqh - (var(--board-rows, 1) - 1) * 1rem) / var(--board-rows, 1)
+        );
+        /* A board's content (two 5rem slots + padding) used to hold it 12rem
+           tall however narrow it got. Keep that, but never taller than its row. */
+        min-height: min(12rem, (100cqh - (var(--board-rows, 1) - 1) * 1rem) / var(--board-rows, 1));
+    }
+    #game-board-container > #meta-board { max-width: 100cqmin; max-height: 100cqmin; }
+}
+
 .computer-result-icon,
 .player-result-icon {
     position: relative;

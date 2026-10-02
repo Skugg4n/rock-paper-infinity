@@ -185,7 +185,7 @@ function scheduleUIUpdate() {
             const boardId = `game-board-${gameBoards.length + 1}`;
             const board = document.createElement('div');
             board.id = boardId;
-            board.className = 'bg-white rounded-2xl shadow-md aspect-square w-full h-auto flex flex-col justify-around items-center p-4 transition-all';
+            board.className = 'game-board bg-white rounded-2xl shadow-md aspect-square w-full h-auto flex flex-col justify-around items-center p-4';
             board.innerHTML = `
                 <div class="relative h-20 w-20 flex justify-center items-center">
                     <div class="computer-result-icon text-slate-400"></div>
@@ -214,6 +214,9 @@ function scheduleUIUpdate() {
             if (count > 1) cols = 2;
             if (count > 4) cols = 3;
             gameBoardContainer.className = `flex-grow grid grid-cols-${cols} items-center justify-center gap-4`;
+            // style.css sizes a board from the grid's shape, so it fits the height too
+            gameBoardContainer.style.setProperty('--board-cols', cols);
+            gameBoardContainer.style.setProperty('--board-rows', Math.ceil(count / cols));
             
             if (count > 4) {
                 gameBoardContainer.classList.add('small-icons');
@@ -263,7 +266,9 @@ function scheduleUIUpdate() {
                 metaBoard.appendChild(getIcon('factory', 'factory-center-icon'));
 
                 gameBoardContainer.innerHTML = '';
-                gameBoardContainer.className = 'pointer-events-none flex-grow grid grid-cols-1 items-center justify-center max-w-sm mx-auto';
+                gameBoardContainer.className = 'pointer-events-none flex-grow grid grid-cols-1 items-center justify-center justify-items-center';
+                gameBoardContainer.style.setProperty('--board-cols', 1);
+                gameBoardContainer.style.setProperty('--board-rows', 1);
                 gameBoardContainer.appendChild(metaBoard);
             }
             metaBoard.style.display = 'flex';

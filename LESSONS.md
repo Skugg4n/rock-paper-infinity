@@ -115,6 +115,12 @@
 **Lesson:** Data shared across modules must be tolerant of the other side being one version behind, or boot must detect failure and refetch.
 **Rule:** "After a failed boot, refetch all modules once with cache: 'reload' and retry; and prefer a hard reload right after a deploy when testing."
 
+### #20 — `transition-all` and container units: every resize becomes an animation
+**Problem:** With the board's width in `cqw`/`cqh` (v1.55.1) the board stood still at its old size after the window changed, in a tab that was not painting.
+**Cause:** `width: 100%` never transitions (the computed value stays `100%`), but container units compute to pixels, so the board's `transition-all` started a width transition on every resize; in a hidden tab it never finishes.
+**Lesson:** A size that comes from container or viewport units is a computed length and will transition.
+**Rule:** No `transition-all` on elements sized with container units; name the properties that should animate.
+
 ## Rules Checklist
 - [ ] Never bump version without updating all files in the checklist
 - [ ] Keep modules focused — one concern per file
