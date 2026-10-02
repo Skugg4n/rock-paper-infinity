@@ -1524,3 +1524,27 @@ items:
       big and can be clicked although auto is running.
     status: done
     resolved_in: v1.55.0
+
+  - id: B161
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      The big battery's bar should have the same colour as the small one,
+      only thicker and bigger as now. One purchase should fill it completely.
+    status: done
+    resolved_in: v1.56.0
+
+  - id: B162
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      Start adding sound, a little at a time, for the mood. Chapter I very
+      basic at first: a pling on a win and a click on buttons. When it goes
+      fast that gets tiresome, so it should turn into a background loop: mood
+      music with a steady rhythm, humming, a bass line, a heartbeat in time
+      with the engine that charges the battery. Controls for sound and music
+      on/off in the ☰ menu.
+    status: open
+    notes: |
+      Design dialogue first. Earlier proposal: docs/superpowers/specs/2026-09-27-sound-design.md
+      (it said no music; Ola's idea of the machine's rhythm as music replaces that for chapter I).

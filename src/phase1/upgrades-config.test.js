@@ -8,6 +8,8 @@ const IDS = ['autoPlay', 'manualRecharge', 'speed', 'energyGenerator', 'buyBatte
 let createUpgrades;
 let eps;
 let batteries;
+let energyFull;
+let reserveFull;
 let upgrades;
 
 beforeEach(async () => {
@@ -16,11 +18,14 @@ beforeEach(async () => {
     ({ createUpgrades } = await import('./upgrades-config.js'));
     eps = 0;
     batteries = 0;
+    energyFull = false;
+    reserveFull = false;
     upgrades = createUpgrades({
         rechargeEnergy: () => {}, addReserve: () => {}, incrementSpeed: () => {},
         createGameBoard: () => {}, mergeToMetaBoard: () => {}, setPhaseToCity: () => {},
         getTotalStarsEarned: () => 0, getFoamCollapses: () => 0, getFoamFraction: () => 0,
         getEnergyPerSecond: () => eps, getBatteriesBought: () => batteries,
+        isEnergyFull: () => energyFull, isReserveFull: () => reserveFull,
     });
 });
 
@@ -53,6 +58,15 @@ describe('the energy ladder unlocks by need', () => {
         batteries = 0;
         upgrades.energyGenerator.level = 1;
         expect(upgrades.energyGenerator.unlockCondition()).toBe(true);
+    });
+
+    test('a full battery cannot be charged: recharge and the big battery are blocked when full', () => {
+        expect(upgrades.manualRecharge.blocked()).toBe(false);
+        expect(upgrades.buyBattery.blocked()).toBe(false);
+        energyFull = true;
+        reserveFull = true;
+        expect(upgrades.manualRecharge.blocked()).toBe(true);
+        expect(upgrades.buyBattery.blocked()).toBe(true);
     });
 
     test('the recharge button is unchanged', () => {

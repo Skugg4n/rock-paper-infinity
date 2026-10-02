@@ -121,7 +121,10 @@ const resetBtn = document.getElementById('reset-btn');
 
         const upgrades = createUpgrades({
             rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); },
-            addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 500); batteriesBought++; },
+            // One big battery is a full big battery.
+            addReserve:        () => { reserveEnergy = MAX_RESERVE_ENERGY; batteriesBought++; },
+            isEnergyFull:      () => energy >= MAX_ENERGY,
+            isReserveFull:     () => reserveEnergy >= MAX_RESERVE_ENERGY,
             getEnergyPerSecond: () => getEPS(gameSpeed, isMetaBoardActive, gameBoards.length),
             getBatteriesBought: () => batteriesBought,
             incrementSpeed:    () => { gameSpeed += 1; },
@@ -535,7 +538,7 @@ const uiState = {
             const showReserveChanged = showReserve !== uiState.showReserve;
             const cloverChanged = cloverVisible !== uiState.cloverVisible || cloverEvergreen !== uiState.cloverEvergreen;
             const handsChanged = handsRest !== uiState.handsRest;
-            const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive || foamChanged;
+            const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive || foamChanged || energyChanged || reserveChanged;
 
             const tasks = [];
             if (gamesChanged) tasks.push(() => {
@@ -809,6 +812,7 @@ const uiState = {
             }
             
             const currentCost = (typeof upgrade.cost === 'function') ? upgrade.cost() : upgrade.cost;
+            if (typeof upgrade.blocked === 'function' && upgrade.blocked()) return;
             if (starBalance >= currentCost) {
                 if(upgrade.level !== undefined && upgrade.level >= upgrade.maxLevel) return;
 

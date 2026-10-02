@@ -400,7 +400,9 @@ export function renderUpgrades({
                     upgrade.element.classList.add('purchased', 'invisible');
                 }
             } else if (upgrade.consumable) {
-                upgrade.element.disabled = starBalance < currentCost;
+                // A consumable can be blocked: there is no point in charging a full battery.
+                const blocked = typeof upgrade.blocked === 'function' && upgrade.blocked();
+                upgrade.element.disabled = starBalance < currentCost || blocked;
             } else {
                 upgrade.element.disabled = (starBalance < currentCost) || upgrade.purchased;
                 if (upgrade.purchased) upgrade.element.classList.add('purchased');

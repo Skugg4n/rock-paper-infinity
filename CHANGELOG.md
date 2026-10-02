@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.56.0 - 2026-10-02 (chapter I)
+
+### One big battery is a full big battery
+
+- **A purchase fills the big battery completely** (1 500 energy, was a pack of 500 that could be topped up three times). At 22 energy a second the first one now lasts 38 seconds instead of 15.
+- **The big battery's bar has the small one's colour**, only thicker and taller as before.
+- **A full battery cannot be charged.** The big battery's button is greyed while the bar is full, and the recharge button while the small tank is full, so no star is spent on nothing.
+- **Simulation**: big battery 5:39, then 38, 18, 14 and 9 seconds between purchases, generator 6:58, bank 12:16 (lazy); 4:05, 5:24, 10:42 (fiddler).
+
 ## v1.55.1 - 2026-10-02 (chapter I)
 
 ### The board fits the window

@@ -119,7 +119,7 @@ the previous one*, not by a star count that a fast player reaches too early.
 
 - **Energy in chapter I.** First you click the recharge button on the ordinary battery.
   When that has become a slog (the machines eat about 22 energy a second, the tank is
-  empty in under five), the big battery arrives: a pack of five tanks. The line keeps
+  empty in under five), the big battery arrives: one purchase fills it, fifteen tanks. The line keeps
   climbing, the pack is eaten in seconds, and after the fifth pack the generator
   arrives as the next relief. Each helper is the right answer for a
   while and then too small. That is the dynamic, not a bug.

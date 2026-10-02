@@ -16,7 +16,7 @@ const P = {
   genMax: 50, genCost: L => sig2(25 * Math.pow(1.07, L)), genRate: 10, genUnlockBatteries: 5,
   boardMax: 8, boardCost: L => sig2(250 * Math.pow(1.9, L)), boardUnlock: 150,
   luckCost: 50, luckUnlockGames: 100,
-  battCost: 20, battAmount: 500, battUnlockEps: 22, reserveMax: 1500,
+  battCost: 20, battAmount: 1500, battUnlockEps: 22, reserveMax: 1500,
   rechargeAmount: 25, rechargeUnlock: 15, clicksPerSecond: 1,
   factoryCost: 10000, bankGate: 250000, foamMax: 20000, foamBonusSec: 30,
   cloverUptime: 0.8,

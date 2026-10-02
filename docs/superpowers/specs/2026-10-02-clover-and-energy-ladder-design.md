@@ -124,7 +124,7 @@ two boards), then the generator has outgrown it.
 | Bank | 12:20 | 10:46 |
 | Recharge clicks | 34 | 31 |
 
-Open: at 22 energy a second a pack of 500 lasts about a quarter of a minute, so the
-big battery has no long good stretch of its own (46 seconds from first pack to
-generator). A pack that fills the whole big bar (1 500) gives 38, 18, 14 and 9
-seconds and 80 seconds in all. Ola decides.
+Decided by Ola the same day (v1.56.0): one purchase fills the whole big bar
+(1 500). The big batteries then last 38, 18, 14 and 9 seconds, the generator comes
+at 6:58 (lazy) and 5:24 (fiddler), the bank at 12:16 and 10:42. The bar has the small
+one's colour, and a full battery cannot be charged (its button is greyed).

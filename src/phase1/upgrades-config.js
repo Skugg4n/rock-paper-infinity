@@ -24,6 +24,8 @@ const { BATTERY_UNLOCK_EPS, GENERATOR_UNLOCK_BATTERIES } = PHASE1_CONSTANTS;
  * @param {object} actions - Callbacks for purchase side-effects
  * @param {function} actions.rechargeEnergy  - Adds energy (manualRecharge)
  * @param {function} actions.addReserve      - Adds reserve energy (buyBattery)
+ * @param {function} actions.isEnergyFull    - The small battery is full (recharge is blocked)
+ * @param {function} actions.isReserveFull   - The big battery is full (buying another is blocked)
  * @param {function} actions.getEnergyPerSecond - Energy the machines eat per second (battery gate)
  * @param {function} actions.getBatteriesBought - Big batteries bought so far (generator gate)
  * @param {function} actions.incrementSpeed  - Bumps gameSpeed by 1 (speed)
@@ -62,6 +64,7 @@ export function createUpgrades(actions) {
         },
         manualRecharge: {
             cost: 1, consumable: true, unlocksAt: 15, unlocks: [],
+            blocked: () => actions.isEnergyFull(),
             element: document.getElementById('manualRecharge'),
             purchase: function() { rechargeEnergy(); }
         },
@@ -91,10 +94,12 @@ export function createUpgrades(actions) {
         },
         buyBattery: {
             // The big battery, the step between clicking recharge and the
-            // generator: a pack of 500 energy. Arrives when clicking has become
-            // a slog: the machines eat 22 energy a second, the tank is empty in
-            // under five. Once bought it stays.
+            // generator: one purchase fills it completely (1 500 energy, fifteen
+            // small tanks). Arrives when clicking has become a slog: the machines
+            // eat 22 energy a second, the tank is empty in under five. Once
+            // bought it stays, and a new one can be bought when it runs down.
             cost: 20, consumable: true,
+            blocked: () => actions.isReserveFull(),
             unlocksAt: 0, unlocks: [],
             unlockCondition: () =>
                 actions.getBatteriesBought() > 0 ||
