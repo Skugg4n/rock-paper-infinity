@@ -6,11 +6,11 @@
  */
 import {
     initialDeepState, tickDay, sleepTrouble, ordersDone, completeBuilds, startBuild, repairTick,
-    resolveDueProbes, CRYO, MOURN_DAYS, mourning, automationCost, levelCost, roomCost, digCost,
+    resolveDueProbes, CRYO, MOURN_DAYS, mourning,
     DAYS_PER_YEAR,
 } from './deep.js';
 import { cryoNeed, offerFor, lowPoint, stocks, rewardShows, short, cloneState } from './readout.js';
-import { screen, decide } from './policy.js';
+import { screen, decide, press } from './policy.js';
 
 /** The colony the chapter starts with (checkpoint iv-start). */
 const start = () => initialDeepState({ salvage: 1500, doom0: 85 });
@@ -146,15 +146,6 @@ describe('people and rewards have weight', () => {
 });
 
 describe('a player who follows the dot and the captions gets to sleep (the overnight playtest could not)', () => {
-    /** The phase's own purchases, done the way its buttons do them. */
-    function press(s, a) {
-        if (a.kind === 'cryo') { s.stars -= CRYO[0].cost; s.cryo = 0; s.chambers += 1; s.rooms.cryo = 1; return; }
-        if (a.kind === 'auto') { s.stars -= automationCost(a.type, s.auto[a.type]); startBuild(s, 'auto', { type: a.type }); }
-        if (a.kind === 'level') { s.stars -= levelCost(a.type, s.level[a.type]); startBuild(s, 'level', { type: a.type }); }
-        if (a.kind === 'room') { s.minerals -= roomCost(a.type, s.rooms[a.type]); startBuild(s, 'room', { type: a.type }); }
-        if (a.kind === 'dig') { s.minerals -= digCost(s.chambers); startBuild(s, 'dig'); }
-    }
-
     test('Cryo I is bought inside eight real minutes from the descent', () => {
         const s = start();
         let at = null;
@@ -164,7 +155,8 @@ describe('a player who follows the dot and the captions gets to sleep (the overn
             repairTick(s, [], r.hands);
             const view = screen(s);
             for (const a of decide(s, view)) {
-                press(s, a);
+                // deep-tree: levels, automations and the hall are bought on the tree
+                expect(press(s, a, view)).toBe(true);
                 if (a.kind === 'cryo') { at = sec; break; }
             }
             // every locked cryo caption the player read was the tooltip's own reason

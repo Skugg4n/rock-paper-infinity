@@ -884,98 +884,25 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-q-row.is-held { opacity: 0.45; }
 .deep-q-row.is-stuck { cursor: default; }
 
-/* ---- v1.51.0: THE LADDER YOU CAN SEE ----------------------------------------------------
-   Under the Watcher: the whole road as one thin line with a tick per rung (SYSTEM, HARDWARE,
-   BIOLOGICAL) and a filled trail, and one pill with the next step only. The rung being climbed and
-   the ones done are named bright; the next is named dim, readable, a teaser; one further has a
-   tick and no name. When BIOLOGICAL opens, the pill turns warm. */
-.deep-ladder[hidden] { display: none; }
-.deep-ladder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-}
-.deep-ladder-line { position: relative; width: 300px; height: 22px; }
-.deep-ladder-track {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 4px;
-    height: 2px;
-    border-radius: 1px;
-    background: #262c34;
-    overflow: hidden;
-}
-.deep-ladder-trail {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 0;
-    background: #f4efe2;
-    transition: width 600ms ease;
-}
-.deep-ladder-tick { position: absolute; top: 0; width: 2px; height: 10px; background: #3a414b; }
-.deep-ladder-tick > span {
-    position: absolute;
-    top: 12px;
-    left: 0;
-    font-size: 8px;
-    letter-spacing: 0.24em;
-    white-space: nowrap;
-    color: #6d6a63;
-}
-.deep-ladder-tick.is-done, .deep-ladder-tick.is-open { background: #f4efe2; }
-.deep-ladder-tick.is-done > span { color: #8d877b; }
-.deep-ladder-tick.is-open > span { color: #f4efe2; }
-.deep-ladder-tick.is-tease > span { color: #6d6a63; }
-.deep-ladder-tick.is-far > span { visibility: hidden; }
-.deep-ladder-tick.is-bio.is-open, .deep-ladder-tick.is-bio.is-done { background: #d8a48a; }
-.deep-ladder-tick.is-bio.is-open > span { color: #e6b9a1; }
-.deep-ladder-pill {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 3px;
-    min-width: 300px;
-    padding: 7px 18px 8px;
+/* ---- deep-tree: the ladder line and pill are gone; the Watcher's steps live in the tree. A
+   biological step paid for and waiting for its sector is one warm line under the meter, steady
+   (a question, not an alarm); a click asks again. */
+.deep-watcher-ask[hidden] { display: none; }
+.deep-watcher-ask {
+    display: block;
+    margin: 8px auto 0;
+    padding: 6px 12px;
     border: 0;
-    border-radius: 9999px;
-    background: #1f252d;
-    color: #f4efe2;
-    text-align: left;
+    border-radius: 14px;
+    background: #3a271f;
+    box-shadow: 0 0 0 1px rgba(230, 185, 161, 0.85);
+    color: #f0c7ae;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
     cursor: pointer;
-    box-shadow: 0 0 0 1px rgba(244, 239, 226, 0.28);
-    transition: transform 0.2s ease, background-color 0.3s ease, box-shadow 0.3s ease;
 }
-.deep-ladder-pill[hidden] { display: none; }
-.deep-ladder-pill > :not(.tooltip) { pointer-events: none; }
-.deep-ladder-pill:hover:not(.is-locked) { transform: translateY(-1px); background: #262d36; }
-.deep-ladder-pill.is-locked { cursor: default; background: #171b21; box-shadow: none; }
-.deep-pill-head { font-size: 11px; white-space: nowrap; color: #f4efe2; }
-.deep-pill-head .rung { font-size: 9px; letter-spacing: 0.24em; color: #b9b3a5; }
-.deep-pill-head .sep { color: #5d5a54; }
-.deep-pill-head .cost { color: #b9b3a5; }
-.deep-pill-sub { font-size: 10px; color: #8d877b; white-space: nowrap; padding-left: 0; }
-.deep-ladder-pill.is-missing .deep-pill-sub { color: #d9a25f; }
-.deep-ladder-pill.is-locked .deep-pill-head .name { color: #b9b3a5; }
-/* BIOLOGICAL: the pill turns warm, and the people it takes lead its line */
-.deep-ladder-pill.is-bio { background: #2b211d; box-shadow: 0 0 0 1px rgba(216, 164, 138, 0.5); }
-.deep-ladder-pill.is-bio.is-locked { background: #211a17; box-shadow: 0 0 0 1px rgba(216, 164, 138, 0.2); }
-.deep-ladder-pill.is-bio .rung { color: #e6b9a1; }
-.deep-ladder-pill.is-bio .cost { color: #e6b9a1; }
-#phase-deep .deep-ladder-pill .tooltip {
-    right: auto;
-    left: 50%;
-    top: auto;
-    bottom: calc(100% + 10px);
-    transform: translateX(-50%);
-}
-#phase-deep .deep-ladder-pill:hover .tooltip { opacity: 1; }
-.deep-step-name { display: block; font-size: 11px; letter-spacing: 0.2em; color: #f4efe2; margin-bottom: 4px; }
+.deep-watcher-ask.is-choosing { background: #2b211d; box-shadow: 0 0 0 1px rgba(230, 185, 161, 0.35); }
 
 /* ---- v1.51.0: THE LAMPS -------------------------------------------------------------
    The lamp riddle is played on the lamps of the automated rooms themselves. While it runs the
@@ -1078,13 +1005,10 @@ body.in-deep #version-info { z-index: 1400; }
 @keyframes deep-letter-in { from { opacity: 0; transform: translateX(8px); } }
 
 /* ---- v1.52.0: THE CUT ------------------------------------------------------------------
-   BIOLOGICAL IS A CHOICE: while a paid step waits for its sector the pill asks, steadily warm
+   BIOLOGICAL IS A CHOICE: while a paid step waits for its sector the line under the meter asks, steadily warm
    (no loop: it is a question, not an alarm); choosing, the cursor is a crosshair over the whole
    model and the candidate arms glow in the scene. The people the body takes fall off the H bar
    with a red delta that fades once. A sealed plate says "part of the body" under the cursor. */
-.deep-ladder-pill.is-asking { background: #3a271f; box-shadow: 0 0 0 1px rgba(230, 185, 161, 0.85); }
-.deep-ladder-pill.is-asking .deep-pill-sub { color: #f0c7ae; }
-.deep-ladder-pill.is-asking.is-choosing { background: #2b211d; box-shadow: 0 0 0 1px rgba(230, 185, 161, 0.35); }
 #phase-deep.is-sleeping #deep-scene.is-choosing canvas { cursor: crosshair; }
 .deep-delta.is-drop { opacity: 1; font-size: 12px; animation: deep-drop-fade 2400ms ease-out forwards; }
 @keyframes deep-drop-fade {
@@ -1142,4 +1066,113 @@ body.in-deep #version-info { z-index: 1400; }
 @keyframes deep-watch-blob {
     0%, 100% { opacity: 0.6; transform: scale(0.94) rotate(0deg); }
     50% { opacity: 1; transform: scale(1.06) rotate(8deg); }
+}
+
+/* ---- deep-tree: THE SKILL TREE ------------------------------------------------------------
+   Mockup 10's mechanical state (docs/mockups/deep-tree-10.html): a dark board over the dimmed
+   colony, the mockup's own palette (rock #0a0d12, plate #d5dbe3, bright #ffffff on what can be
+   bought), square nodes, traces at right angles, mono labels, pips. One FIXED info box under the
+   board; no floating tooltips. Hover life: the trace from the root lights in order, the node lifts
+   a pixel, its pips tick once. Nothing loops: what can be bought is outlined, it does not breathe.
+   The button column stays where it is, above the panel, so the tree button closes what it opened;
+   the rest of the column is dimmed while the tree is open. */
+.deep-tree[hidden] { display: none; }
+.deep-tree {
+    position: absolute;
+    inset: 0;
+    z-index: 55;
+    background: rgba(10, 13, 18, 0.95);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    color: #d5dbe3;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.deep-tree-stage {
+    position: absolute;
+    inset: 28px 256px 22px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.deep-tree-board { flex: 1 1 auto; width: 100%; min-height: 0; display: block; }
+.deep-tree-board text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; pointer-events: none; }
+.deep-tree-board .tn { cursor: pointer; transition: transform 140ms ease-out; }
+.deep-tree-board .tn.hov { transform: translateY(-1px); }
+@keyframes deep-tree-tick { 0% { opacity: 1; } 45% { opacity: 0.2; } 100% { opacity: 1; } }
+.deep-tree-board .tn.tick .pip { animation: deep-tree-tick 260ms ease-out 1 both; animation-delay: calc(var(--i) * 22ms); }
+@keyframes deep-tree-draw { to { stroke-dashoffset: 0; } }
+.deep-tree-board .lit { fill: none; stroke-dasharray: 1; stroke-dashoffset: 1; animation: deep-tree-draw 110ms linear forwards; }
+.deep-tree-foot {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 560px) 1fr;
+    align-items: end;
+    width: 100%;
+}
+.deep-tree-legend {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-left: 28px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: rgba(213, 219, 227, 0.42);
+    padding-bottom: 4px;
+}
+.deep-tree-legend span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.deep-tree-legend .lg { display: inline-block; width: 11px; height: 11px; box-sizing: border-box; position: relative; }
+.deep-tree-legend .lg-bought { background: #d5dbe3; }
+.deep-tree-legend .lg-buy { border: 1.5px solid #ffffff; }
+.deep-tree-legend .lg-lock { border: 1px solid rgba(213, 219, 227, 0.3); }
+.deep-tree-legend .lg-surface { border: 1px dashed rgba(213, 219, 227, 0.2); }
+.deep-tree-legend .lg-surface::after {
+    content: ''; position: absolute; right: 1px; top: 1px; width: 3px; height: 3px;
+    border: 1px solid rgba(213, 219, 227, 0.5); border-radius: 50%;
+}
+.deep-tree-info {
+    grid-column: 2;
+    grid-row: 1;
+    position: relative;
+    width: 100%;
+    height: 84px;
+    box-sizing: border-box;
+    padding: 10px 16px;
+    background: #0a0d12;
+    box-shadow: inset 0 0 0 1px rgba(213, 219, 227, 0.22);
+    font-size: 10px;
+    line-height: 16px;
+    color: rgba(213, 219, 227, 0.75);
+    overflow: hidden;
+}
+.deep-tree-info .ib-row { display: flex; justify-content: space-between; gap: 12px; }
+.deep-tree-info .ib-name { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: #ffffff; white-space: nowrap; }
+.deep-tree-info.is-bio .ib-name { color: #e6b9a1; }
+.deep-tree-info .ib-lvl { white-space: nowrap; }
+.deep-tree-info .ib-eff { color: rgba(213, 219, 227, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deep-tree-info .ib-x { color: rgba(213, 219, 227, 0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deep-tree-info .ib-x.is-why { color: #d9a25f; }
+.deep-tree-info .ib-x.is-go { color: #ffffff; }
+.deep-tree-info .ib-empty { display: none; }
+.deep-tree-info.is-empty > :not(.ib-empty) { visibility: hidden; }
+.deep-tree-info.is-empty .ib-empty {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    position: absolute; inset: 0; font-size: 14px; color: rgba(213, 219, 227, 0.28);
+}
+.deep-tree-info .ib-caret { display: inline-block; width: 7px; height: 12px; background: rgba(213, 219, 227, 0.2); }
+
+/* the column stays put and on top while the tree is open; only the tree button speaks */
+#phase-deep.is-tree-open .deep-btn-col { z-index: 56; }
+#phase-deep.is-tree-open .deep-group:not(#deep-group-tree),
+#phase-deep.is-tree-open #deep-reset-view { opacity: 0.18; pointer-events: none; }
+#phase-deep.is-tree-open #deep-tree-btn { background-color: #d5dbe3; color: #0a0d12; }
+#phase-deep.is-tree-open #deep-tree-btn .tooltip { display: none; }
+#phase-deep #deep-tree-badge { background: #ffffff; color: #0a0d12; font-weight: 700; }
+/* a narrow window: the legend goes, the info box takes the width there is */
+@media (max-width: 1100px) {
+    .deep-tree-stage { left: 16px; }
+    .deep-tree-foot { grid-template-columns: 0 1fr 0; }
+    .deep-tree-legend { display: none; }
 }

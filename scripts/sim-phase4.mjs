@@ -25,6 +25,17 @@ import {
   LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake, snap,
 } from '../src/phase4/watcher.js';
 import { THROWS } from '../src/phase4/surface.js';
+// deep-tree (step 1): every level, automation, cryo tier and Watcher step is bought ON THE TREE,
+// the way the game's panel buys it. The greedy player still decides what to buy, as before; the
+// tree only does the buying. The sim never kept the queue's cap of eight (it orders one per lane).
+import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode, nextWatcherNode } from '../src/phase4/tree.js';
+const SIM = { queueMax: Infinity };
+/** Buy a node; the sim has already checked the price, so a refusal is a bug in the sim. */
+function onTree(id, ctx = SIM) {
+  const r = treeBuy(s, id, ctx);
+  if (!r) throw new Error(`sim: the tree refused ${id}`);
+  return r;
+}
 
 const WAIT_DAYS = 30;        // a human waits this long awake for a purchase; longer than that, they sleep
 const SLEEP_SECONDS = 3;     // real seconds a sleep costs around it: the walk in, the walk out, reading the wake line
@@ -66,8 +77,9 @@ const events = [], log = [], buysPerWake = [], pressesPerTier = CRYO.map(() => 0
 let starved = 0, minHumans = s.humans, starsDay0 = 0, starsDayEnd = 0, stall = 0, worstStall = 0;
 const fmt = (sec) => `${Math.floor(sec / 60)}m${String(Math.round(sec) % 60).padStart(2, '0')}s`;
 const yr = (d) => (d / DAYS_PER_YEAR).toFixed(1);
-// a chamber an order has already claimed is not an empty one
-const usedChambers = () => ROOMS.reduce((a, t) => a + s.rooms[t], 0) + (s.builds || []).filter((j) => j.kind === 'room').length;
+// a chamber an order has already claimed is not an empty one; the cryo hall has one of its own
+// (deep-tree: the hall is bought on the tree as the game buys it, with its chamber)
+const usedChambers = () => ROOMS.reduce((a, t) => a + s.rooms[t], 0) + (s.rooms.cryo || 0) + (s.builds || []).filter((j) => j.kind === 'room').length;
 const crewOf = (t) => (s.auto[t] > 0 ? 0 : s.rooms[t] * ROOM[t].crew * roomMultiplier(s.level[t], s.auto[t]));
 
 /**
@@ -101,7 +113,7 @@ function buy(report) {
   if (t === 'auto') {
     const hungriest = ROOMS.filter((r) => crewOf(r) > 0 && !buildPending(s, 'auto', r)).sort((a, b) => crewOf(b) - crewOf(a))[0];
     if (hungriest && s.stars >= automationCost(hungriest, s.auto[hungriest])) {
-      s.stars -= automationCost(hungriest, s.auto[hungriest]); startBuild(s, 'auto', { type: hungriest });
+      onTree(AUTO_NODE[hungriest]);
       return `auto ${hungriest} ${s.auto[hungriest] + 1} ordered (${BUILD_DAYS.auto} d)`;
     }
     t = 'dorm';
@@ -109,14 +121,14 @@ function buy(report) {
   // 3. level or automate the weakest, cheaper first (stars)
   const lv = levelCost(t, s.level[t]), au = automationCost(t, s.auto[t]);
   const canLv = !buildPending(s, 'level', t), canAu = !buildPending(s, 'auto', t);
-  if (canLv && lv <= au && s.stars >= lv) { s.stars -= lv; startBuild(s, 'level', { type: t }); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
-  if (canAu && s.stars >= au) { s.stars -= au; startBuild(s, 'auto', { type: t }); return `auto ${t} ${s.auto[t] + 1} ordered (${BUILD_DAYS.auto} d)`; }
-  if (canLv && s.stars >= lv) { s.stars -= lv; startBuild(s, 'level', { type: t }); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
+  if (canLv && lv <= au && s.stars >= lv) { onTree(LEVEL_NODE[t]); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
+  if (canAu && s.stars >= au) { onTree(AUTO_NODE[t]); return `auto ${t} ${s.auto[t] + 1} ordered (${BUILD_DAYS.auto} d)`; }
+  if (canLv && s.stars >= lv) { onTree(LEVEL_NODE[t]); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
   // 4. a faster sleep (stars), once a dry run says the colony could sleep a second of it safely
   const next = CRYO[s.cryo + 1];
   if (next && s.stars >= next.cost && (s.cryo < 0 ? true : !sleepTrouble(s, next.days))) {
     if (s.cryo < 0 && sleepTrouble(s, next.days)) return null;
-    s.stars -= next.cost; s.cryo++; if (s.cryo === 0) s.rooms.cryo = 1;
+    onTree(cryoNode(s.cryo + 1), { ...SIM, need: null });     // the gate is the dry run just above
     return `${next.id} (${next.days} d a second)`;
   }
   return null;
@@ -209,8 +221,10 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
         // Surface, when it comes: a throw at random
         if (surfaceDue(w, slept + sum.days, rate)) { openSurface(w); playSurface(w, THROWS[Math.floor(rng() * 3)]); surfaceGames++; }
         // the ladder: the next step the moment it can be paid
-        let got;
-        while ((got = buyStep(w, s, slots()))) ladderAt.push({ id: got.step.id, real, year: s.day / DAYS_PER_YEAR });
+        let id, got;
+        while ((id = nextWatcherNode(s)) && (got = treeBuy(s, id, { ...SIM, asleep: true, slots: slots() }))) {
+          ladderAt.push({ id: got.step.step.id, real, year: s.day / DAYS_PER_YEAR });
+        }
       }
       lowest = Math.min(lowest, w.stability);
       if (capFullAt === null && w.capacity >= 100) capFullAt = real;

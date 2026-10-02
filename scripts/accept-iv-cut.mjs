@@ -1,7 +1,7 @@
 // Chapter IV, the cut (v1.52.0): the acceptance check from
 // docs/superpowers/specs/2026-09-28-chapter-iv-reduction.md, played in a real browser.
 //
-//   node scripts/accept-iv-cut.mjs [--seconds 60] [--headed] [--shots DIR]
+//   node scripts/accept-iv-cut.mjs [--seconds 60] [--headed] [--shots DIR] [--port N]
 //
 // It serves the repo on a free port, starts Google Chrome headless (new headless, WebGL through
 // SwiftShader) with a throwaway profile, drives it over the DevTools protocol with Node's own
@@ -18,6 +18,16 @@
 //    that arm's plates are sealed, the people fell by the step's cost with a red delta on the H
 //    bar, its walkers leave, the Watcher's glyph class changed, and a sealed plate says "part of
 //    the body" under the cursor.
+// deep-tree (step 1 of the tree): the level, automate and longer-sleep buttons and the Watcher's
+// pill are gone; the tree has them. So, before 1 and 2:
+// 0. From "IV · the deep" (awake): the old buttons are gone, the way up is a greyed teaser
+//    ("survival 85 % needed"); the tree button opens the panel, a hovered Seam node writes the info
+//    box, a click orders a mine level (paid, in the queue, built a few days later), Escape closes the
+//    panel, and no button in the column moved.
+// 1. also: from "IV · Surface" the tree shows the WATCHER branch (the steps bought filled) and
+//    Surface's nodes greyed with the hollow ring.
+// 2. the biological step is bought on the tree's BIOLOGICAL branch, and the line under the meter
+//    asks for the sector (it was the pill).
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -44,8 +54,10 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     fs.createReadStream(file).pipe(res);
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const PORT = server.address().port;
+// --port N: use a server that is already running there (python3 -m http.server N) instead of our own
+const OWN_PORT = arg('--port', 0);
+if (!OWN_PORT) await new Promise((r) => server.listen(0, '127.0.0.1', r));
+const PORT = OWN_PORT || server.address().port;
 
 // ---- Chrome ----
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'rpi-accept-'));
@@ -63,7 +75,7 @@ function check(ok, what) {
 }
 async function cleanup() {
     try { chrome.kill('SIGTERM'); } catch { /* gone */ }
-    server.close();
+    if (!OWN_PORT) server.close();
     await sleepMs(300);
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* ignore */ }
 }
@@ -105,13 +117,13 @@ try {
     await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 
-    async function jump(idOf) {
+    async function jump(idOf, { asleep = true } = {}) {
         await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug` });
         await sleepMs(1500);
         await evaluate(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(idOf)}); return true; })`);
         await sleepMs(2500);
         for (let i = 0; i < 60; i++) {
-            if (await evaluate('!!(window.rpiDeep && window.rpiDeep.scene && window.rpiDeep.state.asleep)')) break;
+            if (await evaluate(`!!(window.rpiDeep && window.rpiDeep.scene && ${asleep ? 'window.rpiDeep.state.asleep' : 'true'})`)) break;
             await sleepMs(250);
         }
         await sleepMs(800);     // a few frames: the camera framed, the labels drawn
@@ -126,8 +138,85 @@ try {
         return null;
     }`;
 
+    /** The centre of an element on screen, or null when it is not drawn. */
+    const centre = async (sel) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null;
+        const r = e.getBoundingClientRect(); return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; })()`);
+    const nodeAt = (id) => centre(`#deep-tree g.tn[data-id="${id}"] .plate`);
+    const COLUMN_RECTS = `(() => [...document.querySelectorAll('.deep-btn-col .btn')].filter((b) => b.offsetParent)
+        .map((b) => { const r = b.getBoundingClientRect(); return b.id + ':' + Math.round(r.left) + ',' + Math.round(r.top); }).join(' '))()`;
+    const info = () => evaluate(`(() => { const q = (c) => document.querySelector('#deep-tree-info .' + c).textContent;
+        return { name: q('ib-name'), lvl: q('ib-lvl'), cost: q('ib-cost'), eff: q('ib-eff'), x: q('ib-x') }; })()`);
+
+    // ================= 0. IV · the deep: the tree, and the buttons it replaced ==================
+    await jump('iv-start', { asleep: false });
+    const gone0 = await evaluate(`['deep-level-btn', 'deep-auto-btn', 'deep-cryo-up', 'deep-ladder', 'deep-ladder-pill', 'deep-group-grow']
+        .filter((id) => document.getElementById(id))`);
+    check(gone0.length === 0, `the level, automate and longer-sleep buttons and the Watcher's pill are gone${gone0.length ? `: still ${gone0.join(', ')}` : ''}`);
+    const up0 = await evaluate(`(() => { const b = document.getElementById('deep-ascend-btn'); return { locked: b.classList.contains('is-locked'),
+        caption: document.getElementById('deep-ascend-caption').textContent, shown: b.classList.contains('is-captioned') }; })()`);
+    check(up0.locked && up0.shown && up0.caption === 'survival 85 % needed', `the way up is a greyed teaser: "${up0.caption}" (locked ${up0.locked})`);
+    await evaluate('debug_deep("stars")');
+    await sleepMs(300);
+    const col0 = await evaluate(COLUMN_RECTS);
+    const badge0 = await evaluate(`document.getElementById('deep-tree-badge').textContent`);
+    check(Number(badge0) > 0, `the tree button's badge counts what can be bought: ${badge0}`);
+    const treeBtn = await centre('#deep-tree-btn');
+    await click(treeBtn.x, treeBtn.y);
+    await sleepMs(400);
+    const open0 = await evaluate(`({ open: rpiDeep.treeOpen, shown: !document.getElementById('deep-tree').hidden,
+        watcher: rpiDeep.treeDrawn.watchdog?.visible, seam: rpiDeep.treeDrawn.seam?.status })`);
+    check(open0.open && open0.shown, `the tree button opens the panel (open ${open0.open})`);
+    check(open0.watcher === false && open0.seam === 'buyable', `at the descent: no WATCHER branch yet (${open0.watcher}), Seam can be bought (${open0.seam})`);
+    const seam = await nodeAt('seam');
+    await mouse('mouseMoved', seam.x, seam.y);
+    await sleepMs(350);
+    const i1 = await info();
+    const lit = await evaluate(`document.querySelectorAll('#deep-tree .tt-lit path').length`);
+    check(i1.name === 'SEAM' && i1.lvl === '0 / 20' && i1.cost === 'next ★ 4.4 k' && /^Doubles every mine\./.test(i1.eff) && /^click/.test(i1.x),
+        `the info box on Seam: "${i1.name} | ${i1.lvl} | ${i1.cost} | ${i1.eff} | ${i1.x}"`);
+    check(lit === 1, `the trace from the root lights on hover (${lit} lit)`);
+    await shot('0-the-tree');
+    const s0 = await evaluate('({ stars: rpiDeep.state.stars, perDay: rpiDeep.report.stars, level: rpiDeep.state.level.mine })');
+    await click(seam.x, seam.y);
+    await sleepMs(300);
+    const s1 = await evaluate(`({ stars: rpiDeep.state.stars, level: rpiDeep.state.level.mine,
+        order: rpiDeep.state.builds.filter((j) => j.kind === 'level' && j.type === 'mine').length })`);
+    const i2 = await info();
+    // the colony earns its stars a day while the click travels; the price is 4.4 k
+    const paid = s0.stars - s1.stars;
+    check(paid <= 4400 + 1 && paid >= 4400 - 2 * s0.perDay - 1 && s1.order === 1 && s1.level === 0,
+        `a click on Seam ordered a mine level: ${Math.round(paid)} stars paid (less ${Math.round(s0.perDay)} a day earned), ${s1.order} order in the queue, level ${s1.level} until it is built`);
+    check(i2.lvl === '0 / 20 · 1 ordered' && i2.cost === 'next ★ 40 k', `the info box follows: "${i2.lvl} | ${i2.cost}"`);
+    const queued = await evaluate(`document.getElementById('deep-queue').textContent`);
+    check(/lv mine/.test(queued), `the order is in the queue strip with its ring ("${queued.trim()}")`);
+    await key('Escape');
+    await sleepMs(300);
+    const col1 = await evaluate(COLUMN_RECTS);
+    check(!(await evaluate('rpiDeep.treeOpen')) && (await evaluate(`document.getElementById('deep-tree').hidden`)), 'Escape closes the panel');
+    check(col0 === col1, `no button in the column moved${col0 === col1 ? '' : `: ${col0} / ${col1}`}`);
+    for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.level.mine')) < 1; i++) await sleepMs(250);
+    check((await evaluate('rpiDeep.state.level.mine')) === 1, 'the order lands: the mines are at level 1, Seam reads 1');
+
     // ================= 1. IV · Surface: one demand at a time, the snap holds ==================
     await jump('iv-surface');
+    // the tree asleep: the WATCHER branch, the steps bought, Surface's nodes greyed
+    const tb = await centre('#deep-tree-btn');
+    await click(tb.x, tb.y);
+    await sleepMs(400);
+    const t1 = await evaluate(`(() => { const d = rpiDeep.treeDrawn;
+        const ring = (id) => !!document.querySelector('#deep-tree g.tn[data-id="' + id + '"] circle')
+            && !!document.querySelector('#deep-tree g.tn[data-id="' + id + '"] rect[stroke-dasharray]');
+        return { open: rpiDeep.treeOpen, watcher: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore', 'mast', 'reactor'].map((id) => d[id].visible && d[id].status),
+            surface: ['lossless', 'cold', 'longcount', 'quiet', 'question'].map((id) => d[id].status + (ring(id) ? '+ring' : '')),
+            seam: d.seam.reason }; })()`);
+    await shot('1-the-tree-asleep');
+    check(t1.open && t1.watcher.slice(0, 6).every((x) => x === 'bought') && t1.watcher[6] && t1.watcher[6] !== 'bought',
+        `from IV · Surface the WATCHER branch shows: ${t1.watcher.join(', ')}`);
+    check(t1.surface.every((x) => x === 'surface+ring'), `Surface's nodes greyed with the hollow ring: ${t1.surface.join(', ')}`);
+    check(t1.seam === 'The colony is asleep: wake it to buy.', `asleep, a level says why not: "${t1.seam}"`);
+    await key('Escape');
+    await sleepMs(300);
+    check(!(await evaluate('rpiDeep.treeOpen')) && (await evaluate('rpiDeep.state.asleep')), 'Escape closes the tree; the colony sleeps on');
     const start = await evaluate('({ stab: rpiDeep.state.watcher.stability, cryo: rpiDeep.state.cryo })');
     let both = 0, samples = 0, lowAsleep = 100, asleepSamples = 0, clicks = 0, snaps = 0, loudFeed = 0, loudAdvisor = 0, surfaceSeen = 0, lampsSeen = 0;
     const t0 = Date.now();
@@ -207,31 +296,41 @@ try {
             glyph: document.querySelector('#deep-watcher .deep-watcher-pulse').className,
             sealed: d.state.watcher.sealed.slice() };
     })()`);
-    const pillAt = async () => evaluate(`(() => { const r = document.getElementById('deep-ladder-pill').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
-    let pill = await pillAt();
-    await click(pill.x, pill.y);
-    await sleepMs(300);
+    /** The biological step, bought on the tree: open it, click Brain tissue. */
+    const brainOnTree = async () => {
+        const b = await centre('#deep-tree-btn');
+        await click(b.x, b.y);
+        await sleepMs(400);
+        const n = await nodeAt('brain');
+        await mouse('mouseMoved', n.x, n.y);
+        await sleepMs(200);
+        const said = await info();
+        await click(n.x, n.y);
+        await sleepMs(300);
+        return said;
+    };
+    const ib = await brainOnTree();
+    check(ib.name === 'BRAIN TISSUE' && /^BIOLOGICAL: /.test(ib.eff), `the tree's BIOLOGICAL branch: "${ib.name} | ${ib.cost} | ${ib.eff}"`);
     const c1 = await evaluate(`(() => {
         const d = window.rpiDeep;
         return { choosing: d.choosing, sealing: d.state.watcher.sealing, humans: d.state.humans, cap: d.state.watcher.capacity,
-            sub: document.getElementById('deep-pill-sub').textContent, cands: d.scene.stats.candidates, glow: d.scene.stats.candPlates,
+            sub: document.getElementById('deep-watcher-ask').hidden ? '' : document.getElementById('deep-watcher-ask').textContent,
+            tree: d.treeOpen, cands: d.scene.stats.candidates, glow: d.scene.stats.candPlates,
             crosshair: document.getElementById('deep-scene').classList.contains('is-choosing') };
     })()`);
     await shot('1-choose-a-sector');
-    check(c1.choosing && c1.sealing === 'brain', `the pill bought Brain tissue and asks for a sector (choosing ${c1.choosing}, waiting ${c1.sealing})`);
-    check(c1.sub === 'Choose a sector to seal', `the pill reads "${c1.sub}"`);
+    check(c1.choosing && c1.sealing === 'brain' && !c1.tree, `the tree bought Brain tissue, closed, and asks for a sector (choosing ${c1.choosing}, waiting ${c1.sealing})`);
+    check(c1.sub === 'BIOLOGICAL · Choose a sector to seal', `the line under the meter reads "${c1.sub}"`);
     check(c1.cands.length === 4 && c1.glow > 0 && c1.crosshair, `the arms glow as candidates: sectors ${c1.cands.join(',')}, ${c1.glow} plates, crosshair ${c1.crosshair}`);
     check(c1.humans === b0.humans && c1.cap < b0.cap, `paid in capacity (${b0.cap} to ${c1.cap}), nobody taken yet (${c1.humans})`);
     await key('Escape');
     await sleepMs(200);
-    const c2 = await evaluate(`(() => { const d = window.rpiDeep; return { choosing: d.choosing, sealing: d.state.watcher.sealing, cap: d.state.watcher.capacity, glow: d.scene.stats.candPlates, asks: document.getElementById('deep-ladder-pill').classList.contains('is-asking') }; })()`);
+    const c2 = await evaluate(`(() => { const d = window.rpiDeep; return { choosing: d.choosing, sealing: d.state.watcher.sealing, cap: d.state.watcher.capacity, glow: d.scene.stats.candPlates, asks: !document.getElementById('deep-watcher-ask').hidden }; })()`);
     // the machines keep filling the pool while they sleep; a refund would put the step's 120 back
     check(!c2.choosing && c2.sealing === 'brain' && c2.cap - c1.cap < 60 && c2.glow === 0 && c2.asks,
-        `Escape: the choice put away (choosing ${c2.choosing}, glow ${c2.glow}), nothing refunded (capacity ${Math.round(c1.cap)} to ${Math.round(c2.cap)}), the pill still asks (${c2.asks})`);
-    pill = await pillAt();
-    await click(pill.x, pill.y);
-    await sleepMs(300);
-    check(await evaluate('rpiDeep.choosing'), 'a click on the pill asks again');
+        `Escape: the choice put away (choosing ${c2.choosing}, glow ${c2.glow}), nothing refunded (capacity ${Math.round(c1.cap)} to ${Math.round(c2.cap)}), the line still asks (${c2.asks})`);
+    const ib2 = await brainOnTree();
+    check((await evaluate('rpiDeep.choosing')) && ib2.x === 'Paid. Choose a sector to seal.', `a click on the node in the tree asks again (it said "${ib2.x}")`);
     // a plate of one arm, found where the camera shows it
     const target = await evaluate(`(${PLATE_AT})(rpiDeep.layout.slots.map((_, i) => i).reverse())`);
     check(!!target, `a plate to click: chamber ${target?.slot}`);

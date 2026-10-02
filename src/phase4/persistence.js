@@ -8,8 +8,9 @@
 import { normalizeLayout } from './layout.js';
 import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
 import { initialWatcher, normalizeWatcher } from './watcher.js';
+import { normalizeTree } from './tree.js';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -60,6 +61,18 @@ const MIGRATIONS = {
         p.state = st;
         return p;
     },
+    /* deep-tree (step 1 of the tree): the upgrades move into the skill tree. The tree READS every
+       level, automation, cryo tier and Watcher step off the fields the colony already keeps
+       (tree.js levelOf), so nothing an old save bought is lost or copied: Seam is the mines'
+       level, Drill automation their automation, Cryo III the tier, Reactor tap the ladder's step.
+       The tree's own memory is new and empty: Surface has opened nothing yet. */
+    5: (p) => {
+        const st = p.state || {};
+        st.watcher = normalizeWatcher(st.watcher || initialWatcher());
+        st.tree = normalizeTree(st.tree);
+        p.state = st;
+        return p;
+    },
 };
 
 /**
@@ -102,6 +115,7 @@ export function deserializeDeep(raw) {
     if (!parsed.state || typeof parsed.state !== 'object') return null;
     const state = { ...initialDeepState(), ...parsed.state };
     state.watcher = normalizeWatcher(state.watcher);
+    state.tree = normalizeTree(state.tree);
     return { state, layout: normalizeLayout(state, parsed.layout) };
 }
 

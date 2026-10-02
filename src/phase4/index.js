@@ -21,23 +21,23 @@
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from '../constants.js';
 import {
     initialDeepState, tickDay, sleep,
-    COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V, MAX_AUTO,
+    COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V,
     cryoLabel, cryoName, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
     clearChamber, clearDarkType, stalledRooms, attemptAscent, canTryAscent, ascentOdds, SURVIVAL_AT,
-    completeBuilds, buildProgress, buildPending, estimateNow, habitableYear,
+    completeBuilds, buildProgress, estimateNow, habitableYear,
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
     ASCENT_MIN_PEOPLE, ordersDone, mourn,
-    orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep, ordered,
+    orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep,
     cancelOrder, digSpare,
 } from './deep.js';
 import {
-    conditions, advisorLines, pushFeed, ROOM_WORD, DESCENT_LINE, alarmLine, alarmGlyph,
+    conditions, advisorLines, pushFeed, DESCENT_LINE, alarmLine, alarmGlyph,
     scoutLine, scoutSentLine, troubleClause, ascentFailLine,
 } from './advisor.js';
 import {
     ledger, buySentence, preview, deltaText, stocks, flows, flowText, previewStocks,
     nextOrePrice, affordText, cryoReadyLine, consequence, span, rateWords,
-    short, backIn, cryoNeed, offerFor, lowPoint, rewardShows,
+    short, backIn, cryoNeed, lowPoint, rewardShows,
 } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout, sectorOf } from './layout.js';
 import { createScene, supportsWebGL, ROOM_ICON } from './scene.js';
@@ -48,13 +48,15 @@ import {
     normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
     puzzleDue, openPuzzle, beginSleep, dismissPuzzle, puzzleStars, sleepDays,
     STABILITY_MAX, firstSleep, FIRST_SLEEP_DAYS, WATCHER_HELLO, snapWait, SNAP_COOLDOWN_MS,
-    recoverAwake, LADDER, RUNGS, stepNeed, buyStep, capacityMax, surfaceDue, openSurface, closeSurface,
-    playSurface, SPACE_LINE, peopleFor, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
+    recoverAwake, LADDER, capacityMax, surfaceDue, openSurface, closeSurface,
+    playSurface, SPACE_LINE, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, GO_UP_ALONE, sealLine, BODY_GROW_SECONDS,
-    lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, ladderLine, rungOpenLine, nextStep,
+    lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, rungOpenLine,
     sealCandidates, sealSector, choosingSector, bodyGlyph, inBody,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE } from './surface.js';
+import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, buyableCount, normalizeTree } from './tree.js';
+import { createTreeView } from './tree-view.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
 
@@ -158,6 +160,7 @@ export function init() {
     }
     layout = normalizeLayout(state, layout);
     state.watcher = normalizeWatcher(state.watcher);
+    state.tree = normalizeTree(state.tree);
 
     const ui = {
         sceneHost: document.getElementById('deep-scene'),
@@ -185,18 +188,17 @@ export function init() {
         bars: Object.fromEntries(COLUMN.map((c) => [c, document.getElementById(`deep-bar-${c}`)])),
         digBtn: document.getElementById('deep-dig-btn'),
         roomBtns: ['mine', 'farm', 'generator', 'dorm'].map((t) => ({ type: t, el: document.getElementById(`deep-room-${t}`) })),
-        levelBtn: document.getElementById('deep-level-btn'),
-        autoBtn: document.getElementById('deep-auto-btn'),
+        treeBtn: document.getElementById('deep-tree-btn'),
+        treeBadge: document.getElementById('deep-tree-badge'),
+        tree: document.getElementById('deep-tree'),
         cryoBtn: document.getElementById('deep-cryo-btn'),
         cryoText: document.getElementById('deep-cryo-text'),
         wakeBtn: document.getElementById('deep-wake-btn'),
         cryoCaption: document.getElementById('deep-cryo-caption'),
-        cryoUpCaption: document.getElementById('deep-cryo-up-caption'),
         probeText: document.getElementById('deep-probe-text'),
-        cryoUpBtn: document.getElementById('deep-cryo-up'),
-        cryoUpBadge: document.getElementById('deep-cryo-up-badge'),
         probeBtn: document.getElementById('deep-probe-btn'),
         ascendBtn: document.getElementById('deep-ascend-btn'),
+        ascendCaption: document.getElementById('deep-ascend-caption'),
         resetBtn: document.getElementById('deep-reset-view'),
         crust: document.getElementById('deep-crust'),
         replay: document.getElementById('deep-replay'),
@@ -214,14 +216,7 @@ export function init() {
             said: document.getElementById('deep-puzzle-said'),
         },
         queue: document.getElementById('deep-queue'),
-        ladder: document.getElementById('deep-ladder'),
-        ladderTrail: document.getElementById('deep-ladder-trail'),
-        ladderTicks: [...document.querySelectorAll('#deep-ladder .deep-ladder-tick')],
-        pill: document.getElementById('deep-ladder-pill'),
-        pillRung: document.getElementById('deep-pill-rung'),
-        pillName: document.getElementById('deep-pill-name'),
-        pillCost: document.getElementById('deep-pill-cost'),
-        pillSub: document.getElementById('deep-pill-sub'),
+        ask: document.getElementById('deep-watcher-ask'),
         duel: document.getElementById('deep-rps-duel'),
         fistYou: document.getElementById('deep-fist-you'),
         fistIt: document.getElementById('deep-fist-it'),
@@ -352,12 +347,9 @@ export function init() {
             starsPerDay: report.stars,
         });
     }
-    /** What the dot marks, and why: the store running low (v1.48.0). */
-    const lowNow = () => lowPoint(state, report, stocks(state, report, nextOrePrice(state, report)));
-    /** The room type the level and automate buttons sell today, and why. */
-    function offers(need = needFor(), low = lowNow()) {
-        return { level: offerFor('level', state, report, need, low), auto: offerFor('auto', state, report, need) };
-    }
+    /** What the tree is told about the colony today: the next cryo tier's one reason (kept once a
+     *  colony day, never per frame), the stars a day for "affordable in", and whether it sleeps. */
+    const treeCtx = () => ({ need: needFor(), starsPerDay: report.stars, asleep: !!state.asleep });
 
     /**
      * The tooltip of a purchase: the price, what it does, and then either what is still
@@ -479,40 +471,24 @@ export function init() {
         }
         drawQueue();
 
-        // v1.48.0: the level and automate buttons sell what the NEXT GOAL needs (the next cryo tier),
-        // then what runs low, then the weakest column, and their tooltips say which and why
-        const offer = offers(need, low);
-        const lvType = offer.level.type;
-        const levelPrice = nextPrice(state, 'level', lvType);
-        // levelling or automating a room type the colony has none of would buy nothing at all
-        const noneOf = (t) => !(state.rooms[t] > 0) && !buildPending(state, 'room', t);
-        const noneText = (t) => `Build a ${ROOM_WORD[t]} first: there is none to improve.`;
-        ui.levelBtn.classList.toggle('is-locked', asleep || state.stars < levelPrice || full || noneOf(lvType));
-        buyTip(ui.levelBtn, { kind: 'level', type: lvType, price: levelPrice, currency: 'stars', sentence: noneOf(lvType) ? noneText(lvType) : `${offer.level.head} ${buySentence('level', lvType, state)}`, blocked: full ? 'full' : '', mark: roomMark(lvType) });
-        showBuild(ui.levelBtn, 'level', lvType);
-
-        // automation is teased once the first level is bought, or the moment cryo needs it
-        const auType = offer.auto.type;
-        const autoShown = Object.values(state.level).some((l) => l > 0) || need?.button === 'auto';
-        ui.autoBtn.classList.toggle('hidden', !autoShown);
-        if (autoShown) {
-            const autoPrice = nextPrice(state, 'auto', auType);
-            ui.autoBtn.classList.toggle('is-locked', asleep || !(state.stars >= autoPrice) || full || noneOf(auType));
-            buyTip(ui.autoBtn, {
-                kind: 'auto', type: auType, price: autoPrice, currency: 'stars', mark: roomMark(auType),
-                sentence: noneOf(auType) ? noneText(auType) : (Number.isFinite(autoPrice) ? `${offer.auto.head} ${buySentence('auto', auType, state)}` : ''),
-                blocked: (state.auto[auType] || 0) + ordered(state, 'auto', auType) >= MAX_AUTO ? 'top' : (full ? 'full' : ''),
-            });
-            showBuild(ui.autoBtn, 'auto', auType);
-        }
+        // deep-tree: the level, automate and longer-sleep buttons are the tree's now. Its button
+        // carries a badge with how many nodes can be bought right now, and the open panel redraws
+        const canNow = gone ? 0 : buyableCount(state, treeCtx());
+        const badge = canNow > 0 ? String(canNow) : '';
+        if (ui.treeBadge.textContent !== badge) ui.treeBadge.textContent = badge;
+        ui.treeBadge.classList.toggle('hidden', !badge);
+        setTooltip(ui.treeBtn, says('The tree: levels, automation, cryo, and what stays awake.')
+            + note(canNow ? `${canNow} can be bought now.` : 'Nothing can be bought just now.'));
+        treeView?.refresh();
 
         // ---- cryo: the hall, then the sleep; asleep, the sun that wakes the colony ----
         const tier = state.cryo;
         const owns = tier >= 0;
         ui.cryoBtn.classList.toggle('hidden', asleep);
         ui.wakeBtn.classList.toggle('hidden', !state.asleep);
-        // v1.51.0: an action is a pill with a word: "Cryo hall" until it is dug, then "Sleep · 1 y/s"
-        const cryoWord = owns ? `Sleep · ${rateLabel(tier)}` : 'Cryo hall';
+        // v1.51.0: an action is a pill with a word, "Sleep · 1 y/s". deep-tree: the hall is Cryo I in
+        // the tree; until it is bought the pill says so, and a click opens the tree
+        const cryoWord = owns ? `Sleep · ${rateLabel(tier)}` : 'Sleep';
         if (ui.cryoText.textContent !== cryoWord) ui.cryoText.textContent = cryoWord;
         if (owns) setCaption(ui.cryoCaption, state.humans < MIN_SLEEPERS ? `needs ${MIN_SLEEPERS} people` : '');
         if (state.asleep) {
@@ -530,28 +506,13 @@ export function init() {
                 + says(`Sleep: ${rateWords(CRYO[tier].days)} a second. The colony runs until something wakes it.`)
                 + note(warn, 'is-missing'));
         } else {
-            // one reason, from one function, in the caption and the tooltip alike (v1.48.0); the hall
-            // is dug with its own chamber, so it never waits for a free one
-            setCaption(ui.cryoCaption, need ? need.short : '');
-            ui.cryoBtn.classList.toggle('is-locked', busy || !!need);
-            setTooltip(ui.cryoBtn, priceRow(roomMark('cryo') + starCost(CRYO[0].cost))
-                + says(`${cryoName(0)}: a cryo hall, dug with its own chamber. Asleep, a month passes every second and the machines keep working.`)
+            // deep-tree: the hall is bought in the tree (Cryo I); the reason it cannot be yet is the
+            // node's, and the same words
+            setCaption(ui.cryoCaption, `needs ${cryoName(0)}`);
+            ui.cryoBtn.classList.add('is-locked');
+            setTooltip(ui.cryoBtn, says(`Sleep needs a cryo hall: ${cryoName(0)}, in the tree.`)
                 + note(need ? need.long : '', 'is-missing'));
         }
-        // the next tier: on screen once the hall is dug, offered once a sleep at its rate is safe.
-        // v1.51.0: asleep it stays where it is, greyed, so the pills under it never move
-        const nextTier = owns ? CRYO[tier + 1] : null;
-        ui.cryoUpBtn.classList.toggle('hidden', !nextTier);
-        if (nextTier) {
-            ui.cryoUpBadge.textContent = rateLabel(tier + 1);
-            // the reason is on screen, not only under the cursor, and it is the tooltip's reason too
-            setCaption(ui.cryoUpCaption, need && !asleep ? need.short : '');
-            ui.cryoUpBtn.classList.toggle('is-locked', busy || asleep || !!need);
-            setTooltip(ui.cryoUpBtn, priceRow(roomMark('cryo') + starCost(nextTier.cost))
-                + says(`${cryoName(tier + 1)}: sleep ${rateWords(nextTier.days)} a second.`)
-                + note(asleep ? affordText({ blocked: gone ? 'gone' : 'asleep' }) : (need ? need.long : ''), 'is-missing'));
-        }
-
         // ---- scout parties: people up the shaft, for a reading of the sky ----
         // Everything about a party is on the button before it goes (v1.45.0): who, how long, the
         // odds of each way it can end, and how far a good reading may be off.
@@ -586,20 +547,27 @@ export function init() {
             }
         }
 
-        // ---- the way up: you can always try (v1.45.0). The button never waits on the estimate;
-        //      it says what the colony believes, and what a wrong guess costs ----
+        // ---- the way up. deep-tree: no early attempt any more. The button is a greyed teaser,
+        //      "survival 85 % needed", until the colony's own estimate reaches the line; then it
+        //      opens, and what is behind the hatch is the truth, as before ----
         const ao = ascentOdds(state);
         const canTry = canTryAscent(state);
         if (gone) {
             // v1.50.0: the Watcher alone. No odds: there is nothing left to lose
+            setCaption(ui.ascendCaption, '');
             ui.ascendBtn.classList.toggle('is-locked', busy || !!state.ascended);
             ui.ascendBtn.setAttribute('aria-label', 'Go up');
             setTooltip(ui.ascendBtn, says(GO_UP_ALONE));
         } else {
-            ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !canTry);
-            setTooltip(ui.ascendBtn, says(`Try to resurface: everyone goes up. Survival ${Math.round(ao.survival)} % `
-                    + `(± ${Math.round(ao.spread)}). Below ${SURVIVAL_AT} % the first ${formatCount(ao.party)} die and the rest wait.`)
-                + note(asleep ? 'The colony is asleep: wake it to try.'
+            const ready = ascentReady();
+            setCaption(ui.ascendCaption, ready ? '' : `survival ${SURVIVAL_AT} % needed`);
+            ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !canTry || !ready);
+            setTooltip(ui.ascendBtn, (ready
+                ? says(`Resurface: everyone goes up. The colony believes survival up there is ${Math.round(ao.survival)} % `
+                    + `(± ${Math.round(ao.spread)}). If it is wrong, the first ${formatCount(ao.party)} die and the rest wait.`)
+                : says(`The way up opens when the colony believes survival up there is ${SURVIVAL_AT} %: `
+                    + `${Math.round(ao.survival)} % (± ${Math.round(ao.spread)}) today.`))
+                + note(!ready ? '' : asleep ? 'The colony is asleep: wake it to go.'
                     : (!canTry ? `Too few of us: at least ${ASCENT_MIN_PEOPLE} people to send anyone up.` : ''), 'is-missing'));
         }
 
@@ -634,8 +602,8 @@ export function init() {
                 const shape = bodyGlyph(w);
                 const cls = `deep-watcher-pulse${shape ? ` is-body is-${shape}` : ''}`;
                 if (ui.pulse && ui.pulse.className !== cls) ui.pulse.className = cls;
-                drawLadder();
             }
+            drawAsk();
             drawLampCard();
         }
         drawSurface();
@@ -643,92 +611,68 @@ export function init() {
         scene?.setSoftness(asleep ? softness(w.stability) : 0);
     }
 
-    /* ---- THE LADDER YOU CAN SEE (v1.51.0) ------------------------------------------
-       The whole road as one thin line (a tick per rung, a filled trail, the next rung named as a
-       teaser) and ONE pill under it with the next step: its rung, its name, what it takes, and
-       either what it does or what is still missing ("needs 120 · 84 now"). BIOLOGICAL turns the
-       pill warm and leads with the people it takes. The tooltip starts with the step's name in
-       capitals, so no two read alike. */
+    /* ---- THE TREE (deep-tree, step 1) ------------------------------------------------
+       The level and automate buttons, the longer-sleep button and the Watcher's pill all moved
+       into one panel (tree.js the rules, tree-view.js the board). A click buys one level, a
+       shift-click as many as can be paid; a level or an automation is still an order in the build
+       queue with its ring. The game keeps ticking underneath. */
     const sealedThisSleep = [];     // sectors the body took in this sleep, for the wake-up strip
-    function takesOf(step) {
-        const takes = [];
-        if (step.ore) takes.push(`${formatCount(step.ore)} ore`);
-        if (step.beds) takes.push(step.beds === 1 ? 'a dormitory' : `${step.beds} dormitories`);
-        if (step.people) takes.push(`${formatCount(peopleFor(step, state))} people`);
-        return takes;
+    const treeView = ui.tree ? createTreeView(ui.tree, { state: () => state, ctx: treeCtx, onBuy: (id, many) => buyNode(id, many) }) : null;
+    function openTree() {
+        if (!treeView || treeView.isOpen()) return;
+        hovering = null;
+        pointer = null;                 // the cursor is over the board now, not the base
+        leaveChoice();
+        ui.root.classList.add('is-tree-open');
+        treeView.open();
+        updateChrome();
     }
-    /** What is still missing for the next step, in the pill's own short words, or ''. */
-    function needWords(step, need) {
-        const w = state.watcher;
-        switch (need && need.missing) {
-            case 'capacity': return `needs ${formatCount(step.cap)} · ${Math.floor(w.capacity)} now`;
-            case 'stars': return `needs ${formatCount(step.stars)} ★ · ${formatCount(state.stars)} now`;
-            case 'ore': return `needs ${formatCount(step.ore)} ore · ${formatCount(state.minerals)} now`;
-            case 'dorm': return 'needs a dormitory to spare';
-            case 'people': return 'needs more people: some must stay under the ice';
-            case 'growing': return 'it is still growing';
-            case 'sector': return 'Choose a sector to seal';
-            default: return '';
+    function closeTree() {
+        if (!treeView || !treeView.isOpen()) return;
+        treeView.close();
+        ui.root.classList.remove('is-tree-open');
+        updateChrome();
+    }
+    const toggleTree = () => (treeView?.isOpen() ? closeTree() : openTree());
+    /** A node clicked. The tree says whether it can be bought; the phase does the rest: the layout,
+     *  the faults a purchase clears, the feed, the sector a biological step asks for. */
+    function buyNode(id, many = false) {
+        if (busy || paused()) return false;
+        const n = NODE_BY_ID[id];
+        if (!n) return false;
+        if (n.kind === 'watcher' || n.kind === 'bio') {
+            const out = treeBuy(state, id, { ...treeCtx(), slots: layout.slots, choose: true });
+            if (!out) return false;
+            // a biological step paid for and waiting for its sector: the tree closes, the arms light
+            if (out.choose || (out.step && out.step.pending)) {
+                if (out.step?.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
+                saveGame();
+                closeTree();
+                enterChoice();
+                return true;
+            }
+            if (out.step.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
+            afterStep(out.step.step);
+            return true;
         }
-    }
-    function stepTip(step, need) {
-        const takes = takesOf(step);
-        const price = priceRow(`<span class="deep-mono">${formatCount(step.cap)} cap</span>` + starCost(step.stars));
-        return `<span class="deep-step-name">${escapeText(step.name.toUpperCase())}</span>`
-            + price + says(`${RUNGS[step.rung]}: ${step.does}`)
-            + note(takes.length ? `Takes ${takes.join(' and ')}.` : '')
-            + note(need && need.missing ? needWords(step, need).replace(/^./, (c) => c.toUpperCase()) + '.' : '', 'is-missing');
-    }
-    function drawLadder() {
-        if (!ui.ladder) return;
-        const w = state.watcher;
-        // the first sleep only teaches: the ladder shows itself from the second
-        ui.ladder.hidden = firstSleep(w) && !(w.bought || []).length;
-        const line = ladderLine(w);
-        ui.ladderTrail.style.width = `${(100 * line.trail).toFixed(1)}%`;
-        line.ticks.forEach((t, i) => {
-            const el = ui.ladderTicks[i];
-            if (!el) return;
-            el.style.left = `${(100 * t.at).toFixed(2)}%`;
-            const cls = `deep-ladder-tick is-${t.state}${i === RUNGS.length - 1 ? ' is-bio' : ''}`;
-            if (el.className !== cls) el.className = cls;
-        });
-        const step = nextStep(w);
-        ui.pill.hidden = !step || !!w.gone;
-        if (!step || w.gone) return;
-        const need = stepNeed(w, state);
-        const bio = !!step.people;
-        const missing = needWords(step, need);
-        // v1.52.0: paid for and waiting for its sector: the pill asks, and a click on it asks again
-        const asks = need.missing === 'sector';
-        ui.pill.classList.toggle('is-bio', bio);
-        ui.pill.classList.toggle('is-locked', (!!need.missing && !asks) || busy);
-        ui.pill.classList.toggle('is-missing', !!missing && !asks);
-        ui.pill.classList.toggle('is-asking', asks);
-        ui.pill.classList.toggle('is-choosing', asks && choosing);
-        const set = (el, text) => { if (el.textContent !== text) el.textContent = text; };
-        set(ui.pillRung, RUNGS[step.rung]);
-        set(ui.pillName, step.name);
-        const stars = `${formatCount(step.cap)} cap + ${formatCount(step.stars)} ★`;
-        set(ui.pillCost, bio ? `${formatCount(peopleFor(step, state))} people` : stars);
-        const extra = bio ? stars : takesOf(step).join(', ');
-        set(ui.pillSub, missing || (extra ? `${step.short} · ${bio ? '' : 'takes '}${extra}` : step.short));
-        setTooltip(ui.pill, stepTip(step, need));
-    }
-    function buyLadder() {
-        if (!state.asleep || busy || paused()) return;
-        // v1.52.0: a biological step already paid for asks again for its sector
-        if (choosingSector(state.watcher)) { enterChoice(); return; }
-        const out = buyStep(state.watcher, state, layout.slots, { choose: true });
-        if (!out) return;
-        if (out.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
-        if (out.pending) {
-            // BIOLOGICAL IS A CHOICE (v1.52.0): paid; now the arms light up and wait for a click
-            saveGame();
-            enterChoice();
-            return;
+        const done = many ? treeBuyMany(state, id, treeCtx()) : [treeBuy(state, id, treeCtx())].filter(Boolean);
+        if (!done.length) return false;
+        for (const r of done) {
+            if (r.kind === 'level' || r.kind === 'auto') mendType(r.type);
+            // the hall is dug with its own chamber (v1.48.0)
+            if (r.kind === 'cryo' && r.tier === 0) { layout.slots.push('cryo'); layout = normalizeLayout(state, layout); }
         }
-        afterStep(out.step);
+        bought();
+        afterChange();
+        return true;
+    }
+    /** A biological step paid for and waiting for its sector: one line under the meter asks. */
+    function drawAsk() {
+        if (!ui.ask) return;
+        const w = state.watcher;
+        const asks = !!state.asleep && !w.gone && choosingSector(w);
+        if (ui.ask.hidden === asks) ui.ask.hidden = !asks;
+        ui.ask.classList.toggle('is-choosing', asks && choosing);
     }
     /** What every step bought says and does after it, whichever way it was bought. */
     function afterStep(step) {
@@ -1126,30 +1070,6 @@ export function init() {
         bought();
         afterChange();
     }
-    /** Levels the room type the button offers (the next goal, what runs low, the weakest). */
-    function levelWeakest() {
-        const type = offers().level.type;
-        if (!(state.rooms[type] > 0) || queueFull()) return;
-        const price = nextPrice(state, 'level', type);
-        if (state.stars < price) return;
-        state.stars -= price;
-        orderBuild(state, 'level', { type });
-        mendType(type);
-        bought();
-        afterChange();
-    }
-    function automateWeakest() {
-        const type = offers().auto.type;
-        if (!(state.rooms[type] > 0) || queueFull()) return;
-        const price = nextPrice(state, 'auto', type);
-        if (!Number.isFinite(price) || state.stars < price) return;
-        state.stars -= price;
-        orderBuild(state, 'auto', { type });
-        mendType(type);
-        bought();
-        afterChange();
-    }
-
     /* ---- THE QUEUE (v1.49.0), since v1.51.0 a strip along the bottom of the window: "dig ◔ ·
        dig ○ · mine ○", each order with its ring. It never moves a button. An order that waits
        while the colony sleeps (no Scheduler yet) is drawn dim. A click on an order takes it back
@@ -1221,30 +1141,9 @@ export function init() {
     }
     const landBuilds = () => placeBuilt(completeBuilds(state));
 
-    // --- cryo: the hall, the ladder ---------------------------------------------
-    /** The hall is dug with its own chamber (v1.48.0): a free one was a second, hidden price, and
-     *  the rooms the dot asked for always took it first. */
-    function buyCryoHall() {
-        if (state.stars < CRYO[0].cost || needFor(0)) return;
-        state.stars -= CRYO[0].cost;
-        state.cryo = 0;
-        state.chambers += 1;
-        state.rooms.cryo = (state.rooms.cryo || 0) + 1;
-        layout.slots.push('cryo');
-        layout = normalizeLayout(state, layout);
-        bought();
-        afterChange();
-    }
-    function buyCryoTier() {
-        const next = CRYO[state.cryo + 1];
-        if (!next || state.stars < next.cost || needFor(state.cryo + 1)) return;
-        state.stars -= next.cost;
-        state.cryo += 1;
-        bought();
-        afterChange();
-    }
+    // --- cryo: the hall and the tiers are bought in the tree; the pill sleeps ---------
     function pressCryo() {
-        if (state.cryo < 0) { buyCryoHall(); return; }
+        if (state.cryo < 0) { openTree(); return; }
         startSleep().catch((e) => console.error('the deep: the sleep broke', e));
     }
 
@@ -1503,11 +1402,16 @@ export function init() {
     }
 
     // --- the way up -----------------------------------------------------------
-    /** You can always try (v1.45.0). What is behind the hatch is the truth: on a surface that is
-     *  not ready the first party dies up there, the rest wait, and the colony knows the truth. */
+    /** deep-tree: the way up opens when the colony's own estimate of survival up there reaches the
+     *  line (85 %); before that the button is a greyed teaser. The early attempt is gone. */
+    function ascentReady() {
+        return ascentOdds(state).survival >= SURVIVAL_AT - 1e-9;
+    }
+    /** What is behind the hatch is the truth: on a surface that is not ready (the estimate was
+     *  wrong) the first party dies up there, the rest wait, and the colony knows the truth. */
     async function pressAscent() {
         if (state.watcher.gone) { await goUpAlone(); return; }
-        if (busy || state.asleep || !canTryAscent(state)) return;
+        if (busy || state.asleep || !canTryAscent(state) || !ascentReady()) return;
         setBusy(true);
         stopClock();
         const out = attemptAscent(state);
@@ -1642,6 +1546,7 @@ export function init() {
 
     /** Escape lets the lamps go (no cost; the next event is still two sleeps away). */
     document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && treeView?.isOpen()) { closeTree(); return; }
         if (e.key !== 'Escape' || !state.asleep) return;
         // v1.52.0: Escape puts the choice away; nothing is refunded, the step waits, the pill asks
         if (choosing) { leaveChoice(); updateChrome(); return; }
@@ -1651,7 +1556,8 @@ export function init() {
         updateChrome();
         saveGame();
     }, { signal });
-    ui.pill.addEventListener('click', () => buyLadder(), { signal });
+    ui.ask.addEventListener('click', () => { if (!busy && !paused()) enterChoice(); }, { signal });
+    ui.treeBtn.addEventListener('click', () => { if (!busy) toggleTree(); }, { signal });
     for (const b of ui.rpsBtns) b.addEventListener('click', () => throwAtSurface(b.dataset.throw), { signal });
 
     // a click puts a button's tooltip away until the cursor leaves it (v1.48.0: the snowflake's
@@ -1663,25 +1569,13 @@ export function init() {
     }
     ui.digBtn.addEventListener('click', guarded(dig), { signal });
     for (const { type, el } of ui.roomBtns) el.addEventListener('click', guarded(() => buildRoom(type)), { signal });
-    ui.levelBtn.addEventListener('click', guarded(levelWeakest), { signal });
-    ui.autoBtn.addEventListener('click', guarded(automateWeakest), { signal });
     // the preview: every purchase button shows its own future on the bars
     watchHover(ui.digBtn, () => ({ kind: 'dig', type: null, price: nextPrice(state, 'dig'), currency: 'minerals' }));
     for (const { type, el } of ui.roomBtns) {
         watchHover(el, () => ({ kind: 'room', type, price: nextPrice(state, 'room', type), currency: 'minerals' }));
     }
-    watchHover(ui.levelBtn, () => {
-        const type = offers().level.type;
-        return { kind: 'level', type, price: nextPrice(state, 'level', type), currency: 'stars' };
-    });
-    watchHover(ui.autoBtn, () => {
-        const type = offers().auto.type;
-        const price = nextPrice(state, 'auto', type);
-        return { kind: 'auto', type, price: Number.isFinite(price) ? price : 0, currency: 'stars' };
-    });
     ui.cryoBtn.addEventListener('click', guarded(pressCryo), { signal });
     ui.wakeBtn.addEventListener('click', () => { if (!busy) wake({ kind: 'manual' }); }, { signal });
-    ui.cryoUpBtn.addEventListener('click', guarded(buyCryoTier), { signal });
     ui.probeBtn.addEventListener('click', guarded(sendProbe), { signal });
     ui.ascendBtn.addEventListener('click', guarded(pressAscent), { signal });
     // the replay strip stays until the next thing the player does
@@ -1802,6 +1696,11 @@ export function init() {
         // v1.52.0, for the tests: the choice of a sector, and the people rolling off the H bar
         get choosing() { return choosing; },
         get hDrop() { return hDrop ? { text: hDrop.text, from: hDrop.from, to: hDrop.to } : null; },
+        // deep-tree, for the tests: the panel, and what each node was last drawn from
+        get treeOpen() { return !!treeView?.isOpen(); },
+        get treeDrawn() { return treeView ? treeView.drawn : {}; },
+        openTree: () => openTree(),
+        closeTree: () => closeTree(),
     };
     let debugOn = false;
     try { debugOn = window.location.search.includes('debug') || localStorage.getItem(DEBUG_KEY) === '1'; } catch { /* ignore */ }

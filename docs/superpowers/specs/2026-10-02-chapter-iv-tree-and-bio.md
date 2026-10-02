@@ -198,3 +198,72 @@ swollen or filled a growth is. Forms irregular, as if grown, not drawn with a ru
   Lower walls or none. Steel, not brass.
 - Mockups 12 lock both looks; the build starts with the mechanical tree (step 1),
   which Ola approved in mockup 10.
+
+## Built: step 1, the tree (deep-tree branch)
+
+Opus, 2026-10-02. The tree panel in the mechanical state, with today's upgrades moved in;
+GROW, the longer-sleep button and the Watcher's pill are gone. No balance change.
+
+**The rules** (`src/phase4/tree.js`, pure, `tree.test.js`). Every node READS its level off
+the state the colony already keeps, so the save holds no second copy: Seam, Yield, Output and
+Beds are the room types' levels; Drill, Farm and Generator automation and Creche their
+automation (four levels each); Cryo I to VII the tier; the Watcher's and the biological
+nodes `watcher.bought`. `canBuy` / `buy` / `buyMany` / `nodeStatus` (bought, buyable, locked,
+surface) / `buyableCount`, with reasons in plain words ("Build a mine first: there is none to
+improve.", "Cryo I needs generators automated: asleep, nobody runs them.", "Needs Cryo II
+first.", "Only while the colony sleeps.", "Affordable in 12 days."). Buying does exactly what
+the old buttons did: a level or an automation is paid and ordered into the build queue
+(`orderBuild`, with its ring), a cryo tier is paid at once (the hall with its own chamber), a
+Watcher step goes through `buyStep`. Positions are mockup 10's board (1000 x 730).
+
+Decisions taken here, for Ola to overrule:
+- **Levels draw 20 pips, not 10.** The rules have no cap and the simulated run buys up to 18
+  levels of a room type, so a cap of 10 would be a balance change (B175).
+- **HABITAT**: Beds = the dormitory level, Creche = the dormitory automation (four levels, as
+  automation has), Hands has no neutral mapping and is a locked teaser (B174). The order on the
+  board is Beds, Creche, Hands, with Quiet hands above Hands.
+- **Teasers with no rule yet**, locked with "Not open yet.": Deep seam, Hydroponics, Hands and
+  **The machine: feed**. The machine's star rule (10 × the weakest column) has no neutral
+  mapping to "more energy, more games"; it waits for step 3 (B174).
+- **WATCHER is all eight steps**, not six: Deep read and Second core are kept (old saves own
+  them and the ladder is bought in order). SYSTEM runs along the lower row, HARDWARE back along
+  the upper. The branch shows once the first sleep is over.
+- **BIOLOGICAL** is a plain branch above the Watcher: the four steps as they work today. A
+  click pays and closes the tree, the arms light up, a click on an arm seals it; while a paid
+  step waits, one warm line under the stability meter asks ("BIOLOGICAL · Choose a sector to
+  seal"), and a click on it or on the node asks again.
+- **Surface's five nodes** are on the board from the start, dashed with the hollow ring, no
+  price, "not ours to open". `state.tree.opened` (schema 6) is where step 2 records what
+  Surface opens.
+- **Automation needs no level first.** The trace runs Seam to Drill automation, but the only
+  prerequisite is a room to improve: at the descent Cryo I asks for automated generators.
+- **No breathing loop** on buyable nodes (the mockup has one): the house rule forbids
+  decorative loops, so a buyable node is a bright outline that holds still.
+
+**The panel** (`src/phase4/tree-view.js`, markup `#deep-tree`). A full-screen dark panel over
+the dimmed colony; the button column stays where it is, above it, dimmed except the TREE
+button, which closes what it opened; Escape closes it too. The fixed info box sits under the
+board (name in caps, level and orders, next price, effect, and the reason or "click: one level
+· shift-click: as many as can be paid"), the legend beside it. Hover: the trace from the root
+lights in sequence, the node lifts a pixel, its pips tick once; ordered levels are outlined
+pips. The board is built once and a node is redrawn only when its status, level, orders or
+price change. The badge on the TREE button counts what can be bought now.
+
+**The way up**: no early attempt. A greyed teaser with the caption "survival 85 % needed"
+until the colony's estimate reaches 85; then it opens, and the truth decides as before.
+
+**Sim and scripted player.** `scripts/sim-phase4.mjs` and `policy.js` (`press`) buy every
+level, automation, cryo tier and Watcher step through `tree.js`. Bought that way both runs are
+byte-identical to before, with one exception: the simulated player now digs the cryo hall's
+own chamber, as the game has since v1.48.0 (the sim had never done it, so it also counted the
+hall's chamber as free). Plain run: **25m03s** to year 802 701 (was 26m26s), 108 wake-ups,
+longest stall 76 s. `--watcher`: the biological ending at **23m45s**, year 1 302 701 (was
+26m04s, year 3 602 702), the ring at 22m41s. The reference watcher bands are unchanged
+(attentive 71 to 89, unattended first reboot in sleep 3 to 5).
+
+**Acceptance** (`scripts/accept-iv-cut.mjs`, also `--port N` for a running server): from
+"IV · the deep" the old buttons are gone, the way up is the teaser, the tree opens, the info
+box on Seam reads "SEAM | 0 / 20 | next ★ 4.4 k | Doubles every mine..." and a click orders
+the level (paid, in the queue, built), Escape closes, no button moved; from "IV · Surface" the
+WATCHER branch shows and Surface's nodes are greyed with the ring; from "IV · the body" the
+biological step is bought on the tree and the sector choice works as before.
