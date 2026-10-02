@@ -12,6 +12,7 @@ The sounds from `docs/mockups/sound-board-city.html` (mockup 3), now in the game
 - **The change to III · WAR**: everything in the city falls away at once and one C♯ hangs; three drum strokes as III stands on the card; the heaviest boom on WAR; silence; their drum alone, and our bass under it when the card lifts. The card itself is silent (the set piece carries it).
 - **Words by material.** Every purchase begins with chapter I's thunk; then wood for building, levelling up and selling, glass for research, metal for industry (tool case, car, computer, superconductor), grain for food (stall, crop, hand harvest), earth for land. "Something new" (a button arriving) is chapter I's three notes.
 - Paused or hidden: silent. The war has no city music (the WAR session's own sound follows).
+- **More water between the islands** (B203): the strait is 62 px wide instead of 14, so the piers end in the water and the boats lie off the beaches, not on them.
 ## v1.64.0 - 2026-10-03 (chapter III, war by boat)
 
 ### Landings and strikes sail, guards meet them on the beach, controls arrive with effect

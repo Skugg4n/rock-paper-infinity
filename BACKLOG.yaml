@@ -1987,4 +1987,6 @@ items:
       the grids): the channel between them is a strait a hull's width wide and their pier ends on
       our beach. More water between the islands would let the boats read better. Islands are the
       CAPITAL session's (islands.js, index.html margin).
-    status: open
+    status: done
+    resolved_in: v1.65.0
+    notes: "The margin between the grids is 160 px (was 112): 62 px of water between the shores, room for a pier and a hull on each side."
