@@ -20,8 +20,6 @@ const PENTA = [0, 3, 5, 7, 10];                       // D minor pentatonic
 const CHORDS = [{ root: 38, third: 3 }, { root: 34, third: 4 }, { root: 41, third: 4 }, { root: 36, third: 4 }];
 const SFX_LEVEL = 0.62;
 const MUSIC_LEVEL = 0.4;
-/** Above this many wins a second single plings fuse into the shimmer. */
-export const PLING_LIMIT = 5;
 
 // ---------------------------------------------------------------- pure rules (tested)
 
@@ -36,22 +34,44 @@ export function bpmFor(gps) {
     return Math.max(58, Math.min(128, 58 + 26 * Math.log10(gps / 0.5)));
 }
 
+/** 0 below `from`, 1 above `to`, a straight line between. */
+export function ramp(x, from, to) {
+    return Math.max(0, Math.min(1, (x - from) / (to - from)));
+}
+
 /**
- * Which layers of the machine play, from the state alone.
+ * How much of each layer of the machine should be heard, 0..1, from the state
+ * alone. Nothing switches on: every layer creeps in over a stretch of speed,
+ * so the music grows with the machine instead of taking steps. (The game
+ * itself jumps, from 2.6 to 10 games a second at speed ten; `approach` below
+ * turns that jump into a glide in time.)
  *
  * @param {{ gps: number, wins: number, battery: number, gen: number, boards: number }} s
  *        gps = games a second, wins = wins a second, battery and gen 0..1
  */
-export function layersFor(s) {
-    const alive = s.battery > 0;
+export function intensitiesFor(s) {
+    const alive = s.battery > 0 ? 1 : 0;
     return {
-        pulse: s.gps >= 3,
-        hat: alive && s.gps >= 3,
-        bass: alive && s.gps >= 10,
-        arp: alive && s.wins >= PLING_LIMIT,
-        pad: alive && s.boards >= 2,
-        hum: alive && s.gen > 0,
+        pulse: ramp(s.gps, 1, 3),                      // the heartbeat
+        hat: alive * ramp(s.gps, 2, 6),                // the tick on the eighths
+        hat16: alive * ramp(s.gps, 8, 20),             // ...and on the sixteenths between
+        bass: alive * ramp(s.gps, 6, 14),
+        arp: alive * ramp(s.wins, 3, 8),               // the shimmer that replaces single plings
+        arp16: alive * ramp(s.wins, 12, 30),           // ...its sixteenths
+        wide: alive * ramp(s.wins, 15, 80),            // ...how far up the scale it reaches
+        high: alive * ramp(s.wins, 60, 200),           // ...how often a note is lifted an octave
+        pad: alive * (s.boards >= 2 ? 1 : 0),
+        hum: alive * (s.gen > 0 ? 0.3 + 0.7 * s.gen : 0),
     };
+}
+
+/**
+ * One step of a glide: `current` moves toward `target`, closing 63 % of the
+ * gap every `tau` seconds.
+ */
+export function approach(current, target, dt, tau) {
+    if (!(tau > 0)) return target;
+    return current + (target - current) * (1 - Math.exp(-dt / tau));
 }
 
 /** Saved choices, with everything on as the default. */
@@ -69,6 +89,14 @@ export function readPrefs(raw) {
 let ctx = null, master, sfxBus, musicBus, reverb, noiseBuf, hum = null;
 let prefs = { sfx: true, music: true };
 const M = { running: false, gps: 0, wins: 0, battery: 1, gen: 0, boards: 1, plings: false, step: 0, next: 0, timer: null };
+// What is actually heard: the tempo and every layer glide toward what the state
+// asks for, so a jump in the game (speed ten, a new board) arrives over seconds.
+const LAYERS = ['pulse', 'hat', 'hat16', 'bass', 'arp', 'arp16', 'wide', 'high', 'pad', 'hum'];
+const H = { bpm: 58, at: 0 };
+LAYERS.forEach((k) => { H[k] = 0; });
+const TEMPO_TAU = 3.5;      // seconds
+const RISE_TAU = 3;         // a layer creeps in
+const FALL_TAU = 0.8;       // and leaves a little quicker (an empty battery should be felt)
 let streak = 0, streakAt = 0;
 
 const hasAudio = () => typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext);
@@ -157,7 +185,10 @@ function pling() {
     const now = ctx.currentTime;
     streak = now - streakAt > 8 ? 0 : (streak + 1) % 10;
     streakAt = now;
-    playPling(now, pentaNote(streak), 1, sfxBus);
+    // Single plings give way to the machine's shimmer as it creeps in.
+    const level = M.running ? 1 - H.arp : 1;
+    if (level < 0.08) return;
+    playPling(now, pentaNote(streak), level, sfxBus);
 }
 
 /** A purchase. */
@@ -226,27 +257,29 @@ function hat(t, level) {
     hp.connect(env(t, 0.05 * level, 0.001, 0.03, musicBus));
     noise(t, 0.04, hp);
 }
-function bass(t, midi, dur) {
+function bass(t, midi, dur, level) {
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2;
-    lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(220, t + Math.max(0.08, dur * 0.8));
-    lp.connect(env(t, 0.26, 0.006, Math.max(0.1, dur), musicBus));
+    // quiet bass is also darker, so it comes up out of the floor
+    lp.frequency.setValueAtTime(350 + 550 * level, t); lp.frequency.exponentialRampToValueAtTime(220, t + Math.max(0.08, dur * 0.8));
+    lp.connect(env(t, 0.26 * level, 0.006, Math.max(0.1, dur), musicBus));
     osc('sawtooth', mtof(midi), t, t + dur + 0.2, lp);
-    osc('sine', mtof(midi - 12), t, t + dur + 0.2, env(t, 0.16, 0.006, Math.max(0.1, dur), musicBus));
+    osc('sine', mtof(midi - 12), t, t + dur + 0.2, env(t, 0.16 * level, 0.006, Math.max(0.1, dur), musicBus));
 }
-function pad(t, chord, dur, voices) {
+function pad(t, chord, dur, voices, level) {
     [0, 7, 12, 12 + chord.third, 19, 24, 24 + chord.third, 31, 36].slice(0, voices).forEach((semi, i) => {
         const g = ctx.createGain();
         g.gain.setValueAtTime(0.0001, t);
-        g.gain.linearRampToValueAtTime(0.028, t + dur * 0.3);
+        g.gain.linearRampToValueAtTime(0.028 * level, t + dur * 0.3);
         g.gain.linearRampToValueAtTime(0.0001, t + dur * 1.05);
         g.connect(musicBus); send(g, 0.7);
         osc('triangle', mtof(chord.root + 12 + semi), t, t + dur * 1.1, g).detune.value = (i % 2 ? 6 : -6);
     });
 }
-function arp(t, step, wins) {
-    const span = wins > 60 ? 10 : wins > 20 ? 8 : 5;                  // brighter and wider with the rate
+function arp(t, step, level) {
+    const span = 5 + Math.round(5 * H.wide);                          // reaches further up the scale with the rate
     const pattern = [0, 2, 4, 1, 3, 5, 2, 4, 6, 3, 5, 7, 4, 6, 8, 5];
-    playPling(t, pentaNote(pattern[step % 16] % span + (wins > 120 ? 5 : 0)), wins > 60 ? 0.3 : 0.38, musicBus);
+    const lift = Math.random() < H.high ? 5 : 0;                      // more and more notes an octave up
+    playPling(t, pentaNote(pattern[step % 16] % span + lift), (0.38 - 0.08 * H.wide) * level, musicBus);
 }
 function startHum() {
     const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(musicBus);
@@ -257,45 +290,57 @@ function startHum() {
     a.connect(lp); b.connect(lp); a.start(); b.start();
     hum = { g, lp, a, b };
 }
-function updateHum(L, chord) {
+function updateHum(chord) {
     if (!hum) return;
     const t = ctx.currentTime;
-    hum.g.gain.setTargetAtTime(L.hum && M.running ? 0.03 + 0.07 * M.gen : 0.0001, t, 0.25);
-    hum.lp.frequency.setTargetAtTime(90 + 520 * M.gen, t, 0.3);
+    hum.g.gain.setTargetAtTime(M.running ? Math.max(0.0001, 0.1 * H.hum) : 0.0001, t, 0.25);
+    hum.lp.frequency.setTargetAtTime(90 + 520 * M.gen, t, 1.2);
     const f = mtof(chord.root - 12);
     hum.a.frequency.setTargetAtTime(f, t, 0.2); hum.b.frequency.setTargetAtTime(f, t, 0.2);
 }
 
 function scheduleStep(step, t) {
-    const dur = 60 / bpmFor(M.gps) / 4;
+    const dur = 60 / H.bpm / 4;
     const s16 = step % 16;
+    const even = s16 % 2 === 0;
     const chord = CHORDS[Math.floor(step / 16) % 4];
-    const L = layersFor(M);
     const alive = M.battery > 0;
-    if (L.pulse) {
+    if (H.pulse > 0.03) {
         if (alive) {
-            const heart = 0.45 + 0.55 * Math.min(1, M.battery / 0.25);   // a weak battery is a weak heart
+            const heart = (0.45 + 0.55 * Math.min(1, M.battery / 0.25)) * H.pulse;   // a weak battery is a weak heart
             if (s16 === 0 || s16 === 8) kick(t, heart, false);
             if ((s16 === 3 || s16 === 11) && M.battery > 0.12) kick(t, 0.5 * heart, true);
-        } else if (s16 === 0) kick(t, 0.35, true);                       // empty: one faint beat a bar
+        } else if (s16 === 0) kick(t, 0.35 * H.pulse, true);                         // empty: one faint beat a bar
     }
     if (alive) {
-        if (L.hat && (M.gps >= 10 || s16 % 2 === 0)) hat(t, s16 % 4 === 2 ? 1 : 0.55);
-        if (L.bass && (s16 % 4 === 0 || s16 === 6 || s16 === 14)) bass(t, chord.root + (s16 === 6 || s16 === 14 ? 7 : 0), dur * 1.7);
-        if (L.pad && s16 === 0) pad(t, chord, dur * 16, M.boards);
-        if (L.arp && (M.wins >= 20 || s16 % 2 === 0)) arp(t, step, M.wins);
-        // Bulk play has no single wins to ring; below the shimmer the machine rings them itself.
-        if (M.plings && !L.arp && Math.random() < M.wins * dur) playPling(t + Math.random() * dur, pentaNote(Math.floor(Math.random() * 5)), 0.8, musicBus);
+        const hatLevel = H.hat * (even ? 1 : H.hat16);
+        if (hatLevel > 0.04) hat(t, (s16 % 4 === 2 ? 1 : 0.55) * hatLevel);
+        if (H.bass > 0.03 && (s16 % 4 === 0 || s16 === 6 || s16 === 14)) bass(t, chord.root + (s16 === 6 || s16 === 14 ? 7 : 0), dur * 1.7, H.bass);
+        if (H.pad > 0.03 && s16 === 0) pad(t, chord, dur * 16, M.boards, H.pad);
+        const arpLevel = H.arp * (even ? 1 : H.arp16);
+        if (arpLevel > 0.05) arp(t, step, arpLevel);
+        // Bulk play has no single wins to ring; the machine rings them itself, less and less as the shimmer comes in.
+        if (M.plings && Math.random() < M.wins * dur * (1 - H.arp)) playPling(t + Math.random() * dur, pentaNote(Math.floor(Math.random() * 5)), 0.8 * (1 - H.arp), musicBus);
     }
-    if (s16 === 0 || s16 === 8) updateHum(L, chord);
+    if (s16 % 4 === 0) updateHum(chord);
+}
+/** Lets what is heard glide toward what the state asks for. */
+function glide() {
+    const now = ctx.currentTime;
+    const dt = Math.min(0.5, Math.max(0, now - H.at));
+    H.at = now;
+    H.bpm = approach(H.bpm, bpmFor(M.gps), dt, TEMPO_TAU);
+    const want = intensitiesFor(M);
+    for (const k of LAYERS) H[k] = approach(H[k], want[k], dt, want[k] > H[k] ? RISE_TAU : FALL_TAU);
 }
 function pump() {
     if (!M.running || !ctx) return;
+    glide();
     // A stalled timer (hidden tab) must not play a backlog when it wakes.
     if (M.next < ctx.currentTime - 0.2) M.next = ctx.currentTime + 0.05;
     while (M.next < ctx.currentTime + 0.14) {
         scheduleStep(M.step, M.next);
-        M.next += 60 / bpmFor(M.gps) / 4;
+        M.next += 60 / H.bpm / 4;
         M.step++;
     }
 }
@@ -322,6 +367,9 @@ function machine(s) {
     M.plings = !!s.plings;
     if (M.running) return;
     M.running = true; M.step = 0; M.next = ctx.currentTime + 0.06;
+    // A start is quiet: the tempo is right at once, the layers come in from nothing.
+    H.bpm = bpmFor(M.gps); H.at = ctx.currentTime;
+    LAYERS.forEach((k) => { H[k] = 0; });
     if (!hum) startHum();
     M.timer = setInterval(pump, 25);
 }

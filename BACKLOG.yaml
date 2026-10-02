@@ -1610,3 +1610,12 @@ items:
     status: done
     resolved_in: v1.59.1
     notes: "The display eased toward a value that only moves once a second. It now glides linearly across the second (never ahead of the real value)."
+
+  - id: B168
+    added: 2026-10-02
+    source: "chat 2026-10-02 (playing v1.59.0)"
+    request: |
+      The music takes a couple of big, clear steps when the speed passes
+      certain points. Can they be sneaked in more? It would feel more magical.
+    status: done
+    resolved_in: v1.59.2

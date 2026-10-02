@@ -11,7 +11,7 @@ import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber, helperCounters } from "./persistence.js";
 import { createUpgrades } from "./upgrades-config.js";
 import { createFactoryView, FACTORY_TILES } from "./factory-view.js";
-import { audio, PLING_LIMIT } from "../audio.js";
+import { audio } from "../audio.js";
 import { setupDashes, updateDashes, updateProgressDashes, PROGRESS_DASHES } from "./upgrade-dashes.js";
 import { mountSaveButtons } from "../save-export.js";
 import {
@@ -786,8 +786,8 @@ const uiState = {
             renderRound(board, playerChoice, computerChoice, result, { instant, celebrate });
 
             if (result === 'win') {
-                // Single wins ring; when they come too close the machine's shimmer takes over.
-                if (!autoPlayInterval || machineState().wins < PLING_LIMIT) audio.pling();
+                // Single wins ring; audio.js fades them out as the machine's shimmer creeps in.
+                audio.pling();
                 totalWins++;
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;

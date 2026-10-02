@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.59.2 - 2026-10-02 (sound, chapter I)
+
+### The music creeps in instead of taking steps
+
+Ola, after playing v1.59.0: the music has a couple of big, clear steps at certain speeds; could they come sneaking instead (B168).
+
+- **No layer switches on any more.** Every layer has a stretch of speed over which it comes in: the heartbeat between 1 and 3 games a second, the tick between 2 and 6, the bass between 6 and 14 (and darker while it is quiet), the shimmer between 3 and 8 wins a second, its sixteenths between 12 and 30, its reach up the scale between 15 and 80, its octave lifts between 60 and 200.
+- **What is heard glides in time too.** The game itself jumps, from 2.6 to 10 games a second at speed ten, and doubles with a new board. The tempo now follows over a few seconds, and a layer takes about three seconds to come in (and under one to leave, so an empty battery is still felt). Measured at the jump to speed ten: the notes per second rise over about eight seconds instead of at once.
+- **Single plings and the shimmer cross-fade**: the plings grow quieter as the shimmer comes in, instead of stopping at a limit.
+- **A start is quiet**: after a pause or an empty battery the layers come back from nothing.
+- Rules in `src/audio.js`: `intensitiesFor` (replaces `layersFor`), `ramp`, `approach`; tested for having no steps.
+
 ## v1.59.1 - 2026-10-02 (chapter II, polish)
 
 ### Things arrive, they do not clunk in
