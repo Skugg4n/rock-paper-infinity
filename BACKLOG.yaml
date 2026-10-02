@@ -1667,6 +1667,9 @@ items:
       of the one to CAPITAL. Built: five steps from chime to dread, the raid as a twelve
       second set piece, the II to III transition with a card on the board (boom, a hanging
       C sharp, three drum strokes for III, the heaviest boom on WAR, their drum, our bass).
+      2026-10-02: Ola approved mockup 3 ("Jättebra! Vi kör på så"). Next: into the game, after
+      the neighbour's new stages (B191) are settled, since the sound follows them; src/audio.js
+      is shared, tell the TRIVIAL session first (score sheet, section 5).
 
   - id: B181
     added: 2026-10-02
@@ -1748,3 +1751,23 @@ items:
       keep the info box clear of the bottom-left buttons at narrow widths.
     status: open
     resolved_in: null
+
+  - id: B191
+    added: 2026-10-02
+    source: "chat 2026-10-02 (CAPITAL)"
+    request: |
+      The enemy's behaviour, its graphics and functions, and our soldiers
+      should be better and tidier. Today it is odd: we live on islands but
+      people just walk back and forth over the "water" in long rows, and
+      houses hang over the islands into the water. It should be more real.
+      The enemy first builds houses and a cosy place; then come buildings
+      that show weapons and an arms industry, fortifications; last a
+      shipyard. They gather, and from the shipyard they attack by a boat
+      that takes them to where they will strike.
+    status: open
+    notes: |
+      Mockup first: docs/mockups/neighbour-1.html (moving: five stages, the squad drilling,
+      the raid by boat, islands that hold their plates). Ola judges it, then build.
+      The war (chapter III) moves the same way today (rows of dots over water): landings and
+      our strikes should become boats too, with a harbour of our own. That part is the WAR
+      session's; the boat and harbour code in src/phase2/ants.js should be shared.

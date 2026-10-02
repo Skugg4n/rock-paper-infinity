@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grannen · mockup 1</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  /* The neighbour in chapter II, tidied up (Ola 2026-10-02): they settle, they
+     fortify, they build a shipyard, and they attack by boat. Nobody walks on
+     water, and the islands hold their houses. A moving mockup; nothing here
+     is in the game. Same look as the game: tone plates, no lines. */
+  :root { --ink: #0f172a; --mid: #475569; --soft: #94a3b8; --tile: #e2e8f0; --bg: #f1f5f9; --water: #d3dde8; --shallow: #dfe7ef; --land: #f1f5f9; --enemy-land: #e9eef4; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; font-weight: 600; margin: 0 0 14px; }
+  p, li { font-size: 13px; line-height: 1.55; color: var(--mid); max-width: 68ch; }
+  p { margin: 0 0 12px; }
+  ul { margin: 0; padding-left: 18px; }
+  section { background: #fff; border-radius: 20px; padding: 22px; margin-top: 18px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07); }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 0; border-radius: 9999px; padding: 10px 18px; cursor: pointer; transition: transform 0.12s ease, background 0.15s ease; }
+  button:hover { background: var(--tile); transform: translateY(-1px); }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover { background: #1e293b; }
+  .rowline { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); }
+  .grid { display: grid; grid-template-columns: 70px 1fr; gap: 12px 14px; align-items: center; margin: 14px 0; }
+  .grid label { font-size: 13px; }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+
+  #frame { width: 100%; overflow-x: auto; border-radius: 16px; }
+  #scene { position: relative; width: 760px; height: 610px; margin: 0 auto; background: var(--water); border-radius: 16px; overflow: hidden; }
+  .isle { position: absolute; background: var(--land); box-shadow: 0 0 0 14px var(--shallow); transition: opacity 1600ms ease, transform 1600ms ease; }
+  #isle-ours { left: 164px; top: 26px; width: 432px; height: 268px; border-radius: 47% 53% 50% 50% / 54% 50% 50% 46%; }
+  #isle-theirs { left: 196px; top: 372px; width: 368px; height: 212px; background: var(--enemy-land); border-radius: 52% 48% 46% 54% / 50% 56% 44% 50%; opacity: 0; transform: scale(0.9); }
+  #isle-theirs.on { opacity: 1; transform: none; }
+  .plate { position: absolute; border-radius: 12px; background: #fff; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); display: flex; align-items: center; justify-content: center; color: #475569; transition: background-color 900ms ease, box-shadow 600ms ease, opacity 700ms ease, transform 700ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+  .plate svg { width: 26px; height: 26px; transition: opacity 700ms ease; }
+  .plate.factory { background: #e2e8f0; }
+  .plate.razed { background: #334155; box-shadow: none; }
+  .plate.razed svg { opacity: 0; }
+  .plate.hit { box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.55); }
+  .enemy.plate { background: #f8fafc; opacity: 0; transform: scale(0.6) translateY(6px); }
+  .enemy.plate.on { opacity: 1; transform: none; }
+  .enemy.plate svg { width: 24px; height: 24px; color: #64748b; }
+  .enemy.plate .alt { position: absolute; opacity: 0; }
+  .enemy.plate.armed .base { opacity: 0; }
+  .enemy.plate.armed .alt { opacity: 1; }
+  .enemy.plate.armed { background: #e2e8f0; }
+  /* The wall facing us: tone, not line */
+  .wall { position: absolute; height: 9px; border-radius: 5px; background: #64748b; opacity: 0; transform: scaleX(0.3); transition: opacity 900ms ease, transform 900ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+  .wall.on { opacity: 0.85; transform: none; }
+  #pier { position: absolute; left: 497px; top: 338px; width: 12px; height: 46px; border-radius: 4px; background: #94a3b8; opacity: 0; transition: opacity 900ms ease; }
+  #pier.on { opacity: 1; }
+  canvas { position: absolute; inset: 0; width: 760px; height: 610px; pointer-events: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Grannen · mockup 1</h1>
+  <p>En rörlig skiss av hur grannen kan bete sig i Capital: de bosätter sig, de befäster, de bygger ett varv, och de anfaller med båt. Ingen går på vattnet, och öarna rymmer sina hus. Inget av detta finns i spelet än.</p>
+
+  <section>
+    <div class="rowline">
+      <button class="primary" id="play">Spela hela förloppet</button>
+      <button id="raid">Spela räden</button>
+      <span class="readout" id="readout"></span>
+    </div>
+    <div class="grid">
+      <label for="stage">Skede</label><input id="stage" type="range" min="0" max="5" step="1" value="0">
+    </div>
+    <div id="frame">
+      <div id="scene">
+        <div class="isle" id="isle-ours"></div>
+        <div class="isle" id="isle-theirs"></div>
+        <div id="pier"></div>
+        <canvas id="dots" width="760" height="610"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>VAD SOM ÄR ANNORLUNDA MOT IDAG</h2>
+    <ul>
+      <li><b>Öarna rymmer sina hus.</b> Kusten ritas med marginal runt alla brickor och växer när marken växer. Runt ön ligger grunt vatten, så att strand och hav skiljs åt.</li>
+      <li><b>Grannen bygger i tre akter.</b> Först hus, butik och fabrik: en granne som bor. Sedan en mur mot oss, vakttorn, radar, kasern, och fabriken blir vapensmedja. Sist varvet, med en båt vid bryggan.</li>
+      <li><b>Soldater syns innan de kommer.</b> De exercerar i led på sin ö från skede 4. När de anfaller går de till bryggan och går ombord.</li>
+      <li><b>De kommer med båt.</b> Båten korsar vattnet till stranden närmast målet. De går i land, går gatan fram till huset, raserar det, går tillbaka, och båten seglar hem.</li>
+      <li><b>Ljudet följer samma steg</b> som på ljudtavlan: klockspel och trä när de bor, metall och trumma när de rustar, och räden som ett eget förlopp.</li>
+    </ul>
+    <p style="margin-top: 12px;">Kriget (akt III) använder samma sätt att röra sig idag, med led av prickar över vattnet. Tanken är att landstigningarna där också blir båtar, och att vi får en egen hamn som våra styrkor seglar från. Det hör till WAR-sessionen och visas inte här.</p>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const scene = $('scene'), canvas = $('dots'), g = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+canvas.width = 760 * dpr; canvas.height = 610 * dpr; g.scale(dpr, dpr);
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+const BLUE = '#1e3a8a', RED = '#b91c1c', SOLDIER = '#7f1d1d';
+
+// ---------------------------------------------------------------- our island: 5 x 3 plates
+const OURS = { x: 212, y: 56, size: 56, gap: 14, cols: 5, rows: 3 };
+const ourIcons = ['factory', 'landmark', 'building', 'building', 'building-2', 'building', 'building-2', 'building', 'shopping-cart', 'building', 'home', 'building', 'store', 'home', 'home'];
+const ours = ourIcons.map((icon, i) => {
+  const c = i % OURS.cols, r = Math.floor(i / OURS.cols);
+  const el = document.createElement('div');
+  el.className = 'plate' + (icon === 'factory' ? ' factory' : '');
+  const x = OURS.x + c * (OURS.size + OURS.gap), y = OURS.y + r * (OURS.size + OURS.gap);
+  Object.assign(el.style, { left: x + 'px', top: y + 'px', width: OURS.size + 'px', height: OURS.size + 'px' });
+  el.innerHTML = `<i data-lucide="${icon}"></i>`;
+  scene.insertBefore(el, canvas);
+  return { el, cx: x + OURS.size / 2, cy: y + OURS.size / 2, c, r };
+});
+const TARGET = ours[13];                                   // the house they raze: bottom row, facing them
+const streetY = (r) => OURS.y + r * (OURS.size + OURS.gap) + OURS.size + OURS.gap / 2;
+const OUR_BEACH = OURS.y + OURS.rows * (OURS.size + OURS.gap) - OURS.gap + 26;
+
+// ---------------------------------------------------------------- their island: 4 x 2 tiles, built in stages
+const THEIRS = { x: 258, y: 408, size: 52, gap: 12 };
+const theirPlan = [
+  { c: 1, r: 0, at: 1, icon: 'home' },
+  { c: 1, r: 1, at: 2, icon: 'home' },
+  { c: 2, r: 1, at: 2, icon: 'store' },
+  { c: 3, r: 1, at: 2, icon: 'factory', alt: 'anvil', armedAt: 4 },
+  { c: 0, r: 0, at: 3, icon: 'castle' },
+  { c: 2, r: 0, at: 3, icon: 'radar' },
+  { c: 0, r: 1, at: 4, icon: 'tent' },
+  { c: 3, r: 0, at: 5, icon: 'ship' },
+];
+const theirs = theirPlan.map((t) => {
+  const el = document.createElement('div');
+  el.className = 'plate enemy';
+  const x = THEIRS.x + t.c * (THEIRS.size + THEIRS.gap), y = THEIRS.y + t.r * (THEIRS.size + THEIRS.gap);
+  Object.assign(el.style, { left: x + 'px', top: y + 'px', width: THEIRS.size + 'px', height: THEIRS.size + 'px' });
+  el.innerHTML = `<i data-lucide="${t.icon}" class="base"></i>${t.alt ? `<i data-lucide="${t.alt}" class="alt"></i>` : ''}`;
+  scene.insertBefore(el, canvas);
+  return { ...t, el, cx: x + THEIRS.size / 2, cy: y + THEIRS.size / 2 };
+});
+// the wall along the coast that faces us
+const walls = [[236, 70], [318, 84], [414, 64]].map(([x, w]) => {
+  const el = document.createElement('div'); el.className = 'wall';
+  Object.assign(el.style, { left: x + 'px', top: '390px', width: w + 'px' });
+  scene.insertBefore(el, canvas); return el;
+});
+lucide.createIcons();
+
+const PIER = { x: 503, top: 340, bottom: 384 };
+const DOCK = { x: 503, y: 328 };                           // where the boat lies
+const LANDING = { x: TARGET.cx, y: OUR_BEACH + 12 };       // the beach nearest the target
+const PARADE = { x: 380, y: 548 };
+
+const STAGE_TEXT = [
+  'Ingen granne än',
+  '1 · En granne! Ett hus.',
+  '2 · De bor och bygger: hus, butik, fabrik',
+  '3 · Befästningar: mur mot oss, vakttorn, radar',
+  '4 · Kasern och vapensmedja. Soldater exercerar.',
+  '5 · Varv och båt. De är redo.',
+];
+
+// ---------------------------------------------------------------- state
+let stage = 0, raid = null, razed = false, playTimer = null;
+const boat = { x: DOCK.x, y: DOCK.y, angle: -Math.PI / 2, shown: 0, aboard: 0 };
+
+function setStage(n) {
+  stage = n;
+  $('stage').value = n;
+  $('readout').textContent = raid ? raid.text : STAGE_TEXT[n];
+  $('isle-theirs').classList.toggle('on', n >= 1);
+  theirs.forEach((t) => { t.el.classList.toggle('on', n >= t.at); t.el.classList.toggle('armed', !!t.armedAt && n >= t.armedAt); });
+  walls.forEach((w, i) => setTimeout(() => w.classList.toggle('on', stage >= 3), n >= 3 ? i * 180 : 0));
+  $('pier').classList.toggle('on', n >= 5);
+}
+
+// ---------------------------------------------------------------- dots
+/** A walker follows waypoints at a speed; `done` when it has arrived. */
+function walker(path, speed, color, size = 2.4) {
+  return { path, seg: 0, x: path[0].x, y: path[0].y, speed, color, size, done: path.length < 2, hidden: false };
+}
+function stepWalker(w, dt) {
+  let left = w.speed * dt;
+  while (!w.done && left > 0) {
+    const to = w.path[w.seg + 1], dx = to.x - w.x, dy = to.y - w.y, d = Math.hypot(dx, dy);
+    if (d <= left) { w.x = to.x; w.y = to.y; left -= d; w.seg++; if (w.seg >= w.path.length - 1) w.done = true; }
+    else { w.x += dx / d * left; w.y += dy / d * left; left = 0; }
+  }
+}
+/** A street route between two of our plates: down to the street, along it, up or down, in. */
+function ourRoute(a, b) {
+  const sa = streetY(Math.min(a.r, OURS.rows - 1)), sb = streetY(Math.min(b.r, OURS.rows - 1));
+  const vx = b.cx + (b.cx >= a.cx ? -1 : 1) * (OURS.size / 2 + OURS.gap / 2);
+  return [{ x: a.cx, y: a.cy }, { x: a.cx, y: sa }, { x: vx, y: sa }, { x: vx, y: sb }, { x: b.cx, y: sb }, { x: b.cx, y: b.cy }];
+}
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const people = Array.from({ length: 16 }, () => {
+  const a = pick(ours), w = walker([{ x: a.cx, y: a.cy }], 30 + Math.random() * 14, BLUE);
+  w.at = a; w.rest = Math.random() * 3; return w;
+});
+/** Their civilians stroll between the tiles that stand, on their own streets. */
+const civilians = Array.from({ length: 7 }, () => ({ w: null, at: null, rest: Math.random() * 2 }));
+function theirRoute(a, b) {
+  const lane = THEIRS.y + THEIRS.size + THEIRS.gap / 2;    // the street between their two rows
+  return [{ x: a.cx, y: a.cy }, { x: a.cx, y: lane }, { x: b.cx, y: lane }, { x: b.cx, y: b.cy }];
+}
+// soldiers: a squad of twelve, in formation on the parade ground from stage 4
+const squad = Array.from({ length: 12 }, (_, i) => ({ i, x: PARADE.x, y: PARADE.y, w: null, hidden: false }));
+const slot = (i, t) => ({ x: PARADE.x - 30 + (i % 6) * 12 + Math.sin(t * 0.7) * 34, y: PARADE.y + Math.floor(i / 6) * 11 });
+
+// ---------------------------------------------------------------- the raid
+/** The squad's way to the pier: round the east end of their island, along the coast road, out on the pier. */
+const toPier = (from) => [from, { x: 532, y: from.y }, { x: 532, y: 396 }, { x: PIER.x, y: 396 }, { x: PIER.x, y: PIER.top + 6 }];
+const toHouse = () => [{ x: LANDING.x, y: LANDING.y - 8 }, { x: TARGET.cx, y: TARGET.cy + OURS.size / 2 + 6 }, { x: TARGET.cx, y: TARGET.cy + 8 }];
+
+function startRaid() {
+  if (raid) return;
+  if (stage < 5) setStage(5);
+  if (razed) { razed = false; TARGET.el.classList.remove('razed'); }
+  raid = { phase: 'muster', t: 0, text: 'De samlas vid bryggan' };
+  squad.forEach((s, k) => { s.hidden = false; s.w = walker(toPier({ x: s.x, y: s.y }), 46, SOLDIER, 2.8); s.delay = Math.floor(k / 2) * 0.28; });
+  boat.aboard = 0;
+}
+function sail(from, to, k) {
+  const e = ease(k), bend = Math.sin(e * Math.PI) * 26;
+  const x = lerp(from.x, to.x, e) + bend, y = lerp(from.y, to.y, e);
+  boat.angle = Math.atan2(y - boat.y, x - boat.x) || boat.angle;
+  boat.x = x; boat.y = y;
+}
+function stepRaid(dt) {
+  const r = raid; r.t += dt;
+  $('readout').textContent = r.text;
+  const all = (fn) => squad.every(fn);
+  if (r.phase === 'muster') {
+    squad.forEach((s) => { if (s.delay > 0) { s.delay -= dt; return; } stepWalker(s.w, dt); if (s.w.done && !s.hidden) { s.hidden = true; boat.aboard++; } else { s.x = s.w.x; s.y = s.w.y; } });
+    if (all((s) => s.hidden)) Object.assign(r, { phase: 'cross', t: 0, text: 'Båten korsar vattnet' });
+  } else if (r.phase === 'cross') {
+    sail(DOCK, LANDING, Math.min(1, r.t / 4.2));
+    if (r.t >= 4.2) {
+      Object.assign(r, { phase: 'ashore', t: 0, text: 'De går i land och fram till huset' });
+      boat.angle = -Math.PI / 2;                             // bow on the beach
+      TARGET.el.classList.add('hit');
+      squad.forEach((s, k) => { s.w = walker(toHouse(), 44, SOLDIER, 2.8); s.delay = Math.floor(k / 2) * 0.25; s.side = k % 2 ? 4 : -4; });
+    }
+  } else if (r.phase === 'ashore') {
+    squad.forEach((s) => { if (s.delay > 0) { s.delay -= dt; return; } if (s.hidden) { s.hidden = false; boat.aboard--; } stepWalker(s.w, dt); s.x = s.w.x + s.side; s.y = s.w.y; });
+    if (all((s) => s.w.done)) Object.assign(r, { phase: 'raze', t: 0, text: 'Huset raseras' });
+  } else if (r.phase === 'raze') {
+    if (r.t > 0.9 && !razed) { razed = true; TARGET.el.classList.remove('hit'); TARGET.el.classList.add('razed'); }
+    if (r.t > 2.2) {
+      Object.assign(r, { phase: 'back', t: 0, text: 'De går tillbaka till båten' });
+      squad.forEach((s, k) => { s.w = walker(toHouse().reverse().map((p) => ({ ...p })), 44, SOLDIER, 2.8); s.w.x = s.x; s.w.y = s.y; s.delay = Math.floor(k / 2) * 0.22; });
+    }
+  } else if (r.phase === 'back') {
+    squad.forEach((s) => { if (s.delay > 0) { s.delay -= dt; return; } stepWalker(s.w, dt); if (s.w.done && !s.hidden) { s.hidden = true; boat.aboard++; } else if (!s.hidden) { s.x = s.w.x + s.side; s.y = s.w.y; } });
+    if (all((s) => s.hidden)) Object.assign(r, { phase: 'home', t: 0, text: 'Båten seglar hem' });
+  } else if (r.phase === 'home') {
+    sail(LANDING, DOCK, Math.min(1, r.t / 4.2));
+    if (r.t >= 4.2) {
+      boat.angle = -Math.PI / 2;
+      Object.assign(r, { phase: 'dismiss', t: 0, text: 'Hemma igen. De kommer tillbaka.' });
+      squad.forEach((s, k) => { s.w = walker(toPier(slot(s.i, 0)).reverse(), 46, SOLDIER, 2.8); s.delay = Math.floor(k / 2) * 0.25; });
+    }
+  } else if (r.phase === 'dismiss') {
+    squad.forEach((s) => { if (s.delay > 0) { s.delay -= dt; return; } if (s.hidden) { s.hidden = false; boat.aboard--; } stepWalker(s.w, dt); s.x = s.w.x; s.y = s.w.y; });
+    if (all((s) => s.w.done)) { raid = null; $('readout').textContent = STAGE_TEXT[stage]; }
+  }
+}
+
+// ---------------------------------------------------------------- loop
+let last = performance.now(), clock = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+  // our people
+  for (const p of people) {
+    if (p.done) {
+      p.rest -= dt;
+      if (p.rest <= 0) {
+        let b = pick(ours); if (b === p.at || (razed && b === TARGET)) b = ours[(ours.indexOf(b) + 1) % ours.length];
+        Object.assign(p, walker(ourRoute(p.at, b), p.speed, BLUE), { at: b, rest: 1 + Math.random() * 3 });
+      }
+    } else stepWalker(p, dt);
+  }
+  // their civilians: fewer as the island turns to war
+  const standing = theirs.filter((t) => stage >= t.at);
+  const wanted = [0, 2, 6, 5, 3, 2][stage];
+  civilians.forEach((c, i) => {
+    if (i >= wanted || standing.length < 1) { c.w = null; c.at = null; return; }
+    if (!c.at || !standing.includes(c.at)) { c.at = pick(standing); c.w = walker([{ x: c.at.cx, y: c.at.cy }], 26, RED); }
+    if (c.w.done) {
+      c.rest -= dt;
+      if (c.rest <= 0 && standing.length > 1) { let b = pick(standing); if (b === c.at) b = standing[(standing.indexOf(b) + 1) % standing.length]; c.w = walker(theirRoute(c.at, b), 26, RED); c.at = b; c.rest = 1 + Math.random() * 3; }
+    } else stepWalker(c.w, dt);
+  });
+  // the squad drills when it is not raiding
+  if (!raid && stage >= 4) squad.forEach((s) => { const to = slot(s.i, clock); s.x += (to.x - s.x) * Math.min(1, dt * 6); s.y += (to.y - s.y) * Math.min(1, dt * 6); s.hidden = false; });
+  if (raid) stepRaid(dt);
+  boat.shown += ((stage >= 5 ? 1 : 0) - boat.shown) * Math.min(1, dt * 1.5);
+
+  // ---- draw
+  g.clearRect(0, 0, 760, 610);
+  const dot = (x, y, color, size, alpha = 0.9) => { g.globalAlpha = alpha; g.fillStyle = color; g.beginPath(); g.arc(x, y, size, 0, Math.PI * 2); g.fill(); };
+  for (const p of people) if (!p.done) dot(p.x, p.y, BLUE, 2.4);
+  civilians.forEach((c) => { if (c.w && !c.w.done) dot(c.w.x, c.w.y, RED, 2.4, 0.8); });
+  if (stage >= 4) squad.forEach((s) => { if (!s.hidden) dot(s.x, s.y, SOLDIER, 2.8, 0.95); });
+  // the boat: a hull seen from above, the squad on deck
+  if (boat.shown > 0.02) {
+    g.save(); g.translate(boat.x, boat.y); g.rotate(boat.angle + Math.PI / 2); g.globalAlpha = boat.shown;
+    g.fillStyle = 'rgba(15, 23, 42, 0.10)'; g.beginPath(); g.ellipse(2, 4, 11, 21, 0, 0, Math.PI * 2); g.fill();     // shadow on the water
+    g.fillStyle = '#475569';
+    g.beginPath(); g.moveTo(0, -22); g.bezierCurveTo(11, -10, 10, 12, 7, 19); g.lineTo(-7, 19); g.bezierCurveTo(-10, 12, -11, -10, 0, -22); g.fill();
+    g.fillStyle = '#e2e8f0'; g.beginPath(); g.ellipse(0, 2, 5.5, 13, 0, 0, Math.PI * 2); g.fill();                    // the deck
+    for (let i = 0; i < Math.min(boat.aboard, 12); i++) { g.fillStyle = SOLDIER; g.beginPath(); g.arc((i % 2 ? 2.6 : -2.6), -8 + Math.floor(i / 2) * 4.2, 1.9, 0, Math.PI * 2); g.fill(); }
+    if (raid && (raid.phase === 'cross' || raid.phase === 'home')) {                                                 // a wake
+      g.globalAlpha = 0.5 * boat.shown; g.fillStyle = '#eef3f8';
+      g.beginPath(); g.moveTo(-6, 20); g.lineTo(0, 44); g.lineTo(6, 20); g.fill();
+    }
+    g.restore();
+  }
+  g.globalAlpha = 1;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------------------------------------------------------------- controls
+$('stage').addEventListener('input', (e) => { clearInterval(playTimer); playTimer = null; if (!raid) setStage(Number(e.target.value)); else e.target.value = stage; });
+$('raid').addEventListener('click', () => { clearInterval(playTimer); playTimer = null; startRaid(); });
+$('play').addEventListener('click', () => {
+  if (raid) return;
+  clearInterval(playTimer);
+  razed = false; TARGET.el.classList.remove('razed');
+  setStage(0);
+  let n = 0;
+  playTimer = setInterval(() => {
+    n++;
+    if (n <= 5) setStage(n);
+    else { clearInterval(playTimer); playTimer = null; startRaid(); }
+  }, 3200);
+});
+setStage(0);
+</script>
+</body>
+</html>
