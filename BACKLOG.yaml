@@ -1731,7 +1731,7 @@ items:
       Four nodes of the design have no rule behind them yet and stand locked ("Not open yet."):
       Deep seam, Hydroponics, Hands and The machine: feed. Each needs a rule and a sim pass.
     status: open
-    notes: "Mapping chosen for step 1: Beds = dormitory level, Creche = dormitory automation (four levels), Hands has no neutral mapping. The machine: feed belongs with step 3 (the machine)."
+    notes: "Mapping chosen for step 1: Beds = dormitory level, Creche = dormitory automation (four levels), Hands has no neutral mapping. The machine: feed belongs with step 3 (the machine). deep-machine: The machine: feed has its rule (B188); Deep seam, Hydroponics and Hands are still teasers."
 
   - id: B175
     added: 2026-10-02
@@ -1866,4 +1866,85 @@ items:
       The --watcher biological ending moved from 23m45s to 28m19s: The question now opens
       BIOLOGICAL only after night 6 (Cryo V), and the four steps wait on capacity and the body's
       growing. Look at it again when step 4 replaces the four steps with the real biological road.
+    status: open
+
+  - id: B187
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 3)"
+    request: |
+      The machine in the scene: on its own plate on top of the colony (the room above the lid, no
+      walls), from mockup 12: hub, three arms ending in bare picture tubes in steel cages (gem,
+      file-text, scissors), a fixed top tube on a mast showing the opponent's throw, meshing gears,
+      flywheel with spokes, chain, pistons, bolts, an exhaust that puffs smoke, steel as the one
+      accent; cables with the energy pulse inside climbing from the colony into its base. The old
+      floating glyph cycle on the lid goes; the straight shaft up is replaced by the hand-hewn
+      passage to the side (scouts and the ascent use it); the home and reset views include it.
+    status: done
+    resolved_in: deep-machine (version at merge)
+    notes: "src/phase4/machine-model.js (the model, static parts merged per material, nothing allocated per frame), scene.js (the neck from the lid, the machine's plate at y 1.75, the passage, the crust's mouth and ring moved over it)."
+
+  - id: B188
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 3)"
+    request: |
+      The machine is where stars come from: fed spare energy, energy fed a day gives games a day on a
+      concave curve, one game in three is a win, each win a star. The weakest column is no longer the
+      star rule. "The machine: feed" (8 levels) raises the share of the spare energy it may draw.
+      Calibrate so the plain and --watcher runs keep their length.
+    status: done
+    resolved_in: deep-machine (version at merge)
+    notes: "deep.js FEED_SHARE0 0.06, FEED_STEP 1.42 (99 % at level 8), FEED_COST0 3e3, FEED_GROWTH 26, GAMES_K 240, GAMES_EXP 0.9, WIN_ODDS 1/3. Plain 24m44s to 24m47s, --watcher 28m19s to 27m40s. Save schema 8: an old save is given the feed its cryo tier implies (impliedFeed)."
+
+  - id: B189
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 3)"
+    request: |
+      What the player sees: the machine's tempo is the stars a day (starved: arms droop, slow throws,
+      thin smoke, dim tubes; fed: toward a blur, racing cable pulses, sparks and the star flash on a
+      win). Hover: "The machine plays. N energy a day. Each win is a star." with live N. Asleep it
+      keeps running, slower and quieter unless fed, its lamp in the automated rooms' rhythm. No text
+      or cards from it otherwise.
+    status: done
+    resolved_in: deep-machine (version at merge)
+    notes: "src/phase4/machine.js (machineTempo, machineSays, lampLevel), #deep-machine-tip."
+
+  - id: B192
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 3)"
+    request: |
+      The scripted player feeds the machine on the tree (sim-phase4.mjs and policy.js); the acceptance
+      script checks from iv-start that the machine stands on top, its hover text, and that the stars a
+      day change with the feed (debug_deep('feed', n)).
+    status: done
+    resolved_in: deep-machine (version at merge)
+    notes: "B191 was already taken by the CAPITAL session, so step 3 uses B187 to B189 and B192 to B195."
+
+  - id: B193
+    added: 2026-10-02
+    source: "deep-machine (open question)"
+    request: |
+      The Watcher's capacity still reads the spare energy BEFORE the machine draws its share (the
+      machine and the Watcher do not compete). Decide whether they should: then the capacity would fall
+      as the machine is fed, and the --watcher run needs a new pass.
+    status: open
+
+  - id: B194
+    added: 2026-10-02
+    source: "deep-machine (open question)"
+    request: |
+      Under the machine rule the --watcher run is more sensitive to small changes than before: seeds 1
+      to 5 end at 27m40s, 27m49s, 27m55s, 29m09s, 27m15s (the plain run 24m44s to 24m56s), and a 1 %
+      change of FEED_SHARE0 makes seed 2 end at 21m14s, the body whole before the ring. The four
+      biological steps are a race for stars once The question is answered. Look at it with B186 when
+      step 4 replaces them.
+    status: open
+
+  - id: B195
+    added: 2026-10-02
+    source: "deep-machine (for Ola's eye)"
+    request: |
+      Judge on screen: (1) at the home view the machine is small, about a fifth of a small colony's
+      width, under the edge of the crust slab; (2) the crust slab hides the upper half of the passage;
+      (3) while it blurs the machine draws its after-image arms (about 60 of its 170 draw calls, on some
+      2 200 at a hundred chambers); real-GPU frame rate not measured, only SwiftShader.
     status: open

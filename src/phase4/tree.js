@@ -20,8 +20,11 @@
  *   surface  greyed, with a hollow ring: only Surface opens them. Since deep-voice (step 2) a
  *            night of Surface's script opens one (`state.tree.opened`): the ring fills, it has a
  *            price in stars, and once bought (`state.tree.bought`) it is a rule in deep.js.
- *   teaser   a node of the design with no rule behind it yet (Deep seam, Hydroponics, Hands,
- *            The machine: feed). Shown locked; never buyable until a later step gives it a rule.
+ *   feed     The machine: feed (deep-machine, step 3): each level raises the share of the spare
+ *            energy the machine may draw (deep.js feedShare), paid in stars at once, awake or asleep.
+ *            Kept in `state.feed`.
+ *   teaser   a node of the design with no rule behind it yet (Deep seam, Hydroponics, Hands).
+ *            Shown locked; never buyable until a later step gives it a rule.
  *
  * Positions are on the mockup's board (docs/mockups/deep-tree-10.html, tab "early"): 1000 x 730
  * units, square nodes of 36, traces at right angles.
@@ -29,7 +32,7 @@
 
 import {
     CRYO, CRYO_TOP, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
-    tickDay, sleepTrouble, ordersDone, gift,
+    tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedCost, feedShare,
 } from './deep.js';
 import { NIGHTS, nightsSaid } from './surface.js';
 import {
@@ -85,8 +88,7 @@ export const NODES = [
     // POWER
     { id: 'output', branch: 'POWER', x: 610, y: 370, kind: 'level', type: 'generator', name: 'OUTPUT', max: LEVEL_MAX, parent: 'root' },
     { id: 'genauto', branch: 'POWER', x: 720, y: 370, kind: 'auto', type: 'generator', name: 'GENERATOR\nAUTOMATION', max: MAX_AUTO, parent: 'output' },
-    { id: 'feed', branch: 'POWER', x: 830, y: 370, kind: 'teaser', name: 'THE MACHINE:\nFEED', max: 8, parent: 'genauto',
-        does: 'More energy to the machine: more games, more stars.' },
+    { id: 'feed', branch: 'POWER', x: 830, y: 370, kind: 'feed', name: 'THE MACHINE:\nFEED', max: FEED_MAX, parent: 'genauto' },
     { id: 'lossless', branch: 'POWER', x: 720, y: 480, kind: 'surface', name: 'LOSSLESS\nRELAY', max: 1, parent: 'genauto',
         does: 'Automation output ×3.' },
 
@@ -214,6 +216,7 @@ export function levelOf(state, id) {
         case 'cryo': return (state.cryo ?? -1) >= n.tier ? 1 : 0;
         case 'watcher': case 'bio': return watcherHas(state.watcher, n.step) ? 1 : 0;
         case 'surface': return gift(state, id) ? 1 : 0;
+        case 'feed': return Math.max(0, Math.min(FEED_MAX, Math.floor(state.feed || 0)));
         default: return 0;
     }
 }
@@ -259,6 +262,10 @@ export function priceOf(state, id) {
     }
     if (n.kind === 'cryo') return CRYO[n.tier] ? { currency: 'stars', stars: CRYO[n.tier].cost } : null;
     if (n.kind === 'surface') return GIFT_PRICE[id] ? { currency: 'stars', stars: GIFT_PRICE[id] } : null;
+    if (n.kind === 'feed') {
+        const p = feedCost(levelOf(state, id));
+        return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
+    }
     if (n.kind === 'watcher' || n.kind === 'bio') {
         const step = LADDER.find((u) => u.id === n.step);
         if (!step) return null;
@@ -333,6 +340,12 @@ export function canBuy(state, id, ctx = {}) {
     if (n.kind === 'surface') {
         if (GIFT_NEEDS[id] !== undefined && (state.cryo ?? -1) < GIFT_NEEDS[id]) return no('prereq', `Needs ${cryoName(GIFT_NEEDS[id])} first.`);
         const miss = affordText({ price: GIFT_PRICE[id], have: state.stars || 0, perDay });
+        return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
+    }
+
+    // the machine runs itself: its feed is bought awake or asleep, with stars, at once
+    if (n.kind === 'feed') {
+        const miss = affordText({ price: feedCost(levelOf(state, id)), have: state.stars || 0, perDay });
         return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
     }
 
@@ -416,6 +429,13 @@ export function doesOf(state, id) {
     if (!n) return '';
     if (n.kind === 'surface' && !opened(state, id)) return '. . .';
     if (n.does) return n.does;
+    if (n.kind === 'feed') {
+        const lvl = levelOf(state, id);
+        const pct = (k) => `${Math.round(100 * feedShare(k))} %`;
+        return lvl >= FEED_MAX
+            ? `The machine draws ${pct(lvl)} of the spare energy.`
+            : `The machine draws ${pct(lvl)} of the spare energy; the next level, ${pct(lvl + 1)}. More energy, more games, more stars.`;
+    }
     if (n.kind === 'level' || n.kind === 'auto') return buySentence(n.kind, n.type, state);
     if (n.kind === 'cryo') return `A sleep: ${rateWords(CRYO[n.tier].days)} a second.${n.tier === 0 ? ' A cryo hall, dug with its own chamber.' : ''}`;
     const step = LADDER.find((u) => u.id === n.step);
@@ -456,6 +476,12 @@ export function buy(state, id, ctx = {}) {
         state.stars -= price;
         const job = orderBuild(state, n.kind, { type: n.type });
         return { id, kind: n.kind, type: n.type, price, job };
+    }
+    if (n.kind === 'feed') {
+        const price = feedCost(levelOf(state, id));
+        state.stars -= price;
+        state.feed = levelOf(state, id) + 1;
+        return { id, kind: 'feed', level: state.feed, price };
     }
     if (n.kind === 'surface') {
         const price = GIFT_PRICE[id];

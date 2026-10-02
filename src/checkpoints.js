@@ -8,7 +8,7 @@
  */
 
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
-import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays } from './phase4/deep.js';
+import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays, impliedFeed } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
 import { initialWatcher, puzzleGapYears, BODY_GROW_SECONDS } from './phase4/watcher.js';
@@ -125,7 +125,7 @@ export const CHECKPOINTS = [
             chambers: 9, rooms: { mine: 3, farm: 2, generator: 2, dorm: 1, cryo: 1 },
             level: { mine: 1, farm: 1, generator: 1, dorm: 0 },
             auto: { mine: 1, farm: 1, generator: 1, dorm: 0 },
-            cryo: 0,
+            cryo: 0, feed: impliedFeed(0),     // deep-machine: the machine fed as the run feeds it by Cryo I
         });
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
@@ -141,7 +141,7 @@ export const CHECKPOINTS = [
             chambers: 26, rooms: { mine: 8, farm: 6, generator: 6, dorm: 4, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
-            cryo: 4,
+            cryo: 4, feed: impliedFeed(4),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1,
             probes: [{ sentDay: day, dueDay: day + probeDays(1), people: 45 }],
         });
@@ -162,7 +162,7 @@ export const CHECKPOINTS = [
             chambers: 26, rooms: { mine: 8, farm: 6, generator: 6, dorm: 4, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
-            cryo: 3, asleep: true,
+            cryo: 3, asleep: true, feed: impliedFeed(3),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             watcher: {
                 ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: slept, seed: 3, sleeps: 40,
@@ -189,7 +189,7 @@ export const CHECKPOINTS = [
             chambers: 29, rooms: { mine: 8, farm: 6, generator: 6, dorm: 6, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
-            cryo: 3, asleep: true,
+            cryo: 3, asleep: true, feed: impliedFeed(3),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             taken: { mine: 0, farm: 0, generator: 0, dorm: 2 }, takenSlots: [25, 24],
             watcher: {
@@ -218,7 +218,7 @@ export const CHECKPOINTS = [
             chambers: 60, rooms: { mine: 16, farm: 12, generator: 12, dorm: 18, cryo: 1 },
             level: { mine: 12, farm: 12, generator: 12, dorm: 10 },
             auto: { mine: 4, farm: 4, generator: 4, dorm: 4 },
-            cryo: 4, asleep: true,
+            cryo: 4, asleep: true, feed: impliedFeed(4),
             est: { bias: -2, spread: 6 }, estRevealed: true, probesSent: 5, shaftOpen: true,
             taken: { mine: 0, farm: 0, generator: 0, dorm: 4 }, takenSlots: [57, 56, 55, 54],
             watcher: {

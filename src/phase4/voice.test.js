@@ -164,7 +164,7 @@ describe('the save (schema 7)', () => {
         delete old.watcher.surface.night;
         delete old.watcher.surface.toLine;
         const back = deserializeDeep(JSON.stringify({ schemaVersion: 6, state: old, layout: { slots: ['mine', 'farm', 'generator', 'dorm', 'cryo'] } }));
-        expect(SCHEMA_VERSION).toBe(7);
+        expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(7);
         const sf = back.state.watcher.surface;
         expect(sf.night).toBe(3);
         expect(sf.words).toBe(4);

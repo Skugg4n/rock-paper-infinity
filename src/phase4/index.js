@@ -28,7 +28,7 @@ import {
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
     ASCENT_MIN_PEOPLE, ordersDone, mourn,
     orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep,
-    cancelOrder, digSpare, nextCryo, CRYO_TOP,
+    cancelOrder, digSpare, nextCryo, CRYO_TOP, FEED_MAX,
 } from './deep.js';
 import {
     conditions, advisorLines, pushFeed, DESCENT_LINE, alarmLine, alarmGlyph,
@@ -56,6 +56,7 @@ import {
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS } from './surface.js';
 import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, buyableCount, normalizeTree } from './tree.js';
+import { machineTempo, machineSays } from './machine.js';
 import { createTreeView } from './tree-view.js';
 import { playChapterCard } from '../chapterCard.js';
 import { doomsday } from '../phase3/war.js';
@@ -208,6 +209,7 @@ export function init() {
         stabFill: document.getElementById('deep-stab-fill'),
         pulse: document.querySelector('#deep-watcher .deep-watcher-pulse'),
         bodyTip: document.getElementById('deep-body-tip'),
+        machineTip: document.getElementById('deep-machine-tip'),
         stabVal: document.getElementById('deep-stab-val'),
         // v1.51.0: the lamps' one line under the Watcher (the riddle cards are gone)
         card: {
@@ -386,7 +388,9 @@ export function init() {
         ui.oreRate.textContent = perDayText(report.parts.M);
         ui.starsRate.textContent = perDayText(report.stars);
         ui.starsDay.textContent = formatCount(report.stars);
-        scene?.setMachine(report.stars);
+        // deep-machine: the machine's tempo IS the stars a day; its hover says what it plays on
+        scene?.setMachine(machineTempo(report, { asleep: !!state.asleep, feed: state.feed }), !!state.asleep);
+        machineText = machineSays(report.fed);
 
         // THE BARS ARE STORES (B056): each on its own scale, the weakest FLOW marked with the dot.
         // Under each, what comes in and what goes out in a day. Hovering a purchase draws a ghost
@@ -450,8 +454,8 @@ export function init() {
         }
         // each bar says where its number came from, in one sentence (B062)
         for (const c of COLUMN) setTooltip(ui.bars[c], escapeText(ledger(c, state, report)));
-        setTooltip(ui.starsRow, says("Wins. The machine plays with the colony's surplus.")
-            + note(`${formatCount(report.stars)} a day: ten for every unit of the weakest column.`));
+        setTooltip(ui.starsRow, says('Wins. The machine on top plays on the spare energy it is fed.')
+            + note(`${formatCount(report.stars)} a day: one game in three is a win, each win a star.`));
         setTooltip(ui.oreRow, says(`Ore in store. ${perDayText(report.parts.M)} after the generators have burned theirs.`));
 
         // after the last wake-up there is nobody to build anything: the buttons stand as if asleep
@@ -1537,6 +1541,7 @@ export function init() {
     }
     let press = null;
     let pointer = null;              // where the cursor is over the scene, for the crosshair and the ring
+    let machineText = '';            // deep-machine: the machine's hover, written once a colony day
     ui.sceneHost.addEventListener('pointerdown', (e) => {
         press = e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
     }, { signal });
@@ -1577,6 +1582,15 @@ export function init() {
         if (ui.bodyTip) {
             if (ui.bodyTip.hidden === body) ui.bodyTip.hidden = !body;
             if (body) ui.bodyTip.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 12}px)`;
+        }
+        // deep-machine: over the machine on top, what it plays on (nothing while a sector is chosen)
+        const onMachine = !!pointer && !!scene && !choosing && !body && scene.machineAt(pointer.x, pointer.y);
+        if (ui.machineTip) {
+            if (ui.machineTip.hidden === onMachine) ui.machineTip.hidden = !onMachine;
+            if (onMachine) {
+                if (ui.machineTip.textContent !== machineText) ui.machineTip.textContent = machineText;
+                ui.machineTip.style.transform = `translate(${pointer.x + 16}px, ${pointer.y + 14}px)`;
+            }
         }
         stepDrop();
         if (!ui.snapRing) return;
@@ -1748,6 +1762,8 @@ export function init() {
                 typing: ui.voice.classList.contains('is-typing') } : null;
         },
         get treeDrawn() { return treeView ? treeView.drawn : {}; },
+        // deep-machine, for the tests: the machine's hover as it reads now, and whether it shows
+        get machineTip() { return { text: machineText, shown: !!ui.machineTip && !ui.machineTip.hidden }; },
         get treeLog() { return treeView ? treeView.log : []; },
         openTree: () => openTree(),
         closeTree: () => closeTree(),
@@ -1805,6 +1821,10 @@ export function init() {
                 }
             }
             else if (what === 'stars') state.stars += 1e8;
+            else if (what === 'feed') {
+                // deep-machine: the machine's feed level, set by hand (0 to FEED_MAX)
+                state.feed = Math.max(0, Math.min(FEED_MAX, Math.floor(Number(n) || 0)));
+            }
             else if (what === 'day100') { for (let i = 0; i < 100; i++) report = tickDay(state, state.asleep); }
             else if (what === 'sleep') { pressCryo(); return; }
             else if (what === 'alarm') { if (state.asleep) wake({ kind: 'debug' }); return; }

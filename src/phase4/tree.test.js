@@ -164,7 +164,7 @@ describe('Surface\'s nodes and the teasers', () => {
             expect(nodeStatus(s, id)).toMatchObject({ status: 'surface', price: null, reason: 'Not ours to open.' });
             expect(buy(s, id)).toBeNull();
         }
-        for (const id of ['deepseam', 'hydro', 'hands', 'feed']) {
+        for (const id of ['deepseam', 'hydro', 'hands']) {
             expect(nodeStatus(s, id).status).toBe('locked');
             expect(buy(s, id)).toBeNull();
         }
@@ -226,9 +226,9 @@ describe('the badge and the save', () => {
         const s = start();
         expect(buyableCount(s)).toBe(0);
         s.stars = levelCost('mine', 0);
-        expect(buyableCount(s, { need: { kind: 'stall' } })).toBe(4);   // the four levels
+        expect(buyableCount(s, { need: { kind: 'stall' } })).toBe(5);   // the four levels and the machine's feed
         s.stars = automationCost('mine', 0);
-        expect(buyableCount(s, { need: { kind: 'stall' } })).toBe(8);   // and the four automations
+        expect(buyableCount(s, { need: { kind: 'stall' } })).toBe(9);   // and the four automations
     });
 
     test('a schema 5 save keeps every level, automation, cryo tier and Watcher step, read as nodes', () => {
@@ -240,7 +240,7 @@ describe('the badge and the save', () => {
             watcher: { ...initialWatcher(), sleeps: 6, bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling'] },
         };
         const back = deserializeDeep(JSON.stringify({ schemaVersion: 5, state: old, layout: { slots: ['mine', 'farm', 'generator', 'dorm', 'cryo'] } }));
-        expect(SCHEMA_VERSION).toBe(7);
+        expect(SCHEMA_VERSION).toBe(8);
         expect(back.state.tree).toEqual({ opened: [], bought: [], unseen: false });
         const lv = treeLevels(back.state);
         expect([lv.seam, lv.yield, lv.output, lv.beds]).toEqual([7, 6, 8, 5]);

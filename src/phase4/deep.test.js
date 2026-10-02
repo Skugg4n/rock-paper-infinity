@@ -8,6 +8,7 @@ import {
     stalledRooms, STALL_AT, attemptAscent, ASCENT_FAIL_LOSS, ASCENT_TAUGHT_SPREAD,
     ROOMS, cryoLabel, group, launchProbe, resolveDueProbes, darkenChamber, clearChamber,
     clearDarkType, weakestOf, estimateText, scoutParty, MIN_SLEEPERS, SLEEP_FOOD,
+    feedShare, gamesFor, WIN_ODDS,
 } from './deep.js';
 
 /** A rng that hands out exactly the numbers a test wants, then zeroes. */
@@ -47,12 +48,17 @@ describe('the deep', () => {
         expect(r.minerals).toBe(12);                     // v1.48.0: a mine came down with the colony
         expect(r.parts.M).toBeCloseTo(r.minerals - r.fuel, 9);
         expect(r.parts.M).toBeGreaterThan(0);            // so the ore does not burn away from day one
-        expect(r.stars).toBe(10 * r.parts[r.weakest]);   // ten for every unit of the weakest column
+        // deep-machine: the stars are the machine's wins on the spare energy it is fed
+        expect(r.fed).toBeCloseTo(r.parts.E * feedShare(0), 9);
+        expect(r.games).toBeCloseTo(gamesFor(r.fed), 9);
+        expect(r.stars).toBeCloseTo(r.games * WIN_ODDS, 9);
         const noMine = initialDeepState(); noMine.rooms.mine = 0;
         const n = tickDay(noMine);
         expect(n.parts.M).toBeLessThan(0);
-        expect(n.weakest).toBe('M');
-        expect(n.stars).toBe(0);                         // a column in the red pays nothing
+        expect(n.weakest).toBe('M');                     // the smallest column is still read
+        expect(n.stars).toBeGreaterThan(0);              // but it no longer sets the stars
+        const dark = initialDeepState(); dark.rooms.generator = 0;
+        expect(tickDay(dark).stars).toBe(0);             // no spare energy, no games
         expect(r.parts.F).toBeCloseTo(r.food - people0 * 1, 6);
         expect(r.parts.E).toBeCloseTo(r.energyMade - r.energyNeed, 6);
         expect(r.parts.H).toBeGreaterThan(0);            // hands not on duty
@@ -151,10 +157,12 @@ describe('the deep', () => {
         for (let i = 0; i < 20000; i++) stars += tickDay(slow, true).stars;
         expect(sum.days).toBe(20000);
         expect(bulk.day).toBe(slow.day);
-        expect(bulk.stars).toBeCloseTo(slow.stars, 6);
+        // the same to the last few bits: a power curve's rounding is not the same summed n times
+        // as multiplied by n, so the stars are compared relative to their size
+        expect(bulk.stars / slow.stars).toBeCloseTo(1, 12);
         expect(bulk.minerals).toBeCloseTo(slow.minerals, 6);
         expect(bulk.humans).toBeCloseTo(slow.humans, 9);
-        expect(sum.stars).toBeCloseTo(stars, 6);
+        expect(sum.stars / stars).toBeCloseTo(1, 12);
     });
 
     test('the way up needs the ring and nothing else: time is the one thing not for sale', () => {

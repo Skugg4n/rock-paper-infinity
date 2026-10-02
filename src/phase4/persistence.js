@@ -6,12 +6,12 @@
  */
 
 import { normalizeLayout } from './layout.js';
-import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
+import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START, impliedFeed, FEED_MAX } from './deep.js';
 import { initialWatcher, normalizeWatcher } from './watcher.js';
 import { normalizeTree } from './tree.js';
 import { impliedNight, nightGift, NIGHTS, SENTENCE_LINE } from './surface.js';
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -94,6 +94,17 @@ const MIGRATIONS = {
             if (g && !tree.opened.includes(g)) tree.opened.push(g);
         }
         st.tree = tree;
+        p.state = st;
+        return p;
+    },
+    /* deep-machine (step 3 of the tree): the stars are the machine's wins on the spare energy it
+       is fed, and "The machine: feed" sets how much of it the machine may draw. A save from before
+       has bought no feed; it is given the feed the simulated run has bought by its cryo tier
+       (deep.js impliedFeed), so its stars a day do not fall away under the new rule. */
+    7: (p) => {
+        const st = p.state || {};
+        if (!Number.isFinite(st.feed)) st.feed = impliedFeed(st.cryo ?? -1);
+        st.feed = Math.max(0, Math.min(FEED_MAX, Math.floor(st.feed)));
         p.state = st;
         return p;
     },

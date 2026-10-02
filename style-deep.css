@@ -522,23 +522,32 @@ body.in-deep #version-info { z-index: 1400; }
 /* the sun: the one live control while the years roll */
 #deep-wake-btn { background-color: #3c4a5c; color: #f2d98a; }
 
-/* the star machine on the lid: chapter I's three throws, one at a time, and a star on a win */
-.deep-lbl-in .deep-machine {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 9999px;
-    background: #2b3442;
-    color: #dbe4f0;
+/* deep-machine: the star machine stands in 3D on top of the colony (machine-model.js). A win
+   throws one small star up over its top tube: a one-shot, attached to the machine. */
+.deep-machine-star { opacity: 0; line-height: 0; pointer-events: none; }
+.deep-machine-star svg { width: 16px; height: 16px; fill: #d9a25f; }
+.deep-machine-star.is-go { animation: deep-machine-win 760ms ease-out forwards; }
+@keyframes deep-machine-win {
+    0%   { opacity: 0; transform: translateY(6px) scale(0.4); }
+    18%  { opacity: 1; transform: translateY(0) scale(1.25); }
+    60%  { opacity: 1; transform: translateY(-10px) scale(1); }
+    100% { opacity: 0; transform: translateY(-22px) scale(0.85); }
 }
-.deep-machine .rps, .deep-machine .win { position: absolute; display: none; line-height: 0; }
-.deep-machine .rps.is-on { display: block; }
-.deep-lbl-in.is-win .deep-machine { background: #d9a25f; color: #1e2733; }
-.deep-lbl-in.is-win .deep-machine .rps { display: none; }
-.deep-lbl-in.is-win .deep-machine .win { display: block; }
+/* its hover: what it plays on, live, in the colony's tooltip tone */
+#deep-machine-tip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background-color: #2a3442;
+    color: #dbe4f0;
+    font-size: 13px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 60;
+}
+#deep-machine-tip[hidden] { display: none; }
 
 /* the wake-up strip opens with what woke the colony */
 .deep-replay-alarm { color: #d9a25f; }
