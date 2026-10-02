@@ -1,6 +1,6 @@
 import { PHASE1_CONSTANTS } from '../constants.js';
 
-const { BATTERY_UNLOCK_CLICKS, GENERATOR_UNLOCK_BATTERIES } = PHASE1_CONSTANTS;
+const { BATTERY_UNLOCK_EPS, GENERATOR_UNLOCK_BATTERIES } = PHASE1_CONSTANTS;
 
 /**
  * Factory that builds the `upgrades` configuration object for Phase 1.
@@ -16,14 +16,15 @@ const { BATTERY_UNLOCK_CLICKS, GENERATOR_UNLOCK_BATTERIES } = PHASE1_CONSTANTS;
  * → luck (100 games) → boards (150★) → factory (everything maxed) → bank.
  *
  * The energy ladder (v1.53.0, docs/superpowers/specs/2026-10-02-clover-and-energy-ladder-design.md)
- * unlocks by USE, not by stars, so each helper is felt before the next one
- * arrives: recharge clicks → big battery (after 6 clicks) → generator (after
- * 5 big batteries). Good, then a slog, then the upgrade that makes it good again.
+ * unlocks by NEED, not by stars, so each helper is felt before the next one
+ * arrives: recharge clicks → big battery (when the machines eat 22 energy a
+ * second and clicking cannot keep up) → generator (after 5 big batteries).
+ * Good, then a slog, then the upgrade that makes it good again.
  *
  * @param {object} actions - Callbacks for purchase side-effects
  * @param {function} actions.rechargeEnergy  - Adds energy (manualRecharge)
  * @param {function} actions.addReserve      - Adds reserve energy (buyBattery)
- * @param {function} actions.getRechargeClicks  - Recharge clicks so far (battery gate)
+ * @param {function} actions.getEnergyPerSecond - Energy the machines eat per second (battery gate)
  * @param {function} actions.getBatteriesBought - Big batteries bought so far (generator gate)
  * @param {function} actions.incrementSpeed  - Bumps gameSpeed by 1 (speed)
  * @param {function} actions.createGameBoard - Adds a new game board (addGameBoard)
@@ -90,11 +91,14 @@ export function createUpgrades(actions) {
         },
         buyBattery: {
             // The big battery, the step between clicking recharge and the
-            // generator: a pack of 500 energy lasts minutes in the animated
-            // phase, seconds in bulk. Arrives when clicking has become a slog.
+            // generator: a pack of 500 energy. Arrives when clicking has become
+            // a slog: the machines eat 22 energy a second, the tank is empty in
+            // under five. Once bought it stays.
             cost: 20, consumable: true,
             unlocksAt: 0, unlocks: [],
-            unlockCondition: () => actions.getRechargeClicks() >= BATTERY_UNLOCK_CLICKS,
+            unlockCondition: () =>
+                actions.getBatteriesBought() > 0 ||
+                actions.getEnergyPerSecond() >= BATTERY_UNLOCK_EPS,
             element: document.getElementById('buyBattery'),
             purchase: function() {
                 addReserve();

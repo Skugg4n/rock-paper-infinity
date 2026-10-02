@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import {
     getSPS, getEPS, getGamesPerSecond, roundTiming, updateMeasuredRate, pickOutcome,
-    getVisibleDots, formatCount, formatRate, BASE_WIN_RATE, LUCK_WIN_RATE, currentWinRate,
+    getVisibleDots, formatCount, formatRate, BASE_WIN_RATE, LUCK_WIN_RATE, currentWinRate, heroPlacement,
 } from './rates.js';
 
 describe('rates', () => {
@@ -174,6 +174,21 @@ describe('rates', () => {
             expect(pickOutcome(0.6, LUCK_WIN_RATE)).toBe('win');
             expect(pickOutcome(0.75, LUCK_WIN_RATE)).toBe('draw');
             expect(pickOutcome(0.95, LUCK_WIN_RATE)).toBe('lose');
+        });
+    });
+
+    describe('heroPlacement (the first stars under the board)', () => {
+        test('centres the scaled tracker on the controls, a gap above them', () => {
+            const anchor = { left: 400, top: 800, width: 400 };
+            const natural = { left: 20, top: 30, width: 56, height: 8 };
+            // scaled: 168 x 24; centre 600 -> left 516; bottom at 800 - 28 -> top 748
+            expect(heroPlacement(anchor, natural, 3, 28)).toEqual({ x: 496, y: 718 });
+        });
+
+        test('scale 1 and no gap puts it right on top of the controls', () => {
+            const anchor = { left: 100, top: 500, width: 200 };
+            const natural = { left: 0, top: 0, width: 100, height: 10 };
+            expect(heroPlacement(anchor, natural, 1, 0)).toEqual({ x: 150, y: 490 });
         });
     });
 

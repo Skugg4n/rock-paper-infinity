@@ -1461,3 +1461,45 @@ items:
       something neater).
     status: done
     resolved_in: v1.54.0
+
+  - id: B157
+    added: 2026-10-02
+    source: "chat 2026-10-02 (playtest of v1.54.0)"
+    request: |
+      The little clover: wrong position and it should not turn green. Put it
+      to the right of the auto button. It looks greyed out although it can and
+      should be clicked. It is hard to understand what it does, that it has an
+      effect: maybe a symbol beside stars/second, an arrow up or similar.
+    status: done
+    resolved_in: v1.55.0
+
+  - id: B158
+    added: 2026-10-02
+    source: "chat 2026-10-02 (playtest of v1.54.0)"
+    request: |
+      The yellow star that flies fast across the screen on the first wins
+      breaks the system (nothing else is yellow or flies). Instead: the first
+      five win stars lie where the clover is today, bigger. After the first
+      five wins the following empty slots appear, plop plop plop plop plop,
+      and everything glides up to the corner where the stars live now.
+    status: done
+    resolved_in: v1.55.0
+
+  - id: B159
+    added: 2026-10-02
+    source: "chat 2026-10-02 (playtest of v1.54.0)"
+    request: |
+      The big battery still appears too early, before it is needed. It also
+      has to animate in more nicely.
+    status: done
+    resolved_in: v1.55.0
+
+  - id: B160
+    added: 2026-10-02
+    source: "chat 2026-10-02 (playtest of v1.54.0)"
+    request: |
+      The rock, paper and scissors buttons are odd as they are. When auto is
+      started they should get smaller (animated) and greyed out. Now they are
+      big and can be clicked although auto is running.
+    status: done
+    resolved_in: v1.55.0

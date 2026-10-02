@@ -10,7 +10,7 @@ export const MODULE_PATHS = [
   'src/icons.js', 'src/modules.js', 'src/perf.js', 'src/save-export.js', 'src/version.js',
   'src/phase1/cost-visual.js', 'src/phase1/countdown.js', 'src/phase1/index.js',
   'src/phase1/persistence.js', 'src/phase1/rates.js', 'src/phase1/rendering.js',
-  'src/phase1/star-animation.js', 'src/phase1/upgrade-dashes.js', 'src/phase1/upgrades-config.js',
+  'src/phase1/upgrade-dashes.js', 'src/phase1/upgrades-config.js',
   'src/phase2/ants.js', 'src/phase2/buildings-config.js', 'src/phase2/economy.js',
   'src/phase2/index.js', 'src/phase2/islands.js', 'src/phase2/layout.js',
   'src/phase2/persistence.js', 'src/phase2/rendering.js',

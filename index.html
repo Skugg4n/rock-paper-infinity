@@ -53,7 +53,7 @@
                 <div id="energy-container" aria-label="Energy" role="progressbar" class="w-3 h-24 sm:w-4 sm:h-32 bg-slate-300 rounded-full overflow-hidden p-0.5 sm:p-1 flex flex-col justify-end">
                     <div id="energy-fill" class="w-full bg-slate-500 rounded-full transition-all duration-300"></div>
                 </div>
-                <div id="reserve-energy-container" aria-label="Reserve energy" role="progressbar" class="w-4 h-28 sm:w-6 sm:h-40 bg-slate-300 rounded-full overflow-hidden p-0.5 sm:p-1 flex flex-col justify-end">
+                <div id="reserve-energy-container" aria-label="Reserve energy" role="progressbar" class="reserve-collapsed w-4 h-28 sm:w-6 sm:h-40 bg-slate-300 rounded-full overflow-hidden p-0.5 sm:p-1 flex flex-col justify-end">
                     <div id="reserve-energy-fill" class="w-full bg-slate-400 rounded-full transition-all duration-300"></div>
                 </div>
             </div>
@@ -64,6 +64,8 @@
                 </button>
             </div>
             <div id="sps-container" class="hidden flex items-center gap-1 sm:gap-2 text-slate-500">
+                <!-- Lit while the little clover's luck runs: luck is what is pushing the rate up. -->
+                <span id="luck-indicator" aria-hidden="true"><i data-lucide="clover" class="w-3 h-3 sm:w-4 sm:h-4"></i><i data-lucide="arrow-up" class="w-3 h-3 sm:w-4 sm:h-4"></i></span>
                 <span id="sps-value" class="font-bold text-sm sm:text-lg font-mono">0.0</span>
                 <div class="flex items-center">
                     <i data-lucide="star" class="w-3 h-3 sm:w-4 sm:h-4"></i>
@@ -99,20 +101,17 @@
             </main>
 
             <footer id="player-zone" class="h-40 flex-shrink-0 flex flex-col justify-end items-center gap-4 pb-4">
-                <!-- The little clover: a toy by the board. A click is three seconds of luck. -->
-                <button id="clover" aria-label="Lucky clover" class="invisible btn clover-btn w-9 h-9 sm:w-10 sm:h-10 rounded-full flex justify-center items-center">
-                    <svg class="clover-ring" viewBox="0 0 40 40" aria-hidden="true">
-                        <circle class="clover-track" cx="20" cy="20" r="18"></circle>
-                        <circle class="clover-time" cx="20" cy="20" r="18"></circle>
-                    </svg>
-                    <i data-lucide="clover" class="relative w-5 h-5"></i>
-                </button>
                 <div id="player-controls-container" class="flex justify-center items-center gap-1.5 sm:gap-2 w-full max-w-sm">
                     <button data-choice="rock" aria-label="Rock" class="btn choice-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="gem"></i></button>
                     <button data-choice="paper" aria-label="Paper" class="btn choice-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="file-text"></i></button>
                     <button data-choice="scissors" aria-label="Scissors" class="btn choice-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="scissors"></i></button>
                     <button id="manualRecharge" aria-label="Manual recharge" data-upgrade="manualRecharge" class="invisible btn upgrade-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="battery-charging"></i></button>
                     <button id="autoPlay" aria-label="Auto-play" data-upgrade="autoPlay" class="invisible btn upgrade-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="repeat-2"></i></button>
+                    <!-- The little clover: something to fiddle with while the machine plays. A click is three seconds of luck. -->
+                    <button id="clover" aria-label="Lucky clover" class="invisible btn clover-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center">
+                        <svg class="clover-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="clover-time" cx="50" cy="50" r="47"></circle></svg>
+                        <i data-lucide="clover"></i>
+                    </button>
                 </div>
             </footer>
         </div>
@@ -715,7 +714,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.54.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.55.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

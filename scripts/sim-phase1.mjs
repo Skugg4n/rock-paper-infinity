@@ -4,7 +4,9 @@
 // Two players. "lazy" never touches the little clover; "fiddler" keeps it lit
 // 80 % of the time until the big clover is bought. Both save up for luck, for
 // the big battery and for the generator when those are open, and otherwise buy
-// whichever of speed and boards gives most games per star.
+// whichever of speed and boards gives most games per star. A hand clicks the
+// recharge button at most once a second; when that is not enough the machines
+// stand still part of the time, which is the slog the big battery ends.
 //
 // The v1.19.2 "old" mode lived here until v1.52.0; see git history.
 const sig2 = (raw) => { const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(raw)) - 1)); return Math.round(raw / mag) * mag; };
@@ -14,8 +16,8 @@ const P = {
   genMax: 50, genCost: L => sig2(25 * Math.pow(1.07, L)), genRate: 10, genUnlockBatteries: 5,
   boardMax: 8, boardCost: L => sig2(250 * Math.pow(1.9, L)), boardUnlock: 150,
   luckCost: 50, luckUnlockGames: 100,
-  battCost: 20, battAmount: 500, battUnlockClicks: 6, reserveMax: 1500,
-  rechargeAmount: 25, rechargeUnlock: 15,
+  battCost: 20, battAmount: 500, battUnlockEps: 22, reserveMax: 1500,
+  rechargeAmount: 25, rechargeUnlock: 15, clicksPerSecond: 1,
   factoryCost: 10000, bankGate: 250000, foamMax: 20000, foamBonusSec: 30,
   cloverUptime: 0.8,
 };
@@ -32,7 +34,7 @@ function run(clover) {
     foam: 0, clicks: 0, batteries: 0,
   };
   const milestones = {}; const mark = (k) => { if (!(k in milestones)) milestones[k] = st.t; };
-  const battTimes = []; const log = [];
+  const battTimes = []; const log = []; let stalled = 0; let stalledBeforeBattery = 0;
   const gameSpeed = () => 1 + st.speed;
   const winRate = () => (st.luck ? 2 / 3 : st.auto ? 1 / 3 + clover / 3 : 1 / 3);
   const mult = () => (st.factory ? 10 : 1);
@@ -43,6 +45,7 @@ function run(clover) {
   const buy = (cost) => { if (st.bal >= cost) { st.bal -= cost; return true; } return false; };
 
   function shop() {
+    let clicksLeft = P.clicksPerSecond;
     for (let guard = 0; guard < 200; guard++) {
       if (!st.auto) { if (st.earned >= 2 && buy(5)) { st.auto = true; mark('autoPlay'); continue; } return; }
       const luckOpen = !st.luck && st.games >= P.luckUnlockGames;
@@ -54,13 +57,13 @@ function run(clover) {
       const genNeeded = genOpen && (st.gen * P.genRate < cons || restMaxed);
       if (genNeeded && buy(P.genCost(st.gen))) { st.gen++; mark('generator'); continue; }
       let saving = genNeeded || luckOpen;
-      const battOpen = st.clicks >= P.battUnlockClicks && st.gen * P.genRate < cons;
+      const battOpen = (st.batteries > 0 || cons >= P.battUnlockEps) && st.gen * P.genRate < cons;
       if (battOpen && st.reserve < cons * 3) {
         if (buy(P.battCost)) { st.reserve = Math.min(P.reserveMax, st.reserve + P.battAmount); st.batteries++; battTimes.push(st.t); mark('bigBattery'); continue; }
         saving = true;
       }
-      if (starving && st.earned >= P.rechargeUnlock && st.bal >= 1 && st.energy < 100) {
-        st.bal -= 1; st.energy = Math.min(100, st.energy + P.rechargeAmount); st.clicks++; mark('firstRecharge'); continue;
+      if (starving && clicksLeft > 0 && st.earned >= P.rechargeUnlock && st.bal >= 1 && st.energy < 100) {
+        clicksLeft--; st.bal -= 1; st.energy = Math.min(100, st.energy + P.rechargeAmount); st.clicks++; mark('firstRecharge'); continue;
       }
       if (saving) return;
       if (st.factory) { if (!st.bank && st.earned >= P.bankGate) { st.bank = true; mark('bank'); } return; }
@@ -90,6 +93,7 @@ function run(clover) {
   while (st.t < 3 * 3600 && !st.bank) {
     const g = gamesPerSec();
     const manual = st.auto && st.energy + st.reserve <= 0 && !st.factory;
+    if (manual) { stalled++; if (!st.batteries) stalledBeforeBattery++; }
     const cons = st.factory || manual || !st.auto ? 0 : g;
     const played = cons === 0 ? g : Math.min(g, st.energy + st.reserve);
     if (cons > 0) { if (st.energy >= played) st.energy -= played; else { st.reserve = Math.max(0, st.reserve - (played - st.energy)); st.energy = 0; } }
@@ -102,13 +106,13 @@ function run(clover) {
     st.t++;
     if (st.t % 60 === 0) log.push({ t: st.t, realSps: +gain.toFixed(1), speed: gameSpeed(), boards: st.boards, gen: st.gen, energy: Math.round(st.energy + st.reserve), bal: Math.round(st.bal), earned: Math.round(st.earned), clicks: st.clicks, batteries: st.batteries });
   }
-  return { st, milestones, log, battGaps: battTimes.slice(1).map((t, i) => t - battTimes[i]) };
+  return { st, milestones, log, stalled, stalledBeforeBattery, battGaps: battTimes.slice(1).map((t, i) => t - battTimes[i]) };
 }
 
 const arg = process.argv.slice(2).find(a => a === 'lazy' || a === 'fiddler');
 for (const player of arg ? [arg] : ['lazy', 'fiddler']) {
-  const { st, milestones, log, battGaps } = run(player === 'fiddler' ? P.cloverUptime : 0);
-  console.log(`\nPLAYER=${player}  finished at ${fmt(st.t)}  recharge clicks=${st.clicks}  big batteries=${st.batteries}  seconds between big batteries=${battGaps.join(', ')}`);
+  const { st, milestones, log, battGaps, stalled, stalledBeforeBattery } = run(player === 'fiddler' ? P.cloverUptime : 0);
+  console.log(`\nPLAYER=${player}  finished at ${fmt(st.t)}  recharge clicks=${st.clicks}  big batteries=${st.batteries}  seconds between big batteries=${battGaps.join(', ')}  machines stood still ${stalled} s (${stalledBeforeBattery} s before the big battery)`);
   console.log('milestones:', Object.fromEntries(Object.entries(milestones).map(([k, v]) => [k, fmt(v)])));
   console.table(log.slice(0, 20));
 }

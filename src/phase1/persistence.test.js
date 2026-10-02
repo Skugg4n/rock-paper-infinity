@@ -274,39 +274,31 @@ describe('helper counters (energy ladder)', () => {
         autoPlayWantsToRun: false, gameBoardsCount: 1,
     };
 
-    test('counters round-trip through the save', () => {
-        const json = serializeGameState({ ...base, rechargeClicks: 7, batteriesBought: 3 }, {});
+    test('the counter round-trips through the save', () => {
+        const json = serializeGameState({ ...base, batteriesBought: 3 }, {});
         const data = deserializeGameState(json);
-        expect(data.rechargeClicks).toBe(7);
         expect(data.batteriesBought).toBe(3);
-        expect(helperCounters(data)).toEqual({ rechargeClicks: 7, batteriesBought: 3 });
+        expect(helperCounters(data)).toEqual({ batteriesBought: 3 });
     });
 
-    test('missing counters serialize as zero', () => {
+    test('a missing counter serializes as zero', () => {
         const data = JSON.parse(serializeGameState(base, {}));
-        expect(data.rechargeClicks).toBe(0);
         expect(data.batteriesBought).toBe(0);
     });
 
-    test('an old save below the old battery unlock gets nothing', () => {
-        expect(helperCounters({ totalStarsEarned: 39 })).toEqual({ rechargeClicks: 0, batteriesBought: 0 });
+    test('an old save below the old generator unlock gets nothing', () => {
+        expect(helperCounters({ totalStarsEarned: 99 })).toEqual({ batteriesBought: 0 });
     });
 
-    test('an old save past the old battery unlock keeps the battery', () => {
-        expect(helperCounters({ totalStarsEarned: 40 })).toEqual({ rechargeClicks: 6, batteriesBought: 0 });
+    test('an old save past the old generator unlock keeps battery and generator', () => {
+        expect(helperCounters({ totalStarsEarned: 100 })).toEqual({ batteriesBought: 5 });
     });
 
-    test('an old save past the old generator unlock keeps both', () => {
-        expect(helperCounters({ totalStarsEarned: 100 })).toEqual({ rechargeClicks: 6, batteriesBought: 5 });
+    test('a saved counter wins over the derived one', () => {
+        expect(helperCounters({ totalStarsEarned: 5000, batteriesBought: 1 })).toEqual({ batteriesBought: 1 });
     });
 
-    test('saved counters win over derived ones', () => {
-        expect(helperCounters({ totalStarsEarned: 5000, rechargeClicks: 2, batteriesBought: 1 }))
-            .toEqual({ rechargeClicks: 2, batteriesBought: 1 });
-    });
-
-    test('corrupt counters fall back to derived ones', () => {
-        expect(helperCounters({ totalStarsEarned: 100, rechargeClicks: NaN, batteriesBought: 'x' }))
-            .toEqual({ rechargeClicks: 6, batteriesBought: 5 });
+    test('a corrupt counter falls back to the derived one', () => {
+        expect(helperCounters({ totalStarsEarned: 100, batteriesBought: 'x' })).toEqual({ batteriesBought: 5 });
     });
 });

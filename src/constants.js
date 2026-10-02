@@ -14,9 +14,15 @@ export const PHASE1_CONSTANTS = {
     BANK_GATE_COLLAPSES: 2,
     // The little clover: one click is this much luck (refills, never stacks).
     CLOVER_MS: 3000,
-    // The energy ladder: each helper is unlocked by use of the previous one.
-    BATTERY_UNLOCK_CLICKS: 6,
+    // The energy ladder: a helper arrives when the previous one has become a
+    // slog. The big battery when the machines eat this much energy a second
+    // (the recharge button cannot keep up), the generator after this many
+    // big batteries.
+    BATTERY_UNLOCK_EPS: 22,
     GENERATOR_UNLOCK_BATTERIES: 5,
+    // The first stars lie big under the board; after this many the tracker
+    // gets its next slots and glides to its corner.
+    HERO_STARS: 5,
     SAVE_KEY: 'rpi-save',
 };
 

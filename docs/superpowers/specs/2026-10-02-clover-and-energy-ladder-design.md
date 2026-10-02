@@ -99,3 +99,32 @@ two boards), then the generator has outgrown it.
 - Unlock tests: battery hidden at 5 clicks and shown at 6; generator hidden at 4
   batteries and shown at 5; generator shown when its level is above 0.
 - Browser check: the big battery's bar is absent before the first purchase.
+
+## Amended the same day (v1.55.0, after Ola's playtest of v1.54.0)
+
+- **The clover** moved into the player's row, right of auto, and is no longer green:
+  pressed in with a dark draining ring while the luck runs, and a small clover with
+  an arrow up beside the stars-per-second. Idle it looks like the other buttons in
+  the row (the grey version read as disabled).
+- **The big battery** arrives when the machines eat 22 energy a second, not after
+  six recharge clicks (a player who fills the tank makes six clicks at once, so it
+  came before it was needed). Once bought it stays. Its bar grows in.
+- **The first five stars** lie big under the board; after the fifth the next slots
+  plop in and the row glides to its corner. The flying yellow star is removed.
+- **The hand buttons** shrink and go grey while the machine plays.
+
+| | Lazy | Fiddler |
+|---|---|---|
+| First recharge click | 1:57 | 1:35 |
+| Big clover | 3:27 | 2:19 |
+| Bulk (speed 10) | 4:56 | 3:22 |
+| Big battery (22 energy/s) | 5:39 | 4:05 |
+| Seconds between big batteries | 15, 13, 11, 7 | 16, 13, 10, 7 |
+| Generator | 6:25 | 4:51 |
+| Bank | 12:20 | 10:46 |
+| Recharge clicks | 34 | 31 |
+
+Open: at 22 energy a second a pack of 500 lasts about a quarter of a minute, so the
+big battery has no long good stretch of its own (46 seconds from first pack to
+generator). A pack that fills the whole big bar (1 500) gives 38, 18, 14 and 9
+seconds and 80 seconds in all. Ola decides.

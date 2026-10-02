@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.55.0 - 2026-10-02 (chapter I, after Ola's playtest of v1.54.0)
+
+### The first five stars, the clover in the row, the battery when it is needed
+
+- **The first five stars lie big under the board.** Five large empty slots sit between the board and the player's buttons from the start. A star that is won lands in its slot. After the fifth the next five slots plop in, one after another, and the whole row glides up to its corner and shrinks to the size it has always had. The yellow star that flew across the screen is gone (`star-animation.js` removed): nothing else in the game is yellow or flies.
+- **The little clover sits in the player's row, right of auto**, and looks like the other buttons there (it looked greyed out although it should be clicked). No green: while its luck runs the button sits pressed in, like auto when it is on, and a dark ring around it drains. Beside the stars-per-second a small clover with an arrow up shows for as long as the luck lasts, so it is plain what the click does.
+- **The hand buttons step back while the machine plays.** Rock, paper and scissors shrink (animated) and go grey and cannot be clicked while auto runs; they come back when it stops (no energy, or auto switched off).
+- **The big battery arrives when it is needed**: when the machines eat 22 energy a second (was: after six recharge clicks, which a player filling the tank reaches at once). Once bought it stays. The generator still arrives after five big batteries.
+- **The big battery's bar grows in** beside the small one when the first big battery is bought, instead of just being there.
+- **Simulation** (`node scripts/sim-phase1.mjs`, a hand now clicks recharge at most once a second). Lazy: big battery 5:39, generator 6:25, bank 12:20, 34 recharge clicks. Fiddler: 4:05, 4:51, 10:46. The big batteries last 15, 13, 11 and 7 seconds.
+
 ## v1.54.0 - 2026-10-02 (chapter III → IV)
 
 ### The gate before THE DEEP

@@ -114,13 +114,14 @@ Every helper has three beats *(Ola, 2026-10-02)*: **it is good** (the new thing 
 the problem), **it becomes a slog** (the line outgrows it and the player works to keep
 up), **an upgrade makes it good again**. This runs through the whole game. The next
 helper must never arrive before the slog of the previous one has been felt, so a
-helper is unlocked by *use of the previous one*, not by a star count that a fast
-player reaches too early.
+helper is unlocked by *need* (the previous one can no longer keep up) or by *use of
+the previous one*, not by a star count that a fast player reaches too early.
 
 - **Energy in chapter I.** First you click the recharge button on the ordinary battery.
-  When that has become a slog (six clicks), the big battery arrives: a pack that lasts
-  minutes. The line keeps climbing, the pack is eaten in seconds, and after the fifth
-  pack the generator arrives as the next relief. Each helper is the right answer for a
+  When that has become a slog (the machines eat about 22 energy a second, the tank is
+  empty in under five), the big battery arrives: a pack of five tanks. The line keeps
+  climbing, the pack is eaten in seconds, and after the fifth pack the generator
+  arrives as the next relief. Each helper is the right answer for a
   while and then too small. That is the dynamic, not a bug.
 - **Luck in chapter I.** The little clover is something to fiddle with while the
   machine plays: a click is three seconds of luck. The big clover is the upgrade that

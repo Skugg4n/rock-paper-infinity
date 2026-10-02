@@ -113,6 +113,24 @@ export function pickOutcome(rand, winRate) {
 }
 
 /**
+ * Where the win tracker goes while the first stars lie big under the board:
+ * centred on the player's controls, `gap` px above them, scaled from its top
+ * left corner. Returns the translation from the tracker's own place.
+ *
+ * @param {{ left: number, top: number, width: number }} anchor - the controls' rect
+ * @param {{ left: number, top: number, width: number, height: number }} natural - the tracker's untransformed rect
+ * @param {number} scale
+ * @param {number} gap
+ * @returns {{ x: number, y: number }}
+ */
+export function heroPlacement(anchor, natural, scale, gap) {
+    return {
+        x: Math.round(anchor.left + anchor.width / 2 - (natural.width * scale) / 2 - natural.left),
+        y: Math.round(anchor.top - gap - natural.height * scale - natural.top),
+    };
+}
+
+/**
  * Returns the number of win-tracker dots to display based on total stars earned.
  * Progressive disclosure: starts at 5 dots, unlocks more as the player earns stars.
  *

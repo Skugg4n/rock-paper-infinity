@@ -4,12 +4,11 @@ import { playChapterCard } from "../chapterCard.js";
 import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import {
     getSPS, getEPS, getGamesPerSecond, roundTiming, updateMeasuredRate, pickOutcome,
-    currentWinRate,
+    currentWinRate, heroPlacement,
 } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber, helperCounters } from "./persistence.js";
-import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
 import { setupDashes, updateDashes, updateProgressDashes, PROGRESS_DASHES } from "./upgrade-dashes.js";
 import { mountSaveButtons } from "../save-export.js";
@@ -37,6 +36,8 @@ import { timed, counter } from "../perf.js";
         const reserveEnergyFillEl = document.getElementById('reserve-energy-fill');
         const reserveEnergyContainer = document.getElementById('reserve-energy-container');
         const cloverBtn = document.getElementById('clover');
+        const luckIndicator = document.getElementById('luck-indicator');
+        const playerControls = document.getElementById('player-controls-container');
         const quantumFoamContainer = document.getElementById('quantum-foam-container');
         const collapseFoamBtn = document.getElementById('collapse-foam-btn');
         const collapseFoamFill = document.getElementById('collapse-foam-fill');
@@ -68,11 +69,20 @@ const resetBtn = document.getElementById('reset-btn');
         let totalWins = 0;
         let energy = PHASE1_CONSTANTS.MAX_ENERGY;
         let reserveEnergy = 0;
-        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_COLLAPSES, CLOVER_MS, SAVE_KEY } = PHASE1_CONSTANTS;
-        // The energy ladder unlocks by use: recharge clicks open the big
-        // battery, big batteries bought open the generator.
-        let rechargeClicks = 0;
+        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_COLLAPSES, CLOVER_MS, HERO_STARS, SAVE_KEY } = PHASE1_CONSTANTS;
+        // The energy ladder: big batteries bought open the generator (the big
+        // battery itself opens on consumption, see upgrades-config.js).
         let batteriesBought = 0;
+        // The first stars lie big under the board ('hero'). After HERO_STARS
+        // the next slots plop in and the tracker glides to its corner
+        // ('leaving'), where it stays ('done').
+        const HERO_SCALE = 3;
+        const HERO_GAP = 28;            // px between the big stars and the controls
+        const PLOPP_STAGGER_MS = 130;
+        const HERO_GLIDE_MS = 900;
+        let heroState = 'hero';
+        let heroExitAt = 0;
+        let heroTimer = null;
         // The little clover: luck until this timestamp (performance.now clock).
         // Not saved; a reload starts with the clover idle.
         let cloverUntil = 0;
@@ -110,9 +120,9 @@ const resetBtn = document.getElementById('reset-btn');
         }
 
         const upgrades = createUpgrades({
-            rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); rechargeClicks++; },
+            rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); },
             addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 500); batteriesBought++; },
-            getRechargeClicks: () => rechargeClicks,
+            getEnergyPerSecond: () => getEPS(gameSpeed, isMetaBoardActive, gameBoards.length),
             getBatteriesBought: () => batteriesBought,
             incrementSpeed:    () => { gameSpeed += 1; },
             createGameBoard:   () => createGameBoard(),
@@ -276,6 +286,8 @@ function scheduleUIUpdate() {
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
             cloverBtn.addEventListener('pointerup', (e) => { e.preventDefault(); clickClover(); }, { signal });
+            window.addEventListener('resize', () => { if (heroState === 'hero') placeHero(); }, { signal });
+            heroState = totalStarsEarned < HERO_STARS ? 'hero' : 'done';
             resetBtn.addEventListener('click', resetGame, { signal });
 
             updateAnimationSpeed();
@@ -298,8 +310,13 @@ function scheduleUIUpdate() {
             cloverBtn.classList.remove('lucky');
             void cloverBtn.offsetWidth;
             cloverBtn.classList.add('lucky');
+            // Beside the stars-per-second: luck is what is pushing it up.
+            luckIndicator.classList.add('is-on');
             clearTimeout(cloverTimer);
-            cloverTimer = setTimeout(() => cloverBtn.classList.remove('lucky'), CLOVER_MS);
+            cloverTimer = setTimeout(() => {
+                cloverBtn.classList.remove('lucky');
+                luckIndicator.classList.remove('is-on');
+            }, CLOVER_MS);
         }
 
         function stopClover() {
@@ -307,6 +324,50 @@ function scheduleUIUpdate() {
             cloverTimer = null;
             cloverUntil = 0;
             cloverBtn.classList.remove('lucky');
+            luckIndicator.classList.remove('is-on');
+        }
+
+        /**
+         * Puts the win tracker, enlarged, just above the player's controls.
+         * The tracker stays in its corner in the DOM; a transform carries it
+         * here, so leaving is just letting the transform go.
+         */
+        function placeHero({ animate = false } = {}) {
+            const anchor = playerControls.getBoundingClientRect();
+            if (!anchor.width) return;
+            const current = winTracker.style.transform;
+            winTracker.style.transition = 'none';
+            winTracker.style.transform = 'none';
+            const natural = winTracker.getBoundingClientRect();
+            const { x, y } = heroPlacement(anchor, natural, HERO_SCALE, HERO_GAP);
+            winTracker.style.transformOrigin = 'top left';
+            if (animate) {
+                winTracker.style.transform = current;
+                void winTracker.offsetWidth;
+                winTracker.style.transition = 'transform 500ms ease';
+            }
+            winTracker.style.transform = `translate(${x}px, ${y}px) scale(${HERO_SCALE})`;
+        }
+
+        /** The fifth star: the next slots plop in, then everything glides to the corner. */
+        function startHeroExit() {
+            heroState = 'leaving';
+            heroExitAt = performance.now();
+            clearTimeout(heroTimer);
+            heroTimer = setTimeout(() => {
+                winTracker.style.transition = `transform ${HERO_GLIDE_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`;
+                winTracker.style.transform = 'translate(0px, 0px) scale(1)';
+                heroTimer = setTimeout(endHero, HERO_GLIDE_MS + 50);
+            }, HERO_STARS * PLOPP_STAGGER_MS + 500);
+        }
+
+        function endHero() {
+            clearTimeout(heroTimer);
+            heroTimer = null;
+            heroState = 'done';
+            winTracker.style.transition = '';
+            winTracker.style.transform = '';
+            winTracker.style.transformOrigin = '';
         }
 
         function passiveTick() {
@@ -357,9 +418,21 @@ function scheduleUIUpdate() {
 
         function updateWinVisuals() {
             if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned) return;
+            const gained = lastStarBalance >= 0 && starBalance > lastStarBalance;
+            const leavingNow = heroState === 'hero' && totalStarsEarned >= HERO_STARS;
+            if (leavingNow) startHeroExit();
             lastStarBalance = starBalance;
             lastTotalStarsEarned = totalStarsEarned;
-            renderWinTracker({ winTracker }, starBalance, totalStarsEarned);
+            renderWinTracker({ winTracker }, starBalance, totalStarsEarned, {
+                hero: heroState === 'hero',
+                // The star just won lands in its slot (instead of flying there).
+                landIndex: heroState !== 'done' && gained ? (starBalance % 100) - 1 : -1,
+                plopp: heroState === 'leaving'
+                    ? { from: HERO_STARS, staggerMs: PLOPP_STAGGER_MS, elapsedMs: performance.now() - heroExitAt }
+                    : null,
+            });
+            if (heroState === 'hero') placeHero();
+            else if (leavingNow) placeHero({ animate: true });   // make room for the new slots
         }
         
         function updateRateDisplays(sps, eps, egps, autoActive, energyPaused) {
@@ -419,7 +492,8 @@ const uiState = {
     foamReady: false,
     showReserve: null,
     cloverVisible: null,
-    cloverEvergreen: null
+    cloverEvergreen: null,
+    handsRest: null
 };
 
         function updateUI() {
@@ -441,6 +515,8 @@ const uiState = {
             const showReserve = batteriesBought > 0 || reserveEnergy > 0;
             const cloverVisible = upgrades.autoPlay.purchased && !isMetaBoardActive;
             const cloverEvergreen = upgrades.luck.purchased;
+            // While the machine plays, the hand buttons step back.
+            const handsRest = !!autoPlayInterval && !isMetaBoardActive;
 
             const wins = Math.floor(totalWins);
             const gamesChanged = games !== uiState.gamesPlayed || wins !== uiState.totalWins;
@@ -453,6 +529,7 @@ const uiState = {
             const foamChanged = isMetaBoardActive && (foamPercent !== uiState.foamPercent || foamReady !== uiState.foamReady);
             const showReserveChanged = showReserve !== uiState.showReserve;
             const cloverChanged = cloverVisible !== uiState.cloverVisible || cloverEvergreen !== uiState.cloverEvergreen;
+            const handsChanged = handsRest !== uiState.handsRest;
             const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive || foamChanged;
 
             const tasks = [];
@@ -465,16 +542,13 @@ const uiState = {
             }
             if (energyChanged) tasks.push(() => renderEnergyBar(energyFillEl, energyPercent));
             if (reserveChanged) tasks.push(() => renderReserveBar(reserveEnergyFillEl, reservePercent));
-            if (showReserveChanged) tasks.push(() => renderReserveVisibility(reserveEnergyContainer, showReserve));
-            if (cloverChanged) tasks.push(() => {
-                // Materialize like an upgrade when it first appears in play (not on load).
-                if (cloverVisible && uiState.cloverVisible === false && firstUpgradeUpdateDone) {
-                    cloverBtn.classList.add('materialize');
-                    cloverBtn.addEventListener('animationend', () => cloverBtn.classList.remove('materialize'),
-                        { once: true, signal: listenerController.signal });
-                }
-                renderClover(cloverBtn, { visible: cloverVisible, evergreen: cloverEvergreen });
-            });
+            if (showReserveChanged) {
+                // Grows in when the first big battery is bought; just there on load.
+                const animate = uiState.showReserve !== null;
+                tasks.push(() => renderReserveVisibility(reserveEnergyContainer, showReserve, animate));
+            }
+            if (cloverChanged) tasks.push(() => renderClover(cloverBtn, { visible: cloverVisible, evergreen: cloverEvergreen }));
+            if (handsChanged) tasks.push(() => playerControls.classList.toggle('hands-rest', handsRest));
             if (emptyChanged) tasks.push(() => renderEnergyEmpty(energyFillEl, energyEmpty));
             if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
             if (balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || foamChanged) tasks.push(() => updateProgressCircles(starBalance));
@@ -492,6 +566,7 @@ const uiState = {
             if (reserveChanged) uiState.reservePercent = reservePercent;
             if (showReserveChanged) uiState.showReserve = showReserve;
             if (cloverChanged) { uiState.cloverVisible = cloverVisible; uiState.cloverEvergreen = cloverEvergreen; }
+            if (handsChanged) uiState.handsRest = handsRest;
             if (emptyChanged) uiState.energyEmpty = energyEmpty;
             if (rateChanged) { uiState.sps = sps; uiState.eps = eps; uiState.egps = egps; uiState.autoPlayActive = autoActive; uiState.energyPaused = energyPaused; }
             if (balanceChanged) uiState.starBalance = starBalance;
@@ -520,7 +595,7 @@ const uiState = {
                 energy, reserveEnergy, gameSpeed, starMultiplier, quantumFoam, foamCollapses,
                 isMetaBoardActive, autoPlayWantsToRun,
                 gameBoardsCount: gameBoards.length,
-                rechargeClicks, batteriesBought
+                batteriesBought
             };
             saveToStorage(SAVE_KEY, serializeGameState(state, upgrades));
         }
@@ -540,7 +615,7 @@ const uiState = {
                 foamCollapses = sanitizeNumber(data.foamCollapses) ?? foamCollapses;
                 isMetaBoardActive = data.isMetaBoardActive ?? isMetaBoardActive;
                 autoPlayWantsToRun = data.autoPlayWantsToRun ?? autoPlayWantsToRun;
-                ({ rechargeClicks, batteriesBought } = helperCounters(data));
+                ({ batteriesBought } = helperCounters(data));
                 measuredLastTotal = totalStarsEarned;
                 if (data.upgrades) {
                     for (const key in data.upgrades) {
@@ -587,10 +662,13 @@ const uiState = {
             totalWins = 0;
             energy = MAX_ENERGY;
             reserveEnergy = 0;
-            rechargeClicks = 0;
             batteriesBought = 0;
             stopClover();
-            cloverBtn.classList.remove('evergreen', 'materialize');
+            cloverBtn.classList.remove('evergreen');
+            endHero();
+            heroState = 'hero';
+            lastStarBalance = -1;
+            lastTotalStarsEarned = -1;
             starMultiplier = 1;
             quantumFoam = 0;
             foamCollapses = 0;
@@ -607,7 +685,7 @@ const uiState = {
                 sps: -1, eps: -1, egps: -1, autoPlayActive: false,
                 energyPaused: false, starBalance: -1, totalStarsEarned: -1,
                 isMetaBoardActive: false, foamPercent: -1, foamReady: false,
-                showReserve: null, cloverVisible: null, cloverEvergreen: null,
+                showReserve: null, cloverVisible: null, cloverEvergreen: null, handsRest: null,
             });
             quantumFoamContainer.classList.add('hidden');
             quantumFoamContainer.classList.remove('is-locked');
@@ -699,15 +777,6 @@ const uiState = {
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;
                 totalStarsEarned += starGain;
-                // Flying-star animation: only for the first 10 stars earned
-                if (totalStarsEarned <= 10) {
-                    try {
-                        // Source: the player result area on this board; target: win-tracker
-                        fireStarAnimation(board.playerEl, winTracker);
-                    } catch (e) {
-                        console.error('fireStarAnimation failed:', e);
-                    }
-                }
             }
 
             scheduleUIUpdate();
@@ -908,6 +977,8 @@ const uiState = {
         export function teardown() {
             stopAutoPlayInterval();
             stopClover();
+            clearTimeout(heroTimer);
+            heroTimer = null;
             if (passiveInterval) {
                 clearInterval(passiveInterval);
                 passiveInterval = null;

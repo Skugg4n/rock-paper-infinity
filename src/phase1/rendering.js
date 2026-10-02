@@ -26,9 +26,13 @@ const starSmallTemplate = getIcon('star', 'lucide-star-small text-slate-800');
  * @param {object} refs   - { winTracker, lastStarBalance, lastTotalStarsEarned }
  * @param {number} starBalance
  * @param {number} totalStarsEarned
- * @returns {{ lastStarBalance: number, lastTotalStarsEarned: number }} updated cache
+ * @param {object} [opts]
+ * @param {boolean} [opts.hero] - the first stars: one row of five, laid out to be shown big
+ * @param {number} [opts.landIndex] - index of a star that was just won (it lands in its slot), or -1
+ * @param {{ from: number, staggerMs: number, elapsedMs: number } | null} [opts.plopp] - slots from
+ *        this index plop in one after another; elapsedMs keeps a re-render in step
  */
-export function renderWinTracker(refs, starBalance, totalStarsEarned) {
+export function renderWinTracker(refs, starBalance, totalStarsEarned, { hero = false, landIndex = -1, plopp = null } = {}) {
     const { winTracker } = refs;
     winTracker.innerHTML = '';
     const crowns = Math.floor(starBalance / 10000);
@@ -77,16 +81,23 @@ export function renderWinTracker(refs, starBalance, totalStarsEarned) {
 
     const dotsToShow = getVisibleDots(totalStarsEarned);
     const gridContainer = document.createElement('div');
-    gridContainer.className = 'grid grid-cols-10 gap-1';
+    gridContainer.className = hero ? 'grid grid-cols-5 gap-1' : 'grid grid-cols-10 gap-1';
     for (let i = 0; i < dotsToShow; i++) {
         const slot = document.createElement('div');
         if (i < smallStars) {
             const star = starSmallTemplate.cloneNode(true);
             star.setAttribute('fill', 'currentColor');
             star.setAttribute('stroke', 'none');
+            if (i === landIndex) star.classList.add('star-land');
             slot.appendChild(star);
         } else {
             slot.className = 'dot';
+        }
+        if (plopp && i >= plopp.from) {
+            // A negative delay starts the animation part-way, so a re-render
+            // in the middle of the sequence does not start it over.
+            slot.classList.add('slot-plopp');
+            slot.style.animationDelay = `${Math.round((i - plopp.from) * plopp.staggerMs - plopp.elapsedMs)}ms`;
         }
         gridContainer.appendChild(slot);
     }
@@ -205,13 +216,20 @@ export function renderReserveBar(reserveEnergyFillEl, percent) {
 
 /**
  * Shows the big battery's bar only once there is a big battery: before the
- * first one is bought there is nothing for the bar to say.
+ * first one is bought there is nothing for the bar to say. It grows in beside
+ * the small one (style.css, .reserve-collapsed).
  *
  * @param {HTMLElement} reserveContainerEl
  * @param {boolean} show
+ * @param {boolean} [animate=true] - false on load: the bar is just there
  */
-export function renderReserveVisibility(reserveContainerEl, show) {
-    reserveContainerEl.classList.toggle('hidden', !show);
+export function renderReserveVisibility(reserveContainerEl, show, animate = true) {
+    if (!animate) reserveContainerEl.style.transition = 'none';
+    reserveContainerEl.classList.toggle('reserve-collapsed', !show);
+    if (!animate) {
+        void reserveContainerEl.offsetWidth;
+        reserveContainerEl.style.transition = '';
+    }
 }
 
 /**

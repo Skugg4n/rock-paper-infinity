@@ -75,7 +75,6 @@ rock-paper-infinity/
 │   │   ├── rendering.js      # All Phase 1 DOM renderers (win tracker, upgrades, bars, counters)
 │   │   ├── upgrades-config.js # createUpgrades(actions) factory — static config + purchase callbacks
 │   │   ├── rates.js          # Pure calculations: getSPS, getEPS, getVisibleDots, formatCount, fillFraction
-│   │   ├── star-animation.js # Flying-star DOM animation (extracted for testability)
 │   │   ├── cost-visual.js    # Tally SVGs + Roman numeral cost display
 │   │   ├── countdown.js      # RPS countdown animation
 │   │   └── persistence.js    # Game state serialization/deserialization

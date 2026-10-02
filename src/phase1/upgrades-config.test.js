@@ -6,7 +6,7 @@ const IDS = ['autoPlay', 'manualRecharge', 'speed', 'energyGenerator', 'buyBatte
     'addGameBoard', 'mergeGameBoard', 'bank'];
 
 let createUpgrades;
-let clicks;
+let eps;
 let batteries;
 let upgrades;
 
@@ -14,23 +14,30 @@ beforeEach(async () => {
     const dom = new JSDOM(`<!DOCTYPE html><html><body>${IDS.map(id => `<button id="${id}"></button>`).join('')}</body></html>`);
     global.document = dom.window.document;
     ({ createUpgrades } = await import('./upgrades-config.js'));
-    clicks = 0;
+    eps = 0;
     batteries = 0;
     upgrades = createUpgrades({
         rechargeEnergy: () => {}, addReserve: () => {}, incrementSpeed: () => {},
         createGameBoard: () => {}, mergeToMetaBoard: () => {}, setPhaseToCity: () => {},
         getTotalStarsEarned: () => 0, getFoamCollapses: () => 0, getFoamFraction: () => 0,
-        getRechargeClicks: () => clicks, getBatteriesBought: () => batteries,
+        getEnergyPerSecond: () => eps, getBatteriesBought: () => batteries,
     });
 });
 
-describe('the energy ladder unlocks by use', () => {
-    test('the big battery costs 20 and waits for six recharge clicks', () => {
+describe('the energy ladder unlocks by need', () => {
+    test('the big battery costs 20 and waits until the machines eat 22 energy a second', () => {
+        expect(PHASE1_CONSTANTS.BATTERY_UNLOCK_EPS).toBe(22);
         expect(upgrades.buyBattery.cost).toBe(20);
         expect(upgrades.buyBattery.unlocksAt).toBe(0);
-        clicks = PHASE1_CONSTANTS.BATTERY_UNLOCK_CLICKS - 1;
+        eps = 21.9;
         expect(upgrades.buyBattery.unlockCondition()).toBe(false);
-        clicks = PHASE1_CONSTANTS.BATTERY_UNLOCK_CLICKS;
+        eps = 22;
+        expect(upgrades.buyBattery.unlockCondition()).toBe(true);
+    });
+
+    test('a big battery that has been bought stays, whatever the consumption', () => {
+        eps = 0;
+        batteries = 1;
         expect(upgrades.buyBattery.unlockCondition()).toBe(true);
     });
 

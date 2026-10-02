@@ -513,25 +513,6 @@ input[type=range]:focus-visible {
 .deep-gate__actions .deep-gate__stay { opacity: 0.55; }
 .deep-gate__actions .deep-gate__stay:hover { opacity: 1; }
 
-/* Flying star animation — fires on first wins (≤10 stars earned) */
-@keyframes star-fly {
-    0%   { transform: translate(var(--from-x), var(--from-y)) scale(1.2); opacity: 1; }
-    20%  { transform: translate(var(--from-x), var(--from-y)) scale(1.4); opacity: 1; }
-    100% { transform: translate(var(--to-x), var(--to-y)) scale(0.8); opacity: 0; }
-}
-
-.star-fly {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 24px;
-    height: 24px;
-    pointer-events: none;
-    z-index: 999;
-    color: #b8860b;
-    animation: star-fly 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
 /* =========================================================
    REDUCED MOTION — honour prefers-reduced-motion: reduce
    All keyframe animations collapse to ~0ms; transitions too.
@@ -561,7 +542,8 @@ input[type=range]:focus-visible {
     .reveal-item,
     .winner.celebrate,
     .pop-item,
-    .star-fly,
+    .star-land,
+    .slot-plopp,
     .materialize,
     .materialize > * {
         animation-duration: 200ms !important;
@@ -590,41 +572,96 @@ input[type=range]:focus-visible {
     overflow: hidden;
 }
 
-/* The little clover (chapter I): a toy by the board, not a purchase. A click
-   is three seconds of luck; the ring drains while it lasts (3s = CLOVER_MS).
-   The big clover (the luck upgrade) leaves it lit for good. */
-.clover-btn {
-    position: relative;
-    color: #94a3b8;
-    transition: color 0.2s ease, transform 0.15s ease, opacity 0.4s ease;
+/* The little clover (chapter I): something to fiddle with while the machine
+   plays, in the player's row, right of auto. A click is three seconds of luck;
+   the button sits pressed in (like auto when it is on) and a ring around it
+   drains while the luck lasts (3s = CLOVER_MS). No colour: the system is grey.
+   The big clover (the luck upgrade) leaves it pressed in for good. */
+.clover-btn { position: relative; }
+.clover-btn:hover:not(:disabled) { transform: translateY(-4px); background-color: #ffffff; }
+.clover-btn.lucky,
+.clover-btn.lucky:hover:not(:disabled),
+.clover-btn.evergreen {
+    background-color: #e2e8f0;
+    box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
 }
-.clover-btn:hover:not(:disabled) { color: #64748b; transform: translateY(-2px); }
-.clover-btn:active:not(:disabled) { transform: scale(0.9); }
+.clover-btn.evergreen { cursor: default; }
 .clover-ring {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    inset: -6px;
+    width: calc(100% + 12px);
+    height: calc(100% + 12px);
     transform: rotate(-90deg);
     overflow: visible;
 }
-.clover-ring circle { fill: none; stroke-width: 2; }
-.clover-track { stroke: #e2e8f0; }
 .clover-time {
-    stroke: #16a34a;
+    fill: none;
+    stroke: #475569;
+    stroke-width: 3;
     stroke-linecap: round;
-    stroke-dasharray: 113.1;
-    stroke-dashoffset: 113.1;
+    stroke-dasharray: 295.4;
+    stroke-dashoffset: 295.4;
 }
-.clover-btn.lucky,
-.clover-btn.lucky:hover:not(:disabled) { color: #16a34a; }
 .clover-btn.lucky .clover-time { animation: clover-drain 3s linear forwards; }
 @keyframes clover-drain {
     from { stroke-dashoffset: 0; }
-    to { stroke-dashoffset: 113.1; }
+    to { stroke-dashoffset: 295.4; }
 }
-.clover-btn.evergreen { color: #16a34a; cursor: default; }
-.clover-btn.evergreen .clover-track { stroke: #bbf7d0; }
+#player-controls-container > .clover-btn.invisible .clover-ring { display: none; }
+
+/* Beside the stars-per-second while the little clover's luck runs. */
+#luck-indicator {
+    display: inline-flex;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#luck-indicator.is-on { opacity: 1; transform: none; }
+
+/* While the machine plays, the hand buttons step back: smaller and grey.
+   They come back when it stops (no energy, or auto switched off). */
+#player-controls-container > .choice-btn { transition: width 0.5s ease, height 0.5s ease, opacity 0.4s ease, transform 0.4s ease, margin 0.5s ease; }
+#player-controls-container > .choice-btn svg { transition: width 0.5s ease, height 0.5s ease; }
+#player-controls-container.hands-rest > .choice-btn {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    opacity: 0.45;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+    pointer-events: none;
+}
+#player-controls-container.hands-rest > .choice-btn svg { width: 16px; height: 16px; }
+
+/* The first stars (index.js, placeHero): the tracker is carried, enlarged, to
+   just above the player's controls by a transform. A star that is won lands
+   in its slot; after the fifth the next slots plop in, one after another. */
+#win-tracker { will-change: transform; }
+.star-land { animation: star-land 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes star-land {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+.slot-plopp { animation: slot-plopp 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes slot-plopp {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* The big battery's bar grows in beside the small one when the first big
+   battery is bought (rendering.js, renderReserveVisibility). */
+#reserve-energy-container {
+    transform-origin: bottom;
+    transition: width 0.6s ease, padding 0.6s ease, margin 0.6s ease, opacity 0.5s ease,
+                transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#reserve-energy-container.reserve-collapsed {
+    width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: -0.5rem;
+    opacity: 0;
+    transform: scaleY(0.15);
+}
 
 /* Pause (main.js): a small round button beside the ☰ button. While paused
    the city sits back a little; nothing is blurred. */
