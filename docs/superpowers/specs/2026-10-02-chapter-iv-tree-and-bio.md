@@ -175,3 +175,16 @@ black and gunmetal with bone-pale ribbing, one arterial colour for the pulse. No
 are ribbed vertebrae with a membrane window that shows fluid level (the level pips
 become chambers filling), never a slit or a pupil. Mockup 10 shows two palettes side
 by side for Ola to choose.
+
+## Ola on mockups 10 (2026-10-02): "Såååå fint!"
+
+- **The organic look is still not it.** It reads as a face, and it is very digital
+  after all: the horns, the gauges. Not his taste. He wants a few alternatives.
+- **Energy must climb through CABLES** up to the machine that drives the star
+  production, not loose through the air. Everything should feel physical and real.
+- **The top screen sits fixed.** The machine should feel more like a machine than it
+  does now; it is a bit basic. Cogwheels and such.
+
+Rules for the bio alternatives (Claude): no bilateral symmetry (symmetry is what makes
+faces), no horns, no gauges or tick marks, nothing digital. Level is shown by how
+swollen or filled a growth is. Forms irregular, as if grown, not drawn with a ruler.
