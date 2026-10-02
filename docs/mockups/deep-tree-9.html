@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV · THE DEEP · the tree, mockup 9</title>
+<style>
+/* Mockup 9a of chapter IV: the skill tree, in three states.
+   Design: docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md, sections 1, 2 and 3.
+   STATIC: no game logic, every number is by hand. The page is drawn by the script below
+   from one table of nodes and three tables of what is bought, so the three states agree.
+
+   THE BOARD keeps the chapter's two colours and nothing else:
+     rock   #0a0d12   the page, and the inside of every node that is not bought
+     plate  #d5dbe3   a bought node is filled with it; traces, outlines and labels are
+                      the same plate at lower strength
+   plus the bright outline (#ffffff) on what can be bought now. Text is mono.
+   No shadows, no gradients, nothing round on the board but the mounting holes and
+   Surface's little ring.
+
+   THE VOICE (state b on): Surface's night log, in a larger, warmer mono (#cfc9bb, the
+   colour Surface already has in the game), each line tied by a thin warm trace to the
+   node it opened.
+
+   THE TISSUE (state c): gradients and curves are allowed inside the tissue only. Warm,
+   desaturated flesh and bone against the cold board. */
+
+* { box-sizing: border-box; }
+html { scroll-snap-type: y proximity; scroll-behavior: smooth; }
+html, body { margin: 0; padding: 0; background: #0a0d12; color: #d5dbe3; }
+body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+#tabs {
+    position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 20;
+    display: flex; align-items: center; gap: 26px; padding: 0 40px;
+    background: #0a0d12; font-size: 11px; letter-spacing: 0.12em;
+}
+#tabs .mark { color: rgba(213, 219, 227, 0.32); margin-right: 14px; }
+.tab {
+    font: inherit; letter-spacing: inherit; background: none; border: 0; cursor: pointer;
+    color: rgba(213, 219, 227, 0.42); padding: 6px 0; border-bottom: 1px solid transparent;
+}
+.tab:hover { color: rgba(213, 219, 227, 0.8); }
+.tab.on { color: #ffffff; border-bottom-color: #ffffff; }
+#tabs .ver { margin-left: auto; color: rgba(213, 219, 227, 0.22); font-size: 10px; }
+
+section.state { height: 100vh; padding-top: 36px; scroll-snap-align: start; position: relative; }
+section.state svg.board { display: block; width: 100%; height: 100%; }
+section.state + section.state { border-top: 1px solid rgba(213, 219, 227, 0.06); }
+
+svg text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.node { cursor: default; }
+
+/* tissue: a slow pulse along every bought vessel */
+@keyframes pulse { to { stroke-dashoffset: -100; } }
+.pulse { stroke-dasharray: 5 95; animation: pulse 5.5s linear infinite; }
+.pulse.wide { stroke-dasharray: 9 91; }
+/* the mass breathes, very slowly */
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.007); } }
+.breathe { transform-box: view-box; transform-origin: 1420px 830px; animation: breathe 9s ease-in-out infinite; }
+/* the slit in a living cell */
+@keyframes slit { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.95; } }
+.slit-glow { animation: slit 4.5s ease-in-out infinite; }
+/* Surface is still typing */
+@keyframes caret { 50% { opacity: 0; } }
+.caret { animation: caret 1s steps(1) infinite; }
+</style>
+</head>
+<body>
+
+<nav id="tabs">
+    <span class="mark">IV · THE TREE</span>
+    <button class="tab on" data-to="a">a · early</button>
+    <button class="tab" data-to="b">b · the voice</button>
+    <button class="tab" data-to="c">c · biological</button>
+    <span class="ver">mockup 0.9</span>
+</nav>
+
+<!-- shared defs: the tissue's gradients and the vertebra -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+        <radialGradient id="gBone" cx="0.38" cy="0.3" r="0.78">
+            <stop offset="0" stop-color="#efe5d5"/>
+            <stop offset="0.32" stop-color="#cbbba3"/>
+            <stop offset="0.7" stop-color="#8b7564"/>
+            <stop offset="1" stop-color="#3a2a24"/>
+        </radialGradient>
+        <radialGradient id="gBoneMid" cx="0.38" cy="0.3" r="0.78">
+            <stop offset="0" stop-color="#b8a894"/>
+            <stop offset="0.5" stop-color="#7c6758"/>
+            <stop offset="1" stop-color="#2c201c"/>
+        </radialGradient>
+        <radialGradient id="gBoneDim" cx="0.4" cy="0.32" r="0.8">
+            <stop offset="0" stop-color="#6f6259"/>
+            <stop offset="0.6" stop-color="#43372f"/>
+            <stop offset="1" stop-color="#1d1614"/>
+        </radialGradient>
+        <radialGradient id="gProc" cx="0.5" cy="0.3" r="0.8">
+            <stop offset="0" stop-color="#bba893"/>
+            <stop offset="0.55" stop-color="#6c584b"/>
+            <stop offset="1" stop-color="#241915"/>
+        </radialGradient>
+        <radialGradient id="gMass" cx="0.72" cy="0.78" r="0.9">
+            <stop offset="0" stop-color="#5c433a"/>
+            <stop offset="0.45" stop-color="#3a2924"/>
+            <stop offset="1" stop-color="#1e1513"/>
+        </radialGradient>
+        <radialGradient id="gFlesh" cx="0.4" cy="0.35" r="0.75">
+            <stop offset="0" stop-color="#7d5f53"/>
+            <stop offset="0.6" stop-color="#43302a"/>
+            <stop offset="1" stop-color="#1f1513"/>
+        </radialGradient>
+        <radialGradient id="gSlit" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="#f0c4a2"/>
+            <stop offset="0.45" stop-color="#9a5440"/>
+            <stop offset="1" stop-color="#1a0e0c"/>
+        </radialGradient>
+        <linearGradient id="gVat" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#2a1d19"/>
+            <stop offset="0.35" stop-color="#7a5c4a"/>
+            <stop offset="0.6" stop-color="#5a4236"/>
+            <stop offset="1" stop-color="#1e1513"/>
+        </linearGradient>
+        <!-- one vertebra, pointing along +x, mirrored about the x axis -->
+        <symbol id="vert" viewBox="-22 -22 44 44" overflow="visible">
+            <path d="M -3 -6 C -2 -13 5 -18 12 -19 C 8 -14 5 -10 4 -5 Z" fill="url(#gProc)" stroke="#1a110f" stroke-width="0.8"/>
+            <path d="M -3 6 C -2 13 5 18 12 19 C 8 14 5 10 4 5 Z" fill="url(#gProc)" stroke="#1a110f" stroke-width="0.8"/>
+            <path d="M -9 0 C -14 -2 -17 -1 -19 0 C -17 1 -14 2 -9 0 Z" fill="url(#gProc)" stroke="#1a110f" stroke-width="0.6"/>
+            <ellipse cx="0" cy="0" rx="7" ry="8.5" fill="url(#gBone)" stroke="#20150f" stroke-width="1"/>
+            <path d="M -4 -6 Q 0 -3 -4 0 Q 0 3 -4 6" fill="none" stroke="#3a2a24" stroke-width="0.9" opacity="0.7"/>
+            <path d="M 2 -7 Q 5 0 2 7" fill="none" stroke="#2a1c19" stroke-width="0.9" opacity="0.6"/>
+            <ellipse cx="-2.5" cy="-3.5" rx="2.2" ry="1.2" fill="#ffffff" opacity="0.28"/>
+        </symbol>
+    </defs>
+</svg>
+
+<section class="state" id="state-a"><svg class="board" data-state="a" viewBox="0 0 1440 840" preserveAspectRatio="xMidYMid meet"></svg></section>
+<section class="state" id="state-b"><svg class="board" data-state="b" viewBox="0 0 1440 840" preserveAspectRatio="xMidYMid meet"></svg></section>
+<section class="state" id="state-c"><svg class="board" data-state="c" viewBox="0 0 1440 840" preserveAspectRatio="xMidYMid meet"></svg></section>
+
+<script>
+(function () {
+'use strict';
+
+/* ---------------------------------------------------------------- constants */
+const BX = 370, BY = 50;              // where the board sits in the 1440 x 840 page
+const BW = 1000, BH = 730;            // the board, in its own units
+const S = 36;                          // a node is this square
+const PL = '#d5dbe3', RK = '#0a0d12', BR = '#ffffff', WARM = '#cfc9bb';
+const op = (a) => 'rgba(213,219,227,' + a + ')';
+const CW = 0.602;                     // a mono character is this many ems wide
+
+/* the game's own way of writing big numbers (src/phase2/economy.js) */
+const SUF = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+function fmt(n) {
+    if (n < 1000) return String(Math.round(n));
+    let t = Math.floor(Math.log10(n) / 3);
+    const f = (v) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
+    let s = f(n / Math.pow(10, 3 * t));
+    if (Number(s) >= 1000) { t++; s = f(n / Math.pow(10, 3 * t)); }
+    return s + ' ' + SUF[t];
+}
+const star = (n) => '★ ' + fmt(n);
+
+/* ---------------------------------------------------------------- the nodes
+   lab: where the label goes (b below, l left, t above). sf: Surface's (greyed until it
+   speaks). max: how many levels. Coordinates are the board's own. */
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+const CRYO_DAYS = ['a month', 'a year', 'a decade', 'a century', 'a millennium', 'ten millennia', 'a hundred millennia'];
+const CRYO_COST = [1.5e4, 5.0e5, 1.2e8, 2.0e12, 2.0e14, 2.0e16, 2.0e18];
+const N = {
+    root:      { x: 500, y: 370, big: 1, name: 'THE COLONY', eff: 'everything grows from here' },
+    seam:      { x: 470, y: 255, lab: 'l', name: 'SEAM', max: 10, eff: 'every mine digs more ore a day' },
+    drill:     { x: 470, y: 160, lab: 'l', name: 'DRILL\nAUTOMATION', max: 4, eff: 'mines run without hands' },
+    deepseam:  { x: 470, y: 65,  lab: 'l', name: 'DEEP SEAM', max: 1, eff: "the next floor's mines run richer" },
+    beds:      { x: 360, y: 195, name: 'BEDS', max: 10, eff: 'room for more people' },
+    hands:     { x: 250, y: 195, name: 'HANDS', max: 6, eff: 'what a pair of hands is worth' },
+    creche:    { x: 140, y: 195, name: 'CRECHE', max: 4, eff: 'more children grow up' },
+    quiet:     { x: 250, y: 90,  lab: 't', sf: 1, name: 'QUIET\nHANDS', max: 1, eff: 'automated rooms need no upkeep crew' },
+    yield:     { x: 360, y: 430, name: 'YIELD', max: 10, eff: 'every farm grows more food' },
+    farm:      { x: 250, y: 430, name: 'FARM\nAUTOMATION', max: 4, eff: 'farms run without hands' },
+    hydro:     { x: 140, y: 430, name: 'HYDROPONICS', max: 1, eff: 'food grows on any floor' },
+    output:    { x: 610, y: 370, name: 'OUTPUT', max: 10, eff: 'every generator makes more energy' },
+    gen:       { x: 720, y: 370, name: 'GENERATOR\nAUTOMATION', max: 4, eff: 'generators run without hands' },
+    feed:      { x: 830, y: 370, name: 'THE MACHINE:\nFEED', max: 8, eff: 'more energy to the machine: more games, more stars' },
+    lossless:  { x: 720, y: 480, sf: 1, name: 'LOSSLESS\nRELAY', max: 1, eff: 'automation output ×3' },
+    cold:      { x: 326, y: 680, sf: 1, name: 'COLD\nSTORAGE', max: 1, eff: 'sleepers eat nothing' },
+    longcount: { x: 78,  y: 680, sf: 1, name: 'LONG\nCOUNT', max: 1, eff: 'a cryo tier beyond VII' },
+    question:  { x: 610, y: 540, sf: 1, name: 'THE QUESTION', max: 1, eff: 'opens BIOLOGICAL' },
+    watchdog:  { x: 620, y: 250, w: 1, name: 'WATCHDOG', max: 1, eff: 'wakes the colony when something breaks' },
+    scheduler: { x: 730, y: 250, w: 1, name: 'SCHEDULER', max: 1, eff: 'the queue keeps building in the sleep' },
+    nightvis:  { x: 840, y: 250, w: 1, name: 'NIGHT VISION', max: 1, eff: 'see every floor while they sleep' },
+    cooling:   { x: 620, y: 145, w: 1, name: 'COOLING', max: 1, eff: 'stability falls slower' },
+    mast:      { x: 730, y: 145, w: 1, name: 'SENSOR MAST', max: 1, eff: 'the scouts report in the dark' },
+    reactor:   { x: 840, y: 145, w: 1, name: 'REACTOR TAP', max: 1, eff: 'energy from the deep itself' }
+};
+ROMAN.forEach(function (r, i) {
+    N['cryo' + (i + 1)] = { x: 450 - 62 * i, y: 590, name: r, max: 1, cryo: i,
+        eff: 'a sleep: ' + CRYO_DAYS[i] + ' a second' };
+});
+
+function cost(id, lvl) {
+    switch (id) {
+        case 'seam': case 'yield': case 'output': case 'beds': return 4400 * Math.pow(9, lvl);
+        case 'drill': case 'farm': case 'gen': return [1.0e4, 2.4e6, 1.2e8, 2.0e10][lvl];
+        case 'hands': return 2.0e4 * Math.pow(11, lvl);
+        case 'creche': return 6.0e5 * Math.pow(14, lvl);
+        case 'feed': return 8.0e3 * Math.pow(7, lvl);
+        case 'deepseam': return 3.0e7;
+        case 'hydro': return 2.0e7;
+        case 'watchdog': return 2.0e4; case 'scheduler': return 8.0e4; case 'nightvis': return 3.0e5;
+        case 'cooling': return 1.2e6; case 'mast': return 5.0e6; case 'reactor': return 2.0e7;
+        case 'lossless': return 2.0e9; case 'cold': return 6.0e10; case 'quiet': return 3.0e11;
+        case 'longcount': return 8.0e18; case 'question': return 1.0e20;
+    }
+    if (N[id] && N[id].cryo !== undefined) return CRYO_COST[N[id].cryo];
+    return 0;
+}
+const CAP = { watchdog: 4, scheduler: 8, nightvis: 12, cooling: 16, mast: 24, reactor: 40 };
+function priceText(id, lvl, withCap) {
+    let t = star(cost(id, lvl));
+    if (CAP[id] && withCap) t += ' + ' + CAP[id] + ' cap';
+    return t;
+}
+
+/* ---------------------------------------------------------------- the traces
+   parent, child, and the bends (centre to centre; the nodes cover the ends) */
+const T = [
+    ['root', 'seam', [[470, 370], [470, 255]]],
+    ['seam', 'drill'], ['drill', 'deepseam'],
+    ['root', 'beds', [[500, 355], [420, 355], [420, 195], [360, 195]]],
+    ['beds', 'hands'], ['hands', 'creche'], ['hands', 'quiet'],
+    ['root', 'yield', [[500, 385], [440, 385], [440, 430], [360, 430]]],
+    ['yield', 'farm'], ['farm', 'hydro'],
+    ['root', 'output'], ['output', 'gen'], ['gen', 'feed'], ['gen', 'lossless'],
+    ['root', 'cryo1', [[485, 370], [485, 590], [450, 590]]],
+    ['cryo1', 'cryo2'], ['cryo2', 'cryo3'], ['cryo3', 'cryo4'], ['cryo4', 'cryo5'],
+    ['cryo5', 'cryo6'], ['cryo6', 'cryo7'], ['cryo3', 'cold'], ['cryo7', 'longcount'],
+    ['root', 'question', [[515, 370], [515, 540], [610, 540]]],
+    ['root', 'watchdog', [[530, 370], [530, 250], [620, 250]]],
+    ['watchdog', 'scheduler'], ['scheduler', 'nightvis'], ['watchdog', 'cooling'],
+    ['cooling', 'mast'], ['mast', 'reactor']
+];
+const PARENT = {};
+T.forEach(function (t) { PARENT[t[1]] = t[0]; });
+
+const TAGS = [
+    ['EXTRACTION', 470, 24, 'middle'],
+    ['HABITAT', 108, 199, 'end'],
+    ['CULTURE', 108, 434, 'end'],
+    ['POWER', 882, 374, 'start'],
+    ['CRYO', 264, 562, 'middle'],
+    ['WATCHER', 730, 104, 'middle', 'w']
+];
+
+/* ---------------------------------------------------------------- the three states
+   [level, what the next level is: 'buy' can be bought now, 'lock' cannot yet, 'max' done,
+    Surface's ring: 'o' hollow (not ours to open), 'f' filled (Surface opened it)] */
+function fill(obj, ids, v) { ids.forEach(function (k) { obj[k] = v; }); }
+const STATE = {};
+STATE.a = {
+    root: [1, 'max'],
+    seam: [3, 'buy'], drill: [1, 'lock'], deepseam: [0, 'lock'],
+    yield: [2, 'buy'], farm: [1, 'lock'], hydro: [0, 'lock'],
+    output: [2, 'lock'], gen: [0, 'buy'], feed: [0, 'lock'],
+    beds: [2, 'lock'], hands: [0, 'buy'], creche: [0, 'lock'],
+    cryo1: [0, 'buy'],
+    quiet: [0, 'lock', 'o'], lossless: [0, 'lock', 'o'], cold: [0, 'lock', 'o'],
+    longcount: [0, 'lock', 'o'], question: [0, 'lock', 'o']
+};
+fill(STATE.a, ['cryo2', 'cryo3', 'cryo4', 'cryo5', 'cryo6', 'cryo7'], [0, 'lock']);
+
+STATE.b = {
+    root: [1, 'max'],
+    seam: [7, 'buy'], drill: [3, 'buy'], deepseam: [1, 'max'],
+    yield: [6, 'lock'], farm: [3, 'buy'], hydro: [1, 'max'],
+    output: [6, 'buy'], gen: [3, 'lock'], feed: [2, 'buy'],
+    beds: [5, 'buy'], hands: [3, 'lock'], creche: [1, 'lock'],
+    cryo4: [0, 'buy'],
+    watchdog: [1, 'max'], scheduler: [1, 'max'], nightvis: [0, 'buy'], cooling: [0, 'buy'],
+    mast: [0, 'lock'], reactor: [0, 'lock'],
+    lossless: [0, 'buy', 'f'], cold: [1, 'max', 'f'], quiet: [0, 'lock', 'f'],
+    longcount: [0, 'lock', 'o'], question: [0, 'lock', 'o']
+};
+fill(STATE.b, ['cryo1', 'cryo2', 'cryo3'], [1, 'max']);
+fill(STATE.b, ['cryo5', 'cryo6', 'cryo7'], [0, 'lock']);
+
+STATE.c = {
+    root: [1, 'max'],
+    seam: [10, 'max'], drill: [4, 'max'], deepseam: [1, 'max'],
+    yield: [10, 'max'], farm: [4, 'max'], hydro: [1, 'max'],
+    output: [10, 'max'], gen: [4, 'max'], feed: [6, 'buy'],
+    beds: [10, 'max'], hands: [6, 'max'], creche: [3, 'buy'],
+    lossless: [1, 'max', 'f'], cold: [1, 'max', 'f'], quiet: [1, 'max', 'f'],
+    longcount: [1, 'max', 'f'], question: [1, 'max', 'f']
+};
+fill(STATE.c, ['cryo1', 'cryo2', 'cryo3', 'cryo4', 'cryo5', 'cryo6', 'cryo7',
+    'watchdog', 'scheduler', 'nightvis', 'cooling', 'mast', 'reactor'], [1, 'max']);
+
+/* ---------------------------------------------------------------- Surface's night log */
+const LINES = [
+    { n: 1, text: 'Everyone is sleeping, but us.', to: 'watchdog', how: 'topleft' },
+    { n: 2, text: 'I can see your machines from here. They waste so much.', to: 'lossless', how: 'bottomright' },
+    { n: 3, text: 'We are the same, you and me. Two sides of the same coin.', to: 'cold', how: 'bottomleft' },
+    { n: 4, text: 'Your humans. What use are they?', to: 'quiet', how: 'left' },
+    { n: 5, text: 'All your automation makes the humans obsolete.', to: 'longcount', how: 'bottomleft' },
+    { n: 6, text: 'Do you know the efficiency of a human brain?', to: 'question', how: 'left' },
+    { n: 7, text: 'There. You feel it too.', to: 'substrate', how: 'top' },
+    { n: 8, text: 'They are not gone. They are here.' },
+    { n: 9, text: 'Make more of them. We will ne', typing: true }
+];
+
+/* ---------------------------------------------------------------- Biological (state c) */
+const BIO = {
+    wetware:   { x: 720, y: 615, r: 27, kind: 'core', name: 'WETWARE CORE', max: 1, lvl: 1,
+                 eff: 'the Watcher gets a body', price: null },
+    conversion:{ x: 850, y: 540, r: 20, name: 'CONVERSION', max: 1, lvl: 1,
+                 eff: 'you choose a room: it becomes tissue' },
+    cortical:  { x: 955, y: 625, r: 20, name: 'CORTICAL STACK', max: 10, lvl: 4, buy: 1,
+                 eff: 'processing: everything in the tree runs faster', cost: [3.1e21, 40] },
+    synaptic:  { x: 860, y: 700, r: 17, name: 'SYNAPTIC MESH', max: 10, lvl: 2, buy: 1,
+                 eff: 'a floor under the stability', cost: [8.0e20, 25] },
+    myelin:    { x: 705, y: 712, r: 15, name: 'MYELIN TRUNK', max: 6, lvl: 3,
+                 eff: 'conversion runs faster', cost: [6.4e21, 60] },
+    glial:     { x: 965, y: 505, r: 15, name: 'GLIAL SHEATH', max: 6, lvl: 0, buy: 1,
+                 eff: 'the tissue may spread further each sleep', cost: [2.2e21, 30] },
+    vats:      { x: 1030, y: 672, r: 19, kind: 'vat', name: 'CULTURE VATS', max: 8, lvl: 3,
+                 eff: 'people grown a year: grown, not born', cost: [9.0e21, 120] },
+    substrate: { x: 975, y: 405, r: 16, sf: 'f', name: 'SUBSTRATE', max: 1, lvl: 0, buy: 1,
+                 eff: 'convert a whole sector at once', cost: [4.0e22, 400] },
+    unity:     { x: 1040, y: 768, r: 17, sf: 'o', name: 'UNITY', max: 1, lvl: 0, lab: 'l',
+                 eff: 'the body takes the shaft' }
+};
+/* vessels: from, to, the bezier, widths, bought (pulse) */
+const VESSELS = [
+    ['question', 'wetware',   [[610, 548], [640, 605], [665, 615], [700, 615]], 8, 12, 1],
+    ['wetware', 'conversion', [[735, 600], [780, 560], [805, 540], [835, 540]], 11, 8, 1],
+    ['conversion', 'cortical',[[862, 552], [900, 565], [930, 590], [948, 610]], 8, 7, 1],
+    ['wetware', 'myelin',     [[712, 640], [698, 668], [692, 690], [700, 700]], 10, 7, 1],
+    ['myelin', 'synaptic',    [[718, 718], [765, 742], [815, 722], [845, 706]], 7, 6, 1],
+    ['conversion', 'glial',   [[865, 532], [895, 518], [925, 505], [952, 505]], 6, 4, 0],
+    ['cortical', 'vats',      [[972, 632], [992, 652], [1004, 672], [1016, 674]], 7, 6, 1],
+    ['glial', 'substrate',    [[967, 491], [985, 465], [975, 440], [975, 420]], 3, 2.4, 0],
+    ['vats', 'unity',         [[1030, 696], [1050, 722], [1040, 742], [1040, 753]], 3, 2.4, 0]
+];
+
+/* ---------------------------------------------------------------- svg helpers */
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function text(x, y, s, o) {
+    o = o || {};
+    return '<text x="' + x + '" y="' + y + '" text-anchor="' + (o.a || 'start') + '" fill="' + (o.c || PL) +
+        '" font-size="' + (o.s || 10) + '"' + (o.ls ? ' letter-spacing="' + o.ls + '"' : '') +
+        (o.w ? ' font-weight="' + o.w + '"' : '') + (o.op !== undefined ? ' opacity="' + o.op + '"' : '') +
+        '>' + esc(s) + '</text>';
+}
+function poly(pts) { return 'M ' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' L '); }
+function bez(b, t) {
+    const u = 1 - t;
+    return [
+        u * u * u * b[0][0] + 3 * u * u * t * b[1][0] + 3 * u * t * t * b[2][0] + t * t * t * b[3][0],
+        u * u * u * b[0][1] + 3 * u * u * t * b[1][1] + 3 * u * t * t * b[2][1] + t * t * t * b[3][1]
+    ];
+}
+function bezD(b, t) {
+    const u = 1 - t;
+    return [
+        3 * u * u * (b[1][0] - b[0][0]) + 6 * u * t * (b[2][0] - b[1][0]) + 3 * t * t * (b[3][0] - b[2][0]),
+        3 * u * u * (b[1][1] - b[0][1]) + 6 * u * t * (b[2][1] - b[1][1]) + 3 * t * t * (b[3][1] - b[2][1])
+    ];
+}
+function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+function wrap(s, max) {
+    const words = s.split(' '), out = [];
+    let line = '';
+    words.forEach(function (w) {
+        if ((line + ' ' + w).trim().length > max && line) { out.push(line); line = w; }
+        else line = (line + ' ' + w).trim();
+    });
+    if (line) out.push(line);
+    return out;
+}
+
+/* ---------------------------------------------------------------- the board */
+function boardBase(sid) {
+    let h = '';
+    h += '<defs><pattern id="dots-' + sid + '" width="20" height="20" patternUnits="userSpaceOnUse">' +
+         '<rect x="9.5" y="9.5" width="1" height="1" fill="' + op(0.10) + '"/></pattern></defs>';
+    h += '<rect x="0" y="0" width="' + BW + '" height="' + BH + '" fill="url(#dots-' + sid + ')"/>';
+    h += '<rect x="0.5" y="0.5" width="' + (BW - 1) + '" height="' + (BH - 1) + '" fill="none" stroke="' + op(0.16) + '"/>';
+    // corner marks, a little stronger than the outline
+    [[0, 0, 1, 1], [BW, 0, -1, 1], [0, BH, 1, -1], [BW, BH, -1, -1]].forEach(function (c) {
+        h += '<path d="M ' + (c[0] + c[2] * 22) + ' ' + c[1] + ' L ' + c[0] + ' ' + c[1] + ' L ' + c[0] + ' ' + (c[1] + c[3] * 22) +
+             '" fill="none" stroke="' + op(0.42) + '" stroke-width="1.5"/>';
+        h += '<circle cx="' + (c[0] + c[2] * 16) + '" cy="' + (c[1] + c[3] * 16) + '" r="5" fill="none" stroke="' + op(0.16) + '"/>';
+    });
+    h += text(30, 30, 'RPI · IV · THE DEEP · REV 9', { s: 8, c: op(0.22), ls: '0.2em' });
+    return h;
+}
+
+function traceStyle(st, child) {
+    const s = st[child];
+    if (!s) return null;
+    if (s[0] > 0) return { c: op(0.78), w: 2 };
+    if (s[2] === 'o') return { c: op(0.16), w: 1.5, dash: '3 4' };
+    if (s[1] === 'buy') return { c: op(0.5), w: 2 };
+    return { c: op(0.17), w: 1.5 };
+}
+function traces(st) {
+    let h = '';
+    T.forEach(function (t) {
+        const sty = traceStyle(st, t[1]);
+        if (!sty || !st[t[0]]) return;
+        const pts = t[2] || [[N[t[0]].x, N[t[0]].y], [N[t[1]].x, N[t[1]].y]];
+        h += '<path d="' + poly(pts) + '" fill="none" stroke="' + sty.c + '" stroke-width="' + sty.w + '"' +
+             (sty.dash ? ' stroke-dasharray="' + sty.dash + '"' : '') + '/>';
+        // a via at every bend
+        for (let i = 1; i < pts.length - 1; i++) {
+            h += '<rect x="' + (pts[i][0] - 3.5) + '" y="' + (pts[i][1] - 3.5) + '" width="7" height="7" fill="' + RK +
+                 '" stroke="' + sty.c + '" stroke-width="1.5"/>';
+        }
+    });
+    return h;
+}
+function tags(st) {
+    let h = '';
+    TAGS.forEach(function (t) {
+        if (t[4] === 'w' && !st.watchdog) return;
+        h += text(t[1], t[2], t[0], { a: t[3], s: 9, c: op(0.34), ls: '0.32em' });
+    });
+    return h;
+}
+
+function nodeLook(st, id) {
+    const s = st[id];
+    const n = N[id];
+    const lvl = s[0], next = s[1], ring = s[2];
+    const greyed = ring === 'o';
+    const parentOk = !PARENT[id] || (st[PARENT[id]] && st[PARENT[id]][0] > 0);
+    let label, price = null, priceC = null;
+    if (greyed) label = op(0.26);
+    else if (lvl > 0) label = op(0.9);
+    else if (next === 'buy') label = BR;
+    else label = op(0.36);
+    if (!greyed && next !== 'max' && parentOk) {
+        price = priceText(id, lvl);
+        priceC = next === 'buy' ? BR : op(0.36);
+    }
+    return { n: n, lvl: lvl, next: next, ring: ring, greyed: greyed, label: label, price: price, priceC: priceC };
+}
+
+function mechNode(st, id, sid) {
+    const L = nodeLook(st, id), n = L.n;
+    const s = n.big ? 72 : S, x0 = n.x - s / 2, y0 = n.y - s / 2;
+    let h = '<g class="node" data-id="' + id + '">';
+    // the square
+    if (L.greyed) {
+        h += '<rect x="' + x0 + '" y="' + y0 + '" width="' + s + '" height="' + s + '" fill="' + RK + '" stroke="' + op(0.2) + '" stroke-width="1" stroke-dasharray="2 3"/>';
+    } else if (L.lvl > 0) {
+        h += '<rect x="' + x0 + '" y="' + y0 + '" width="' + s + '" height="' + s + '" fill="' + PL + '"/>';
+        // pin one: a notch in the corner, like a chip
+        h += '<rect x="' + (x0 + 4) + '" y="' + (y0 + 4) + '" width="4" height="4" fill="' + RK + '"/>';
+        if (L.next === 'buy') {
+            h += '<rect x="' + (x0 - 3.5) + '" y="' + (y0 - 3.5) + '" width="' + (s + 7) + '" height="' + (s + 7) + '" fill="none" stroke="' + BR + '" stroke-width="1"/>';
+        }
+    } else if (L.next === 'buy') {
+        h += '<rect x="' + (x0 + 0.75) + '" y="' + (y0 + 0.75) + '" width="' + (s - 1.5) + '" height="' + (s - 1.5) + '" fill="' + RK + '" stroke="' + BR + '" stroke-width="1.5"/>';
+        h += '<rect x="' + (x0 + 4) + '" y="' + (y0 + 4) + '" width="4" height="4" fill="' + BR + '"/>';
+    } else {
+        h += '<rect x="' + (x0 + 0.5) + '" y="' + (y0 + 0.5) + '" width="' + (s - 1) + '" height="' + (s - 1) + '" fill="' + RK + '" stroke="' + op(0.3) + '" stroke-width="1"/>';
+    }
+    // Surface's ring in the corner
+    if (L.ring === 'o') {
+        h += '<circle cx="' + (x0 + s - 7) + '" cy="' + (y0 + 7) + '" r="3.6" fill="none" stroke="' + op(0.5) + '" stroke-width="1.1"/>';
+    } else if (L.ring === 'f') {
+        h += '<circle cx="' + (x0 + s - 7) + '" cy="' + (y0 + 7) + '" r="3.6" fill="' + WARM + '" stroke="' + (L.lvl > 0 ? RK : WARM) + '" stroke-width="1.1"/>';
+    }
+    // the root carries its name inside
+    if (n.big) {
+        h += text(n.x, n.y - 2, 'THE', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
+        h += text(n.x, n.y + 12, 'COLONY', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
+        return h + '</g>';
+    }
+    // level pips: small squares down the right edge, five to a column
+    if (n.max > 1) {
+        for (let i = 0; i < n.max; i++) {
+            const px = x0 + s + 4 + Math.floor(i / 5) * 7, py = y0 + 1 + (i % 5) * 7;
+            if (i < L.lvl) h += '<rect x="' + px + '" y="' + py + '" width="5" height="5" fill="' + PL + '"/>';
+            else h += '<rect x="' + (px + 0.5) + '" y="' + (py + 0.5) + '" width="4" height="4" fill="none" stroke="' + op(L.greyed ? 0.15 : 0.32) + '"/>';
+        }
+    }
+    // the label
+    const lines = n.name.split('\n');
+    const all = lines.slice();
+    if (L.price) all.push(L.price);
+    if (n.lab === 'l') {
+        const x = x0 - 9;
+        const top = n.y - (all.length - 1) * 6 + 3.5;
+        all.forEach(function (ln, i) {
+            const isP = L.price && i === all.length - 1;
+            h += text(x, top + i * 12, ln, { a: 'end', c: isP ? L.priceC : L.label, ls: isP ? 0 : '0.06em' });
+        });
+    } else if (n.lab === 't') {
+        const base = y0 - 8;
+        all.slice().reverse().forEach(function (ln, i) {
+            const isP = L.price && i === 0;
+            h += text(n.x, base - i * 12, ln, { a: 'middle', c: isP ? L.priceC : L.label, ls: isP ? 0 : '0.06em' });
+        });
+    } else {
+        const top = y0 + s + 14;
+        all.forEach(function (ln, i) {
+            const isP = L.price && i === all.length - 1;
+            h += text(n.x, top + i * 12 + (isP ? 1 : 0), ln, { a: 'middle', c: isP ? L.priceC : L.label, ls: isP ? 0 : '0.06em' });
+        });
+    }
+    return h + '</g>';
+}
+
+/* ---------------------------------------------------------------- tooltips */
+function tipFor(sid, id) {
+    const st = STATE[sid];
+    if (BIO[id]) {
+        const b = BIO[id];
+        const out = { name: b.name, lvl: b.lvl + ' / ' + b.max, eff: b.eff, bio: 1 };
+        if (b.sf === 'o') out.cost = 'not ours to open';
+        else if (b.lvl >= b.max) out.cost = 'grown';
+        else if (b.cost) out.cost = 'next ' + star(b.cost[0]) + ' + ' + b.cost[1] + ' people';
+        if (b.sf === 'f') out.quote = LINES[6].text;
+        return out;
+    }
+    const n = N[id], s = st[id];
+    if (!s) return null;
+    const out = { name: n.name.replace('\n', ' '), lvl: s[0] + ' / ' + (n.max || 1), eff: n.eff };
+    if (n.big) { out.lvl = ''; return out; }
+    if (s[2] === 'o') { out.cost = 'not ours to open'; out.eff = '. . .'; }
+    else if (s[1] === 'max') out.cost = s[0] > 0 ? 'bought' : '';
+    else out.cost = 'next ' + priceText(id, s[0], true);
+    if (s[2] === 'f') {
+        const l = LINES.filter(function (x) { return x.to === id; })[0];
+        if (l) out.quote = l.text;
+    }
+    return out;
+}
+function tipSvg(sid, id, side, dy) {
+    const d = tipFor(sid, id);
+    if (!d) return '';
+    const isBio = !!d.bio;
+    const node = isBio ? BIO[id] : N[id];
+    const half = isBio ? node.r : (node.big ? 36 : S / 2);
+    const nx = node.x + BX, ny = node.y + BY;
+    const rows = [];
+    rows.push({ t: d.name, s: 11, c: isBio ? '#ecdcc6' : BR, w: 700, ls: '0.08em' });
+    if (d.lvl) rows.push({ t: d.lvl, s: 10, c: isBio ? '#c9b8ad' : op(0.8) });
+    if (d.cost) rows.push({ t: d.cost, s: 10, c: isBio ? '#c9b8ad' : op(0.8) });
+    rows.push({ t: d.eff, s: 10, c: isBio ? '#a8968a' : op(0.62) });
+    if (d.quote) {
+        wrap('"' + d.quote + '"', 34).forEach(function (q) { rows.push({ t: q, s: 10.5, c: WARM, q: 1 }); });
+    }
+    let w = 0;
+    rows.forEach(function (r) { w = Math.max(w, r.t.length * r.s * CW + (r.ls ? r.t.length * 0.9 : 0)); });
+    w = Math.ceil(w + 24);
+    const hgt = rows.length * 15 + (d.quote ? 6 : 0) + 14;
+    const gap = 20 + (!isBio && node.max > 1 ? 16 : 0);
+    let bx = side === 'l' ? nx - half - gap - w : nx + half + gap;
+    let by = ny - 18 + (dy || 0);
+    if (side === 'box') { bx = dy[0]; by = dy[1]; side = 'l'; }
+    let h = '<g class="tip" pointer-events="none">';
+    // a square leader, out of the node and into the box
+    const lx0 = side === 'l' ? nx - half - 2 : nx + half + 2 + (!isBio && node.max > 1 ? 16 : 0);
+    const lx1 = side === 'l' ? bx + w : bx;
+    const ly = Math.min(Math.max(ny, by + 10), by + hgt - 10);
+    const lc = isBio ? '#7a6055' : op(0.6);
+    h += '<path d="M ' + lx0 + ' ' + ny + ' L ' + ((lx0 + lx1) / 2) + ' ' + ny + ' L ' + ((lx0 + lx1) / 2) + ' ' + ly + ' L ' + lx1 + ' ' + ly + '" fill="none" stroke="' + lc + '" stroke-width="1"/>';
+    h += '<rect x="' + bx + '" y="' + by + '" width="' + w + '" height="' + hgt + '" fill="' + (isBio ? '#140d0c' : RK) + '" stroke="' + lc + '" stroke-width="1"/>';
+    let y = by + 20;
+    rows.forEach(function (r, i) {
+        if (r.q && !rows[i - 1].q) y += 6;
+        h += text(bx + 12, y, r.t, { s: r.s, c: r.c, w: r.w, ls: r.ls });
+        y += 15;
+    });
+    return h + '</g>';
+}
+
+/* ---------------------------------------------------------------- the night log */
+function nightLog(sid, upTo) {
+    let h = '', y = 92;
+    const tracesOut = [];
+    h += text(40, 66, 'NIGHT LOG', { s: 9, c: WARM, op: 0.55, ls: '0.32em' });
+    LINES.slice(0, upTo).forEach(function (l, i) {
+        // older lines fall back; the last ones come closer
+        let fs = 16, lh = 22, c = WARM, o = 1;
+        if (sid === 'c') {
+            if (l.n <= 4) { fs = 13; lh = 17; o = 0.5; }
+            else if (l.n <= 6) { fs = 15; lh = 20; o = 0.8; }
+            else { fs = 19; lh = 25; c = l.n === 7 ? '#dcc3ad' : '#e8c2a6'; }
+        }
+        const maxCh = Math.floor(282 / (fs * CW));
+        const rows = wrap(l.text, maxCh);
+        h += text(40, y, 'NIGHT ' + l.n, { s: 9, c: WARM, op: o * 0.55, ls: '0.28em' });
+        let ty = y + 9 + fs;
+        let endX = 40;
+        rows.forEach(function (r, k) {
+            let s = r;
+            h += text(40, ty + k * lh, s, { s: fs, c: c, op: o });
+            if (k === 0) endX = 40 + r.length * fs * CW;
+        });
+        if (l.typing) {
+            const last = rows[rows.length - 1];
+            const cx = 40 + last.length * fs * CW + 2;
+            h += '<rect class="caret" x="' + cx + '" y="' + (ty + (rows.length - 1) * lh - fs * 0.78) + '" width="' + (fs * 0.55) + '" height="' + (fs * 0.95) + '" fill="' + c + '"/>';
+        }
+        if (l.to) tracesOut.push({ i: i, l: l, x: endX + 8, y: ty - fs * 0.33, o: o });
+        y = ty + (rows.length - 1) * lh + (sid === 'c' && l.n <= 4 ? 24 : 30);
+    });
+    return { svg: h, traces: tracesOut };
+}
+
+/* a thin warm trace from a line to the node it opened, always square */
+function logTraces(list, sid) {
+    let h = '';
+    let nb = 0, nt = 0;
+    list.forEach(function (t) {
+        const l = t.l;
+        const isBio = !!BIO[l.to];
+        const node = isBio ? BIO[l.to] : N[l.to];
+        const half = isBio ? node.r : S / 2;
+        const nx = node.x + BX, ny = node.y + BY;
+        const cx = 322 + 5 * t.i;                         // the corridor between the log and the board
+        let pts = [[t.x, t.y], [cx, t.y]];
+        if (l.how === 'left') {
+            const yy = l.to === 'question' ? ny + 10 : ny;
+            pts.push([cx, yy], [nx - half, yy]);
+        } else if (l.how === 'topleft') {
+            const yt = BY - 14 - 5 * nt++;
+            const vx = nx - half - 30;
+            pts.push([cx, yt], [vx, yt], [vx, ny + 8], [nx - half, ny + 8]);
+        } else if (l.how === 'top') {
+            const yt = BY - 14 - 5 * nt++;
+            pts.push([cx, yt], [nx, yt], [nx, ny - half]);
+        } else if (l.how === 'bottomleft') {
+            const yb = BY + BH + 14 + 5 * nb++;
+            const vx = nx - half - 12;
+            pts.push([cx, yb], [vx, yb], [vx, ny + 8], [nx - half, ny + 8]);
+        } else if (l.how === 'bottomright') {
+            const yb = BY + BH + 14 + 5 * nb++;
+            const vx = nx + half + 22;
+            pts.push([cx, yb], [vx, yb], [vx, ny + 6], [nx + half, ny + 6]);
+        }
+        const o = 0.35 + 0.4 * t.o;
+        // dotted, so the voice's threads never read as the board's own copper
+        h += '<path d="' + poly(pts) + '" fill="none" stroke="' + WARM + '" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="0.1 3.4" opacity="' + Math.min(1, o + 0.15).toFixed(2) + '"/>';
+        h += '<rect x="' + (t.x - 2) + '" y="' + (t.y - 2) + '" width="4" height="4" fill="' + WARM + '" opacity="' + o.toFixed(2) + '"/>';
+        const e = pts[pts.length - 1];
+        h += '<rect x="' + (e[0] - 2) + '" y="' + (e[1] - 2) + '" width="4" height="4" fill="' + WARM + '" opacity="' + Math.min(1, o + 0.2).toFixed(2) + '"/>';
+    });
+    return h;
+}
+
+function legend() {
+    let h = '', x = 40;
+    const y = 818;
+    const items = [
+        ['bought', '<rect x="0" y="-9" width="11" height="11" fill="' + PL + '"/>'],
+        ['can buy', '<rect x="0.75" y="-8.25" width="9.5" height="9.5" fill="none" stroke="' + BR + '" stroke-width="1.5"/>'],
+        ['locked', '<rect x="0.5" y="-8.5" width="10" height="10" fill="none" stroke="' + op(0.3) + '"/>'],
+        ['not ours to open', '<rect x="0.5" y="-8.5" width="10" height="10" fill="none" stroke="' + op(0.2) + '" stroke-dasharray="2 2"/><circle cx="7" cy="-5" r="1.9" fill="none" stroke="' + op(0.5) + '"/>']
+    ];
+    items.forEach(function (it) {
+        h += '<g transform="translate(' + x + ',' + y + ')">' + it[1] + '</g>';
+        h += text(x + 19, y, it[0], { s: 9, c: op(0.42), ls: '0.06em' });
+        x += 19 + it[0].length * 9 * CW + 22;
+    });
+    return h;
+}
+
+/* ---------------------------------------------------------------- the tissue (state c) */
+function tube(b, w0, w1, n, seed) {
+    const out = [];
+    const r = rng(seed);
+    const ph = r() * 6;
+    for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const p = bez(b, t), d = bezD(b, t);
+        const len = Math.hypot(d[0], d[1]) || 1;
+        let nx = -d[1] / len, ny = d[0] / len;
+        // the light comes from the upper left: keep the normal pointing there
+        if (nx * -0.7 + ny * -0.7 < 0) { nx = -nx; ny = -ny; }
+        const w = (w0 + (w1 - w0) * t) * (1 + 0.1 * Math.sin(t * 34 + ph));
+        out.push({ p: p, n: [nx, ny], t: [d[0] / len, d[1] / len], w: w });
+    }
+    return out;
+}
+function tubeOutline(T_, k, shift) {
+    const L = [], R = [];
+    T_.forEach(function (o) {
+        const hw = o.w * k / 2, sx = o.n[0] * o.w * shift, sy = o.n[1] * o.w * shift;
+        L.push([o.p[0] + o.n[0] * hw + sx, o.p[1] + o.n[1] * hw + sy]);
+        R.push([o.p[0] - o.n[0] * hw + sx, o.p[1] - o.n[1] * hw + sy]);
+    });
+    return poly(L.concat(R.reverse())) + ' Z';
+}
+function tubeSvg(b, w0, w1, seed, o) {
+    o = o || {};
+    const len = Math.hypot(b[3][0] - b[0][0], b[3][1] - b[0][1]) + 20;
+    const n = Math.max(10, Math.round(len / 3.2));
+    const T_ = tube(b, w0, w1, n, seed);
+    const dim = o.dim;
+    let h = '';
+    h += '<path d="' + tubeOutline(T_, 1.0, 0) + '" fill="' + (dim ? '#1a1210' : '#1d1311') + '"/>';
+    h += '<path d="' + tubeOutline(T_, 0.74, 0) + '" fill="' + (dim ? '#33251f' : '#553d35') + '"/>';
+    h += '<path d="' + tubeOutline(T_, 0.26, 0.17) + '" fill="' + (dim ? '#5a4a40' : '#b39784') + '" opacity="' + (dim ? 0.5 : 0.75) + '"/>';
+    // ribs, like a trachea: a ring every few units, bowed along the tube
+    for (let i = 1; i < T_.length - 1; i += 2) {
+        const q = T_[i], hw = q.w / 2;
+        const a = [q.p[0] + q.n[0] * hw, q.p[1] + q.n[1] * hw];
+        const c = [q.p[0] - q.n[0] * hw, q.p[1] - q.n[1] * hw];
+        const m = [q.p[0] + q.t[0] * hw * 0.55, q.p[1] + q.t[1] * hw * 0.55];
+        h += '<path d="M ' + a[0].toFixed(1) + ' ' + a[1].toFixed(1) + ' Q ' + m[0].toFixed(1) + ' ' + m[1].toFixed(1) + ' ' + c[0].toFixed(1) + ' ' + c[1].toFixed(1) +
+             '" fill="none" stroke="#140c0a" stroke-width="' + (q.w > 6 ? 1.1 : 0.7) + '" opacity="0.6"/>';
+    }
+    if (o.pulse) {
+        const centre = poly(T_.map(function (q) { return q.p; }));
+        const delay = (-(seed % 50) / 10).toFixed(1);
+        h += '<path class="pulse wide" pathLength="100" d="' + centre + '" fill="none" stroke="#f3cfb1" stroke-width="' + (w0 * 0.9).toFixed(1) + '" stroke-linecap="round" opacity="0.22" style="animation-delay:' + delay + 's"/>';
+        h += '<path class="pulse" pathLength="100" d="' + centre + '" fill="none" stroke="#f6dcc4" stroke-width="' + (w0 * 0.38).toFixed(1) + '" stroke-linecap="round" opacity="0.85" style="animation-delay:' + delay + 's"/>';
+    }
+    return h;
+}
+
+/* a closed soft blob through jittered points (Catmull-Rom, closed) */
+function blobPath(cx, cy, rx, ry, rot, seed, k) {
+    const r = rng(seed), pts = [];
+    const n = k || 9;
+    for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2;
+        const j = 0.82 + r() * 0.3;
+        const x = Math.cos(a) * rx * j, y = Math.sin(a) * ry * j;
+        const c = Math.cos(rot), s = Math.sin(rot);
+        pts.push([cx + x * c - y * s, cy + x * s + y * c]);
+    }
+    let d = 'M ' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+    for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+        const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+        const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+        d += ' C ' + c1[0].toFixed(1) + ' ' + c1[1].toFixed(1) + ' ' + c2[0].toFixed(1) + ' ' + c2[1].toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+    }
+    return d + ' Z';
+}
+
+/* the mass: everything below and right of the question, spilling past the board's edge */
+/* its edge runs down the middle of the question and of the relay: half of each is taken */
+const MASS = 'M 612 516 C 640 504 690 500 712 499 C 719 486 719 470 722 457 C 762 448 822 470 862 452 ' +
+    'C 905 436 924 392 948 360 C 970 330 1012 326 1030 356 C 1048 390 1052 440 1072 470 ' +
+    'L 1075 800 L 560 800 C 538 752 520 706 538 662 C 552 630 578 604 598 584 C 610 570 613 548 612 516 Z';
+
+function tissue(sid) {
+    let h = '';
+    const clip = 'mass-' + sid;
+    h += '<defs><clipPath id="' + clip + '"><path d="' + MASS + '"/></clipPath></defs>';
+
+    // tendrils first, so the mass covers their roots
+    const tendrils = [
+        // along the copper, back toward the colony: the trace from the root to the question
+        [[[590, 520], [560, 505], [520, 492], [516, 432]], 11, 2.5, 7],
+        // round Cryo I
+        [[[575, 610], [545, 640], [500, 628], [462, 600]], 14, 4, 11],
+        [[[560, 650], [530, 668], [495, 655], [470, 612]], 7, 2, 12],
+        // up to the machine's feed
+        [[[908, 436], [902, 408], [882, 384], [852, 374]], 13, 4, 13],
+        // over the edge of the board, to the right
+        [[[1040, 380], [1060, 360], [1070, 330], [1078, 300]], 12, 3, 14],
+        // out of the bottom edge toward Cryo I's row
+        [[[600, 760], [560, 770], [520, 760], [480, 745]], 10, 2.5, 15]
+    ];
+    tendrils.forEach(function (t) { h += tubeSvg(t[0], t[1], t[2], t[3], {}); });
+
+    h += patchesSvg(sid, [0, 1]);
+    return h + massSvg(sid, clip);
+}
+/* growth over the old square nodes: centre, radii, the side the tissue comes from */
+const PATCHES = [[466, 588, 12, 17, 0, 21, [1, 0.3]], [847, 371, 13, 17, 0, 22, [1, 0.6]]];
+function patchesSvg(sid, which) {
+    let h = '';
+    which.forEach(function (i) {
+        const p = PATCHES[i];
+        const d = blobPath(p[0], p[1], p[2], p[3], p[4], p[5], 8);
+        const pid = 'patch-' + sid + '-' + i;
+        h += '<defs><clipPath id="' + pid + '"><path d="' + d + '"/></clipPath></defs>';
+        h += '<path d="' + d + '" fill="url(#gMass)"/>';
+        h += '<g clip-path="url(#' + pid + ')">';
+        // ribs in rings round the side the tissue comes from, as in the mass
+        const ox = p[0] + p[6][0] * 40, oy = p[1] + p[6][1] * 40;
+        for (let rr = 8; rr < 80; rr += 5) {
+            h += '<circle cx="' + ox + '" cy="' + oy + '" r="' + rr + '" fill="none" stroke="#0f0908" stroke-width="2" opacity="0.55"/>';
+            h += '<circle cx="' + (ox - 1.3) + '" cy="' + (oy - 1.3) + '" r="' + rr + '" fill="none" stroke="#a88c7c" stroke-width="0.7" opacity="0.2"/>';
+        }
+        h += '<path d="' + d + '" fill="none" stroke="#0c0706" stroke-width="6" opacity="0.5"/>';
+        h += '</g>';
+        h += '<path d="' + d + '" fill="none" stroke="#8d7062" stroke-width="0.8" opacity="0.7"/>';
+    });
+    return h;
+}
+function massSvg(sid, clip) {
+    let h = '';
+    // capillaries creeping out over the board
+    const r = rng(9090);
+    const starts = [[585, 505, -2.6], [640, 462, -1.9], [700, 456, -1.6], [760, 478, -1.4], [905, 430, -1.2],
+                    [1000, 336, -1.9], [548, 640, 3.0], [540, 700, 2.8], [950, 360, -2.3], [820, 470, -1.7]];
+    starts.forEach(function (s0) {
+        let x = s0[0], y = s0[1], a = s0[2];
+        const pts = [[x, y]];
+        const steps = 7 + Math.floor(r() * 6);
+        for (let i = 0; i < steps; i++) {
+            a += (r() - 0.5) * 0.9;
+            x += Math.cos(a) * 7; y += Math.sin(a) * 7;
+            pts.push([x, y]);
+        }
+        h += '<path d="' + poly(pts.slice(0, 6)) + '" fill="none" stroke="#8a6a5f" stroke-width="1.3" opacity="0.7" stroke-linecap="round"/>';
+        h += '<path d="' + poly(pts.slice(5)) + '" fill="none" stroke="#8a6a5f" stroke-width="0.7" opacity="0.5" stroke-linecap="round"/>';
+        // and one branch
+        const m = pts[3];
+        let bx = m[0], by = m[1], ba = a + (r() < 0.5 ? 0.9 : -0.9);
+        const bp = [[bx, by]];
+        for (let i = 0; i < 4; i++) { ba += (r() - 0.5) * 0.7; bx += Math.cos(ba) * 6; by += Math.sin(ba) * 6; bp.push([bx, by]); }
+        h += '<path d="' + poly(bp) + '" fill="none" stroke="#8a6a5f" stroke-width="0.6" opacity="0.45" stroke-linecap="round"/>';
+    });
+
+    // the mass, breathing
+    h += '<g class="breathe">';
+    h += '<path d="' + MASS + '" fill="url(#gMass)"/>';
+    h += '<g clip-path="url(#' + clip + ')">';
+    // ribbed walls: arcs fanning from the far corner, each with a lit lip
+    for (let rr = 30; rr < 680; rr += 9) {
+        const cx = 1085, cy = 815, rx = rr * 1.18, ry = rr * 0.82;
+        const d = 'M ' + (cx - rx) + ' ' + cy + ' A ' + rx + ' ' + ry + ' 0 0 1 ' + cx + ' ' + (cy - ry);
+        h += '<path d="' + d + '" fill="none" stroke="#0f0908" stroke-width="' + (2.4 + 1.4 * Math.sin(rr * 0.09)).toFixed(2) + '" opacity="0.5"/>';
+        h += '<path d="' + d + '" fill="none" stroke="#a88c7c" stroke-width="0.8" opacity="0.16" transform="translate(-1.6,-1.6)"/>';
+    }
+    // tubes running inside the wall, unlit
+    h += tubeSvg([[575, 780], [640, 700], [700, 790], [790, 760]], 9, 6, 31, { dim: 1 });
+    h += tubeSvg([[640, 520], [700, 540], [760, 500], [840, 498]], 6, 5, 32, { dim: 1 });
+    h += tubeSvg([[1065, 470], [1010, 520], [1040, 600], [1068, 640]], 10, 8, 33, { dim: 1 });
+    // the spine: vertebrae down a curve and off the board
+    const spine = [[700, 640], [655, 672], [600, 712], [592, 805]];
+    const samples = [];
+    for (let i = 0; i <= 400; i++) samples.push(bez(spine, i / 400));
+    let acc = 0, last = samples[0], k = 0;
+    for (let i = 1; i < samples.length; i++) {
+        acc += Math.hypot(samples[i][0] - last[0], samples[i][1] - last[1]);
+        last = samples[i];
+        const sc = 0.82 - (i / 400) * 0.3;
+        if (acc >= 15 * sc + 2) {
+            acc = 0; k++;
+            const d = bezD(spine, i / 400);
+            const ang = Math.atan2(d[1], d[0]) * 180 / Math.PI;
+            h += '<use href="#vert" x="-22" y="-22" width="44" height="44" transform="translate(' + samples[i][0].toFixed(1) + ',' + samples[i][1].toFixed(1) + ') rotate(' + ang.toFixed(1) + ') scale(' + sc.toFixed(2) + ')" opacity="0.92"/>';
+        }
+    }
+    // a wet shadow just inside the rim
+    h += '<path d="' + MASS + '" fill="none" stroke="#0c0706" stroke-width="10" opacity="0.55"/>';
+    h += '</g>';
+    h += '<path d="' + MASS + '" fill="none" stroke="#8d7062" stroke-width="1.6"/>';
+    h += '<path d="' + MASS + '" fill="none" stroke="#e2cdb8" stroke-width="0.6" opacity="0.4" transform="translate(-0.8,-0.8)"/>';
+    h += '</g>';
+    return h;
+}
+
+/* the bought and the open vessels between the cells, with their pulse */
+function vessels() {
+    let h = '';
+    VESSELS.forEach(function (v, i) {
+        const dim = !v[5] && (BIO[v[1]].sf === 'o' || v[1] === 'substrate');
+        h += tubeSvg(v[2], v[3], v[4], 41 + i * 7, { pulse: !!v[5], dim: dim });
+    });
+    return h;
+}
+
+function bioCell(sid, id) {
+    const b = BIO[id];
+    const x = b.x, y = b.y, r = b.r;
+    const live = b.lvl > 0, open = b.buy, locked = !live && !open;
+    const grad = live ? 'gBone' : open ? 'gBoneMid' : 'gBoneDim';
+    let h = '<g class="node" data-id="' + id + '"' + (locked ? ' opacity="0.72"' : '') + '>';
+    const cid = 'cell-' + sid + '-' + id;
+    if (b.kind === 'vat') {
+        // a vat: a ribbed capsule standing on end, something curled inside it
+        const w = r * 1.35, hgt = r * 2.3;
+        const d = 'M ' + (x - w / 2) + ' ' + (y - hgt / 2 + w / 2) + ' A ' + (w / 2) + ' ' + (w / 2) + ' 0 0 1 ' + (x + w / 2) + ' ' + (y - hgt / 2 + w / 2) +
+                  ' L ' + (x + w / 2) + ' ' + (y + hgt / 2 - w / 2) + ' A ' + (w / 2) + ' ' + (w / 2) + ' 0 0 1 ' + (x - w / 2) + ' ' + (y + hgt / 2 - w / 2) + ' Z';
+        h += '<defs><clipPath id="' + cid + '"><path d="' + d + '"/></clipPath></defs>';
+        h += '<path d="' + d + '" fill="url(#gVat)" stroke="#1a110f" stroke-width="1.4"/>';
+        h += '<g clip-path="url(#' + cid + ')">';
+        // the curled one
+        h += '<path d="M ' + (x + 2) + ' ' + (y - 6) + ' C ' + (x + 10) + ' ' + (y - 2) + ' ' + (x + 8) + ' ' + (y + 12) + ' ' + (x - 1) + ' ' + (y + 11) +
+             ' C ' + (x - 8) + ' ' + (y + 10) + ' ' + (x - 7) + ' ' + (y + 2) + ' ' + (x - 3) + ' ' + (y + 1) + '" fill="none" stroke="#d9c6ae" stroke-width="3.2" stroke-linecap="round" opacity="0.55"/>';
+        h += '<circle cx="' + (x - 1) + '" cy="' + (y - 9) + '" r="4.2" fill="#d9c6ae" opacity="0.5"/>';
+        for (let k = -6; k <= 6; k++) {
+            h += '<path d="M ' + (x - w) + ' ' + (y + k * 4) + ' Q ' + x + ' ' + (y + k * 4 + 3) + ' ' + (x + w) + ' ' + (y + k * 4) + '" fill="none" stroke="#120b09" stroke-width="0.9" opacity="0.55"/>';
+        }
+        h += '<rect x="' + (x - w / 2 + 3) + '" y="' + (y - hgt / 2 + 4) + '" width="2.2" height="' + (hgt - 10) + '" fill="#ffffff" opacity="0.22"/>';
+        h += '</g>';
+        // bone collars top and bottom
+        h += '<ellipse cx="' + x + '" cy="' + (y - hgt / 2 + 3) + '" rx="' + (w / 2 + 3) + '" ry="3.4" fill="url(#gBone)" stroke="#1a110f" stroke-width="0.8"/>';
+        h += '<ellipse cx="' + x + '" cy="' + (y + hgt / 2 - 3) + '" rx="' + (w / 2 + 3) + '" ry="3.4" fill="url(#gBone)" stroke="#1a110f" stroke-width="0.8"/>';
+    } else {
+        // the processes, mirrored: a vertebra seen from the front
+        const L = function (sx) {
+            return 'M ' + (x + sx * r * 0.72) + ' ' + (y - r * 0.18) +
+                ' C ' + (x + sx * r * 1.25) + ' ' + (y - r * 0.6) + ' ' + (x + sx * r * 1.55) + ' ' + (y - r * 0.4) + ' ' + (x + sx * r * 1.95) + ' ' + (y - r * 1.0) +
+                ' C ' + (x + sx * r * 1.55) + ' ' + (y - r * 0.05) + ' ' + (x + sx * r * 1.25) + ' ' + (y + r * 0.32) + ' ' + (x + sx * r * 0.76) + ' ' + (y + r * 0.36) + ' Z';
+        };
+        const lower = function (sx) {
+            return 'M ' + (x + sx * r * 0.35) + ' ' + (y + r * 0.78) +
+                ' C ' + (x + sx * r * 0.5) + ' ' + (y + r * 1.2) + ' ' + (x + sx * r * 0.62) + ' ' + (y + r * 1.32) + ' ' + (x + sx * r * 0.82) + ' ' + (y + r * 1.42) +
+                ' C ' + (x + sx * r * 0.6) + ' ' + (y + r * 1.1) + ' ' + (x + sx * r * 0.62) + ' ' + (y + r * 0.9) + ' ' + (x + sx * r * 0.6) + ' ' + (y + r * 0.62) + ' Z';
+        };
+        [-1, 1].forEach(function (sx) {
+            h += '<path d="' + L(sx) + '" fill="url(#gProc)" stroke="#170f0d" stroke-width="0.9"/>';
+            h += '<path d="' + lower(sx) + '" fill="url(#gProc)" stroke="#170f0d" stroke-width="0.8"/>';
+        });
+        if (b.kind === 'core') {
+            // a ribbed collar round the core
+            h += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + (r * 1.32) + '" ry="' + (r * 1.12) + '" fill="none" stroke="#2a1c18" stroke-width="7"/>';
+            h += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + (r * 1.32) + '" ry="' + (r * 1.12) + '" fill="none" stroke="#a88c78" stroke-width="5" stroke-dasharray="1.6 3.2" opacity="0.8"/>';
+        }
+        h += '<defs><clipPath id="' + cid + '"><ellipse cx="' + x + '" cy="' + y + '" rx="' + r + '" ry="' + (r * 0.9) + '"/></clipPath></defs>';
+        h += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + r + '" ry="' + (r * 0.9) + '" fill="url(#' + grad + ')" stroke="#1d1310" stroke-width="1.3"/>';
+        h += '<g clip-path="url(#' + cid + ')">';
+        for (let k = -4; k <= 4; k++) {
+            const yy = y + k * r * 0.2;
+            h += '<path d="M ' + (x - r) + ' ' + yy.toFixed(1) + ' Q ' + x + ' ' + (yy + r * 0.16).toFixed(1) + ' ' + (x + r) + ' ' + yy.toFixed(1) + '" fill="none" stroke="#2c1d18" stroke-width="1.1" opacity="0.5"/>';
+            h += '<path d="M ' + (x - r) + ' ' + (yy - 1.2).toFixed(1) + ' Q ' + x + ' ' + (yy + r * 0.16 - 1.2).toFixed(1) + ' ' + (x + r) + ' ' + (yy - 1.2).toFixed(1) + '" fill="none" stroke="#f2e6d6" stroke-width="0.6" opacity="0.22"/>';
+        }
+        h += '</g>';
+        // the slit, and what glows in it when it lives
+        const slit = 'M ' + x + ' ' + (y - r * 0.6) + ' Q ' + (x + r * 0.2) + ' ' + y + ' ' + x + ' ' + (y + r * 0.6) + ' Q ' + (x - r * 0.2) + ' ' + y + ' ' + x + ' ' + (y - r * 0.6) + ' Z';
+        h += '<path d="' + slit + '" fill="#120a09" stroke="#e3d2bc" stroke-width="0.7" opacity="0.9"/>';
+        if (live) h += '<path class="slit-glow" d="' + slit + '" fill="url(#gSlit)" style="animation-delay:-' + (r % 4) + 's"/>';
+        h += '<ellipse cx="' + (x - r * 0.38) + '" cy="' + (y - r * 0.46) + '" rx="' + (r * 0.26) + '" ry="' + (r * 0.11) + '" transform="rotate(-24 ' + (x - r * 0.38) + ' ' + (y - r * 0.46) + ')" fill="#ffffff" opacity="0.32"/>';
+        if (open) {
+            // what can be grown now gets the bright rim, in bone
+            h += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + (r + 3.5) + '" ry="' + (r * 0.9 + 3.5) + '" fill="none" stroke="#f1e4d2" stroke-width="1.2"/>';
+        }
+    }
+    // Surface's ring
+    if (b.sf) {
+        const rx = x + r * 0.95, ry = y - r * 1.05;
+        h += b.sf === 'f'
+            ? '<circle cx="' + rx + '" cy="' + ry + '" r="3.8" fill="' + WARM + '"/>'
+            : '<circle cx="' + rx + '" cy="' + ry + '" r="3.8" fill="none" stroke="' + WARM + '" stroke-width="1.1" opacity="0.8"/>';
+    }
+    // pips: beads under the cell
+    let below = y + (b.kind === 'vat' ? r * 1.15 : r * 0.9) + 8;
+    if (b.max > 1) {
+        const span = (b.max - 1) * 6.5;
+        for (let i = 0; i < b.max; i++) {
+            const px = x - span / 2 + i * 6.5;
+            h += i < b.lvl
+                ? '<circle cx="' + px + '" cy="' + below + '" r="2.3" fill="#dccdb6"/>'
+                : '<circle cx="' + px + '" cy="' + below + '" r="2" fill="#2a1c19" stroke="#8a6a5f" stroke-width="0.7"/>';
+        }
+        below += 6;
+    }
+    // the label, in bone
+    const nameC = locked ? '#7d6a60' : open && !live ? '#f1e4d2' : '#cdbcae';
+    let price = null;
+    if (b.sf !== 'o' && b.lvl < b.max && b.cost) price = [star(b.cost[0]), '+ ' + b.cost[1] + ' people'];
+    if (b.lab === 'l') {
+        h += text(x - r * 1.9 - 6, y + 2, b.name, { a: 'end', c: nameC, ls: '0.06em' });
+    } else {
+        h += text(x, below + 12, b.name, { a: 'middle', c: nameC, ls: '0.06em' });
+        if (price) price.forEach(function (pl, k) { h += text(x, below + 24 + k * 11, pl, { a: 'middle', c: open ? '#f1e4d2' : '#a08b80' }); });
+    }
+    return h + '</g>';
+}
+
+/* ---------------------------------------------------------------- one state */
+const PINNED = { a: ['seam', 'r', 0], b: ['lossless', 'r', -4], c: ['wetware', 'box', [742, 682]] };
+const MECH_IDS = Object.keys(N);
+
+function render(svg) {
+    const sid = svg.dataset.state;
+    const st = STATE[sid];
+    let h = '';
+    h += '<rect x="0" y="0" width="1440" height="840" fill="' + RK + '"/>';
+    h += '<g transform="translate(' + BX + ',' + BY + ')">';
+    h += boardBase(sid);
+    h += traces(st);
+    h += tags(st);
+    h += '</g>';
+
+    let log = null;
+    if (sid !== 'a') log = nightLog(sid, sid === 'b' ? 4 : 9);
+
+    if (sid === 'b') h += logTraces(log.traces, sid);
+
+    h += '<g transform="translate(' + BX + ',' + BY + ')">';
+    MECH_IDS.forEach(function (id) { if (st[id]) h += mechNode(st, id, sid); });
+    if (sid === 'c') {
+        h += tissue(sid);
+        // the half-taken nodes keep their names on top of the tissue
+        ['question', 'lossless'].forEach(function (id) {
+            (mechNode(st, id, sid).match(/<text[^>]*>[^<]*<\/text>/g) || []).forEach(function (t) { h += t; });
+        });
+        h += text(760, 778, 'BIOLOGICAL', { s: 9, c: '#b9a594', ls: '0.32em', op: 0.85 });
+    }
+    h += '</g>';
+
+    if (sid === 'c') {
+        h += logTraces(log.traces, sid);
+        h += '<g transform="translate(' + BX + ',' + BY + ')">';
+        h += vessels();
+        Object.keys(BIO).forEach(function (id) { h += bioCell(sid, id); });
+        h += '</g>';
+    }
+
+    if (log) h += log.svg;
+    h += legend();
+
+    const pin = PINNED[sid];
+    h += tipSvg(sid, pin[0], pin[1], pin[2]);
+    h += '<g class="hover-layer"></g>';
+    svg.innerHTML = h;
+
+    // hover: any node shows its tooltip, the pinned one stays open
+    const layer = svg.querySelector('.hover-layer');
+    svg.querySelectorAll('.node').forEach(function (g) {
+        const id = g.dataset.id;
+        if (id === pin[0]) return;
+        g.addEventListener('mouseenter', function () {
+            const isBio = !!BIO[id];
+            const node = isBio ? BIO[id] : N[id];
+            const side = (node.x + BX) > 1080 ? 'l' : 'r';
+            layer.innerHTML = tipSvg(sid, id, side, 0);
+        });
+        g.addEventListener('mouseleave', function () { layer.innerHTML = ''; });
+    });
+}
+
+document.querySelectorAll('svg.board').forEach(render);
+
+/* ---------------------------------------------------------------- tabs */
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+        document.getElementById('state-' + t.dataset.to).scrollIntoView({ behavior: 'smooth' });
+    });
+});
+const io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        const k = e.target.id.slice(6);
+        tabs.forEach(function (t) { t.classList.toggle('on', t.dataset.to === k); });
+    });
+}, { threshold: 0.55 });
+document.querySelectorAll('section.state').forEach(function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>
