@@ -59,14 +59,23 @@ Rows marked *proposal* are mine (the WAR session) and are for Ola and the owners
 
 ## 3. The sheet
 
-| | I · TRIVIAL (built) | II · CAPITAL (board) | III · WAR (*proposal*) | IV · THE DEEP (*sketch*) | V (*sketch*) |
+| | I · TRIVIAL (built) | II · CAPITAL (board) | III · WAR (*proposal*) | IV · THE DEEP (*proposal*) | V (*sketch*) |
 |---|---|---|---|---|---|
+<<<<<<< HEAD
 | **what the machine is** | the game itself | the factory, far back in a large room | the arms factory under the war | the machine room on the lid, slow | whatever comes up with us |
 | **pulse comes from** | games a second (58 to 128 bpm) | the gap between bass hits (calm city = long gap) | the clock to the next landing | the day tick; cryo winds it up | the owner decides |
 | **layers** | heartbeat, tick, bass, shimmer, generator hum, a voice per board | bass, tones, factory, life (short voices, small steps, a far choir in a large city; no noise), traffic, computer, rival (a tone out of key and their drum) | their drum, our drum, bass, tones with holes, arms factory, murmur, drone, shells | drone, drips, the machine, the Surface's voice, the tree | |
 | **what bends the harmony** | nothing: home | the rival, in five steps: a foreign note (E♭) and a faint drum halfway between our bass hits, F→Gm, B♭→E♭, C→A major and the drum strikes twice, the tones chafe (minor ninth, tritone, wider beating) and the people go quiet. A raid: the city holds its breath | the war keeps step five's chords (Dm, E♭, Gm, A) and the doomsday drone pulls home itself upward | the Watcher: slow detuning as it changes state | the major third arrives |
 | **carried over from the act before** | | the three rising notes, the key, the chords | the rival's drum and the bent chords, the murmur, the factory | the last note of the war, the machine | the deep's low D |
 | **ending note** | **D** (struck once, rings 7 s) | **C♯** (*proposal:* the A major chord's cutting third, left hanging on the WAR card; the CAPITAL session agrees, Ola decides) | **E♭** (*proposal:* the drone has reached it when the surface is dead) | **D, two octaves down** (*proposal*) | **F♯** (*proposal:* the first major third in the game) |
+=======
+| **what the machine is** | the game itself | the factory, far back in a large room | the arms factory under the war | the star machine in its own room on top: gears, flywheel, chain, three tubes; it plays the game on the colony's energy | whatever comes up with us |
+| **pulse comes from** | games a second (58 to 128 bpm) | the gap between bass hits (calm city = long gap) | the clock to the next landing | awake: the machine's throws (games a day, so energy fed is tempo). Asleep: no pulse at all, only the roll of the years | the owner decides |
+| **layers** | heartbeat, tick, bass, shimmer, generator hum, a voice per board | bass, tones, factory, murmur, traffic, computer, rival | their drum, our drum, bass, tones with holes, arms factory, murmur, drone, shells | awake: the machine, cable hum, drips, a thin murmur. Asleep: the roll, the lamps, the Watcher's tone, the Surface typing. Late: breath and a heartbeat | |
+| **what bends the harmony** | nothing: home | the rival, in five steps: a foreign note, F→Gm, B♭→E♭, C→A major, the tones chafe | the war keeps step five's chords (Dm, E♭, Gm, A) and the doomsday drone pulls home itself upward | stability: the Watcher's tone drifts flat as it falls; a snap pulls everything true at once. After The question, a heartbeat takes over the machine's pulse, room by room | the major third arrives |
+| **carried over from the act before** | | the three rising notes, the key, the chords | the rival's drum and the bent chords, the murmur, the factory | the war's E♭ falling two octaves to D on the IV card; the machine, moved up top; the murmur, now thin | the deep's low D |
+| **ending note** | **D** (struck once, rings 7 s) | **C♯** (*proposal:* the A major chord's cutting third, left hanging on the WAR card) | **E♭** (*proposal:* the drone has reached it when the surface is dead) | **D, two octaves down** (*proposal*): the people ending leaves it alone under the shaft; the Unity ending has every voice in the colony sing that one D in unison | **F♯** (*proposal:* the first major third in the game) |
+>>>>>>> a5b3232 (docs: score sheet, the IV column and section 4b rewritten by the DEEP session)
 
 **The melody of endings:** D · C♯ · E♭ · low D · F♯. Home, a semitone under home (longing),
 a semitone over home (the wound), home again far below, and at last the note that turns
@@ -126,6 +135,37 @@ fall two octaves to D.
 **Mix.** Music sits under the words as in I. Landings are at least twenty seconds apart,
 so events are sparse by design; the fight flashes of fists and swords stay silent.
 
+## 4b. IV · THE DEEP in detail (*proposal*, from the DEEP session, 2026-10-02)
+
+Written against the locked design (`2026-10-02-chapter-iv-tree-and-bio.md`). Two
+worlds, and they must sound like two worlds: awake has a pulse and people, asleep has
+neither.
+
+| layer | answers | driven by | notes |
+|---|---|---|---|
+| **the machine** (awake) | are we making stars | games a day = energy fed; each throw a soft mechanical clack, a win the pling | rule 1: the same machine, now alone in a room on top; starved it slows and droops in pitch, fed it runs to a whirr |
+| **cable hum** (awake) | where does the energy go | spare energy; a low fifth (D and A) that thickens with the POWER branch | the blue threads in the cables, heard |
+| **murmur and drips** (awake) | are the people still here | population; very thin from the start, thinner with every sealed sector | carried from II and III; in the bio road it does not stop, it changes register (see heartbeat) |
+| **the roll** (asleep) | how fast is time going | years per second (cryo tier): a rising filtered noise, like a tape winding, one step up per tier | no pulse asleep: the odometer is the only motion |
+| **the lamps** (asleep) | what is still running | one quiet pentatonic tone per automated room, slow, out of step with each other | the lamp sequence event plays those same tones in order; a lying lamp is a tone outside the chord |
+| **the Watcher's tone** (asleep) | how stable are we | stability: a held D that drifts flat as stability falls, with slow beating against the lamps | a snap is the thunk plus the tone jumping back to true: the cause and the effect in one sound |
+| **the Surface typing** (asleep) | someone is here | each letter of its line a soft tick; the tick's pitch sits a quarter tone outside the scale | the only sound in the game allowed out of tune. From The question on it moves into tune, line by line: by Unity it is in the chord |
+| **breath and heartbeat** (bio) | how much of the base is body | converted rooms: each adds weight to a slow heartbeat at the machine's own tempo, and a breath on the sealed sector's rhythm | the machine's clack fades as the heartbeat grows: mechanical to organic at the same tempo, never a cut |
+
+**Words in IV.** thunk = a purchase in the tree (a relay closing; in the tissue, a wet
+knock). rise = Surface opening a node. knock = an alarm waking the colony. boom = the
+shaft blown at the descent, and never again. swell = the IV card and the V card.
+
+**The two endings.** The people go up at survival 85: the murmur climbs the shaft and
+leaves the low D alone below. Unity: "Woke: everyone is here." and every voice of the
+murmur lands on the same low D, in unison, the heartbeat under it. One note, all
+voices. V's F♯ answers it.
+
+**Voices (open question 3).** Proposal: neither the Watcher nor the Surface speaks.
+They stay text. The Surface's voice is its typing, out of tune until it is not; the
+Watcher's voice is the tone that drifts and snaps. Speech would explain what the
+chapter wants the player to feel their way into.
+
 ## 5. How the sessions work together
 
 - **One row per act, filled in before building.** Change another act's row only by
@@ -146,3 +186,5 @@ so events are sparse by design; the fight flashes of fists and swords stay silen
    war have no pulse at all, only events over the drone?
 3. Should the Watcher and the Surface have voices in this system (IV's owner decides
    with you), or do they stay text in the quiet?
+   The DEEP session proposes text only, with the typing and the drifting tone as
+   their voices (section 4b).
