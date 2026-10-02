@@ -15,6 +15,35 @@ import { buildingData } from './buildings-config.js';
 import { FORT_COST, plateMaxHp } from '../phase3/war.js';
 import { formatCount } from './economy.js';
 
+/** People needed before a plate may be upgraded to each type. */
+const UPGRADE_POP_REQ = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 };
+
+/** What this plate can become with the research done so far; null if nothing. */
+function upgradeTargetFor(building, r) {
+    if (building.type === 'home' && r.apartmentResearched) return 'apartment';
+    if (building.type === 'store' && r.storeResearched) return 'superStore';
+    if (building.type === 'apartment' && r.urbanismResearched) return 'skyscraper';
+    if (building.type === 'skyscraper' && r.megastructureResearched) return 'district';
+    return null;
+}
+
+/** The "+" on a plate: what the upgrade gives and what it costs. */
+function upgradeButtonHTML(building, upgradeTarget, canAfford, isNew) {
+    const upgradeInfo = buildingData[upgradeTarget];
+    let effectHTML = '';
+    if (upgradeInfo.capacity && building.capacity) {
+        effectHTML = `+${(upgradeInfo.capacity - building.capacity).toLocaleString('en-US')} <i data-lucide='users' class='w-4 h-4'></i>`;
+    } else if (upgradeInfo.supply && building.supply) {
+        effectHTML = `+${upgradeInfo.supply - building.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`;
+    }
+    return `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" data-building-id="${building.id}" data-upgrade-target="${upgradeTarget}" ${canAfford ? '' : 'disabled'}>+
+                <div class="tooltip">
+                    <div class="effect">${effectHTML}</div>
+                    <div class="cost">${formatCount(upgradeInfo.cost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
+                </div>
+            </button>`;
+}
+
 /**
  * Generates the inner HTML string for a building slot.
  *
@@ -62,36 +91,18 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
         </button>`;
     }
 
-    let upgradeTarget = null;
-    if (building.type === 'home' && apartmentResearched) { upgradeTarget = 'apartment'; }
-    else if (building.type === 'store' && storeResearched) { upgradeTarget = 'superStore'; }
-    else if (building.type === 'apartment' && urbanismResearched) { upgradeTarget = 'skyscraper'; }
-    else if (building.type === 'skyscraper' && megastructureResearched) { upgradeTarget = 'district'; }
+    const upgradeTarget = upgradeTargetFor(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched });
 
     if (upgradeTarget) {
-        const upgradeInfo = buildingData[upgradeTarget];
-        const popReq = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 }[upgradeTarget];
-        const canAfford = stars >= upgradeInfo.cost;
-        const unlocked = population >= popReq;
+        const canAfford = stars >= buildingData[upgradeTarget].cost;
+        const unlocked = population >= UPGRADE_POP_REQ[upgradeTarget];
         if (unlocked && canAfford) classes += ' upgradeable';
-
-        let effectHTML = '';
-        if (upgradeInfo.capacity && building.capacity) {
-            effectHTML = `+${(upgradeInfo.capacity - building.capacity).toLocaleString('en-US')} <i data-lucide='users' class='w-4 h-4'></i>`;
-        } else if (upgradeInfo.supply && building.supply) {
-            effectHTML = `+${upgradeInfo.supply - building.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`;
-        }
 
         if (unlocked) {
             const upgradeKey = `${building.id}-${upgradeTarget}`;
             const isNew = initialLoadDone && !notifiedUpgrades.has(upgradeKey);
             notifiedUpgrades.add(upgradeKey);
-            actionButtons += `<button class="building-action-btn upgrade-btn${isNew ? ' upgrade-new' : ''}" data-building-id="${building.id}" data-upgrade-target="${upgradeTarget}" ${canAfford ? '' : 'disabled'}>+
-                <div class="tooltip">
-                    <div class="effect">${effectHTML}</div>
-                    <div class="cost">${formatCount(upgradeInfo.cost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div>
-                </div>
-            </button>`;
+            actionButtons += upgradeButtonHTML(building, upgradeTarget, canAfford, isNew);
         }
     }
 
@@ -113,7 +124,10 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
         } else {
             iconHTML = `<i data-lucide="${icon}" class="w-10 h-10 text-slate-600 relative"></i>`;
         }
-        content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="2" stroke-dasharray="113" stroke-dashoffset="113" style="stroke: #94a3b8;"></circle></svg>${iconHTML}`;
+        // The ring is drawn where it stands (people / room), so a plate that is
+        // rendered again does not run a lap from empty.
+        const filled = building.capacity ? Math.min(1, (building.population || 0) / building.capacity) : 0;
+        content = `<svg class="progress-ring" viewBox="0 0 40 40"><circle class="progress-ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle><circle id="pop-ring-${building.id}" class="progress-ring-fg pop-ring" cx="20" cy="20" r="18" fill="none" stroke-width="2" stroke-dasharray="113" stroke-dashoffset="${113 - filled * 113}" style="stroke: #94a3b8;"></circle></svg>${iconHTML}`;
     } else if (building.type === 'factory') {
         // One tile of chapter I's factory: a board of nine games (style-stage2.css, .mini-factory).
         content = `<div class="relative flex items-center justify-center w-full h-full">
@@ -201,11 +215,12 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
      * @param {object} gameState - Full game state
      * @param {Array} buildings - The gameState.buildings array (used for indexOf fallback)
      * @param {boolean} initialLoadDone - Whether initial load is complete
+     * @returns {Element|null} The "+" button if one was just added and is new to the player
      */
     function refreshBuildingActions(building, slot, gameState, buildings, initialLoadDone) {
-        if (!building || !slot) return;
+        if (!building || !slot) return null;
         const innerDiv = slot.querySelector('.building');
-        if (!innerDiv) return;
+        if (!innerDiv) return null;
 
         // The ◆ button: every targetable plate, districts included (they have no
         // upgrade, which is why this used to be skipped and the button froze).
@@ -224,34 +239,30 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
         const clearBtn0 = innerDiv.querySelector('.clear-btn');
         if (clearBtn0) clearBtn0.disabled = gameState.stars < Math.round((buildingData[building.type]?.cost || 0) * 0.3);
 
-        let upgradeTarget = null;
-        if (building.type === 'home' && gameState.apartmentResearched) upgradeTarget = 'apartment';
-        else if (building.type === 'store' && gameState.storeResearched) upgradeTarget = 'superStore';
-        else if (building.type === 'apartment' && gameState.urbanismResearched) upgradeTarget = 'skyscraper';
-        else if (building.type === 'skyscraper' && gameState.megastructureResearched) upgradeTarget = 'district';
-
-        if (upgradeTarget) {
-            const upgradeInfo = buildingData[upgradeTarget];
-            const popReq = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 }[upgradeTarget];
-            const canAfford = gameState.stars >= upgradeInfo.cost;
-            const unlocked = gameState.population >= popReq;
-
-            // Upgradeable highlight class on wrapper
-            if (unlocked && canAfford) innerDiv.classList.add('upgradeable');
-            else innerDiv.classList.remove('upgradeable');
-
-            // Keep upgrade button disabled state current
-            const upgradeBtn = innerDiv.querySelector('.upgrade-btn');
-            if (upgradeBtn) {
-                upgradeBtn.disabled = !canAfford;
-            } else if (unlocked) {
-                // Upgrade button doesn't exist yet (newly unlocked by research purchase).
-                // Fall back to full re-render for this slot only.
-                renderGridSlot(buildings.indexOf(building), buildings, gameState, initialLoadDone);
-            }
-        } else {
+        const upgradeTarget = upgradeTargetFor(building, gameState);
+        if (!upgradeTarget) {
             innerDiv.classList.remove('upgradeable');
+            return null;
         }
+        const canAfford = gameState.stars >= buildingData[upgradeTarget].cost;
+        const unlocked = gameState.population >= UPGRADE_POP_REQ[upgradeTarget];
+        innerDiv.classList.toggle('upgradeable', unlocked && canAfford);
+
+        const upgradeBtn = innerDiv.querySelector('.upgrade-btn');
+        if (upgradeBtn) {
+            upgradeBtn.disabled = !canAfford;
+            return null;
+        }
+        if (!unlocked || building.razed) return null;
+        // Newly possible (research bought, or the people are there now): the "+"
+        // is added to the plate as it stands. Nothing is rebuilt, so the ring and
+        // the icon stay put and only the button arrives.
+        const upgradeKey = `${building.id}-${upgradeTarget}`;
+        const isNew = initialLoadDone && !notifiedUpgrades.has(upgradeKey);
+        notifiedUpgrades.add(upgradeKey);
+        innerDiv.insertAdjacentHTML('beforeend', upgradeButtonHTML(building, upgradeTarget, canAfford, isNew));
+        scheduleIconRefresh();
+        return isNew ? innerDiv.querySelector('.upgrade-btn') : null;
     }
 
     /**
@@ -263,10 +274,13 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
      * @param {boolean} initialLoadDone - Whether initial load is complete
      */
     function refreshAllBuildingActions(buildings, gameState, initialLoadDone) {
+        // Several new "+" at once (a research purchase) arrive one after another.
+        let arrived = 0;
         buildings.forEach((b, i) => {
             if (!b) return;
             const slot = landGrid.children[i];
-            refreshBuildingActions(b, slot, gameState, buildings, initialLoadDone);
+            const added = refreshBuildingActions(b, slot, gameState, buildings, initialLoadDone);
+            if (added) added.style.animationDelay = `${arrived++ * 70}ms`;
         });
     }
 

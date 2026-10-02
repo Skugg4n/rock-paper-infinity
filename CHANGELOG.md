@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.59.1 - 2026-10-02 (chapter II, polish)
+
+### Things arrive, they do not clunk in
+
+- **The rings stand still when an upgrade opens** (B165). Buying the research that lets houses be levelled up used to rebuild every plate, and every ring ran a lap from empty. Now the "+" is added to the plate as it stands and the buttons arrive one after another. A ring is also drawn where it stands whenever a plate is rendered again (built, upgraded, fortified).
+- **The minus is small and cannot be hit by mistake** (B166). It is 16 px (was 24), tucked into the corner, and with a mouse it is exactly as big as it looks. Before, its enlarged click target reached in under the neighbouring house's "+", invisible, so a click on the left part of a plus sold the house beside it. The plus always lies on top. Touch keeps the large target and its two taps.
+- **The counters count at an even pace** (B167). Stars and science move once a second in the rules; the display now glides from the last second's value to this one's instead of rushing and resting. It never shows more than you have. The rings of the houses fill over the whole second in the same way.
+- **New things arrive softly**: a plate that is built or upgraded settles in, and a button that appears in the right-hand column (research, the market stall) pops in like the house and store buttons do. A button that arrives greyed out stays grey.
+
 ## v1.59.0 - 2026-10-02 (sound, chapter I)
 
 ### The game has sound

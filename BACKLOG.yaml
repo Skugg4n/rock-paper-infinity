@@ -1579,3 +1579,34 @@ items:
     status: done
     resolved_in: v1.57.0
     notes: "The better factory animation in the city follows the direction chosen in B163."
+
+  - id: B165
+    added: 2026-10-02
+    source: "chat 2026-10-02 (CAPITAL polish)"
+    request: |
+      Chapter II: things must animate in nicely, not clunk in. When the level
+      up from house to apartment has just been bought, every house's ring
+      runs a lap, KLONK. That is not pretty.
+    status: done
+    resolved_in: v1.59.1
+    notes: "The plates were rebuilt on a research purchase (ring drawn from empty). Now only the + is added; rings are drawn where they stand."
+
+  - id: B166
+    added: 2026-10-02
+    source: "chat 2026-10-02 (CAPITAL polish)"
+    request: |
+      Minus (sell) on a house is very close to level up on the house beside
+      it, so a wrong click sells a building quite often. Make the minus smaller.
+    status: done
+    resolved_in: v1.59.1
+    notes: "Root cause: the minus had an invisible 44 px click target that lay over the neighbour's plus. Smaller, tucked in, no enlarged target with a mouse, not clickable while invisible, plus on top."
+
+  - id: B167
+    added: 2026-10-02
+    source: "chat 2026-10-02 (CAPITAL polish)"
+    request: |
+      The counter stutters upward: counts up, pauses, counts up, pauses,
+      about once a second.
+    status: done
+    resolved_in: v1.59.1
+    notes: "The display eased toward a value that only moves once a second. It now glides linearly across the second (never ahead of the real value)."

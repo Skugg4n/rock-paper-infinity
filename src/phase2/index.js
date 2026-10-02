@@ -63,9 +63,15 @@ async function goDeep() {
 let _ants = null;
 let _islands = null;
 
-// Smooth counter rolling — lerp displayed values toward actual values each fastUiTick
+// Smooth counter rolling. The real values move once a second (logicTick); the
+// display glides from the previous second's value to this one's, so it counts
+// at an even pace instead of rushing and resting. It is never ahead of the
+// real value. The lerp on top softens sudden changes (a purchase, a sale).
 let _displayedStars = 0;
 let _displayedScience = 0;
+let _starsStep = 0;      // what the last logic tick added
+let _scienceStep = 0;
+let _stepAt = 0;         // when it did (performance.now())
 const COUNTER_LERP = 0.18;
 
 // Progressive disclosure — track which thresholds have already fired
@@ -749,6 +755,7 @@ export function init() {
           // --- BUILDING & RENDERING LOGIC ---
           const notifiedUpgrades = new Set();
           let initialLoadDone = false;
+          let uiSettled = false;   // the first full UI pass is done: from here on, new buttons arrive
 
           // --- ICON REFRESH (debounced) ---
           let iconRefreshPending = false;
@@ -763,6 +770,8 @@ export function init() {
 
           const renderer = createRenderer({ landGrid: ui.landGrid, scheduleIconRefresh, notifiedUpgrades });
           const renderGridSlot = (index) => renderer.renderGridSlot(index, gameState.buildings, gameState, initialLoadDone);
+          /** A plate that was just built or upgraded settles in softly. */
+          const settlePlate = (index) => ui.landGrid.children[index]?.querySelector('.building')?.classList.add('building-arrive');
           const refreshAllBuildingActions = () => renderer.refreshAllBuildingActions(gameState.buildings, gameState, initialLoadDone);
 
           // Ants: people and cars on the streets, the enemy on its island
@@ -867,6 +876,7 @@ export function init() {
                       building[key] = upgradeData[key];
                   });
                   renderGridSlot(index);
+                  settlePlate(index);
               }
           }
           
@@ -877,6 +887,7 @@ export function init() {
                   const newId = Date.now() + Math.random();
                   gameState.buildings[index] = { id: newId, type, population: 0, ...buildingData[type]};
                   renderGridSlot(index);
+                  settlePlate(index);
               }
           }
   
@@ -911,6 +922,13 @@ export function init() {
               }
           }
   
+          /** Shows or hides a button; one that becomes visible during play arrives softly. */
+          function showBtn(btn, show) {
+              const wasHidden = btn.classList.contains('hidden');
+              btn.classList.toggle('hidden', !show);
+              if (show && wasHidden && uiSettled) arrive(btn);
+          }
+
           function updateAllUI() {
               const pop = gameState.population;
               const canAfford = (item) => gameState.stars >= (item.cost || 0) && gameState.science >= (item.scienceCost || 0);
@@ -940,7 +958,7 @@ export function init() {
 
                   // Done means gone, multi-level too; and chapter II research hides during the war
                   const warOn = !!gameState.war?.active;
-                  btn.classList.toggle('hidden', !shouldShow || isPurchased || warOn);
+                  showBtn(btn, shouldShow && !isPurchased && !warOn);
                   if (shouldShow && !isPurchased && !warOn) anyUpgradeVisible = true;
               });
               ui.buildSeparator.classList.toggle('hidden', !anyUpgradeVisible);
@@ -984,7 +1002,7 @@ export function init() {
               setTooltip(ui.buildHomeBtn, { effect: `+${buildingData.home.capacity} <i data-lucide='users' class='w-4 h-4'></i>`, cost: buildingData.home.cost });
               setTooltip(ui.buildStoreBtn, { effect: `+${buildingData.store.supply} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`, cost: buildingData.store.cost });
               // Market stall: visible once food matters (5 pop), no land needed
-              ui.buildStallBtn.classList.toggle('hidden', pop < 5 && !(gameState.stalls > 0));
+              showBtn(ui.buildStallBtn, pop >= 5 || gameState.stalls > 0);
               ui.buildStallBtn.disabled = gameState.stars < stallCost(gameState.stalls || 0);
               setTooltip(ui.buildStallBtn, { effect: `+${STALL_SUPPLY * Math.pow(2, gameState.gmoLevel)} <i data-lucide='shopping-basket' class='w-4 h-4'></i>/s`, cost: stallCost(gameState.stalls || 0) });
               ui.stallCount.textContent = String(gameState.stalls || 0);
@@ -1103,8 +1121,12 @@ export function init() {
                   gameState.netStarChangePerSecond = netStarChange;
               }
               if (!skipGrowth) {
+                  const stars0 = gameState.stars, science0 = gameState.science;
                   gameState.stars = Math.max(0, gameState.stars + netStarChange);
                   gameState.science = Math.max(0, gameState.science + netScienceChange);
+                  _starsStep = gameState.stars - stars0;
+                  _scienceStep = gameState.science - science0;
+                  _stepAt = performance.now();
               }
 
               const troops = gameState.war?.active ? ((gameState.war.defence || 0) + (gameState.war.force || 0) + (gameState.war.air || 0)) * FOOD_PER_UNIT : 0;
@@ -1219,10 +1241,13 @@ export function init() {
           }
           function _fastUiTickBody() {
               // Smooth counter rolling: lerp toward actual values for a "spinning numbers" effect
-              _displayedStars += (gameState.stars - _displayedStars) * COUNTER_LERP;
-              _displayedScience += (gameState.science - _displayedScience) * COUNTER_LERP;
-              if (Math.abs(gameState.stars - _displayedStars) < 0.5) _displayedStars = gameState.stars;
-              if (Math.abs(gameState.science - _displayedScience) < 0.5) _displayedScience = gameState.science;
+              const left = 1 - Math.min(1, (performance.now() - _stepAt) / 1000);   // of the current second
+              const starsNow = Math.max(0, gameState.stars - _starsStep * left);
+              const scienceNow = Math.max(0, gameState.science - _scienceStep * left);
+              _displayedStars += (starsNow - _displayedStars) * COUNTER_LERP;
+              _displayedScience += (scienceNow - _displayedScience) * COUNTER_LERP;
+              if (Math.abs(starsNow - _displayedStars) < 0.5) _displayedStars = starsNow;
+              if (Math.abs(scienceNow - _displayedScience) < 0.5) _displayedScience = scienceNow;
               // Astronomical, but readable: 1.90 T, the full number on hover
               showCount(ui.starCount, _displayedStars);
               showCount(ui.scienceCount, _displayedScience);
@@ -1455,19 +1480,10 @@ export function init() {
                   gameState.stars -= (upgradeData.cost || 0);
                   gameState.science -= (upgradeData.scienceCost || 0);
                   gameState[flag] = true;
-                  // Re-render only the buildings that gain a new upgrade option from this
-                  // research. Urbanisim enables home→apartment and apartment→skyscraper
-                  // upgrade buttons; Megastructure enables skyscraper→district. Other buildings
-                  // are unaffected and must not be touched — rebuilding them resets their rings.
-                  gameState.buildings.forEach((b, i) => {
-                      if (!b) return;
-                      const affected =
-                          (flag === 'apartmentResearched' && b.type === 'home') ||
-                          (flag === 'storeResearched' && b.type === 'store') ||
-                          (flag === 'urbanismResearched' && (b.type === 'home' || b.type === 'apartment')) ||
-                          (flag === 'megastructureResearched' && b.type === 'skyscraper');
-                      if (affected) renderGridSlot(i);
-                  });
+                  // Research that opens an upgrade puts a "+" on the plates it concerns.
+                  // The plates are not rebuilt (that made every ring run a lap): the
+                  // buttons are added where they stand, one after another.
+                  refreshAllBuildingActions();
               }
           };
   
@@ -1567,6 +1583,8 @@ export function init() {
                 btn.classList.remove('btn-arrive');
                 void btn.offsetWidth;
                 btn.classList.add('btn-arrive');
+                // Let go when it has landed, so hover and the greyed state are the button's own again.
+                btn.addEventListener('animationend', () => btn.classList.remove('btn-arrive'), { once: true, signal });
             }
 
             /**
@@ -1650,6 +1668,7 @@ export function init() {
                 initialLoadDone = true;
                 logicTick(true);
                 updateAllUI();
+                uiSettled = true;
                 saveGameState();
             }
 
@@ -1699,6 +1718,9 @@ export function teardown() {
   savingEnabled = true;
   _displayedStars = 0;
   _displayedScience = 0;
+  _starsStep = 0;
+  _scienceStep = 0;
+  _stepAt = 0;
   _starsPerPersonRevealed = false;
   _scienceRevealed = false;
 }
