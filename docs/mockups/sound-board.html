@@ -51,6 +51,8 @@
       <button data-sfx="lucky">Klövern</button>
       <button data-sfx="knock">Batteriet tomt</button>
       <button data-sfx="swell">Kapitelkort</button>
+      <button data-sfx="boom1">Bom (blixten, första)</button>
+      <button data-sfx="boom2">Bom (blixten, andra)</button>
     </div>
     <p class="hint">Plingen stiger en ton för varje vinst i rad och börjar om efter en paus.</p>
   </section>
@@ -190,6 +192,24 @@ function swell(t = ctx.currentTime) {
   sub.gain.exponentialRampToValueAtTime(0.3, t + 1.6); sub.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
   sub.connect(sfxBus); osc('sine', mtof(38), t, t + 3.3, sub);
 }
+// The foam collapses (as in src/audio.js, boom()): the second one is lower, longer and heavier.
+function boom(power) {
+  const p = power, t = ctx.currentTime, tail = 2.2 + 1.4 * (p - 1);
+  const out = ctx.createGain(); out.gain.value = 0.9 + 0.25 * (p - 1); out.connect(sfxBus); send(out, 1.1);
+  const body = osc('sine', 110, t, t + tail + 0.2, env(t, 0.9, 0.004, tail, out));
+  body.frequency.exponentialRampToValueAtTime(p > 1.5 ? 30 : 38, t + 0.5);
+  const over = osc('triangle', 220, t, t + tail * 0.6, env(t, 0.22, 0.004, tail * 0.5, out));
+  over.frequency.exponentialRampToValueAtTime(p > 1.5 ? 60 : 76, t + 0.5);
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+  lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(70, t + tail * 0.8);
+  lp.connect(env(t, 0.5, 0.003, tail * 0.9, out)); noise(t, tail + 0.1, lp);
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+  hp.connect(env(t, 0.25, 0.001, 0.06, out)); noise(t, 0.08, hp);
+  const level = Math.pow(+$('vol-music').value / 100, 2);
+  musicBus.gain.cancelScheduledValues(t);
+  musicBus.gain.setTargetAtTime(level * 0.2, t, 0.02);
+  musicBus.gain.setTargetAtTime(level, t + 0.45 * p, 0.5 * p);
+}
 let streak = 0, streakAt = 0;
 function nextPlingNote() {
   const now = performance.now();
@@ -201,6 +221,7 @@ const SFX = {
   click: () => click(), pling: () => pling(ctx.currentTime, nextPlingNote()), thunk: () => thunk(),
   streak: () => { for (let i = 0; i < 5; i++) pling(ctx.currentTime + i * 0.38, pentaNote(i)); },
   rise: () => rise(), lucky: () => lucky(), knock: () => knock(), swell: () => swell(),
+  boom1: () => boom(1), boom2: () => boom(2),
 };
 document.querySelectorAll('[data-sfx]').forEach((b) => b.addEventListener('click', () => { ensure(); SFX[b.dataset.sfx](); }));
 

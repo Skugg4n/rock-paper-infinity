@@ -893,9 +893,10 @@ const uiState = {
             quantumFoam = 0;
             foamCollapses++;
             
-            // The collapse shows as a wave of wins from the middle of the factory.
+            // The collapse shows as a wave of wins from the middle of the factory,
+            // and sounds as a boom; the second one (it opens the bank) is heavier.
             factoryView?.wave(4, 4);
-            audio.rise();
+            audio.boom(foamCollapses);
             scheduleUIUpdate();
         }
 

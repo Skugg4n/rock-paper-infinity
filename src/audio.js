@@ -4,7 +4,7 @@
  * (docs/mockups/sound-board.html), which this module is lifted from.
  *
  * Two kinds of sound:
- * - words: short events (click, pling, thunk, rise, lucky, knock, swell)
+ * - words: short events (click, pling, thunk, rise, lucky, knock, boom, swell)
  * - the machine: the music of chapter I. A pulse that follows the speed, then
  *   a bass, then a shimmer when wins come too close to ring one by one. The
  *   battery is the heart, the generator hums, every board is a voice more.
@@ -227,6 +227,41 @@ function knock() {
     });
 }
 
+/**
+ * The foam collapses: a boom. A low note that falls, a rumble under it and a
+ * long tail in the room, and the music steps back for a moment to make room.
+ * `power` 1 is the first collapse; 2 (the one that opens the bank) is lower,
+ * longer and heavier, so the chapter builds toward its end.
+ */
+function boom(power = 1) {
+    if (!can()) return;
+    const p = Math.max(1, Math.min(2, power));
+    const t = ctx.currentTime;
+    const tail = 2.2 + 1.4 * (p - 1);
+    const out = ctx.createGain(); out.gain.value = 0.9 + 0.25 * (p - 1); out.connect(sfxBus); send(out, 1.1);
+    // the body: a sine that falls from a thump to a sub note
+    const body = osc('sine', 110, t, t + tail + 0.2, env(t, 0.9, 0.004, tail, out));
+    body.frequency.exponentialRampToValueAtTime(p > 1.5 ? 30 : 38, t + 0.5);
+    // an octave above it, so the boom is there on small speakers too
+    const over = osc('triangle', 220, t, t + tail * 0.6, env(t, 0.22, 0.004, tail * 0.5, out));
+    over.frequency.exponentialRampToValueAtTime(p > 1.5 ? 60 : 76, t + 0.5);
+    // the rumble: noise through a filter that closes
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(70, t + tail * 0.8);
+    lp.connect(env(t, 0.5, 0.003, tail * 0.9, out));
+    noise(t, tail + 0.1, lp);
+    // the crack at the very start
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+    hp.connect(env(t, 0.25, 0.001, 0.06, out));
+    noise(t, 0.08, hp);
+    // the music ducks under it and comes back
+    if (prefs.music) {
+        musicBus.gain.cancelScheduledValues(t);
+        musicBus.gain.setTargetAtTime(MUSIC_LEVEL * 0.2, t, 0.02);
+        musicBus.gain.setTargetAtTime(MUSIC_LEVEL, t + 0.45 * p, 0.5 * p);
+    }
+}
+
 /** A chapter card. Dark cards swell lower and longer. */
 function swell(dark = false) {
     if (!can()) return;
@@ -421,4 +456,4 @@ if (typeof window !== 'undefined') {
     window.addEventListener('keydown', unlock, { capture: true });
 }
 
-export const audio = { click, pling, thunk, rise, lucky, knock, swell, machine, stopMachine, finale, begin, getPrefs, setPref };
+export const audio = { click, pling, thunk, rise, lucky, knock, boom, swell, machine, stopMachine, finale, begin, getPrefs, setPref };

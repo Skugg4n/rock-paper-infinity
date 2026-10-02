@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.59.4 - 2026-10-02 (sound, the end of chapter I)
+
+### The lightning is a boom
+
+Ola: the lightning button at the end, the one that is clicked twice, should not go bling bling bling but boooom, building up toward the end (B180).
+
+- **Collapsing the foam is a boom**: a low note that falls to a sub note, a rumble under it, a crack at the very start and a long tail in the room. The music steps back under it and comes back. (It was the three rising notes used for "something new".)
+- **The second boom is heavier**: lower, longer and a little louder. It is the one that opens the bank, so the chapter builds toward its last note.
+- The sound board has both: "Bom (blixten, första)" and "Bom (blixten, andra)".
+
 ## v1.59.3 - 2026-10-02 (sound, the end of chapter I)
 
 ### The music ends on one note

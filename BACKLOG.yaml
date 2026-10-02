@@ -1629,3 +1629,12 @@ items:
       or just before.
     status: done
     resolved_in: v1.59.3
+
+  - id: B180
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      The lightning button at the end of chapter I (clicked twice): instead of
+      a bling bling bling it should be a boooom, building up toward the end.
+    status: done
+    resolved_in: v1.59.4
