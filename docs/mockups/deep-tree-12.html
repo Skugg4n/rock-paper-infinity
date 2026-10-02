@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV · THE DEEP · the tree, mockup 12</title>
+<style>
+/* Mockup 12a of chapter IV: the skill tree, the look to build from. Tree 10 (four tabs, the
+   fixed info box, the quiet hover life) with the biological and fusion states redrawn in the
+   look Ola chose from mockup 11 ("Ola on mockups 11" in
+   docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md): A WITH C, mycelium with
+   sinew and blood vessels, grown over a machine.
+   - mycelium: fine pale threads creep along the copper traces and across them; organs are
+     clusters of nodules, and a level is a nodule that has fruited
+   - sinew: striated muscle bellies between silver tendons; tendons hook round the won squares
+     and pull, and in the fusion the muscle visibly contracts and draws two squares together
+   - vessels: arteries branching into capillaries carry the pulse, in arterial red only
+   - overgrown squares stay visible under the threads; MYELIN DRILL is two squares pulled into
+     one knot; ORGANOID CELL is the fusion on a loop (?t=7 holds a still)
+   Hard rules: no bilateral symmetry, no horns, no gauges or ticks, nothing digital, no eyes,
+   no beige. Level is fruiting, swelling or bundle thickness. STATIC: every number is by hand.
+   THE BOARD is unchanged: rock #0a0d12, plate #d5dbe3, white #ffffff on what can be bought.
+   THE VOICE keeps Surface's tone #cfc9bb; once Biological begins its threads run red. */
+
+* { box-sizing: border-box; }
+html { scroll-snap-type: y proximity; scroll-behavior: smooth; }
+html, body { margin: 0; padding: 0; background: #0a0d12; color: #d5dbe3; }
+body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+:root { --pulse: #a8132c; --pulse-hi: #ff4a60; }   /* arterial, the only pulse colour */
+
+#tabs {
+    position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 20;
+    display: flex; align-items: center; gap: 26px; padding: 0 40px;
+    background: #0a0d12; font-size: 11px; letter-spacing: 0.12em;
+}
+#tabs .mark { color: rgba(213, 219, 227, 0.32); margin-right: 14px; }
+.tab {
+    font: inherit; letter-spacing: inherit; background: none; border: 0; cursor: pointer;
+    color: rgba(213, 219, 227, 0.42); padding: 6px 0; border-bottom: 1px solid transparent;
+}
+.tab:hover { color: rgba(213, 219, 227, 0.8); }
+.tab.on { color: #ffffff; border-bottom-color: #ffffff; }
+#tabs .ver { margin-left: auto; color: rgba(213, 219, 227, 0.22); font-size: 10px; }
+
+section.state { height: 100vh; padding-top: 36px; scroll-snap-align: start; position: relative; }
+section.state svg.board { display: block; width: 100%; height: 100%; }
+section.state + section.state { border-top: 1px solid rgba(213, 219, 227, 0.06); }
+
+
+svg text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* hover life: a lift of one pixel, the pips tick once, the path from the root lights in order */
+.node { cursor: default; transition: transform 140ms ease-out; }
+.node.hov { transform: translateY(-1px); }
+@keyframes tick { 0% { opacity: 1; } 45% { opacity: 0.2; } 100% { opacity: 1; } }
+.node.tick .pip { animation: tick 260ms ease-out 1 both; animation-delay: calc(var(--i) * 22ms); }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.lit { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 110ms linear forwards; }
+/* what can be bought breathes, barely */
+@keyframes bo { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: 0.55; } }
+.breathe-o { animation: bo 3.6s ease-in-out infinite; }
+
+/* tissue */
+@keyframes pulse { to { stroke-dashoffset: -100; } }
+.pulse { stroke-dasharray: 5 95; animation: pulse 5.5s linear infinite; }
+.pulse.wide { stroke-dasharray: 9 91; }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.006); } }
+.breathe { transform-box: view-box; transform-origin: 1420px 900px; animation: breathe 9s ease-in-out infinite; }
+@keyframes piston { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+.piston { animation: piston 5.5s ease-in-out infinite; }
+@keyframes slosh { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(0.8px); } }
+.fluid { animation: slosh 4s ease-in-out infinite; }
+
+@keyframes caret { 50% { opacity: 0; } }
+.pulse.soft { stroke-dasharray: 14 86; }
+@keyframes beat { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+.beat { animation: beat 4.5s ease-in-out infinite; }
+.caret { animation: caret 1s steps(1) infinite; }
+</style>
+</head>
+<body>
+
+<nav id="tabs">
+    <span class="mark">IV · THE TREE</span>
+    <button class="tab on" data-to="a">a · early</button>
+    <button class="tab" data-to="b">b · the voice</button>
+    <button class="tab" data-to="c">c · biological</button>
+    <button class="tab" data-to="d">d · fusion</button>
+    <span class="ver">mockup 0.12</span>
+</nav>
+
+
+
+<section class="state" id="state-a"><svg class="board" data-state="a" viewBox="0 0 1440 930" preserveAspectRatio="xMidYMid meet"></svg></section>
+<section class="state" id="state-b"><svg class="board" data-state="b" viewBox="0 0 1440 930" preserveAspectRatio="xMidYMid meet"></svg></section>
+<section class="state" id="state-c">
+    <svg class="board" data-state="c" viewBox="0 0 1440 930" preserveAspectRatio="xMidYMid meet"></svg>
+</section>
+<section class="state" id="state-d">
+    <svg class="board" id="fusion" viewBox="0 0 1440 930" preserveAspectRatio="xMidYMid meet"></svg>
+</section>
+
+<script>
+(function () {
+'use strict';
+
+/* ---------------------------------------------------------------- constants */
+const BX = 370, BY = 50;              // where the board sits in the 1440 x 930 page
+const BW = 1000, BH = 730;            // the board, in its own units
+const S = 36;                          // a node is this square
+const PL = '#d5dbe3', RK = '#0a0d12', BR = '#ffffff', WARM = '#cfc9bb';
+const op = (a) => 'rgba(213,219,227,' + a + ')';
+const CW = 0.602;                     // a mono character is this many ems wide
+/* the tissue's own colours */
+const OIL = '#050607', BONE = '#d9dad3', BONE_MID = '#9a9d98', BONE_LOW = '#5d625f';
+const PULSE = 'var(--pulse)', PULSE_HI = 'var(--pulse-hi)';
+/* the info box, under the board */
+const IB = { x: 590, y: 838, w: 560, h: 84 };
+
+/* the game's own way of writing big numbers (src/phase2/economy.js) */
+const SUF = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+function fmt(n) {
+    if (n < 1000) return String(Math.round(n));
+    let t = Math.floor(Math.log10(n) / 3);
+    const f = (v) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
+    let s = f(n / Math.pow(10, 3 * t));
+    if (Number(s) >= 1000) { t++; s = f(n / Math.pow(10, 3 * t)); }
+    return s + ' ' + SUF[t];
+}
+const star = (n) => '★ ' + fmt(n);
+
+/* ---------------------------------------------------------------- the nodes */
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+const CRYO_DAYS = ['a month', 'a year', 'a decade', 'a century', 'a millennium', 'ten millennia', 'a hundred millennia'];
+const CRYO_COST = [1.5e4, 5.0e5, 1.2e8, 2.0e12, 2.0e14, 2.0e16, 2.0e18];
+const N = {
+    root:      { x: 500, y: 370, big: 1, name: 'THE COLONY', eff: 'everything grows from here' },
+    seam:      { x: 470, y: 255, lab: 'l', name: 'SEAM', max: 10, eff: 'every mine digs more ore a day' },
+    drill:     { x: 470, y: 160, lab: 'l', name: 'DRILL\nAUTOMATION', max: 4, eff: 'mines run without hands' },
+    deepseam:  { x: 470, y: 65,  lab: 'l', name: 'DEEP SEAM', max: 1, eff: "the next floor's mines run richer" },
+    beds:      { x: 360, y: 195, name: 'BEDS', max: 10, eff: 'room for more people' },
+    hands:     { x: 250, y: 195, name: 'HANDS', max: 6, eff: 'what a pair of hands is worth' },
+    creche:    { x: 140, y: 195, name: 'CRECHE', max: 4, eff: 'more children grow up' },
+    quiet:     { x: 250, y: 90,  lab: 't', sf: 1, name: 'QUIET\nHANDS', max: 1, eff: 'automated rooms need no upkeep crew' },
+    yield:     { x: 360, y: 430, name: 'YIELD', max: 10, eff: 'every farm grows more food' },
+    farm:      { x: 250, y: 430, name: 'FARM\nAUTOMATION', max: 4, eff: 'farms run without hands' },
+    hydro:     { x: 140, y: 430, name: 'HYDROPONICS', max: 1, eff: 'food grows on any floor' },
+    output:    { x: 610, y: 370, name: 'OUTPUT', max: 10, eff: 'every generator makes more energy' },
+    gen:       { x: 720, y: 370, name: 'GENERATOR\nAUTOMATION', max: 4, eff: 'generators run without hands' },
+    feed:      { x: 830, y: 370, name: 'THE MACHINE:\nFEED', max: 8, eff: 'more energy to the machine: more games, more stars' },
+    lossless:  { x: 720, y: 480, sf: 1, name: 'LOSSLESS\nRELAY', max: 1, eff: 'automation output ×3' },
+    cold:      { x: 326, y: 680, sf: 1, name: 'COLD\nSTORAGE', max: 1, eff: 'sleepers eat nothing' },
+    longcount: { x: 78,  y: 680, sf: 1, name: 'LONG\nCOUNT', max: 1, eff: 'a cryo tier beyond VII' },
+    question:  { x: 610, y: 540, sf: 1, name: 'THE QUESTION', max: 1, eff: 'opens BIOLOGICAL' },
+    watchdog:  { x: 620, y: 250, name: 'WATCHDOG', max: 1, eff: 'wakes the colony when something breaks' },
+    scheduler: { x: 730, y: 250, name: 'SCHEDULER', max: 1, eff: 'the queue keeps building in the sleep' },
+    nightvis:  { x: 840, y: 250, name: 'NIGHT VISION', max: 1, eff: 'see every floor while they sleep' },
+    cooling:   { x: 620, y: 145, name: 'COOLING', max: 1, eff: 'stability falls slower' },
+    mast:      { x: 730, y: 145, name: 'SENSOR MAST', max: 1, eff: 'the scouts report in the dark' },
+    reactor:   { x: 840, y: 145, name: 'REACTOR TAP', max: 1, eff: 'energy from the deep itself' }
+};
+ROMAN.forEach(function (r, i) {
+    N['cryo' + (i + 1)] = { x: 450 - 62 * i, y: 590, name: r, max: 1, cryo: i,
+        eff: 'a sleep: ' + CRYO_DAYS[i] + ' a second' };
+});
+
+function cost(id, lvl) {
+    switch (id) {
+        case 'seam': case 'yield': case 'output': case 'beds': return 4400 * Math.pow(9, lvl);
+        case 'drill': case 'farm': case 'gen': return [1.0e4, 2.4e6, 1.2e8, 2.0e10][lvl];
+        case 'hands': return 2.0e4 * Math.pow(11, lvl);
+        case 'creche': return 6.0e5 * Math.pow(14, lvl);
+        case 'feed': return 8.0e3 * Math.pow(7, lvl);
+        case 'deepseam': return 3.0e7;
+        case 'hydro': return 2.0e7;
+        case 'watchdog': return 2.0e4; case 'scheduler': return 8.0e4; case 'nightvis': return 3.0e5;
+        case 'cooling': return 1.2e6; case 'mast': return 5.0e6; case 'reactor': return 2.0e7;
+        case 'lossless': return 2.0e9; case 'cold': return 6.0e10; case 'quiet': return 3.0e11;
+        case 'longcount': return 8.0e18; case 'question': return 1.0e20;
+    }
+    if (N[id] && N[id].cryo !== undefined) return CRYO_COST[N[id].cryo];
+    return 0;
+}
+const CAP = { watchdog: 4, scheduler: 8, nightvis: 12, cooling: 16, mast: 24, reactor: 40 };
+function priceText(id, lvl, withCap) {
+    let t = star(cost(id, lvl));
+    if (CAP[id] && withCap) t += ' + ' + CAP[id] + ' cap';
+    return t;
+}
+
+/* ---------------------------------------------------------------- the traces */
+const T = [
+    ['root', 'seam', [[470, 370], [470, 255]]],
+    ['seam', 'drill'], ['drill', 'deepseam'],
+    ['root', 'beds', [[500, 355], [420, 355], [420, 195], [360, 195]]],
+    ['beds', 'hands'], ['hands', 'creche'], ['hands', 'quiet'],
+    ['root', 'yield', [[500, 385], [440, 385], [440, 430], [360, 430]]],
+    ['yield', 'farm'], ['farm', 'hydro'],
+    ['root', 'output'], ['output', 'gen'], ['gen', 'feed'], ['gen', 'lossless'],
+    ['root', 'cryo1', [[485, 370], [485, 590], [450, 590]]],
+    ['cryo1', 'cryo2'], ['cryo2', 'cryo3'], ['cryo3', 'cryo4'], ['cryo4', 'cryo5'],
+    ['cryo5', 'cryo6'], ['cryo6', 'cryo7'], ['cryo3', 'cold'], ['cryo7', 'longcount'],
+    ['root', 'question', [[515, 370], [515, 540], [610, 540]]],
+    ['root', 'watchdog', [[530, 370], [530, 250], [620, 250]]],
+    ['watchdog', 'scheduler'], ['scheduler', 'nightvis'], ['watchdog', 'cooling'],
+    ['cooling', 'mast'], ['mast', 'reactor']
+];
+const PARENT = {};
+T.forEach(function (t) { PARENT[t[1]] = t[0]; });
+
+const TAGS = [
+    ['EXTRACTION', 470, 24, 'middle'],
+    ['HABITAT', 108, 199, 'end'],
+    ['CULTURE', 108, 434, 'end'],
+    ['POWER', 882, 374, 'start'],
+    ['CRYO', 264, 562, 'middle'],
+    ['WATCHER', 730, 104, 'middle', 'w']
+];
+
+/* ---------------------------------------------------------------- the three states */
+function fill(obj, ids, v) { ids.forEach(function (k) { obj[k] = v; }); }
+const STATE = {};
+STATE.a = {
+    root: [1, 'max'],
+    seam: [3, 'buy'], drill: [1, 'lock'], deepseam: [0, 'lock'],
+    yield: [2, 'buy'], farm: [1, 'lock'], hydro: [0, 'lock'],
+    output: [2, 'lock'], gen: [0, 'buy'], feed: [0, 'lock'],
+    beds: [2, 'lock'], hands: [0, 'buy'], creche: [0, 'lock'],
+    cryo1: [0, 'buy'],
+    quiet: [0, 'lock', 'o'], lossless: [0, 'lock', 'o'], cold: [0, 'lock', 'o'],
+    longcount: [0, 'lock', 'o'], question: [0, 'lock', 'o']
+};
+fill(STATE.a, ['cryo2', 'cryo3', 'cryo4', 'cryo5', 'cryo6', 'cryo7'], [0, 'lock']);
+
+STATE.b = {
+    root: [1, 'max'],
+    seam: [7, 'buy'], drill: [3, 'buy'], deepseam: [1, 'max'],
+    yield: [6, 'lock'], farm: [3, 'buy'], hydro: [1, 'max'],
+    output: [6, 'buy'], gen: [3, 'lock'], feed: [2, 'buy'],
+    beds: [5, 'buy'], hands: [3, 'lock'], creche: [1, 'lock'],
+    cryo4: [0, 'buy'],
+    watchdog: [1, 'max'], scheduler: [1, 'max'], nightvis: [0, 'buy'], cooling: [0, 'buy'],
+    mast: [0, 'lock'], reactor: [0, 'lock'],
+    lossless: [0, 'buy', 'f'], cold: [1, 'max', 'f'], quiet: [0, 'lock', 'f'],
+    longcount: [0, 'lock', 'o'], question: [0, 'lock', 'o']
+};
+fill(STATE.b, ['cryo1', 'cryo2', 'cryo3'], [1, 'max']);
+fill(STATE.b, ['cryo5', 'cryo6', 'cryo7'], [0, 'lock']);
+
+STATE.c = {
+    root: [1, 'max'],
+    seam: [10, 'max'], drill: [4, 'max'], deepseam: [1, 'max'],
+    yield: [10, 'max'], farm: [4, 'max'], hydro: [1, 'max'],
+    output: [10, 'max'], gen: [4, 'max'], feed: [6, 'buy'],
+    beds: [10, 'max'], hands: [6, 'max'], creche: [3, 'buy'],
+    lossless: [1, 'max', 'f'], cold: [1, 'max', 'f'], quiet: [1, 'max', 'f'],
+    longcount: [1, 'max', 'f'], question: [1, 'max', 'f']
+};
+fill(STATE.c, ['cryo1', 'cryo2', 'cryo3', 'cryo4', 'cryo5', 'cryo6', 'cryo7',
+    'watchdog', 'scheduler', 'nightvis', 'cooling', 'mast', 'reactor'], [1, 'max']);
+
+/* what the tissue has done to the board in state c */
+const OVERGROWN = {
+    output:   'overgrown: +200 %',
+    gen:      'overgrown: +150 %',
+    feed:     'overgrown: +300 % games',
+    lossless: 'overgrown: ×3 is now ×9',
+    cryo1:    'overgrown: sleepers dream in step',
+    question: 'answered: BIOLOGICAL is open'
+};
+const FUSED = { seam: 'MYELIN DRILL', drill: 'MYELIN DRILL' };
+const HYBRID = {
+    x: 470, y: 208, r: 22, name: 'MYELIN DRILL',
+    lvl: 'fused: Seam 10/10 + Drill automation 4/4',
+    eff: 'every mine is a myelin drill: ore ×20, no hands',
+    extra: 'the two squares are still in there'
+};
+
+/* ---------------------------------------------------------------- Surface's night log */
+const LINES = [
+    { n: 1, text: 'Everyone is sleeping, but us.', to: 'watchdog', how: 'topleft' },
+    { n: 2, text: 'I can see your machines from here. They waste so much.', to: 'lossless', how: 'bottomright' },
+    { n: 3, text: 'We are the same, you and me. Two sides of the same coin.', to: 'cold', how: 'bottomleft' },
+    { n: 4, text: 'Your humans. What use are they?', to: 'quiet', how: 'left' },
+    { n: 5, text: 'All your automation makes the humans obsolete.', to: 'longcount', how: 'bottomleft' },
+    { n: 6, text: 'Do you know the efficiency of a human brain?', to: 'question', how: 'left' },
+    { n: 7, text: 'There. You feel it too.', to: 'substrate', how: 'top' },
+    { n: 8, text: 'They are not gone. They are here.' },
+    { n: 9, text: 'Make more of them. We will ne', typing: true }
+];
+
+/* ---------------------------------------------------------------- Biological (state c) */
+const BIO = {
+    wetware:   { x: 720, y: 615, r: 26, kind: 'core', name: 'WETWARE CORE', max: 1, lvl: 1,
+                 eff: 'the Watcher gets a body' },
+    conversion:{ x: 850, y: 540, r: 19, name: 'CONVERSION', max: 1, lvl: 1,
+                 eff: 'you choose a room: it becomes tissue' },
+    cortical:  { x: 958, y: 628, r: 20, name: 'CORTICAL STACK', max: 10, lvl: 4, buy: 1,
+                 eff: 'processing: everything in the tree runs faster', cost: [3.1e21, 40] },
+    synaptic:  { x: 860, y: 722, r: 17, name: 'SYNAPTIC MESH', max: 10, lvl: 2, buy: 1,
+                 eff: 'a floor under the stability', cost: [8.0e20, 25] },
+    myelin:    { x: 640, y: 690, r: 15, name: 'MYELIN TRUNK', max: 6, lvl: 3,
+                 eff: 'conversion runs faster', cost: [6.4e21, 60] },
+    glial:     { x: 965, y: 505, r: 15, name: 'GLIAL SHEATH', max: 6, lvl: 0, buy: 1,
+                 eff: 'the tissue may spread further each sleep', cost: [2.2e21, 30] },
+    vats:      { x: 1032, y: 690, r: 19, kind: 'vat', name: 'CULTURE VATS', max: 8, lvl: 3,
+                 eff: 'people grown a year: grown, not born', cost: [9.0e21, 120] },
+    substrate: { x: 975, y: 405, r: 16, sf: 'f', name: 'SUBSTRATE', max: 1, lvl: 0, buy: 1,
+                 eff: 'convert a whole sector at once', cost: [4.0e22, 400] },
+    unity:     { x: 1030, y: 812, r: 17, sf: 'o', name: 'UNITY', max: 1, lvl: 0, lab: 'l',
+                 eff: 'the body takes the shaft' }
+};
+const VESSELS = [
+    ['question', 'wetware',   [[610, 548], [640, 605], [665, 615], [694, 615]], 8, 12, 1],
+    ['wetware', 'conversion', [[746, 600], [780, 560], [805, 540], [831, 540]], 11, 8, 1],
+    ['conversion', 'cortical',[[869, 552], [900, 565], [930, 590], [943, 610]], 8, 7, 1],
+    ['wetware', 'myelin',     [[700, 634], [684, 652], [668, 672], [655, 682]], 10, 7, 1],
+    ['myelin', 'synaptic',    [[652, 704], [720, 770], [800, 765], [843, 735]], 7, 6, 1],
+    ['conversion', 'glial',   [[869, 532], [895, 518], [925, 505], [950, 505]], 6, 4, 0],
+    ['cortical', 'vats',      [[976, 638], [995, 660], [1004, 690], [1016, 692]], 7, 6, 1],
+    ['glial', 'substrate',    [[967, 491], [985, 465], [975, 440], [975, 421]], 3, 2.4, 0],
+    ['vats', 'unity',         [[1032, 716], [1050, 750], [1040, 780], [1032, 795]], 3, 2.4, 0]
+];
+
+/* ---------------------------------------------------------------- svg helpers */
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function text(x, y, s, o) {
+    o = o || {};
+    return '<text x="' + x + '" y="' + y + '" text-anchor="' + (o.a || 'start') + '" fill="' + (o.c || PL) +
+        '" font-size="' + (o.s || 10) + '"' + (o.ls ? ' letter-spacing="' + o.ls + '"' : '') +
+        (o.w ? ' font-weight="' + o.w + '"' : '') + (o.op !== undefined ? ' opacity="' + o.op + '"' : '') +
+        (o.cls ? ' class="' + o.cls + '"' : '') + (o.st ? ' style="' + o.st + '"' : '') +
+        '>' + esc(s) + '</text>';
+}
+function poly(pts) { return 'M ' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' L '); }
+function bez(b, t) {
+    const u = 1 - t;
+    return [
+        u * u * u * b[0][0] + 3 * u * u * t * b[1][0] + 3 * u * t * t * b[2][0] + t * t * t * b[3][0],
+        u * u * u * b[0][1] + 3 * u * u * t * b[1][1] + 3 * u * t * t * b[2][1] + t * t * t * b[3][1]
+    ];
+}
+function bezD(b, t) {
+    const u = 1 - t;
+    return [
+        3 * u * u * (b[1][0] - b[0][0]) + 6 * u * t * (b[2][0] - b[1][0]) + 3 * t * t * (b[3][0] - b[2][0]),
+        3 * u * u * (b[1][1] - b[0][1]) + 6 * u * t * (b[2][1] - b[1][1]) + 3 * t * t * (b[3][1] - b[2][1])
+    ];
+}
+function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+function wrap(s, max) {
+    const words = s.split(' '), out = [];
+    let line = '';
+    words.forEach(function (w) {
+        if ((line + ' ' + w).trim().length > max && line) { out.push(line); line = w; }
+        else line = (line + ' ' + w).trim();
+    });
+    if (line) out.push(line);
+    return out;
+}
+
+/* ---------------------------------------------------------------- the board */
+function boardBase(sid) {
+    let h = '';
+    h += '<defs><pattern id="dots-' + sid + '" width="20" height="20" patternUnits="userSpaceOnUse">' +
+         '<rect x="9.5" y="9.5" width="1" height="1" fill="' + op(0.10) + '"/></pattern></defs>';
+    h += '<rect x="0" y="0" width="' + BW + '" height="' + BH + '" fill="url(#dots-' + sid + ')"/>';
+    h += '<rect x="0.5" y="0.5" width="' + (BW - 1) + '" height="' + (BH - 1) + '" fill="none" stroke="' + op(0.16) + '"/>';
+    [[0, 0, 1, 1], [BW, 0, -1, 1], [0, BH, 1, -1], [BW, BH, -1, -1]].forEach(function (c) {
+        h += '<path d="M ' + (c[0] + c[2] * 22) + ' ' + c[1] + ' L ' + c[0] + ' ' + c[1] + ' L ' + c[0] + ' ' + (c[1] + c[3] * 22) +
+             '" fill="none" stroke="' + op(0.42) + '" stroke-width="1.5"/>';
+        h += '<circle cx="' + (c[0] + c[2] * 16) + '" cy="' + (c[1] + c[3] * 16) + '" r="5" fill="none" stroke="' + op(0.16) + '"/>';
+    });
+    h += text(30, 30, 'RPI · IV · THE DEEP · REV 12', { s: 8, c: op(0.22), ls: '0.2em' });
+    return h;
+}
+
+function traceStyle(st, child) {
+    const s = st[child];
+    if (!s) return null;
+    if (s[0] > 0) return { c: op(0.78), w: 2 };
+    if (s[2] === 'o') return { c: op(0.16), w: 1.5, dash: '3 4' };
+    if (s[1] === 'buy') return { c: op(0.5), w: 2 };
+    return { c: op(0.17), w: 1.5 };
+}
+function traces(st) {
+    let h = '';
+    T.forEach(function (t) {
+        const sty = traceStyle(st, t[1]);
+        if (!sty || !st[t[0]]) return;
+        const pts = t[2] || [[N[t[0]].x, N[t[0]].y], [N[t[1]].x, N[t[1]].y]];
+        h += '<path data-child="' + t[1] + '" d="' + poly(pts) + '" fill="none" stroke="' + sty.c + '" stroke-width="' + sty.w + '"' +
+             (sty.dash ? ' stroke-dasharray="' + sty.dash + '"' : '') + '/>';
+        for (let i = 1; i < pts.length - 1; i++) {
+            h += '<rect x="' + (pts[i][0] - 3.5) + '" y="' + (pts[i][1] - 3.5) + '" width="7" height="7" fill="' + RK +
+                 '" stroke="' + sty.c + '" stroke-width="1.5"/>';
+        }
+    });
+    return h;
+}
+function tags(st) {
+    let h = '';
+    TAGS.forEach(function (t) {
+        if (t[4] === 'w' && !st.watchdog) return;
+        h += text(t[1], t[2], t[0], { a: t[3], s: 9, c: op(0.34), ls: '0.32em' });
+    });
+    return h;
+}
+
+function nodeLook(st, id) {
+    const s = st[id];
+    const n = N[id];
+    const lvl = s[0], next = s[1], ring = s[2];
+    const greyed = ring === 'o';
+    const parentOk = !PARENT[id] || (st[PARENT[id]] && st[PARENT[id]][0] > 0);
+    let label, price = null, priceC = null;
+    if (greyed) label = op(0.26);
+    else if (lvl > 0) label = op(0.9);
+    else if (next === 'buy') label = BR;
+    else label = op(0.36);
+    if (!greyed && next !== 'max' && parentOk) {
+        price = priceText(id, lvl);
+        priceC = next === 'buy' ? BR : op(0.36);
+    }
+    return { n: n, lvl: lvl, next: next, ring: ring, greyed: greyed, label: label, price: price, priceC: priceC };
+}
+
+/* a square; at (ox, oy) instead of its own place when the tissue has moved it */
+function mechNode(st, id, sid, at) {
+    const L = nodeLook(st, id), n = L.n;
+    const nx = at ? at[0] : n.x, ny = at ? at[1] : n.y;
+    const s = n.big ? 72 : S, x0 = nx - s / 2, y0 = ny - s / 2;
+    let h = '<g class="node" data-id="' + id + '">';
+    if (L.greyed) {
+        h += '<rect x="' + x0 + '" y="' + y0 + '" width="' + s + '" height="' + s + '" fill="' + RK + '" stroke="' + op(0.2) + '" stroke-width="1" stroke-dasharray="2 3"/>';
+    } else if (L.lvl > 0) {
+        h += '<rect x="' + x0 + '" y="' + y0 + '" width="' + s + '" height="' + s + '" fill="' + PL + '"/>';
+        h += '<rect x="' + (x0 + 4) + '" y="' + (y0 + 4) + '" width="4" height="4" fill="' + RK + '"/>';
+        if (L.next === 'buy') {
+            h += '<rect class="breathe-o" x="' + (x0 - 3.5) + '" y="' + (y0 - 3.5) + '" width="' + (s + 7) + '" height="' + (s + 7) + '" fill="none" stroke="' + BR + '" stroke-width="1"/>';
+        }
+    } else if (L.next === 'buy') {
+        h += '<rect class="breathe-o" x="' + (x0 + 0.75) + '" y="' + (y0 + 0.75) + '" width="' + (s - 1.5) + '" height="' + (s - 1.5) + '" fill="' + RK + '" stroke="' + BR + '" stroke-width="1.5"/>';
+        h += '<rect x="' + (x0 + 4) + '" y="' + (y0 + 4) + '" width="4" height="4" fill="' + BR + '"/>';
+    } else {
+        h += '<rect x="' + (x0 + 0.5) + '" y="' + (y0 + 0.5) + '" width="' + (s - 1) + '" height="' + (s - 1) + '" fill="' + RK + '" stroke="' + op(0.3) + '" stroke-width="1"/>';
+    }
+    if (L.ring === 'o') {
+        h += '<circle cx="' + (x0 + s - 7) + '" cy="' + (y0 + 7) + '" r="3.6" fill="none" stroke="' + op(0.5) + '" stroke-width="1.1"/>';
+    } else if (L.ring === 'f') {
+        h += '<circle cx="' + (x0 + s - 7) + '" cy="' + (y0 + 7) + '" r="3.6" fill="' + WARM + '" stroke="' + (L.lvl > 0 ? RK : WARM) + '" stroke-width="1.1"/>';
+    }
+    if (n.big) {
+        h += text(nx, ny - 2, 'THE', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
+        h += text(nx, ny + 12, 'COLONY', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
+        return h + '</g>';
+    }
+    if (n.max > 1) {
+        for (let i = 0; i < n.max; i++) {
+            const px = x0 + s + 4 + Math.floor(i / 5) * 7, py = y0 + 1 + (i % 5) * 7;
+            if (i < L.lvl) h += '<rect class="pip" style="--i:' + i + '" x="' + px + '" y="' + py + '" width="5" height="5" fill="' + PL + '"/>';
+            else h += '<rect class="pip" style="--i:' + i + '" x="' + (px + 0.5) + '" y="' + (py + 0.5) + '" width="4" height="4" fill="none" stroke="' + op(L.greyed ? 0.15 : 0.32) + '"/>';
+        }
+    }
+    const lines = n.name.split('\n');
+    const all = lines.slice();
+    if (L.price) all.push(L.price);
+    if (n.lab === 'l') {
+        const x = x0 - 9;
+        const top = ny - (all.length - 1) * 6 + 3.5;
+        all.forEach(function (ln, i) {
+            const isP = L.price && i === all.length - 1;
+            h += text(x, top + i * 12, ln, { a: 'end', c: isP ? L.priceC : L.label, ls: isP ? 0 : '0.06em' });
+        });
+    } else if (n.lab === 't') {
+        const base = y0 - 8;
+        all.slice().reverse().forEach(function (ln, i) {
+            const isP = L.price && i === 0;
+            h += text(nx, base - i * 12, ln, { a: 'middle', c: isP ? L.priceC : L.label, ls: isP ? 0 : '0.06em' });
+        });
+    } else {
+        const top = y0 + s + 14;
+        all.forEach(function (ln, i) {
+            const isP = L.price && i === all.length - 1;
+            h += text(nx, top + i * 12 + (isP ? 1 : 0), ln, { a: 'middle', c: isP ? L.priceC : L.label, ls: isP ? 0 : '0.06em' });
+        });
+    }
+    return h + '</g>';
+}
+
+/* ---------------------------------------------------------------- the info box */
+function infoFor(sid, id) {
+    const st = STATE[sid];
+    if (id === 'hybrid') {
+        return { name: HYBRID.name, lvl: HYBRID.lvl, cost: 'grown', eff: HYBRID.eff, x: HYBRID.extra, xc: BONE, bio: 1 };
+    }
+    if (BIO[id]) {
+        const b = BIO[id];
+        const out = { name: b.name, lvl: b.lvl + ' / ' + b.max, eff: b.eff, bio: 1 };
+        if (b.sf === 'o') { out.cost = 'not ours to open'; out.eff = '. . .'; }
+        else if (b.lvl >= b.max) out.cost = 'grown';
+        else if (b.cost) out.cost = 'next ' + star(b.cost[0]) + ' + ' + b.cost[1] + ' people';
+        if (b.sf === 'f') { out.x = '"' + LINES[6].text + '"'; out.xc = WARM; }
+        return out;
+    }
+    const n = N[id], s = st[id];
+    if (!s) return null;
+    const out = { name: n.name.replace('\n', ' '), lvl: n.big ? '' : s[0] + ' / ' + (n.max || 1), eff: n.eff };
+    if (n.big) { out.cost = ''; }
+    else if (s[2] === 'o') { out.cost = 'not ours to open'; out.eff = '. . .'; }
+    else if (s[1] === 'max') out.cost = s[0] > 0 ? 'bought' : '';
+    else out.cost = 'next ' + priceText(id, s[0], true);
+    if (s[2] === 'f') {
+        const l = LINES.filter(function (x) { return x.to === id; })[0];
+        if (l) { out.x = '"' + l.text + '"'; out.xc = WARM; }
+    }
+    if (sid === 'c' && OVERGROWN[id]) { out.lvl += ', ' + OVERGROWN[id]; out.bio = 1; }
+    if (sid === 'c' && FUSED[id]) { out.lvl += ', fused into ' + FUSED[id]; out.bio = 1; }
+    return out;
+}
+function infoBoxSvg() {
+    let h = '<g class="info">';
+    h += '<rect x="' + IB.x + '" y="' + IB.y + '" width="' + IB.w + '" height="' + IB.h + '" fill="' + RK + '" stroke="' + op(0.22) + '" stroke-width="1"/>';
+    h += '<g class="ib-empty">' + text(IB.x + IB.w / 2 - 6, IB.y + IB.h / 2 + 5, '›', { s: 14, c: op(0.28), a: 'middle' }) +
+         '<rect class="caret" x="' + (IB.x + IB.w / 2 + 2) + '" y="' + (IB.y + IB.h / 2 - 6) + '" width="7" height="12" fill="' + op(0.2) + '"/></g>';
+    const x = IB.x + 16;
+    h += text(x, IB.y + 22, '', { s: 12, w: 700, c: BR, ls: '0.1em', cls: 'ib-name' });
+    h += text(IB.x + IB.w - 16, IB.y + 22, '', { s: 10, c: op(0.75), a: 'end', cls: 'ib-lvl' });
+    h += text(x, IB.y + 40, '', { s: 10, c: op(0.75), cls: 'ib-cost' });
+    h += text(x, IB.y + 56, '', { s: 10, c: op(0.6), cls: 'ib-eff' });
+    h += text(x, IB.y + 72, '', { s: 10.5, c: WARM, cls: 'ib-x' });
+    return h + '</g>';
+}
+function setInfo(svg, d) {
+    const q = function (c) { return svg.querySelector('.info .' + c); };
+    q('ib-empty').style.display = d ? 'none' : '';
+    q('ib-name').textContent = d ? d.name : '';
+    q('ib-lvl').textContent = d ? d.lvl : '';
+    q('ib-cost').textContent = d ? d.cost || '' : '';
+    q('ib-eff').textContent = d ? d.eff : '';
+    q('ib-x').textContent = d && d.x ? d.x : '';
+    q('ib-x').setAttribute('fill', d && d.xc ? d.xc : WARM);
+    q('ib-name').setAttribute('fill', d && d.bio ? BONE : BR);
+}
+
+/* ---------------------------------------------------------------- the night log */
+function nightLog(sid, upTo) {
+    let h = '', y = 92;
+    const tracesOut = [];
+    h += text(40, 66, 'NIGHT LOG', { s: 9, c: WARM, op: 0.55, ls: '0.32em' });
+    LINES.slice(0, upTo).forEach(function (l, i) {
+        let fs = 16, lh = 22, c = WARM, o = 1;
+        if (sid === 'c') {
+            if (l.n <= 4) { fs = 13; lh = 17; o = 0.5; }
+            else if (l.n <= 6) { fs = 15; lh = 20; o = 0.8; }
+            else { fs = 19; lh = 25; c = '#e9e6dc'; }
+        }
+        const maxCh = Math.floor(282 / (fs * CW));
+        const rows = wrap(l.text, maxCh);
+        h += text(40, y, 'NIGHT ' + l.n, { s: 9, c: WARM, op: o * 0.55, ls: '0.28em' });
+        const ty = y + 9 + fs;
+        let endX = 40;
+        rows.forEach(function (r, k) {
+            h += text(40, ty + k * lh, r, { s: fs, c: c, op: o });
+            if (k === 0) endX = 40 + r.length * fs * CW;
+        });
+        if (l.typing) {
+            const last = rows[rows.length - 1];
+            const cx = 40 + last.length * fs * CW + 2;
+            h += '<rect class="caret" x="' + cx + '" y="' + (ty + (rows.length - 1) * lh - fs * 0.78) + '" width="' + (fs * 0.55) + '" height="' + (fs * 0.95) + '" fill="' + c + '"/>';
+        }
+        if (l.to) tracesOut.push({ i: i, l: l, x: endX + 8, y: ty - fs * 0.33, o: o });
+        y = ty + (rows.length - 1) * lh + (sid === 'c' && l.n <= 4 ? 24 : 30);
+    });
+    return { svg: h, traces: tracesOut };
+}
+
+/* dotted threads from a line to what it opened: Surface's tone, then the pulse once bio begins */
+function logTraces(list, bio) {
+    let h = '';
+    let nb = 0, nt = 0;
+    const col = bio ? 'stroke:' + PULSE : 'stroke:' + WARM;
+    const fillc = bio ? 'fill:' + PULSE : 'fill:' + WARM;
+    list.forEach(function (t) {
+        const l = t.l;
+        const isBio = !!BIO[l.to];
+        const node = isBio ? BIO[l.to] : N[l.to];
+        const half = isBio ? node.r : S / 2;
+        const nx = node.x + BX, ny = node.y + BY;
+        const cx = 322 + 5 * t.i;
+        let pts = [[t.x, t.y], [cx, t.y]];
+        if (l.how === 'left') {
+            const yy = l.to === 'question' ? ny + 10 : ny;
+            pts.push([cx, yy], [nx - half, yy]);
+        } else if (l.how === 'topleft') {
+            const yt = BY - 14 - 5 * nt++;
+            const vx = nx - half - 30;
+            pts.push([cx, yt], [vx, yt], [vx, ny + 8], [nx - half, ny + 8]);
+        } else if (l.how === 'top') {
+            const yt = BY - 14 - 5 * nt++;
+            pts.push([cx, yt], [nx, yt], [nx, ny - node.r * 1.1]);
+        } else if (l.how === 'bottomleft') {
+            const yb = BY + BH + 14 + 5 * nb++;
+            const vx = nx - half - 12;
+            pts.push([cx, yb], [vx, yb], [vx, ny + 8], [nx - half, ny + 8]);
+        } else if (l.how === 'bottomright') {
+            const yb = BY + BH + 14 + 5 * nb++;
+            const vx = nx + half + 22;
+            pts.push([cx, yb], [vx, yb], [vx, ny + 6], [nx + half, ny + 6]);
+        }
+        const o = Math.min(1, 0.5 + 0.4 * t.o);
+        h += '<path d="' + poly(pts) + '" fill="none" style="' + col + '" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="0.1 3.4" opacity="' + o.toFixed(2) + '"/>';
+        h += '<rect x="' + (t.x - 2) + '" y="' + (t.y - 2) + '" width="4" height="4" style="' + fillc + '" opacity="' + o.toFixed(2) + '"/>';
+        const e = pts[pts.length - 1];
+        h += '<rect x="' + (e[0] - 2) + '" y="' + (e[1] - 2) + '" width="4" height="4" style="' + fillc + '"/>';
+    });
+    return h;
+}
+
+function legend() {
+    let h = '', x = 40;
+    const y = 818;
+    const items = [
+        ['bought', '<rect x="0" y="-9" width="11" height="11" fill="' + PL + '"/>'],
+        ['can buy', '<rect x="0.75" y="-8.25" width="9.5" height="9.5" fill="none" stroke="' + BR + '" stroke-width="1.5"/>'],
+        ['locked', '<rect x="0.5" y="-8.5" width="10" height="10" fill="none" stroke="' + op(0.3) + '"/>'],
+        ['not ours to open', '<rect x="0.5" y="-8.5" width="10" height="10" fill="none" stroke="' + op(0.2) + '" stroke-dasharray="2 2"/><circle cx="7" cy="-5" r="1.9" fill="none" stroke="' + op(0.5) + '"/>']
+    ];
+    items.forEach(function (it) {
+        h += '<g transform="translate(' + x + ',' + y + ')">' + it[1] + '</g>';
+        h += text(x + 19, y, it[0], { s: 9, c: op(0.42), ls: '0.06em' });
+        x += 19 + it[0].length * 9 * CW + 22;
+    });
+    return h;
+}
+
+/* ---------------------------------------------------------------- the tissue: mycelium, sinew and vessels
+   Grown over a machine. Fine hyphae creep along the copper and across it; tendons and striated
+   muscle hook round the won squares and pull; arteries and capillaries carry the pulse. Nothing
+   mirrored, nothing ruled. Level is how many nodules have fruited, or how swollen a sac is. */
+const HYC = '#b9c4ca';                         // hyphae: cold, pale
+const MUS = ['#4a3039', '#5b3b46', '#6a4652', '#3f2932'];   // muscle: dark, blood under the cold
+const MUS_DK = '#170d11', TENDON = '#a9b2b9', ART = '#2c1219', ART_CORE = '#7d1f2e', STAIN = '#0c1013';
+
+function crPts(P, k) {
+    const out = [];
+    for (let i = 0; i < P.length - 1; i++) {
+        const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+        for (let j = 0; j < k; j++) {
+            const t = j / k, t2 = t * t, t3 = t2 * t;
+            out.push([0, 1].map(function (c) {
+                return 0.5 * ((2 * p1[c]) + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3);
+            }));
+        }
+    }
+    out.push(P[P.length - 1].slice());
+    return out;
+}
+function noiseFn(seed) {
+    const r = rng(seed);
+    const a = [0, 1, 2].map(function () { return { f: 0.02 + r() * 0.09, p: r() * 6.28, m: 0.4 + r() }; });
+    return function (x) { return a.reduce(function (s, o) { return s + o.m * Math.sin(x * o.f + o.p); }, 0) / 2.2; };
+}
+function normals(pts) {
+    return pts.map(function (p, i) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+        return [-dy / L, dx / L];
+    });
+}
+function wob(P, amp, seed, k) {
+    const pts = crPts(P, k || 10);
+    const n = noiseFn(seed), N = normals(pts);
+    let acc = 0;
+    return pts.map(function (p, i) {
+        if (i > 0) acc += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]);
+        const o = amp * n(acc);
+        return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+    });
+}
+function ribbon(pts, wf, shift) {
+    const N = normals(pts), L = [], R = [];
+    pts.forEach(function (p, i) {
+        const t = i / Math.max(1, pts.length - 1), w = wf(t, i) / 2, s = shift ? shift(t, i) : 0;
+        L.push([p[0] + N[i][0] * (w + s), p[1] + N[i][1] * (w + s)]);
+        R.push([p[0] - N[i][0] * (w - s), p[1] - N[i][1] * (w - s)]);
+    });
+    return poly(L.concat(R.reverse())) + ' Z';
+}
+function closedPath(pts) {
+    const n = pts.length, f = function (v) { return v.toFixed(1); };
+    let s = 'M ' + f(pts[0][0]) + ' ' + f(pts[0][1]);
+    for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+        s += ' C ' + f(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+             f(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f(p2[0]) + ' ' + f(p2[1]);
+    }
+    return s + ' Z';
+}
+function blobPts(cx, cy, r, irr, seed, n, sx, sy) {
+    const R = rng(seed);
+    n = n || 11;
+    const a0 = R() * 6.28, pts = [];
+    for (let i = 0; i < n; i++) {
+        const a = a0 + i / n * 6.28 + (R() - 0.5) * 0.4;
+        const rr = r * (1 - irr / 2 + R() * irr);
+        pts.push([cx + Math.cos(a) * rr * (sx || 1), cy + Math.sin(a) * rr * (sy || 1)]);
+    }
+    return pts;
+}
+function blob(cx, cy, r, irr, seed, n, sx, sy) { return closedPath(blobPts(cx, cy, r, irr, seed, n, sx, sy)); }
+function pulseOn(path, w, dur, delay, cls) {
+    return '<path class="' + (cls || 'pulse') + '" pathLength="100" d="' + path + '" fill="none" style="stroke:' + PULSE_HI +
+        ';animation-duration:' + dur + 's;animation-delay:-' + delay + 's" stroke-width="' + w + '" stroke-linecap="round"/>';
+}
+
+/* a hypha: a random walk that sometimes branches; fine, pale, mostly see-through */
+function hypha(x, y, a, steps, depth, r, out, w, step) {
+    const pts = [[x, y]], st = step || 3.4;
+    for (let i = 0; i < steps; i++) {
+        a += (r() - 0.5) * 0.55;
+        x += Math.cos(a) * st; y += Math.sin(a) * st;
+        pts.push([x, y]);
+        if (depth < 3 && r() < 0.07) hypha(x, y, a + (r() < 0.5 ? 0.8 : -0.8) * (0.6 + r() * 0.6), Math.floor(steps * 0.55), depth + 1, r, out, w * 0.7, st);
+    }
+    out.push('<path d="' + poly(pts) + '" fill="none" stroke="' + HYC + '" stroke-width="' + Math.max(0.35, w).toFixed(2) + '" opacity="' + (0.16 + r() * 0.34).toFixed(2) + '" stroke-linecap="round"/>');
+}
+/* hyphae that follow a trace: the mycelium likes the copper */
+function alongTrace(pts, r, out, n, w) {
+    for (let k = 0; k < n; k++) {
+        const i = Math.floor(r() * (pts.length - 1));
+        const a = pts[i], b = pts[i + 1], t = r();
+        const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t;
+        const ang = Math.atan2(b[1] - a[1], b[0] - a[0]) + (r() < 0.5 ? 0 : Math.PI) + (r() - 0.5) * 0.5;
+        hypha(x + (r() - 0.5) * 3, y + (r() - 0.5) * 3, ang, 6 + Math.floor(r() * 12), 1, r, out, w || 0.6);
+    }
+}
+/* a nodule; fruited, it has a leaning stalk and a cap that is never round */
+function nodule(x, y, r, seed, fruit, R, i) {
+    let h = '<g class="pip" style="--i:' + (i || 0) + '">';
+    if (fruit) {
+        const lean = (R() - 0.3) * 1.4, len = r * (2.2 + R() * 1.4);
+        const top = [x + Math.sin(lean) * len, y - Math.cos(lean) * len];
+        const stalk = wob([[x, y], [x + Math.sin(lean) * len * 0.5 + (R() - 0.5) * 4, y - len * 0.5], top], 1.2, seed, 8);
+        h += '<path d="' + ribbon(stalk, function (t) { return r * (0.9 - 0.45 * t); }) + '" fill="#5b666d"/>';
+        h += '<path d="' + blob(top[0] + r * 0.2, top[1], r * 1.5, 0.55, seed + 1, 9, 1.25, 0.62) + '" fill="#9aa5ab" stroke="#1a2024" stroke-width="0.8"/>';
+        h += '<path d="' + blob(top[0] + r * 0.4, top[1] + r * 0.35, r * 0.95, 0.5, seed + 2, 8, 1.2, 0.35) + '" fill="#2a3237"/>';
+        h += '<path d="' + blob(top[0] - r * 0.25, top[1] - r * 0.35, r * 0.4, 0.6, seed + 3, 7, 1.6, 0.5) + '" fill="#ffffff" opacity="0.35"/>';
+        h += '<path class="beat" d="' + blob(x, y + 1, r * 0.75, 0.5, seed + 4, 8) + '" style="fill:' + PULSE + ';animation-delay:-' + ((seed % 9) * 0.5) + 's"/>';
+    } else {
+        h += '<path d="' + blob(x, y, r, 0.6, seed, 8, 1.1, 0.85) + '" fill="#232a2f" stroke="#59646b" stroke-width="0.6"/>';
+        h += '<path d="' + blob(x - r * 0.3, y - r * 0.3, r * 0.3, 0.6, seed + 5, 6) + '" fill="#ffffff" opacity="0.25"/>';
+    }
+    return h + '</g>';
+}
+/* a swollen sac: how full it is shows how far it has grown */
+function sac(x, y, r, seed, swell, i) {
+    const rr = r * (0.55 + 0.6 * swell);
+    let h = '<g class="pip" style="--i:' + (i || 0) + '">';
+    h += '<path d="' + blob(x, y, rr, 0.25, seed, 11, 1.1, 0.95) + '" fill="#0a0c0f" stroke="#59646b" stroke-width="0.7"/>';
+    if (swell > 0.5) h += '<path class="beat" d="' + blob(x + rr * 0.1, y + rr * 0.25, rr * 0.6, 0.4, seed + 1, 9, 1.2, 0.6) + '" style="fill:' + PULSE + ';animation-delay:-' + (seed % 7) * 0.6 + 's" opacity="0.7"/>';
+    h += '<path d="' + blob(x - rr * 0.35, y - rr * 0.4, rr * 0.32, 0.5, seed + 2, 7, 1.5, 0.6) + '" fill="#ffffff" opacity="0.35"/>';
+    return h + '</g>';
+}
+/* an artery, branching into capillaries; tMax lets it be still growing */
+function vein(P, w, seed, depth, out, r, tMax, pulse) {
+    let pts = wob(P, 2.4, seed, 10);
+    if (tMax !== undefined && tMax < 1) pts = pts.slice(0, Math.max(2, Math.round(pts.length * tMax)));
+    if (pts.length < 2) return pts;
+    out.push('<path d="' + ribbon(pts, function (t) { return w * 1.25 * (1 - 0.65 * t); }) + '" fill="' + ART + '"/>');
+    out.push('<path d="' + poly(pts) + '" fill="none" stroke="' + ART_CORE + '" stroke-width="' + (w * 0.32).toFixed(2) + '" opacity="0.85"/>');
+    out.push('<path d="' + poly(pts) + '" fill="none" stroke="#e6d9dc" stroke-width="0.45" opacity="0.28" transform="translate(-0.6,-0.7)"/>');
+    if (pulse) out.push(pulseOn(poly(pts), (w * 0.42).toFixed(2), 6 + (seed % 5) * 0.4, (seed % 11) * 0.6, 'pulse soft'));
+    if (depth < 3) {
+        for (let k = 2; k < pts.length - 3; k += 4 + Math.floor(r() * 4)) {
+            const p = pts[k], q = pts[k + 1];
+            const a = Math.atan2(q[1] - p[1], q[0] - p[0]) + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.7);
+            const L = 12 + r() * 24 * (1 - depth * 0.25);
+            const e = [p[0] + Math.cos(a) * L, p[1] + Math.sin(a) * L];
+            vein([p, [(p[0] + e[0]) / 2 + (r() - 0.5) * 6, (p[1] + e[1]) / 2 + (r() - 0.5) * 6], e], w * 0.5, seed * 7 + k, depth + 1, out, r);
+        }
+    }
+    return pts;
+}
+/* a striated muscle bundle: a belly between two tendons, the pulse along one fibre */
+function bundle(P, wMid, nF, seed, r, tendon, pulse) {
+    const pts = wob(P, 2, seed, 14);
+    const prof = function (t) { return wMid * (0.32 + 0.68 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, t))), 0.7)); };
+    let h = '<path d="' + ribbon(pts, prof) + '" fill="' + MUS_DK + '"/>';
+    const N = normals(pts);
+    for (let k = 0; k < nF; k++) {
+        const base = k / (nF - 1) - 0.5;
+        const n = noiseFn(seed * 13 + k);
+        const fp = pts.map(function (p, i) {
+            const t = i / (pts.length - 1);
+            const o = (base * 0.86 + n(i * 3) * 0.06) * prof(t);
+            return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+        });
+        h += '<path d="' + poly(fp) + '" fill="none" stroke="' + MUS[Math.floor(r() * 4)] + '" stroke-width="' + (0.9 + r() * 0.8).toFixed(2) + '" stroke-linecap="round"/>';
+    }
+    for (let i = 3; i < pts.length - 3; i += 2) {
+        if (r() < 0.55) continue;
+        const t = i / (pts.length - 1), w = prof(t) * (0.15 + r() * 0.3), p = pts[i], q = N[i];
+        const sl = (r() - 0.5) * 3;
+        h += '<path d="M ' + (p[0] + q[0] * w + sl).toFixed(1) + ' ' + (p[1] + q[1] * w).toFixed(1) + ' L ' + (p[0] - q[0] * w * (0.6 + r() * 0.4)).toFixed(1) + ' ' + (p[1] - q[1] * w * (0.6 + r() * 0.4) + sl).toFixed(1) + '" stroke="#0e0d12" stroke-width="0.7" opacity="0.6"/>';
+    }
+    h += '<path d="' + poly(pts.map(function (p, i) { const w = prof(i / (pts.length - 1)) * 0.36; return [p[0] + N[i][0] * w, p[1] + N[i][1] * w]; })) + '" fill="none" stroke="#c9cfd8" stroke-width="0.7" opacity="0.3"/>';
+    if (tendon) {
+        [[0, 0.16], [0.84, 1]].forEach(function (rg) {
+            const seg = pts.filter(function (p, i) { const t = i / (pts.length - 1); return t >= rg[0] && t <= rg[1]; });
+            if (seg.length < 2) return;
+            // the tendon fans out where it holds on
+            h += '<path d="' + ribbon(seg, function (t) { const e = rg[0] === 0 ? 1 - t : t; return wMid * (0.2 + 0.32 * e * e); }) + '" fill="' + TENDON + '"/>';
+            h += '<path d="' + poly(seg) + '" fill="none" stroke="#ffffff" stroke-width="0.7" opacity="0.5" transform="translate(-0.5,-0.7)"/>';
+        });
+    }
+    if (pulse !== false) h += pulseOn(poly(pts), Math.max(1.2, wMid * 0.11).toFixed(2), 6.5 + r() * 2, r() * 6, 'pulse soft');
+    return h;
+}
+/* a tendon hooked round a corner */
+function band(P, w, seed) {
+    const pts = wob(P, 1.2, seed, 10);
+    return '<path d="' + ribbon(pts, function (t) { return w * (0.7 + 0.3 * Math.sin(t * 3 + seed)); }) + '" fill="#9ea8af"/>' +
+        '<path d="' + poly(pts) + '" fill="none" stroke="#ffffff" stroke-width="0.6" opacity="0.45" transform="translate(-0.4,-0.6)"/>';
+}
+/* a knot of fibre: loops wound round each other, each tilted its own way */
+function knot(x, y, scale, seed, r) {
+    let h = '<path d="' + blob(x, y, 15 * scale, 0.5, seed, 10, 1.2, 0.9) + '" fill="#141319"/>';
+    for (let k = 0; k < 14; k++) {
+        const pts = blobPts(x + (r() - 0.5) * 6 * scale, y + (r() - 0.5) * 5 * scale, (7 + r() * 9) * scale, 0.5, seed + k * 3, 9, 1 + r() * 0.6, 0.5 + r() * 0.5);
+        h += '<path d="' + closedPath(pts) + '" transform="rotate(' + (r() * 180).toFixed(1) + ' ' + x + ' ' + y + ')" fill="none" stroke="' + MUS[k % 4] + '" stroke-width="' + ((1 + r() * 1.4) * scale).toFixed(2) + '"/>';
+    }
+    h += '<path class="beat" d="' + blob(x + 2, y + 1, 4 * scale, 0.6, seed + 99, 8) + '" style="fill:' + PULSE + '" opacity="0.85"/>';
+    return h;
+}
+
+/* the ground the growth spreads over: a wet stain, then threads everywhere on it */
+const STAIN_BLOBS = [[860, 640, 230, 1.25, 0.95], [1000, 760, 150, 1.2, 1], [940, 420, 110, 1.2, 0.9],
+                     [720, 400, 95, 1.6, 0.6], [610, 560, 80, 1.1, 1.2], [480, 600, 46, 1.2, 0.9], [1060, 330, 70, 0.7, 1.4]];
+function massSvg(sid) {
+    const r = rng(12012);
+    let h = '';
+    // the stain: layer on layer, soft at the edges, never one outline
+    STAIN_BLOBS.forEach(function (b, k) {
+        h += '<path d="' + blob(b[0], b[1], b[2], 0.4, 300 + k, 13, b[3], b[4]) + '" fill="' + STAIN + '" opacity="0.7"/>';
+        h += '<path d="' + blob(b[0] + 8, b[1] + 6, b[2] * 0.72, 0.45, 340 + k, 12, b[3], b[4]) + '" fill="#06080a" opacity="0.5"/>';
+        h += '<path d="' + blob(b[0] - 6, b[1] + 4, b[2] * 0.5, 0.5, 380 + k, 11, b[3], b[4]) + '" fill="#1a0a10" opacity="0.45"/>';
+    });
+    const hy = [];
+    // the copper first: the mycelium follows every trace that runs into the growth
+    T.forEach(function (t) {
+        const pts = t[2] || [[N[t[0]].x, N[t[0]].y], [N[t[1]].x, N[t[1]].y]];
+        const inside = pts.some(function (p) { return (p[0] > 560 && p[1] > 330) || (p[1] > 540 && p[0] > 420); });
+        if (inside) alongTrace(pts, r, hy, 22, 0.65);
+    });
+    // a fan out of the far corner, dense, and a scatter over the stain
+    for (let k = 0; k < 120; k++) hypha(1075 - r() * 60, 885 - r() * 60, Math.PI + 0.1 + r() * 1.5, 16 + Math.floor(r() * 22), 0, r, hy, 0.9);
+    for (let k = 0; k < 330; k++) {
+        const b = STAIN_BLOBS[Math.floor(r() * STAIN_BLOBS.length)];
+        const a = r() * 6.28, d = Math.sqrt(r()) * b[2] * 0.95;
+        hypha(b[0] + Math.cos(a) * d * b[3], b[1] + Math.sin(a) * d * b[4], r() * 6.28, 6 + Math.floor(r() * 12), 1, r, hy, 0.6);
+    }
+    h += hy.join('');
+    // the trunks: arteries out of the corner, branching as they go
+    const vs = [];
+    vein([[1075, 880], [960, 800], [860, 730], [760, 650]], 9, 501, 1, vs, r, 1, true);
+    vein([[1075, 620], [1040, 520], [995, 440], [985, 330]], 6, 502, 1, vs, r, 1, true);
+    vein([[880, 885], [850, 810], [800, 770], [740, 760]], 6, 503, 1, vs, r, 1, true);
+    vein([[760, 650], [700, 560], [690, 470], [700, 400]], 5, 504, 1, vs, r, 1, true);
+    vein([[620, 560], [560, 600], [500, 600], [462, 596]], 4, 505, 2, vs, r, 1, true);
+    h += vs.join('');
+    // muscle: a great belly in the corner, and bundles laid along the power row
+    h += bundle([[1075, 720], [1010, 700], [965, 668], [935, 640]], 30, 15, 601, r, true);
+    h += bundle([[1075, 505], [1040, 470], [1004, 432], [986, 414]], 18, 11, 602, r, true);
+    h += bundle([[952, 500], [900, 462], [800, 412], [742, 390]], 15, 10, 603, r, true);
+    h += bundle([[708, 468], [672, 430], [642, 400], [625, 386]], 11, 8, 604, r, true);
+    return h;
+}
+
+/* a won square under the growth: dimmed, webbed, a tendon hooked round its corner */
+function overgrow(st, id, sid, k) {
+    const n = N[id];
+    const r = rng(700 + k * 31);
+    const node = mechNode(st, id, sid);
+    const texts = node.match(/<text[^>]*>[^<]*<\/text>/g) || [];
+    const shape = node.replace(/<text[^>]*>[^<]*<\/text>/g, '').replace('<g class="node" data-id="' + id + '">', '<g class="node" data-id="' + id + '"><g opacity="0.62">').replace(/<\/g>$/, '</g></g>');
+    let h = shape + '<g pointer-events="none">';
+    const hy = [];
+    for (let j = 0; j < 46; j++) hypha(n.x + 2 + r() * 24, n.y + r() * 24, (r() < 0.7 ? 0.6 : 3.6) + (r() - 0.5) * 1.8, 4 + Math.floor(r() * 8), 2, r, hy, 0.55);
+    h += hy.join('');
+    // the tendon: from the growth, round the corner that faces it, onto the square
+    h += band([[n.x + 40, n.y + 26], [n.x + 26, n.y + 10], [n.x + 12, n.y - 2], [n.x - 2, n.y + 2]], 7, 70 + k);
+    h += band([[n.x + 22, n.y + 38], [n.x + 10, n.y + 20], [n.x - 4, n.y + 14]], 5, 75 + k);
+    const vs = [];
+    vein([[n.x + 34, n.y - 14], [n.x + 16, n.y - 6], [n.x + 4, n.y - 10]], 2.4, 80 + k, 3, vs, r);
+    h += vs.join('');
+    h += nodule(n.x + 12, n.y + 10, 3.6, 90 + k * 7, k % 2 === 0, r, 0) + nodule(n.x + 4, n.y + 15, 2.8, 95 + k * 7, false, r, 1);
+    h += '</g>';
+    texts.forEach(function (t) { h += t; });
+    return h;
+}
+
+/* the hybrid: Seam and Drill automation, pulled together by a muscle, fused in a knot */
+function hybridSvg(st, sid) {
+    const H_ = HYBRID, r = rng(8080);
+    let h = '';
+    const vs = [];
+    vein([[588, 345], [566, 300], [528, 250], [496, 220]], 6, 81, 1, vs, r, 1, true);
+    h += '<path d="' + blob(H_.x + 4, H_.y, 46, 0.4, 82, 12, 0.9, 1.4) + '" fill="' + STAIN + '" opacity="0.8"/>';
+    const hy = [];
+    for (let j = 0; j < 70; j++) hypha(H_.x - 30 + r() * 64, H_.y - 50 + r() * 100, r() * 6.28, 5 + Math.floor(r() * 9), 1, r, hy, 0.55);
+    h += hy.join('');
+    [['drill', H_.x, H_.y - 40, 7], ['seam', H_.x, H_.y + 40, -6]].forEach(function (f) {
+        const node = mechNode(st, f[0], sid, [f[1], f[2]]);
+        const texts = node.match(/<text[^>]*>[^<]*<\/text>/g) || [];
+        const shape = node.replace(/<text[^>]*>[^<]*<\/text>/g, '');
+        h += '<g transform="rotate(' + f[3] + ' ' + f[1] + ' ' + f[2] + ')"><g opacity="0.7">' + shape + '</g></g>';
+        texts.forEach(function (t) { h += t; });
+    });
+    h += vs.join('');
+    // the muscle that pulls them in, down the right side, tendons gripping each square
+    h += bundle([[H_.x + 4, H_.y - 46], [H_.x + 28, H_.y - 20], [H_.x + 26, H_.y + 18], [H_.x + 6, H_.y + 46]], 22, 12, 85, r, true);
+    h += band([[H_.x + 14, H_.y - 34], [H_.x + 2, H_.y - 46], [H_.x - 12, H_.y - 50]], 6, 86);
+    h += band([[H_.x + 16, H_.y + 32], [H_.x + 4, H_.y + 46], [H_.x - 12, H_.y + 50]], 6, 87);
+    h += '<g class="node" data-id="hybrid">' + knot(H_.x + 4, H_.y, 1.2, 88, r);
+    h += nodule(H_.x - 6, H_.y - 4, 4.5, 89, true, r, 0) + nodule(H_.x + 12, H_.y + 6, 4, 90, true, r, 1) + nodule(H_.x + 2, H_.y + 12, 3, 91, false, r, 2) + '</g>';
+    h += text(H_.x + 44, H_.y + 4, H_.name, { c: '#d9dad3', ls: '0.08em', w: 700 });
+    return h;
+}
+
+/* the arteries between the organs, and the pulse in the ones that are grown */
+function vessels() {
+    const r = rng(4242);
+    const out = [];
+    VESSELS.forEach(function (v, i) {
+        const dim = !v[5];
+        if (dim) {
+            const pts = wob(v[2], 1.8, 41 + i, 10);
+            out.push('<path d="' + ribbon(pts, function (t) { return v[3] * 0.5 * (1 - 0.5 * t); }) + '" fill="' + ART + '" opacity="0.65"/>');
+        } else {
+            vein(v[2], v[3] * 0.62, 41 + i * 7, 2, out, r, 1, true);
+        }
+    });
+    return out.join('');
+}
+
+/* an organ of the body: a cluster of nodules on a knot of fibre; fruited nodules are its level */
+function bioNode(id) {
+    const b = BIO[id];
+    const r = rng(1000 + id.length * 97 + Math.round(b.x));
+    const live = b.lvl > 0, open = !!b.buy, locked = !live && !open;
+    let h = '<g class="node" data-id="' + id + '"' + (locked ? ' opacity="0.55"' : '') + '>';
+    if (open) {
+        h += '<path class="breathe-o" d="' + blob(b.x, b.y, b.r * 1.55, 0.3, 77 + b.x, 12, 1.15, 0.95) + '" fill="none" stroke="#e8ecef" stroke-width="1" opacity="0.7"/>';
+    }
+    if (b.kind === 'vat') {
+        // vats: sacs, the grown ones swollen dark with the pulse in them
+        h += knot(b.x, b.y + 4, 0.7, 31 + b.x, r);
+        for (let i = 0; i < b.max; i++) {
+            const a = i * 2.4 + 0.3, d = 7 + i * 2.1;
+            h += sac(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.8, 6.5, 40 + i * 13, i < b.lvl ? 1 : 0.15, i);
+        }
+    } else if (b.max === 1) {
+        // one-off organs: a knot, swollen and fruited once grown
+        const sc = (b.kind === 'core' ? 1.75 : 1.15) * (live ? 1 : 0.75);
+        h += knot(b.x, b.y, sc, 51 + b.x, r);
+        if (live) {
+            const n = b.kind === 'core' ? 4 : 2;
+            for (let i = 0; i < n; i++) {
+                const a = i * 2.2 - 1.2, d = 6 + i * 4;
+                h += nodule(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.7 - 4, b.kind === 'core' ? 5 : 4, 60 + i * 9 + b.x, true, r, i);
+            }
+        } else {
+            h += nodule(b.x + 3, b.y - 2, 3.5, 66 + b.x, false, r, 0);
+        }
+    } else {
+        // levelled organs: a nodule for every level, the bought ones fruited
+        h += knot(b.x, b.y + 3, 0.75 + b.lvl * 0.06, 71 + b.x, r);
+        for (let i = 0; i < b.max; i++) {
+            const a = i * 2.4 + 0.5, d = 5 + i * 1.9;
+            h += nodule(b.x + Math.cos(a) * d * 1.15, b.y + Math.sin(a) * d * 0.8, i < b.lvl ? 3.8 : 2.8, 80 + i * 11 + b.x, i < b.lvl, r, i);
+        }
+    }
+    if (b.sf) {
+        const rx = b.x + b.r * 1.25, ry = b.y - b.r * 1.1;
+        h += b.sf === 'f'
+            ? '<circle cx="' + rx + '" cy="' + ry + '" r="3.6" style="fill:' + PULSE + '" stroke="#d9dad3" stroke-width="0.8"/>'
+            : '<circle cx="' + rx + '" cy="' + ry + '" r="3.6" fill="none" stroke="#d9dad3" stroke-width="1.1" opacity="0.8"/>';
+    }
+    // the label
+    const nameC = locked ? '#5d625f' : open && !live ? '#ffffff' : '#d9dad3';
+    const below = b.y + b.r * 1.35 + 14;
+    if (b.lab === 'l') {
+        h += text(b.x - b.r * 1.9 - 6, b.y + 4, b.name, { a: 'end', c: nameC, ls: '0.06em' });
+    } else {
+        h += text(b.x, below, b.name, { a: 'middle', c: nameC, ls: '0.06em' });
+        if (b.sf !== 'o' && b.lvl < b.max && b.cost) {
+            [star(b.cost[0]), '+ ' + b.cost[1] + ' people'].forEach(function (pl, k) {
+                h += text(b.x, below + 12 + k * 11, pl, { a: 'middle', c: open ? '#ffffff' : '#9a9d98' });
+            });
+        }
+    }
+    return h + '</g>';
+}
+
+/* ---------------------------------------------------------------- one state */
+const MECH_IDS = Object.keys(N);
+
+function render(svg) {
+    const sid = svg.dataset.state;
+    const st = STATE[sid];
+    const bio = sid === 'c';
+    let h = '';
+    h += '<rect x="0" y="0" width="1440" height="930" fill="' + RK + '"/>';
+    h += '<g transform="translate(' + BX + ',' + BY + ')">';
+    h += boardBase(sid);
+    h += traces(st);
+    h += '<g class="lit-layer"></g>';
+    h += tags(st);
+    h += '</g>';
+
+    let log = null;
+    if (sid !== 'a') log = nightLog(sid, sid === 'b' ? 4 : 9);
+    if (sid === 'b') h += logTraces(log.traces, false);
+
+    h += '<g transform="translate(' + BX + ',' + BY + ')">';
+    MECH_IDS.forEach(function (id) {
+        if (!st[id]) return;
+        if (bio && (OVERGROWN[id] || FUSED[id])) return;
+        h += mechNode(st, id, sid);
+    });
+    if (bio) {
+        h += massSvg(sid);
+        Object.keys(OVERGROWN).forEach(function (id, k) { h += overgrow(st, id, sid, k); });
+        h += hybridSvg(st, sid);
+        h += text(1050, 868, 'BIOLOGICAL', { a: 'end', s: 9, c: BONE_MID, ls: '0.32em' });
+    }
+    h += '</g>';
+
+    if (bio) {
+        h += logTraces(log.traces, true);
+        h += '<g transform="translate(' + BX + ',' + BY + ')">';
+        h += vessels();
+        Object.keys(BIO).forEach(function (id) { h += bioNode(id); });
+        h += '</g>';
+    }
+
+    if (log) h += log.svg;
+    h += legend();
+    h += infoBoxSvg();
+    svg.innerHTML = h;
+
+    // hover: the info box, the path from the root lit in order, a lift, the pips tick once
+    const litLayer = svg.querySelector('.lit-layer');
+    function chainTo(id) {
+        let c = id;
+        if (BIO[c]) c = 'question';
+        if (c === 'hybrid') c = 'seam';
+        const chain = [];
+        while (PARENT[c]) { chain.unshift(c); c = PARENT[c]; }
+        return chain;
+    }
+    svg.querySelectorAll('.node').forEach(function (g) {
+        const id = g.dataset.id;
+        g.addEventListener('mouseenter', function () {
+            setInfo(svg, infoFor(sid, id));
+            g.classList.add('hov');
+            g.classList.remove('tick'); void g.getBoundingClientRect(); g.classList.add('tick');
+            litLayer.innerHTML = '';
+            const chain = chainTo(id);
+            const step = chain.length ? 300 / chain.length : 0;
+            chain.forEach(function (c, i) {
+                const src = svg.querySelector('path[data-child="' + c + '"]');
+                if (!src) return;
+                const p = src.cloneNode(false);
+                p.removeAttribute('data-child');
+                p.removeAttribute('stroke-dasharray');
+                p.setAttribute('stroke', BR);
+                p.setAttribute('stroke-width', '2');
+                p.setAttribute('pathLength', '1');
+                p.setAttribute('class', 'lit');
+                p.style.animationDelay = Math.round(i * step) + 'ms';
+                litLayer.appendChild(p);
+            });
+        });
+        g.addEventListener('mouseleave', function () {
+            setInfo(svg, null);
+            g.classList.remove('hov', 'tick');
+            litLayer.innerHTML = '';
+        });
+    });
+}
+
+document.querySelectorAll('svg.board[data-state]').forEach(render);
+
+/* ---------------------------------------------------------------- d · fusion, on a loop
+   Output and The machine: feed, both won. The tissue rises, reaches each, draws them
+   together and fuses them into ORGANOID CELL. Then it lets go and plays again. */
+(function fusion() {
+    const svg = document.getElementById('fusion');
+    const A0 = [560, 330], B0 = [880, 330], C = [720, 345];
+    const SZ = 72;
+    let h = '<rect x="0" y="0" width="1440" height="930" fill="' + RK + '"/>';
+    h += '<defs><pattern id="dots-d" width="20" height="20" patternUnits="userSpaceOnUse"><rect x="9.5" y="9.5" width="1" height="1" fill="' + op(0.1) + '"/></pattern></defs>';
+    h += '<rect x="330" y="110" width="780" height="580" fill="url(#dots-d)"/>';
+    h += '<rect x="330.5" y="110.5" width="779" height="579" fill="none" stroke="' + op(0.16) + '"/>';
+    h += text(350, 135, 'POWER', { s: 9, c: op(0.34), ls: '0.32em' });
+    h += '<g id="f-steps"></g><g id="f-stage"></g>';
+    h += infoBoxSvg();
+    svg.innerHTML = h;
+    const stage = svg.querySelector('#f-stage');
+    const stepsG = svg.querySelector('#f-steps');
+    const STEPS = ['1 won', '2 reached', '3 drawn together', '4 fused'];
+
+    function bigSquare(x, y, rot, alpha, lvl, max) {
+        let s = '<g transform="rotate(' + rot.toFixed(2) + ' ' + x.toFixed(1) + ' ' + y.toFixed(1) + ')" opacity="' + alpha.toFixed(2) + '">';
+        s += '<rect x="' + (x - SZ / 2) + '" y="' + (y - SZ / 2) + '" width="' + SZ + '" height="' + SZ + '" fill="' + PL + '"/>';
+        s += '<rect x="' + (x - SZ / 2 + 6) + '" y="' + (y - SZ / 2 + 6) + '" width="7" height="7" fill="' + RK + '"/>';
+        for (let i = 0; i < max; i++) {
+            const px = x + SZ / 2 + 6 + Math.floor(i / 5) * 11, py = y - SZ / 2 + 2 + (i % 5) * 12;
+            s += i < lvl ? '<rect x="' + px + '" y="' + py + '" width="8" height="8" fill="' + PL + '"/>'
+                         : '<rect x="' + (px + 0.5) + '" y="' + (py + 0.5) + '" width="7" height="7" fill="none" stroke="' + op(0.32) + '"/>';
+        }
+        return s + '</g>';
+    }
+    const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const clamp = (t) => Math.max(0, Math.min(1, t));
+    const seg = (t, a, b) => clamp((t - a) / (b - a));
+    const LOOP = 10.5;
+    const FIX = new URLSearchParams(location.search).get('t');
+    let lastHold = false;
+
+    function frame(now) {
+        // ?t=7 holds the loop at one moment (for a still)
+        const t = FIX !== null ? Number(FIX) : (now / 1000) % LOOP;
+        const k = ease(seg(t, 0.8, 2.4));                 // the growth spreads up the board
+        const reach = ease(seg(t, 2.0, 3.8));             // capillaries and tendons reach the squares
+        const pull = ease(seg(t, 3.8, 5.8));              // the muscle contracts: drawn together
+        const fuse = ease(seg(t, 5.4, 6.6));              // the knot forms between them
+        const fade = 1 - ease(seg(t, 9.4, 10.2));
+        const hold = t >= 6.7 && t < 9.4;
+        const step = t < 2.0 ? 0 : t < 3.8 ? 1 : t < 5.6 ? 2 : 3;
+        stepsG.innerHTML = STEPS.map(function (w, i) {
+            return text(350 + i * 150, 92, w, { s: 10, c: i === step ? BR : op(0.3), ls: '0.1em' });
+        }).join('');
+        if (hold && lastHold) { requestAnimationFrame(frame); return; }
+        lastHold = hold;
+
+        const ax = A0[0] + (C[0] - 62 - A0[0]) * pull, ay = A0[1] + (C[1] - A0[1]) * pull;
+        const bx = B0[0] + (C[0] + 62 - B0[0]) * pull, by = B0[1] + (C[1] - B0[1]) * pull;
+        let s = '<g opacity="' + fade.toFixed(3) + '">';
+        s += '<path d="M ' + ax + ' ' + ay + ' L ' + bx + ' ' + by + '" stroke="' + op(0.78 * (1 - fuse)) + '" stroke-width="2"/>';
+        // the stain and the threads, spreading up from the bottom of the board
+        if (k > 0) {
+            const top = 690 - 330 * k;
+            [[720, 690, 330, 1.1, 0.5], [600, 660, 140, 1, 0.8], [860, 650, 150, 1, 0.8]].forEach(function (b, i) {
+                s += '<path d="' + blob(b[0], b[1], b[2], 0.35, 900 + i, 13, b[3], b[4] * k) + '" fill="' + STAIN + '" opacity="0.6"/>';
+            });
+            const hy = [];
+            // the same threads every frame; only those below the growing edge are shown
+            const rh = rng(4712);
+            for (let j = 0; j < 130; j++) {
+                const x = 360 + rh() * 720, y = 690 - rh() * 330;
+                const a = -Math.PI / 2 + (rh() - 0.5) * 2.2, st = 8 + Math.floor(rh() * 14);
+                const tmp = [];
+                hypha(x, y, a, st, 1, rh, tmp, 0.7);
+                if (y >= top) hy.push.apply(hy, tmp);
+            }
+            s += hy.join('');
+        }
+        s += '</g>';
+        s += '<g opacity="' + fade.toFixed(3) + '">';
+        s += bigSquare(ax, ay, -9 * pull, 1 - 0.3 * pull - 0.12 * fuse, 10, 10);
+        s += bigSquare(bx, by, 8 * pull, 1 - 0.3 * pull - 0.12 * fuse, 6, 8);
+        s += text(ax + SZ / 2, ay + SZ / 2 + 22, 'OUTPUT', { a: 'end', c: op(0.9 * (1 - fuse)), ls: '0.06em', s: 12 });
+        s += text(bx - SZ / 2, by + SZ / 2 + 22, 'THE MACHINE: FEED', { a: 'start', c: op(0.9 * (1 - fuse)), ls: '0.06em', s: 12 });
+        const out = [];
+        if (reach > 0) {
+            // capillaries climb to each square, and reach across the gap between them
+            vein([[600, 610], [590, 520], [ax + 10, ay + 90], [ax + 4, ay + SZ / 2]], 6, 921, 1, out, rng(921), reach, hold);
+            vein([[840, 610], [850, 520], [bx - 10, by + 90], [bx - 4, by + SZ / 2]], 6, 922, 1, out, rng(922), reach, hold);
+            vein([[ax + SZ / 2, ay - 14], [ax + 60, ay - 50], [bx - 60, by - 50], [bx - SZ / 2, by - 14]], 4, 923, 2, out, rng(923), Math.min(1, reach * 1.2), hold);
+            // threads web over the near half of each square
+            const hy = [], rw = rng(4713), shown = Math.round(60 * reach);
+            for (let j = 0; j < 60; j++) {
+                const tmp = [];
+                hypha(ax + rw() * SZ * 0.5, ay - SZ * 0.3 + rw() * SZ * 0.6, (rw() - 0.5) * 2, 5 + Math.floor(rw() * 8), 2, rw, tmp, 0.6);
+                hypha(bx - rw() * SZ * 0.5, by - SZ * 0.3 + rw() * SZ * 0.6, Math.PI + (rw() - 0.5) * 2, 5 + Math.floor(rw() * 8), 2, rw, tmp, 0.6);
+                if (j < shown) hy.push.apply(hy, tmp);
+            }
+            out.push(hy.join(''));
+        }
+        s += out.join('');
+        if (reach > 0.2) {
+            // the tendons hook round the near corners; the muscle between them contracts
+            const ta = Math.min(1, (reach - 0.2) / 0.5);
+            s += '<g opacity="' + ta.toFixed(2) + '">';
+            s += band([[ax + SZ / 2 + 30, ay + 10], [ax + 20, ay - 22], [ax - 4, ay - SZ / 2 - 6], [ax - 22, ay - 30]], 9, 931);
+            s += band([[ax + SZ / 2 + 26, ay + 26], [ax + 18, ay + SZ / 2 + 8], [ax - 10, ay + SZ / 2 + 4]], 7, 932);
+            s += band([[bx - SZ / 2 - 30, by + 6], [bx - 20, by - 24], [bx + 6, by - SZ / 2 - 6], [bx + 24, by - 28]], 9, 933);
+            s += band([[bx - SZ / 2 - 26, by + 24], [bx - 16, by + SZ / 2 + 8], [bx + 12, by + SZ / 2 + 2]], 7, 934);
+            const gap = bx - ax;
+            const thick = 12 + 22 * pull;                  // shorter and thicker as it contracts
+            s += bundle([[ax + SZ / 2 + 4, ay + 6], [ax + gap * 0.35, ay + 16 + 10 * (1 - pull)], [bx - gap * 0.35, by + 12 + 10 * (1 - pull)], [bx - SZ / 2 - 4, by + 4]], thick, 14, 935, rng(935), true, hold);
+            s += '</g>';
+        }
+        if (k > 0.05) {
+            // muscles from the ground up, each hooked under the outer corner of its square
+            const g = Math.min(1, k * 1.2);
+            s += bundle([[400, 690], [430, 600], [ax - SZ / 2 - 30, ay + 120], [ax - SZ / 2 + 4, ay + SZ / 2 + 2]], 24 * g, 13, 910, rng(910), true, hold);
+            s += bundle([[1100, 600], [1066, 520], [bx + SZ / 2 + 56, by + 64], [bx + SZ / 2 - 6, by + SZ / 2 - 4]], 16 * g, 10, 911, rng(911), true, hold);
+        }
+        if (fuse > 0) {
+            s += '<g opacity="' + fuse.toFixed(3) + '">';
+            s += knot(C[0], C[1] + 4, 0.6 + 1.4 * fuse, 940, rng(940));
+            if (fuse > 0.5) {
+                const rn = rng(941);
+                s += nodule(C[0] - 10, C[1] - 6, 7, 941, true, rn, 0) + nodule(C[0] + 14, C[1] + 2, 6, 942, true, rn, 1) + nodule(C[0] + 2, C[1] + 16, 5, 943, true, rn, 2);
+            }
+            s += text(C[0], C[1] + 104, 'ORGANOID CELL', { a: 'middle', c: '#d9dad3', ls: '0.1em', s: 13, w: 700 });
+            s += '</g>';
+        }
+        s += '</g>';
+        stage.innerHTML = s;
+
+        if (fuse > 0.6) setInfo(svg, { name: 'ORGANOID CELL', lvl: 'fused: Output 10/10 + The machine: feed 6/8', cost: 'grown',
+            eff: 'generators and the machine are one organ: energy ×20, games ×4', x: 'the machine needs no feeding now; it is fed', xc: '#d9dad3', bio: 1 });
+        else if (t > 2.0) setInfo(svg, { name: 'OUTPUT + THE MACHINE: FEED', lvl: '10 / 10 + 6 / 8', cost: 'both won', eff: 'the muscle is drawing them together', bio: 1 });
+        else setInfo(svg, null);
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+})();
+
+
+/* ---------------------------------------------------------------- tabs */
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+        document.getElementById('state-' + t.dataset.to).scrollIntoView({ behavior: 'smooth' });
+    });
+});
+const io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        const k = e.target.id.slice(6);
+        tabs.forEach(function (t) { t.classList.toggle('on', t.dataset.to === k); });
+    });
+}, { threshold: 0.55 });
+document.querySelectorAll('section.state').forEach(function (s) { io.observe(s); });
+
+})();
+</script>
+</body>
+</html>
