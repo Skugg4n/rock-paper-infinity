@@ -1771,3 +1771,10 @@ items:
       The war (chapter III) moves the same way today (rows of dots over water): landings and
       our strikes should become boats too, with a harbour of our own. That part is the WAR
       session's; the boat and harbour code in src/phase2/ants.js should be shared.
+      Agreed with the WAR session (2026-10-02): CAPITAL builds the islands, the neighbour's
+      build order and the raid boat in chapter II, and tells WAR before touching ants.js. The
+      boat is a shared building block: a function that carries N dots from a yard or harbour
+      to the shore nearest a target and back. WAR then converts launchWave and launchStrike
+      to boats on its own branch. Keep stable for WAR: the onIsland(path, seg, t) contract
+      (it gates all fighting and losses) and the `losses` / `onImpact` arguments of
+      launchWave and launchStrike. Tell WAR when the boat exists.
