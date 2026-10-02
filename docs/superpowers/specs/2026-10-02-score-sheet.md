@@ -64,7 +64,7 @@ Rows marked *proposal* are mine (the WAR session) and are for Ola and the owners
 | **what the machine is** | the game itself | the factory, far back in a large room | the arms factory under the war | the star machine in its own room on top: gears, flywheel, chain, three tubes; it plays the game on the colony's energy | whatever comes up with us |
 | **pulse comes from** | games a second (58 to 128 bpm) | the gap between bass hits (calm city = long gap) | the clock to the next landing | awake: the machine's throws (games a day, so energy fed is tempo). Asleep: no pulse at all, only the roll of the years | the owner decides |
 | **layers** | heartbeat, tick, bass, shimmer, generator hum, a voice per board | bass, tones, factory, life (short voices, small steps, a far choir in a large city; no noise), traffic, computer, rival (a tone out of key and their drum) | their drum, our drum, bass, tones with holes, arms factory, murmur, drone, shells | awake: the machine, cable hum, drips, a thin murmur. Asleep: the roll, the lamps, the Watcher's tone, the Surface typing. Late: breath and a heartbeat |  |
-| **what bends the harmony** | nothing: home | the rival, in five steps: a foreign note (E♭) and a faint drum halfway between our bass hits, F→Gm, B♭→E♭, C→A major and the drum strikes twice, the tones chafe (minor ninth, tritone, wider beating) and the people go quiet. A raid: the city holds its breath | the war keeps step five's chords (Dm, E♭, Gm, A) and the doomsday drone pulls home itself upward | stability: the Watcher's tone drifts flat as it falls; a snap pulls everything true at once. After The question, a heartbeat takes over the machine's pulse, room by room | the major third arrives |
+| **what bends the harmony** | nothing: home | the neighbour, in five steps, from wow to dread (board mockup 3): 1 a neighbour: their factory answers ours with a bright chime a fifth up · 2 they build (wood), the chime drifts out of time · 3 they arm: the chime stops, building turns to metal, a faint drum answers halfway between our bass hits, F→Gm, a drone on E♭ · 4 B♭→E♭, a thin high note chafes (C♯ against D), the tones grow restless · 5 C→A major, the drum strikes twice, the people have gone quiet. The raid is a set piece: footfalls nearer and faster, a boom, the fall, the city holds its breath on a thin C♯, they walk home | the war keeps step five's chords (Dm, E♭, Gm, A) and the doomsday drone pulls home itself upward | stability: the Watcher's tone drifts flat as it falls; a snap pulls everything true at once. After The question, a heartbeat takes over the machine's pulse, room by room | the major third arrives |
 | **carried over from the act before** | | the three rising notes, the key, the chords | the rival's drum and the bent chords, the murmur, the factory | the war's E♭ falling two octaves to D on the IV card; the machine, moved up top; the murmur, now thin | the deep's low D |
 | **ending note** | **D** (struck once, rings 7 s) | **C♯** (*proposal:* the A major chord's cutting third, left hanging on the WAR card; the CAPITAL session agrees, Ola decides) | **E♭** (*proposal:* the drone has reached it when the surface is dead) | **D, two octaves down** (*proposal*): the people ending leaves it alone under the shaft; the Unity ending has every voice in the colony sing that one D in unison | **F♯** (*proposal:* the first major third in the game) |
 
@@ -80,6 +80,15 @@ Industry (tool case, car, computer) = **metal** and a motor that spins up to the
 Food (stall, crop, hand harvest) = **grain**. Land = **earth**, low and wide. "Something
 new" is chapter I's three notes, unchanged. Metal is the factory's material, so the war's
 metal thunk (below) continues it: the factory turns to arms.
+
+### II → III: the transition (on the board, mockup 3; for Ola to judge)
+
+In the manner of I → II (everything falls away, one note). The swords are pressed: a boom,
+and the whole city is gone at once; one note hangs, **C♯**, struck like chapter I's last D
+and ringing seven seconds without resolving. Darkness. **Three drum strokes** as III stands
+on the card. A breath drawn in, and **the heaviest boom** as WAR appears. Silence. Then
+their drum alone, close and dry, and when the card lifts our bass comes in under it on D.
+That is where the war's own music takes over.
 
 ## 4. III · WAR in detail (*proposal*)
 
