@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.65.0 - 2026-10-03 (chapter II has sound)
+
+### The city's sound, as Ola approved it on the board
+
+The sounds from `docs/mockups/sound-board-city.html` (mockup 3), now in the game (B190). Same graph, same Sound/Music switches and same first-click unlocking as chapter I (`audio.graph()`, `audio.wake()` from the TRIVIAL session). New `src/audio-city.js`.
+
+- **The city.** A heavy, calm bass far back every 6.5 seconds, the chord round of chapter I. Slow tones that drag themselves into the chord, more of them with more people, glassier with taller houses and more research. The factory from chapter I heard over the roofs, in time with the wave on its tile. Life: short voices and small steps, a far choir in a large city. Traffic once there are cars, a quick light pattern once there are computers. The silo is the heart: it weakens below 30 %, and an empty silo knocks (once per hunger) and makes the tones sag.
+- **The neighbour, from wow to dread.** Their factory answers ours with a bright chime; they build (wood); then the chime stops, the building sounds turn to metal, a drum answers halfway between our bass hits, the chords darken one at a time (F → Gm, B♭ → E♭, C → A major), a thin note chafes at the top and the people go quiet.
+- **The raid follows the boat**: the people hush and a tone climbs while they muster and cross (oars), footfalls as they come ashore, the boom and the fall as the house goes, the city holds its breath on one thin note, and comes back when the boat has left.
+- **The change to III · WAR**: everything in the city falls away at once and one C♯ hangs; three drum strokes as III stands on the card; the heaviest boom on WAR; silence; their drum alone, and our bass under it when the card lifts. The card itself is silent (the set piece carries it).
+- **Words by material.** Every purchase begins with chapter I's thunk; then wood for building, levelling up and selling, glass for research, metal for industry (tool case, car, computer, superconductor), grain for food (stall, crop, hand harvest), earth for land. "Something new" (a button arriving) is chapter I's three notes.
+- Paused or hidden: silent. The war has no city music (the WAR session's own sound follows).
 ## v1.64.0 - 2026-10-03 (chapter III, war by boat)
 
 ### Landings and strikes sail, guards meet them on the beach, controls arrive with effect

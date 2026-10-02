@@ -623,7 +623,8 @@ function war(marks = { III: 3.6, WAR: 8.6, LIFT: 14.5 }) {
     osc('sine', f * 2, n, n + 3.8, env(n, 0.13, 0.004, 3.4, seqBus));
     osc('sine', f * 3.01, n, n + 1.9, env(n, 0.04, 0.003, 1.6, seqBus));
     const { III, WAR, LIFT } = marks;
-    [0, 1.25, 2.5].forEach((d, i) => warDrum(t + III + d, 0.55 + 0.15 * i));
+    const stroke = Math.min(1.25, Math.max(0.6, (WAR - III - 0.5) / 2));
+    [0, stroke, 2 * stroke].forEach((d, i) => warDrum(t + III + d, 0.55 + 0.15 * i));
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.8;
     lp.frequency.setValueAtTime(90, t + WAR - 2); lp.frequency.exponentialRampToValueAtTime(1500, t + WAR);
     const sg = ctx.createGain(); sg.gain.setValueAtTime(0.0001, t + WAR - 2); sg.gain.exponentialRampToValueAtTime(0.3, t + WAR); sg.gain.setTargetAtTime(0.0001, t + WAR, 0.02);

@@ -1647,7 +1647,8 @@ items:
       hang together with TRIVIAL. Calm tempo. A few tones in the background
       that drag themselves along, change, shift. A calm, heavy bass far back
       with a very long time between the hits, every 5 to 8 seconds. Test a bit.
-    status: open
+    status: done
+    resolved_in: v1.65.0
     notes: |
       Direction agreed with Ola: chapter I's machine is heard at a distance (the factory in
       the city), the city grows on top (murmur and voices with the population, glassier with

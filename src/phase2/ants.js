@@ -651,7 +651,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     // beach nearest the target; they go ashore in pairs and up the streets, stand
     // on the house until it is razed, go back, and the boat sails home; they return
     // to their posts. `onRazed(building)` fires as the plate goes dark, `onOver()`
-    // when they are home again.
+    // when they are home again, `onPhase(name)` at every step (for the sound).
     let raid = null;
     const RAID_WALK = 44, RAID_SAIL_S = 4.6;
     /** Walks a path at `speed`; true once the end is reached (the walker is then at `w.end`). */
@@ -683,7 +683,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const out = ISLAND_PAD + 14;
         return { x: land.x + dx / L * out, y: land.y + dy / L * out };
     }
-    function startAttack(onRazed, onOver) {
+    function startAttack(onRazed, onOver, onPhase) {
         if (raid || boat.owner) return false;      // the boat is out with a landing (III)
         measure();
         const targets = homes();
@@ -695,7 +695,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const land = route[route.land];
         const pierFoot = { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h + 4 };
         const sPier = ringCoord(R, pierFoot);
-        raid = { phase: 'muster', target, route, land, shore: offshore(land), dock, t: 0, arrived: 0, needed: Math.min(5, watchmen.length), onRazed, onOver, razed: false };
+        raid = { phase: 'muster', target, route, land, shore: offshore(land), dock, t: 0, arrived: 0, needed: Math.min(5, watchmen.length), onRazed, onOver, onPhase, razed: false };
+        onPhase?.('muster');
         watchmen.forEach((m, i) => {
             const from = watchPos(m) || ringPoint(R, m.s);
             m.hidden = false; m.aboard = false; m.x = from.x; m.y = from.y; m.home = m.duty === 'patrol' ? m.s : (m.duty === 'watch' ? R.w * (0.3 + 0.2 * (m.k ?? 0)) : sPier);
@@ -729,15 +730,15 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const allDone = () => watchmen.every(m => !m.walk);
         if (r.phase === 'muster') {
             walkAll(RAID_WALK, (m) => { m.hidden = true; m.aboard = true; boat.aboard++; });
-            if (allDone()) { r.phase = 'cross'; sailBoat(r.dock, r.shore, RAID_SAIL_S, () => {
-                r.phase = 'ashore'; boat.angle = -Math.PI / 2 + Math.atan2(r.land.y - r.shore.y, r.land.x - r.shore.x) + Math.PI / 2;
+            if (allDone()) { r.phase = 'cross'; r.onPhase?.('cross'); sailBoat(r.dock, r.shore, RAID_SAIL_S, () => {
+                r.phase = 'ashore'; r.onPhase?.('ashore'); boat.angle = -Math.PI / 2 + Math.atan2(r.land.y - r.shore.y, r.land.x - r.shore.x) + Math.PI / 2;
                 const streets = r.route.slice(r.route.land + 1);
                 watchmen.forEach((m, i) => { m.walk = { path: [r.shore, r.land, ...streets], seg: 0, t: 0, wait: pairDelay(i, 0.26) }; m.side = i % 2 ? 3 : -3; });
             }); }
         } else if (r.phase === 'ashore') {
             walkAll(RAID_WALK, (m) => { m.razing = true; r.arrived++; });
             if (r.arrived >= r.needed && !r.razed) {
-                r.razed = true; r.phase = 'raze'; r.t = 0;
+                r.razed = true; r.phase = 'raze'; r.t = 0; r.onPhase?.('raze');
                 // The house is razed: a burnt plate, icon gone, nothing left.
                 // Scorched earth is what chapter III is about (vision.md).
                 r.target.el.querySelector('.building')?.classList.add('razed');
@@ -746,13 +747,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             }
         } else if (r.phase === 'raze') {
             if (r.t > 2.6) {
-                r.phase = 'back';
+                r.phase = 'back'; r.onPhase?.('back');
                 const back = [...r.route.slice(r.route.land + 1)].reverse().concat([r.land, r.shore]);
                 watchmen.forEach((m, i) => { m.razing = false; m.walk = { path: [{ x: m.x, y: m.y }, ...back.slice(1)], seg: 0, t: 0, wait: pairDelay(i, 0.22) }; });
             }
         } else if (r.phase === 'back') {
             walkAll(RAID_WALK, (m) => { m.hidden = true; m.aboard = true; boat.aboard++; });
-            if (allDone()) { r.phase = 'home'; sailBoat(r.shore, r.dock, RAID_SAIL_S, () => {
+            if (allDone()) { r.phase = 'home'; r.onPhase?.('home'); sailBoat(r.shore, r.dock, RAID_SAIL_S, () => {
                 r.phase = 'dismiss'; boat.moored = true;
                 const R = townRing(), pierFoot = { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h + 4 }, sPier = ringCoord(R, pierFoot);
                 watchmen.forEach((m, i) => {
@@ -763,7 +764,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             }); }
         } else if (r.phase === 'dismiss') {
             walkAll(RAID_WALK, (m) => { m.x = undefined; m.y = undefined; });
-            if (allDone()) { const cb = r.onOver; raid = null; cb?.(); }
+            if (allDone()) { const cb = r.onOver, ph = r.onPhase; raid = null; ph?.('over'); cb?.(); }
         }
     }
     const raiding = () => !!raid;

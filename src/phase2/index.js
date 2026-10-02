@@ -15,6 +15,8 @@ import {
 import { createAnts } from './ants.js';
 import { layoutRect } from './layout.js';
 import { createIsland } from './islands.js';
+import { audio } from '../audio.js';
+import { city, popLevel } from '../audio-city.js';
 import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap, waveStandingK, defenceStandingK,
     SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
@@ -63,6 +65,7 @@ async function goDeep() {
 }
 let _ants = null;
 let _islands = null;
+let _starvedSaid = false;
 
 // Smooth counter rolling. The real values move once a second (logicTick); the
 // display glides from the previous second's value to this one's, so it counts
@@ -923,6 +926,7 @@ export function init() {
 
               // Second tap (touch) or any non-touch tap: execute sell
               cancelPendingSell(buildingId);
+              city.word('sell');
               gameState.stars += (buildingData[building.type]?.cost || 0) * 0.7;
               gameState.buildings[index] = undefined;
               gameState.population = gameState.buildings.reduce((total, b) => total + (b?.population || 0), 0);
@@ -945,6 +949,7 @@ export function init() {
                   });
                   renderGridSlot(index);
                   settlePlate(index);
+                  city.word('upgrade', { apartment: 1, superStore: 1, skyscraper: 2, district: 3 }[targetType] || 1);
               }
           }
           
@@ -956,6 +961,7 @@ export function init() {
                   gameState.buildings[index] = { id: newId, type, population: 0, ...buildingData[type]};
                   renderGridSlot(index);
                   settlePlate(index);
+                  city.word(type === 'home' ? 'home' : 'store');
               }
           }
   
@@ -1246,6 +1252,7 @@ export function init() {
               if (gameState.population >= COMPETITOR_POP && !gameState.competitorSpawned) {
                   gameState.competitorSpawned = true;
                   gameState.competitorSpawnedAt = Date.now();
+                  city.word('rivalArrives');                         // wow, a neighbour
                   smoothLayoutShift(() => ui.competitorIsland.classList.remove('hidden'));
                   // Trigger fade-in on next frame
                   requestAnimationFrame(() => {
@@ -1299,11 +1306,22 @@ export function init() {
                           arrive(ui.warBtn);
                       }, 4000);
                   };
-                  if (_ants.startAttack(onRazed, onOver)) gameState.lastRaidAt = Date.now();
+                  if (_ants.startAttack(onRazed, onOver, (phase) => city.raid(phase))) gameState.lastRaidAt = Date.now();
               }
 
               if (!skipGrowth) warTick();
               updateAllUI();
+              // The city's sound follows the numbers (src/audio-city.js)
+              const tallest = gameState.buildings.reduce((m, b) => Math.max(m, b ? ({ apartment: 1, superStore: 1, skyscraper: 2, district: 3 }[b.type] || 0) : 0), 0);
+              const starvedNow = gameState.supplies <= 0 && gameState.population > 0;
+              city.set({
+                  pop: popLevel(gameState.population), tier: tallest,
+                  food: starvedNow ? 0 : Math.max(0.05, siloFraction(gameState.supplies, gameState.cachedSupplyConsumption || 0)),
+                  research: gameState.populationAllocation, rival: gameState.competitorSpawned ? (gameState.competitorStage || 1) : 0,
+                  cars: !!gameState.carUnlocked, computers: !!gameState.computerUnlocked,
+              });
+              if (starvedNow && !_starvedSaid) { _starvedSaid = true; audio.knock(); }   // the stop cue, once per hunger
+              if (!starvedNow) _starvedSaid = false;
               saveGameState();
           }
   
@@ -1442,10 +1460,14 @@ export function init() {
               if (!gameState.warReady || gameState.warChosen) return;
               gameState.warChosen = true;
               saveGameState();
+              city.stop();
               // The chapter turns, but the game goes on: the war is played on this map.
               // Slow and dark: black, then III, then WAR; a click or 5 s ends it; a beat; the camera lowers.
               // Drawn out like the card for II: black, a rest, III, a rest, WAR, the hold.
-              playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, pause: 1400, hold: 5000, onMidpoint: () => startWar() })
+              // The sound is the set piece in audio-city.js (everything falls away, one
+              // C sharp hangs, three strokes for III, the boom on WAR), timed to the card.
+              const sounded = city.war({ III: 3.4, WAR: 5.9, LIFT: 13.6 });
+              playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, pause: 1400, hold: 5000, silent: sounded, onMidpoint: () => startWar() })
                   .then(() => setTimeout(() => document.body.classList.add('tilt'), 1500));
           }, { signal });
           /** One click buys a tenth of your arms' worth of units (at least one). */
@@ -1531,6 +1553,7 @@ export function init() {
               hatch?.classList.add('deep-hatch');
               const card = () => {
                   if (fastUiInterval) clearInterval(fastUiInterval);
+                  city.stop();
                   goDeep();
               };
               if (_ants && hatch) { _ants.gatherAt(hatch, () => setTimeout(card, 1200)); setTimeout(card, 20000); } else card();
@@ -1542,6 +1565,7 @@ export function init() {
               if (gameState.stars < cost) return;
               gameState.stars -= cost;
               gameState.stalls = (gameState.stalls || 0) + 1;
+              city.word('food');
               updateAllUI();
           }, { signal });
           // Hand harvest: the manual action of chapter II. Pays less per click
@@ -1551,6 +1575,7 @@ export function init() {
               const gained = harvestAmount(consumption, gameState.harvestEfficiency ?? 1);
               gameState.supplies += gained;
               gameState.harvestEfficiency = spendHarvestEfficiency(gameState.harvestEfficiency ?? 1);
+              city.word('harvest');
               ui.harvestPop.textContent = `+${gained.toLocaleString('en-US')}`;
               ui.harvestPop.classList.remove('go');
               void ui.harvestPop.offsetWidth; // restart animation
@@ -1562,6 +1587,8 @@ export function init() {
                   gameState.stars -= (upgradeData.cost || 0);
                   gameState.science -= (upgradeData.scienceCost || 0);
                   gameState[flag] = true;
+                  // Research is glass, industry (tool case, car, computer) is metal
+                  city.word(['toolCaseUnlocked', 'carUnlocked', 'computerUnlocked'].includes(flag) ? 'tool' : 'research');
                   // Research that opens an upgrade puts a "+" on the plates it concerns.
                   // The plates are not rebuilt (that made every ring run a lap): the
                   // buttons are added where they stand, one after another.
@@ -1576,6 +1603,7 @@ export function init() {
                   gameState.stars -= cost;
                   gameState.science -= scienceCost;
                   gameState.gmoLevel++;
+                  city.word('food');
               }
           }, { signal });
 
@@ -1592,6 +1620,7 @@ export function init() {
               if (gameState.stars >= cost && gameState.superconductorLevel < buildingData.superconductor.maxLevel) {
                   gameState.stars -= cost;
                   gameState.superconductorLevel++;
+                  city.word('tool');
               }
           }, { signal });
 
@@ -1599,6 +1628,7 @@ export function init() {
                 if (gameState.stars >= buildingData.landExpansion.cost && !gameState.landExpanded) {
                     gameState.stars -= buildingData.landExpansion.cost;
                     gameState.landExpanded = true;
+                    city.word('land');
                     smoothLayoutShift(() => addLandSlots(5));
                     updateAllUI();
                 }
@@ -1608,6 +1638,7 @@ export function init() {
               if (gameState.stars >= buildingData.landExpansion2.cost && !gameState.landExpansion2 && gameState.landExpanded) {
                   gameState.stars -= buildingData.landExpansion2.cost;
                   gameState.landExpansion2 = true;
+                  city.word('land');
                   smoothLayoutShift(() => addLandSlots(5));
                   updateAllUI();
               }
@@ -1662,6 +1693,7 @@ export function init() {
 
             /** A button that arrives: one soft pop, so a new choice is seen. */
             function arrive(btn) {
+                city.word('rise');                                   // something new: chapter I's three notes
                 btn.classList.remove('btn-arrive');
                 void btn.offsetWidth;
                 btn.classList.add('btn-arrive');
@@ -1751,6 +1783,9 @@ export function init() {
                 logicTick(true);
                 updateAllUI();
                 uiSettled = true;
+                // The city's music, unless the war is on (it has its own) or the way down is chosen
+                audio.wake();
+                if (!gameState.war?.active && !gameState.shipChosen) city.start();
                 saveGameState();
             }
 
@@ -1787,6 +1822,7 @@ export function init() {
   }
 
 export function teardown() {
+  city.stop();
   if (_ants) { _ants.stop(); _ants = null; delete window.rpiAnts; }
   if (abortController) abortController.abort();
   clearInterval(logicInterval);
@@ -1805,4 +1841,5 @@ export function teardown() {
   _stepAt = 0;
   _starsPerPersonRevealed = false;
   _scienceRevealed = false;
+  _starvedSaid = false;
 }
