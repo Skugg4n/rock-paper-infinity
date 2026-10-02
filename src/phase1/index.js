@@ -115,6 +115,8 @@ const resetBtn = document.getElementById('reset-btn');
             playChapterCard({
                 roman: 'II',
                 title: 'CAPITAL',
+                // Drawn out: white, a rest, II, a rest, CAPITAL, a long hold, then the city.
+                slow: true, pause: 1400, hold: 2400,
                 onMidpoint: () => setPhase(phases.CITY),
             });
         }

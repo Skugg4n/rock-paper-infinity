@@ -723,6 +723,22 @@ body.tilt #city-area {
 }
 .building-slot.slot-new { animation: slot-settle 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
+/* The city's opening (index.js, playCityOpening): a new city begins with only
+   the factory and the bank. The empty plots are closed, then open one after
+   another; the choice to build arrives after them. */
+.building-slot.slot-closed { opacity: 0; transform: scale(0.4); pointer-events: none; transition: none; }
+.building-slot.slot-open { animation: slot-open 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes slot-open {
+    from { opacity: 0; transform: scale(0.4); }
+    to { opacity: 1; transform: scale(1); }
+}
+.btn.btn-arrive { animation: btn-arrive 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes btn-arrive {
+    0% { opacity: 0; transform: scale(0.3); }
+    60% { opacity: 1; }
+    100% { opacity: 1; transform: scale(1); }
+}
+
 /* Enemy competitor island: light tiles like ours, a cooler tint, so they read
    against the island blob and the water */
 .enemy-factory {

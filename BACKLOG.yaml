@@ -1570,4 +1570,6 @@ items:
       better animation here) and the bank. An animation that opens the empty
       building plots. An animation that opens the choice to buy a house. The
       store comes when the food starts to run low.
-    status: open
+    status: done
+    resolved_in: v1.57.0
+    notes: "The better factory animation in the city follows the direction chosen in B163."

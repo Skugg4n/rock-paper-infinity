@@ -31,6 +31,10 @@ let beforeUnloadHandler;
 let abortController;
 let _warCardTriggered = false;
 let _deepStarting = false;
+// The city's opening (a new city only): while it plays, nothing can be built.
+let _cityOpening = false;
+// The store is offered when the food starts to run low (supplies start at 150).
+const STORE_REVEAL_SUPPLIES = 100;
 
 /**
  * IV · THE DEEP. The black card is the bridge: chapter IV is built during its
@@ -95,6 +99,8 @@ export function init() {
               superconductorLevel: 0,
               competitorSpawned: false,
               competitorStage: 0,
+              cityOpened: false,  // the opening has played: plots and the house are there
+              storeShown: false,  // the store has been offered (food ran low)
               warReady: false,    // the competitor has razed a house; WAR can be chosen
               warChosen: false,   // the player pressed the swords
               // Helpers beside the power line (v1.23.0)
@@ -950,8 +956,12 @@ export function init() {
   
               // Disabled state for basic buildings
               // In the war the column is full of war; home and store come back when there is land to rebuild on
-              ui.buildHomeBtn.classList.toggle('hidden', !!gameState.war?.active && !hasEmptySlot);
-              ui.buildStoreBtn.classList.toggle('hidden', !!gameState.war?.active && !hasEmptySlot);
+              if (!gameState.storeShown && !_cityOpening && gameState.supplies < STORE_REVEAL_SUPPLIES) {
+                  gameState.storeShown = true;
+                  arrive(ui.buildStoreBtn);
+              }
+              ui.buildHomeBtn.classList.toggle('hidden', _cityOpening || (!!gameState.war?.active && !hasEmptySlot));
+              ui.buildStoreBtn.classList.toggle('hidden', _cityOpening || !gameState.storeShown || (!!gameState.war?.active && !hasEmptySlot));
               ui.buildHomeBtn.disabled = !canAfford(buildingData.home) || !hasEmptySlot;
               ui.buildStoreBtn.disabled = !canAfford(buildingData.store) || !hasEmptySlot;
   
@@ -1552,6 +1562,44 @@ export function init() {
                 ui.allocationSlider.value = newVal;
             }, { signal });
 
+            /** A button that arrives: one soft pop, so a new choice is seen. */
+            function arrive(btn) {
+                btn.classList.remove('btn-arrive');
+                void btn.offsetWidth;
+                btn.classList.add('btn-arrive');
+            }
+
+            /**
+             * The opening of a new city. It begins as the chapter card lifts,
+             * with only the factory and the bank. Then the empty plots open,
+             * one after another, and then the choice to build a house arrives.
+             */
+            function playCityOpening() {
+                _cityOpening = true;
+                const empties = [...ui.landGrid.children].filter((_, i) => !gameState.buildings[i]);
+                empties.forEach((slot) => slot.classList.add('slot-closed'));
+                const card = document.getElementById('chapter-card');
+                const STAGGER = 150;
+                const later = (fn, ms) => setTimeout(() => { if (!signal.aborted) fn(); }, ms);
+                const begin = () => {
+                    if (card?.classList.contains('is-active')) { later(begin, 200); return; }
+                    later(() => {
+                        empties.forEach((slot, i) => later(() => {
+                            slot.classList.remove('slot-closed');
+                            slot.classList.add('slot-open');
+                        }, i * STAGGER));
+                        later(() => {
+                            _cityOpening = false;
+                            gameState.cityOpened = true;
+                            updateAllUI();
+                            arrive(ui.buildHomeBtn);
+                            saveGameState();
+                        }, empties.length * STAGGER + 800);
+                    }, 1200);
+                };
+                begin();
+            }
+
             function initialize() {
                 if (!Array.isArray(gameState.buildings) || gameState.buildings.length === 0) {
                     gameState.buildings = new Array(10).fill(undefined);
@@ -1563,6 +1611,13 @@ export function init() {
                 grid.innerHTML = '';
                 gameState.buildings.forEach(() => grid.insertAdjacentHTML('beforeend', '<div class="building-slot empty"></div>'));
                 gameState.buildings.forEach((_, i) => renderGridSlot(i));
+
+                // A city that is already lived in (or a save from before v1.57.0) is
+                // open and has its store; only a new city gets the opening.
+                const lived = gameState.population > 0 ||
+                    gameState.buildings.some((b) => b && b.type !== 'factory' && b.type !== 'bank');
+                if (lived) { gameState.cityOpened = true; gameState.storeShown = true; }
+                if (!gameState.cityOpened) playCityOpening();
 
                 // Past-threshold load: reveal disclosed elements immediately (no fade-in)
                 if (gameState.population >= 5) {
@@ -1640,6 +1695,7 @@ export function teardown() {
   delete window.debug_addPopulation;
   _warCardTriggered = false;
   _deepStarting = false;
+  _cityOpening = false;
   savingEnabled = true;
   _displayedStars = 0;
   _displayedScience = 0;

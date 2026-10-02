@@ -59,6 +59,7 @@ function tick() {
   st.stars = Math.max(0, st.stars + income); st.science += science;
   const net = supply - pop;
   st.supplies = Math.max(0, st.supplies + net);
+  if (st.supplies < 100) st.storeShown = true; // the store is offered when the food starts to run low
   if (st.supplies <= 0 && pop > 0) { // starvation
     let deaths = Math.max(1, Math.ceil(Math.abs(net) * 0.05));
     for (const b of st.buildings) { if (!POP[b.type] || deaths <= 0) continue; const k = Math.min(deaths, b.pop); b.pop -= k; deaths -= k; }
@@ -77,7 +78,7 @@ function shop(flow) {
       const store = st.buildings.find(b => b.type === 'store');
       if (store && pop >= 50 && !st.storeResearch && buy(B.storeResearch.cost, B.storeResearch.scienceCost)) { st.storeResearch = true; log('store research'); continue; }
       if (store && pop >= 50 && st.storeResearch && buy(C.superStore)) { store.type = 'superStore'; log('superStore'); flow.supply += 40; continue; }
-      if (free() > 0 && buy(C.store)) { st.buildings.push({ type: 'store' }); log('store'); flow.supply += 20; continue; }
+      if (st.storeShown && free() > 0 && buy(C.store)) { st.buildings.push({ type: 'store' }); log('store'); flow.supply += 20; continue; }
       // stalls only while they are cheaper per unit than a store, or no land
       const stallsCheaper = stallCost(st.stalls) / STALL_SUPPLY < C.store / 20 || free() === 0;
       if (stallsCheaper && buy(stallCost(st.stalls))) { st.stalls++; log('stall'); flow.supply += STALL_SUPPLY; continue; }

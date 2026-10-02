@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.57.0 - 2026-10-02 (chapter I → II)
+
+### The change to CAPITAL takes its time, and the city opens
+
+- **The card is drawn out.** Fade to white, a rest, II, a rest, CAPITAL, a long hold, then the fade to the city: about eleven seconds instead of two. A click during the hold moves on. (`playChapterCard` has a new `pause` option for slow cards.)
+- **A new city begins with only the factory and the bank.** When the card has lifted the eight empty plots open one after another, and then the choice to build a house arrives with a soft pop. Nothing can be built before that.
+- **The store comes when the food starts to run low**: its button arrives when the supplies fall below 100 (they start at 150), which is a few seconds after the first people have moved in. A city that is already lived in, and every older save, has plots, house and store as before.
+- **Simulation**: `scripts/sim-phase2.mjs` knows about the store's condition; the timeline is unchanged (WAR at 19:13).
+- The factory's own graphics, here and at the end of chapter I, are B163: three directions in `docs/mockups/factory-1.html`.
+
 ## v1.56.0 - 2026-10-02 (chapter I)
 
 ### One big battery is a full big battery

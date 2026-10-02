@@ -27,9 +27,10 @@ function delay(ms) {
  * @param {boolean} [opts.dark=false] - Black veil with white title (WAR)
  * @param {number} [opts.hold] - Hold time in ms (default PHASE_DURATIONS.hold); a click ends the hold early
  * @param {boolean} [opts.slow=false] - Ominous pacing: long fades, the numeral before the title
+ * @param {number} [opts.pause=0] - ms on the empty veil before the numeral, and between numeral and title (slow cards)
  * @returns {Promise<void>} Resolves after the card exits (normal mode only; never resolves for to-come)
  */
-export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false } = {}) {
+export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false, pause = 0 } = {}) {
     if (_cardActive) return Promise.resolve();
 
     const card = el('#chapter-card');
@@ -66,11 +67,13 @@ export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dar
             // Phase 1: fade to white (or black)
             veil.style.opacity = '1';
             await delay(D.veilIn);
+            const rest = isSlow ? pause : 0;
+            if (rest) await delay(rest);
 
             // Phase 2: title in (slow: the numeral first, then the title)
             content.style.opacity = '1';
             await delay(D.titleIn);
-            if (isSlow) { titleEl.style.opacity = '1'; await delay(1200); }
+            if (isSlow) { if (rest) await delay(rest / 2); titleEl.style.opacity = '1'; await delay(1200); }
 
             // Phase 3: hold (midpoint callback fires here). A long hold can be
             // ended early with a click anywhere on the card.
