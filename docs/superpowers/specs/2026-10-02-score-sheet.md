@@ -30,6 +30,10 @@ Rows marked *proposal* are mine (the WAR session) and are for Ola and the owners
 3. **A word may change voice but never meaning.** Pling is a win, thunk a purchase, rise
    something new, knock a stop, swell a card, boom a point of no return. The instrument
    that says the word belongs to the act.
+   *(Chapter I's owner:)* in I the boom is the foam collapsing, clicked twice at the end;
+   the second one, which opens the bank, is lower, longer and louder (`audio.boom(1 | 2)`).
+   Ola asked for it as the build-up to the ending. Read "no return" as "a step toward the
+   end that is not taken back", and it holds for I too.
 
 ## 2. What is already common (do not break)
 
@@ -38,7 +42,17 @@ Rows marked *proposal* are mine (the WAR session) and are for Ola and the owners
 - **Words** in `audio.*`: click, pling, thunk, rise, lucky, knock, boom, swell.
 - **Nothing switches on.** Every layer has a stretch of some game number over which it
   creeps in (`intensitiesFor`, `ramp`, `approach`); tempo and levels glide over seconds.
-- **Events play notes from the chord that is sounding**, so they melt into the music.
+- **Events melt into the music.** In I they do it by scale, not by chord: plings, the
+  rise and the shimmer take notes from the D minor pentatonic (D F G A C), which sits
+  on all four chords, so nothing has to know which chord is sounding. (II's board picks
+  from the sounding chord; either is fine as long as it stays in the key.)
+- **Plings climb.** Wins within eight seconds of each other step up the pentatonic and
+  start over after a pause. Single plings cross-fade with the shimmer as wins get dense.
+- **The heart is the reserve.** In I the heartbeat weakens when less than five seconds
+  of energy is left and is one faint beat a bar when it is gone.
+- **Endings:** `audio.finale()` cuts everything and strikes the ending note; the machine
+  then stays silent until `audio.begin()`. `playChapterCard({ silent: true })` drops the
+  card's swell so only that note is heard (the CAPITAL card does this).
 - **Prefs:** Sound and Music on/off in ☰, saved in `rpi-audio`. Paused or hidden = silent.
 - **The gate:** a sound board per act, approved by Ola by ear, before anything ships.
 - **All synthesised.** No files.
