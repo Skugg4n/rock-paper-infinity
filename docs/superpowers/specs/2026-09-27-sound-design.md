@@ -1,5 +1,7 @@
 # Sound · a proposal for the whole game (2026-09-27)
 
+> **Superseded 2026-10-02** by `2026-10-02-score-sheet.md`: chapter I got music (the machine), which this proposal argued against. Kept for the vocabulary and the mixing rules.
+
 Status: **proposal for discussion**, nothing built. The game has no audio today. This is
 how I would give all five chapters one voice, why, and in what order. Written for Ola.
 
