@@ -7,6 +7,19 @@ export const BASE_WIN_RATE = 1 / 3;
 export const LUCK_WIN_RATE = 2 / 3;
 
 /**
+ * Win probability right now. The big clover (the luck upgrade) is luck for
+ * good; the little clover is luck until `cloverUntil` (a timestamp on the same
+ * clock as `now`).
+ *
+ * @param {boolean} luckPurchased
+ * @param {number} cloverUntil - when the little clover's luck runs out
+ * @param {number} now
+ */
+export function currentWinRate(luckPurchased, cloverUntil, now) {
+    return luckPurchased || now < cloverUntil ? LUCK_WIN_RATE : BASE_WIN_RATE;
+}
+
+/**
  * Timing of one hand-played (non-bulk) round at a given speed.
  * The countdown shows 3/2/1 frames as speed rises; the result is then held on
  * screen before the board is free again. Every part has a floor so a round is

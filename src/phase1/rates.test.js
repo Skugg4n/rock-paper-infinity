@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import {
     getSPS, getEPS, getGamesPerSecond, roundTiming, updateMeasuredRate, pickOutcome,
-    getVisibleDots, formatCount, formatRate, BASE_WIN_RATE, LUCK_WIN_RATE,
+    getVisibleDots, formatCount, formatRate, BASE_WIN_RATE, LUCK_WIN_RATE, currentWinRate,
 } from './rates.js';
 
 describe('rates', () => {
@@ -174,6 +174,26 @@ describe('rates', () => {
             expect(pickOutcome(0.6, LUCK_WIN_RATE)).toBe('win');
             expect(pickOutcome(0.75, LUCK_WIN_RATE)).toBe('draw');
             expect(pickOutcome(0.95, LUCK_WIN_RATE)).toBe('lose');
+        });
+    });
+
+    describe('currentWinRate (the little clover)', () => {
+        test('base rate with no clover and no luck', () => {
+            expect(currentWinRate(false, 0, 1000)).toBe(BASE_WIN_RATE);
+        });
+
+        test('lucky while the clover runs', () => {
+            expect(currentWinRate(false, 4000, 1000)).toBe(LUCK_WIN_RATE);
+            expect(currentWinRate(false, 4000, 3999)).toBe(LUCK_WIN_RATE);
+        });
+
+        test('back to base the moment the clover runs out', () => {
+            expect(currentWinRate(false, 4000, 4000)).toBe(BASE_WIN_RATE);
+            expect(currentWinRate(false, 4000, 9000)).toBe(BASE_WIN_RATE);
+        });
+
+        test('the big clover is luck for good', () => {
+            expect(currentWinRate(true, 0, 1000)).toBe(LUCK_WIN_RATE);
         });
     });
 });

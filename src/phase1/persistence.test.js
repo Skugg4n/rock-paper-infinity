@@ -7,6 +7,7 @@ import {
     SCHEMA_VERSION,
     migrate,
     sanitizeNumber,
+    helperCounters,
 } from './persistence.js';
 
 describe('persistence', () => {
@@ -262,5 +263,50 @@ describe('storage wrappers', () => {
 
     test('loadFromStorage returns null for missing key', () => {
         expect(loadFromStorage('nope')).toBeNull();
+    });
+});
+
+describe('helper counters (energy ladder)', () => {
+    const base = {
+        starBalance: 0, totalStarsEarned: 0, totalGamesPlayed: 0,
+        totalWins: 0, energy: 100, reserveEnergy: 0, gameSpeed: 1,
+        starMultiplier: 1, quantumFoam: 0, isMetaBoardActive: false,
+        autoPlayWantsToRun: false, gameBoardsCount: 1,
+    };
+
+    test('counters round-trip through the save', () => {
+        const json = serializeGameState({ ...base, rechargeClicks: 7, batteriesBought: 3 }, {});
+        const data = deserializeGameState(json);
+        expect(data.rechargeClicks).toBe(7);
+        expect(data.batteriesBought).toBe(3);
+        expect(helperCounters(data)).toEqual({ rechargeClicks: 7, batteriesBought: 3 });
+    });
+
+    test('missing counters serialize as zero', () => {
+        const data = JSON.parse(serializeGameState(base, {}));
+        expect(data.rechargeClicks).toBe(0);
+        expect(data.batteriesBought).toBe(0);
+    });
+
+    test('an old save below the old battery unlock gets nothing', () => {
+        expect(helperCounters({ totalStarsEarned: 39 })).toEqual({ rechargeClicks: 0, batteriesBought: 0 });
+    });
+
+    test('an old save past the old battery unlock keeps the battery', () => {
+        expect(helperCounters({ totalStarsEarned: 40 })).toEqual({ rechargeClicks: 6, batteriesBought: 0 });
+    });
+
+    test('an old save past the old generator unlock keeps both', () => {
+        expect(helperCounters({ totalStarsEarned: 100 })).toEqual({ rechargeClicks: 6, batteriesBought: 5 });
+    });
+
+    test('saved counters win over derived ones', () => {
+        expect(helperCounters({ totalStarsEarned: 5000, rechargeClicks: 2, batteriesBought: 1 }))
+            .toEqual({ rechargeClicks: 2, batteriesBought: 1 });
+    });
+
+    test('corrupt counters fall back to derived ones', () => {
+        expect(helperCounters({ totalStarsEarned: 100, rechargeClicks: NaN, batteriesBought: 'x' }))
+            .toEqual({ rechargeClicks: 6, batteriesBought: 5 });
     });
 });

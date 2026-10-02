@@ -1,3 +1,5 @@
+import { PHASE1_CONSTANTS } from '../constants.js';
+
 export const SCHEMA_VERSION = 1;
 
 // Migration map: keyed by the version being migrated FROM.
@@ -48,6 +50,8 @@ export function serializeGameState(state, upgrades) {
         isMetaBoardActive: state.isMetaBoardActive,
         autoPlayWantsToRun: state.autoPlayWantsToRun,
         gameBoards: state.gameBoardsCount,
+        rechargeClicks: state.rechargeClicks ?? 0,
+        batteriesBought: state.batteriesBought ?? 0,
         upgrades: {},
     };
     for (const key in upgrades) {
@@ -66,6 +70,25 @@ export function sanitizeNumber(value) {
     if (typeof value !== 'number') return null;
     if (!isFinite(value)) return null;
     return value;
+}
+
+/**
+ * The energy ladder's counters: recharge clicks unlock the big battery, big
+ * batteries bought unlock the generator. Saves from before v1.53.0 have no
+ * counters; there the unlocks were lifetime stars (battery 40, generator 100),
+ * so a save past those keeps what it already had.
+ *
+ * @param {object} data - parsed save
+ * @returns {{ rechargeClicks: number, batteriesBought: number }}
+ */
+export function helperCounters(data) {
+    const earned = sanitizeNumber(data.totalStarsEarned) ?? 0;
+    return {
+        rechargeClicks: sanitizeNumber(data.rechargeClicks) ??
+            (earned >= 40 ? PHASE1_CONSTANTS.BATTERY_UNLOCK_CLICKS : 0),
+        batteriesBought: sanitizeNumber(data.batteriesBought) ??
+            (earned >= 100 ? PHASE1_CONSTANTS.GENERATOR_UNLOCK_BATTERIES : 0),
+    };
 }
 
 /**

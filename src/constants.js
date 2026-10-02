@@ -12,6 +12,11 @@ export const PHASE1_CONSTANTS = {
     HYPER_SPEED_THRESHOLD: 10,
     // Bank (→ chapter II) opens after the foam has been collapsed this many times.
     BANK_GATE_COLLAPSES: 2,
+    // The little clover: one click is this much luck (refills, never stacks).
+    CLOVER_MS: 3000,
+    // The energy ladder: each helper is unlocked by use of the previous one.
+    BATTERY_UNLOCK_CLICKS: 6,
+    GENERATOR_UNLOCK_BATTERIES: 5,
     SAVE_KEY: 'rpi-save',
 };
 
