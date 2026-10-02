@@ -178,6 +178,14 @@ leaves the low D alone below. Unity: "Woke: everyone is here." and every voice o
 murmur lands on the same low D, in unison, the heartbeat under it. One note, all
 voices. V's F♯ answers it.
 
+**Ola's direction for IV (2026-10-03).** Deep, underground, machine, pounding, rhythmic,
+cryo. Then our notes from the Surface: discordant, in metallic breaks, and then more and
+more the rush of blood in veins. In the night, the sounds compressed or otherwise "under
+water" to mark the difference from the awake world. This fits the table above and sharpens
+it: the night is the same material heard through water (a low-pass and a slow compressor on
+everything but the Surface's typing), the Surface's letters are struck metal that is out of
+tune, and from The question on the blood rush grows under everything until it is the pulse.
+
 **Voices (open question 3).** Proposal: neither the Watcher nor the Surface speaks.
 They stay text. The Surface's voice is its typing, out of tune until it is not; the
 Watcher's voice is the tone that drifts and snaps. Speech would explain what the
