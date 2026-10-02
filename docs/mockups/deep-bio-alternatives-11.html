@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IV · THE DEEP · five tissues, mockup 11</title>
+<style>
+/* Mockup 11a of chapter IV: five alternatives for the biological growth, side by side.
+   Ola on mockup 10 (docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md): the
+   organic look read as a face and was digital after all. Every panel shows the SAME scene:
+   a patch of the square board with four won nodes and their traces; tissue grows in from the
+   lower right corner; two nodes are overgrown, two are being fused into one, one pure growth
+   stands at level 3 of 6, and vessels join them with a slow pulse.
+   Rules for all five: no bilateral symmetry, no horns or spikes, no gauges, ticks or bars,
+   no eyes or slits, no beige. Level is only how swollen, full or branched a growth is.
+   Every shape is grown: jittered paths, varying thickness, nothing ruled. Dark, wet, cold,
+   one pulse colour (arterial red, or cold teal with the toggle) so only FORM differs.
+   STATIC: no game logic. The board keeps the game's rock #0a0d12 and plate #d5dbe3. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0a0d12; color: #d5dbe3; }
+body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+body[data-pulse="red"]  { --pulse: #a8132c; --pulse-hi: #ff4a60; }
+body[data-pulse="teal"] { --pulse: #1bb9a6; --pulse-hi: #93fff0; }
+
+header { padding: 34px 40px 10px; display: flex; align-items: baseline; gap: 28px; flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 12px; font-weight: 400; letter-spacing: 0.32em; color: rgba(213, 219, 227, 0.55); }
+header .rules { font-size: 11px; color: rgba(213, 219, 227, 0.35); letter-spacing: 0.04em; }
+.toggle { margin-left: auto; display: flex; gap: 14px; font-size: 11px; letter-spacing: 0.1em; }
+.toggle button {
+    font: inherit; letter-spacing: inherit; background: none; border: 0; cursor: pointer;
+    color: rgba(213, 219, 227, 0.42); padding: 4px 0; border-bottom: 1px solid transparent;
+}
+.toggle button.on { color: #ffffff; border-bottom-color: #ffffff; }
+.toggle .sw { display: inline-block; width: 8px; height: 8px; margin-right: 7px; }
+
+main { display: grid; grid-template-columns: repeat(2, minmax(520px, 1fr)); gap: 28px 28px; padding: 18px 40px 50px; }
+figure { margin: 0; }
+figure svg { display: block; width: 100%; height: auto; border: 1px solid rgba(213, 219, 227, 0.08); }
+figcaption { display: flex; gap: 14px; align-items: baseline; padding: 10px 2px 0; font-size: 12px; letter-spacing: 0.24em; }
+figcaption .l { color: #ffffff; font-weight: 700; }
+figcaption .w { color: rgba(213, 219, 227, 0.6); }
+figcaption .lv { margin-left: auto; font-size: 10px; letter-spacing: 0.08em; color: rgba(213, 219, 227, 0.32); }
+.key { border: 1px solid rgba(213, 219, 227, 0.08); padding: 26px 28px; font-size: 11px; line-height: 1.9; color: rgba(213, 219, 227, 0.5); align-self: start; }
+.key b { color: rgba(213, 219, 227, 0.85); font-weight: 400; letter-spacing: 0.12em; }
+
+svg text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@keyframes pulse { to { stroke-dashoffset: -100; } }
+.pulse { stroke-dasharray: 6 94; animation: pulse 6.5s linear infinite; }
+.pulse.soft { stroke-dasharray: 14 86; }
+@keyframes pd { to { stroke-dashoffset: -50; } }
+.pdots { stroke-dasharray: 0.5 7 0.5 15 0.5 4 0.5 21; animation: pd 7s linear infinite; }
+@keyframes pore { 0%, 100% { opacity: 0.12; } 45% { opacity: 1; } }
+.pore { animation: pore 4.5s ease-in-out infinite; }
+@keyframes beat { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+.beat { animation: beat 4.5s ease-in-out infinite; }
+@keyframes slosh { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(1.2px, 0.8px); } }
+.slosh { animation: slosh 5s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(1.4deg); } }
+</style>
+</head>
+<body data-pulse="red">
+
+<header>
+    <h1>IV · THE DEEP · FIVE TISSUES · MOCKUP 11</h1>
+    <span class="rules">same scene in each · no symmetry · nothing ruled · level is only swelling, filling, branching</span>
+    <div class="toggle">
+        <button data-p="red" class="on"><span class="sw" style="background:#a8132c"></span>pulse · arterial</button>
+        <button data-p="teal"><span class="sw" style="background:#1bb9a6"></span>pulse · cold teal</button>
+    </div>
+</header>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <radialGradient id="gSac" cx="0.34" cy="0.3" r="0.8">
+        <stop offset="0" stop-color="#d4e0e7" stop-opacity="0.42"/>
+        <stop offset="0.45" stop-color="#7d8f99" stop-opacity="0.16"/>
+        <stop offset="1" stop-color="#0b0e11" stop-opacity="0.75"/>
+    </radialGradient>
+</defs></svg>
+
+<main id="sheet"></main>
+
+<script>
+(function () {
+'use strict';
+
+/* ---------------------------------------------------------------- the shared scene */
+const W = 600, H = 420;
+const PL = '#d5dbe3', RK = '#0a0d12';
+const op = (a) => 'rgba(213,219,227,' + a + ')';
+const PULSE = 'var(--pulse)', PULSE_HI = 'var(--pulse-hi)';
+const SQ = 34;
+/* four won squares: two to be fused (drawn pulled in and tilted), two overgrown */
+const F1 = { x: 130, y: 135, dx: 17, dy: 7, rot: 8, l: 'OUTPUT' };
+const F2 = { x: 270, y: 135, dx: -19, dy: 5, rot: -5, l: 'FEED' };
+const O1 = { x: 440, y: 178, l: 'YIELD' };
+const O2 = { x: 300, y: 300, l: 'BEDS' };
+const HY = [199, 150];          // where the two become one
+const BIO = [484, 322];          // the pure growth, level 3 of 6
+const CORNER = [600, 420];
+const TRACES = [
+    [[0, 135], [130, 135]], [[130, 135], [270, 135]], [[270, 135], [440, 135], [440, 178]],
+    [[130, 135], [130, 300], [300, 300]], [[300, 300], [380, 300], [380, 420]],
+    [[440, 178], [560, 178], [560, 0]], [[270, 135], [270, 0]]
+];
+/* the vessels' courses: the same in every panel, each style grows its own along them */
+const V = [
+    [[600, 420], [566, 388], [524, 352], [494, 330]],
+    [[474, 326], [420, 334], [356, 320], [318, 306]],
+    [[490, 306], [502, 262], [474, 214], [452, 194]],
+    [[292, 288], [262, 232], [232, 186], [212, 160]],
+    [[430, 172], [384, 154], [300, 158], [220, 152]],
+    [[600, 352], [566, 334], [530, 330], [502, 326]],
+    [[548, 420], [520, 386], [500, 356], [488, 338]]
+];
+
+/* ---------------------------------------------------------------- hand tools */
+function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+const f1 = (n) => n.toFixed(1);
+function crPts(P, k) {
+    const out = [];
+    for (let i = 0; i < P.length - 1; i++) {
+        const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+        for (let j = 0; j < k; j++) {
+            const t = j / k, t2 = t * t, t3 = t2 * t;
+            out.push([0, 1].map(function (c) {
+                return 0.5 * ((2 * p1[c]) + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3);
+            }));
+        }
+    }
+    out.push(P[P.length - 1].slice());
+    return out;
+}
+function noiseFn(seed) {
+    const r = rng(seed);
+    const a = [0, 1, 2].map(function () { return { f: 0.02 + r() * 0.09, p: r() * 6.28, m: 0.4 + r() }; });
+    return function (x) { return a.reduce(function (s, o) { return s + o.m * Math.sin(x * o.f + o.p); }, 0) / 2.2; };
+}
+function normals(pts) {
+    return pts.map(function (p, i) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+        return [-dy / L, dx / L];
+    });
+}
+/* a hand-drawn course: through the points, with a wander across it */
+function wob(P, amp, seed, k) {
+    const pts = crPts(P, k || 10);
+    const n = noiseFn(seed), N = normals(pts);
+    let acc = 0;
+    return pts.map(function (p, i) {
+        if (i > 0) acc += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]);
+        const o = amp * n(acc);
+        return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+    });
+}
+function d(pts) { return 'M ' + pts.map(function (p) { return f1(p[0]) + ' ' + f1(p[1]); }).join(' L '); }
+function ribbon(pts, wf, shift) {
+    const N = normals(pts), L = [], R = [];
+    pts.forEach(function (p, i) {
+        const t = i / (pts.length - 1), w = wf(t, i) / 2, s = shift ? shift(t, i) : 0;
+        L.push([p[0] + N[i][0] * (w + s), p[1] + N[i][1] * (w + s)]);
+        R.push([p[0] - N[i][0] * (w - s), p[1] - N[i][1] * (w - s)]);
+    });
+    return d(L.concat(R.reverse())) + ' Z';
+}
+function closed(pts) {
+    const n = pts.length;
+    let s = 'M ' + f1(pts[0][0]) + ' ' + f1(pts[0][1]);
+    for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+        s += ' C ' + f1(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f1(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+             f1(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f1(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f1(p2[0]) + ' ' + f1(p2[1]);
+    }
+    return s + ' Z';
+}
+/* never round, never mirrored */
+function blobPts(cx, cy, r, irr, seed, n, sx, sy) {
+    const R = rng(seed);
+    n = n || 11;
+    const a0 = R() * 6.28, pts = [];
+    for (let i = 0; i < n; i++) {
+        const a = a0 + i / n * 6.28 + (R() - 0.5) * 0.4;
+        const rr = r * (1 - irr / 2 + R() * irr);
+        pts.push([cx + Math.cos(a) * rr * (sx || 1), cy + Math.sin(a) * rr * (sy || 1)]);
+    }
+    return pts;
+}
+function blob(cx, cy, r, irr, seed, n, sx, sy) { return closed(blobPts(cx, cy, r, irr, seed, n, sx, sy)); }
+function pulseOn(path, w, dur, delay, cls) {
+    return '<path class="' + (cls || 'pulse') + '" pathLength="100" d="' + path + '" fill="none" style="stroke:' + PULSE_HI +
+        ';animation-duration:' + dur + 's;animation-delay:-' + delay + 's" stroke-width="' + w + '" stroke-linecap="round"/>';
+}
+function sqPos(s) { return s.dx !== undefined ? [s.x + s.dx, s.y + s.dy] : [s.x, s.y]; }
+
+/* ---------------------------------------------------------------- the board under it all */
+function board(id) {
+    let h = '<rect width="' + W + '" height="' + H + '" fill="' + RK + '"/>';
+    h += '<defs><pattern id="dots-' + id + '" width="20" height="20" patternUnits="userSpaceOnUse"><rect x="9.5" y="9.5" width="1" height="1" fill="' + op(0.1) + '"/></pattern></defs>';
+    h += '<rect width="' + W + '" height="' + H + '" fill="url(#dots-' + id + ')"/>';
+    TRACES.forEach(function (t) {
+        h += '<path d="' + d(t) + '" fill="none" stroke="' + op(0.7) + '" stroke-width="2"/>';
+        for (let i = 1; i < t.length - 1; i++) h += '<rect x="' + (t[i][0] - 3.5) + '" y="' + (t[i][1] - 3.5) + '" width="7" height="7" fill="' + RK + '" stroke="' + op(0.7) + '" stroke-width="1.5"/>';
+    });
+    // where the two fused squares used to sit
+    [F1, F2].forEach(function (s) {
+        h += '<rect x="' + (s.x - SQ / 2) + '" y="' + (s.y - SQ / 2) + '" width="' + SQ + '" height="' + SQ + '" fill="none" stroke="' + op(0.18) + '" stroke-dasharray="2 3"/>';
+    });
+    return h;
+}
+function square(s, alpha) {
+    const p = sqPos(s), rot = s.rot || 0;
+    let h = '<g transform="rotate(' + rot + ' ' + p[0] + ' ' + p[1] + ')" opacity="' + (alpha === undefined ? 1 : alpha) + '">';
+    h += '<rect x="' + (p[0] - SQ / 2) + '" y="' + (p[1] - SQ / 2) + '" width="' + SQ + '" height="' + SQ + '" fill="' + PL + '"/>';
+    h += '<rect x="' + (p[0] - SQ / 2 + 4) + '" y="' + (p[1] - SQ / 2 + 4) + '" width="4" height="4" fill="' + RK + '"/>';
+    return h + '</g>';
+}
+function labels() {
+    let h = '';
+    [[F1, -1], [F2, 1], [O1, 0], [O2, 0]].forEach(function (q) {
+        const s = q[0], p = sqPos(s);
+        const x = q[1] < 0 ? p[0] - 22 : q[1] > 0 ? p[0] + 22 : p[0] + 24;
+        const a = q[1] < 0 ? 'end' : 'start';
+        const y = q[1] !== 0 ? p[1] - 26 : p[1] - 22;
+        h += '<text x="' + x + '" y="' + y + '" text-anchor="' + a + '" font-size="9" letter-spacing="0.08em" fill="' + op(0.55) + '">' + s.l + '</text>';
+    });
+    return h;
+}
+
+/* ================================================================ A · MYCELIUM
+   Fine hyphae creeping along and across the traces; cords (rhizomorphs) carry the pulse as
+   beads; nodes are clustered nodules, some of which have fruited. Level: how many fruited. */
+function hypha(x, y, a, steps, depth, r, out, w) {
+    const pts = [[x, y]];
+    for (let i = 0; i < steps; i++) {
+        a += (r() - 0.5) * 0.55;
+        x += Math.cos(a) * 3.4; y += Math.sin(a) * 3.4;
+        pts.push([x, y]);
+        if (depth < 3 && r() < 0.07) hypha(x, y, a + (r() < 0.5 ? 0.8 : -0.8) * (0.6 + r() * 0.6), Math.floor(steps * 0.55), depth + 1, r, out, w * 0.7);
+    }
+    out.push('<path d="' + d(pts) + '" fill="none" stroke="#b7c2c8" stroke-width="' + f1(Math.max(0.35, w)) + '" opacity="' + (0.18 + r() * 0.35).toFixed(2) + '" stroke-linecap="round"/>');
+}
+function nodule(x, y, r, seed, fruit, R) {
+    let h = '';
+    if (fruit) {
+        // a stalk leaning its own way, and a cap that is never round
+        const lean = (R() - 0.3) * 1.4, len = r * (2.2 + R() * 1.4);
+        const top = [x + Math.sin(lean) * len, y - Math.cos(lean) * len];
+        const stalk = wob([[x, y], [x + Math.sin(lean) * len * 0.5 + (R() - 0.5) * 4, y - len * 0.5], top], 1.2, seed, 8);
+        h += '<path d="' + ribbon(stalk, function (t) { return r * (0.9 - 0.45 * t); }) + '" fill="#5b666d"/>';
+        const cap = blobPts(top[0] + r * 0.2, top[1], r * 1.5, 0.55, seed + 1, 9, 1.25, 0.62);
+        h += '<path d="' + closed(cap) + '" fill="#9aa5ab" stroke="#1a2024" stroke-width="0.8"/>';
+        h += '<path d="' + blob(top[0] + r * 0.4, top[1] + r * 0.35, r * 0.95, 0.5, seed + 2, 8, 1.2, 0.35) + '" fill="#2a3237"/>';
+        h += '<path d="' + blob(top[0] - r * 0.25, top[1] - r * 0.35, r * 0.4, 0.6, seed + 3, 7, 1.6, 0.5) + '" fill="#ffffff" opacity="0.35"/>';
+        h += '<path class="beat" d="' + blob(x, y + 1, r * 0.75, 0.5, seed + 4, 8) + '" style="fill:' + PULSE + ';animation-delay:-' + (seed % 9) * 0.5 + 's"/>';
+    } else {
+        h += '<path d="' + blob(x, y, r, 0.6, seed, 8, 1.1, 0.85) + '" fill="#232a2f" stroke="#59646b" stroke-width="0.6"/>';
+        h += '<path d="' + blob(x - r * 0.3, y - r * 0.3, r * 0.3, 0.6, seed + 5, 6) + '" fill="#ffffff" opacity="0.25"/>';
+    }
+    return h;
+}
+function styleA() {
+    const r = rng(101);
+    let under = '', over = '';
+    under += '<path d="' + blob(560, 392, 96, 0.5, 11, 13, 1.35, 1) + '" fill="#0d1215" opacity="0.95"/>';
+    const hy = [];
+    // along every vessel course, and across the traces
+    V.forEach(function (v, i) {
+        const pts = wob(v, 3, 20 + i, 10);
+        for (let k = 1; k < pts.length - 1; k += 2) {
+            const p = pts[k], q = pts[k + 1];
+            const a = Math.atan2(q[1] - p[1], q[0] - p[0]);
+            hypha(p[0], p[1], a + (r() - 0.5) * 2.2, 8 + Math.floor(r() * 10), 1, r, hy, 0.7);
+        }
+    });
+    // a fan out of the corner
+    for (let k = 0; k < 48; k++) hypha(600 - r() * 30, 420 - r() * 30, Math.PI + 0.1 + r() * 1.4, 18 + Math.floor(r() * 20), 0, r, hy, 0.9);
+    // the two overgrown squares: a dense web over the half that faces the growth
+    [[O1, 0.9], [O2, -0.2]].forEach(function (q) {
+        const s = q[0];
+        for (let k = 0; k < 36; k++) {
+            hypha(s.x + 4 + r() * 22, s.y + 2 + r() * 22, q[1] + Math.PI * (r() < 0.5 ? 1 : 0) + (r() - 0.5) * 1.6, 5 + Math.floor(r() * 9), 2, r, hy, 0.55);
+        }
+    });
+    // the fused pair: a mat between them, and cords tied to their corners
+    const a = sqPos(F1), b = sqPos(F2);
+    for (let k = 0; k < 70; k++) {
+        const t = r();
+        hypha(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + (r() - 0.5) * 30, r() * 6.28, 4 + Math.floor(r() * 8), 2, r, hy, 0.6);
+    }
+    over += hy.join('');
+    // cords: darker, thicker, and the pulse travels them as beads
+    V.forEach(function (v, i) {
+        const pts = wob(v, 3.5, 40 + i, 10);
+        const w = i === 0 || i === 5 ? 3.4 : 2.2;
+        over += '<path d="' + ribbon(pts, function (t) { return w * (1.15 - 0.5 * t) * (0.8 + 0.4 * Math.sin(t * 17 + i)); }) + '" fill="#2b3439"/>';
+        over += '<path d="' + d(pts) + '" fill="none" stroke="#c7d0d5" stroke-width="0.5" opacity="0.35" transform="translate(-0.6,-0.8)"/>';
+        over += '<path class="pdots" d="' + d(pts) + '" fill="none" style="stroke:' + PULSE_HI + ';animation-delay:-' + (i * 1.7) + 's" stroke-width="' + (w * 0.8).toFixed(1) + '" stroke-linecap="round" opacity="0.85"/>';
+    });
+    [[a, HY, 1], [b, HY, -1]].forEach(function (c, k) {
+        for (let j = 0; j < 4; j++) {
+            const p0 = [c[0][0] + (r() - 0.5) * 26, c[0][1] + (r() - 0.5) * 26];
+            over += '<path d="' + d(wob([p0, [(p0[0] + c[1][0]) / 2, (p0[1] + c[1][1]) / 2 + (r() - 0.5) * 6], c[1]], 1.5, 60 + k * 9 + j, 8)) + '" fill="none" stroke="#7d888e" stroke-width="' + f1(0.8 + r()) + '"/>';
+        }
+    });
+    // the hybrid: a crowded clump where the two meet, two of it fruited
+    [[0, 0, 7, 1], [-11, 6, 5, 0], [9, 8, 6, 1], [-4, 13, 4, 0], [13, -4, 4, 0]].forEach(function (n, k) {
+        over += nodule(HY[0] + n[0], HY[1] + n[1], n[2], 300 + k * 7, n[3], r);
+    });
+    // nodules on the overgrown squares
+    over += nodule(O1.x + 12, O1.y + 9, 4, 410, 0, r) + nodule(O1.x + 4, O1.y + 14, 3, 417, 0, r);
+    over += nodule(O2.x + 10, O2.y + 11, 4, 420, 1, r) + nodule(O2.x + 15, O2.y + 2, 3, 427, 0, r);
+    // the pure growth: six nodules, three of them fruited
+    [[0, 0, 7, 1], [-14, 5, 5, 1], [10, 9, 6, 0], [-5, 15, 5, 1], [16, -6, 4, 0], [-18, -8, 4, 0]].forEach(function (n, k) {
+        over += nodule(BIO[0] + n[0] * 1.5, BIO[1] + n[1] * 1.5, n[2] * 1.45, 500 + k * 11, n[3], r);
+    });
+    return { under: under, over: over };
+}
+
+/* ================================================================ B · SACS
+   Anatomy: a translucent membrane laid over the board, vein networks in it, soft sacs pressed
+   between the squares. Level: how full a sac is with dark fluid. */
+function vein(P, w, seed, depth, out, r) {
+    const pts = wob(P, 2.4, seed, 10);
+    out.push('<path d="' + ribbon(pts, function (t) { return w * 1.25 * (1 - 0.7 * t); }) + '" fill="#241f29"/>');
+    out.push('<path d="' + d(pts) + '" fill="none" stroke="#6a4552" stroke-width="' + f1(w * 0.3) + '" opacity="0.75"/>');
+    out.push('<path d="' + d(pts) + '" fill="none" stroke="#c9d3da" stroke-width="0.4" opacity="0.3" transform="translate(-0.6,-0.7)"/>');
+    if (depth < 3) {
+        for (let k = 2; k < pts.length - 3; k += 4 + Math.floor(r() * 4)) {
+            const p = pts[k], q = pts[k + 1];
+            const a = Math.atan2(q[1] - p[1], q[0] - p[0]) + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.7);
+            const L = 14 + r() * 26 * (1 - depth * 0.25);
+            const e = [p[0] + Math.cos(a) * L, p[1] + Math.sin(a) * L];
+            vein([p, [(p[0] + e[0]) / 2 + (r() - 0.5) * 6, (p[1] + e[1]) / 2 + (r() - 0.5) * 6], e], w * 0.55, seed * 7 + k, depth + 1, out, r);
+        }
+    }
+    return pts;
+}
+function sac(x, y, rr, seed, sx, sy, fill, idx) {
+    const pts = blobPts(x, y, rr, 0.2, seed, 13, sx, sy);
+    const id = 'sac-' + idx;
+    let h = '<defs><clipPath id="' + id + '"><path d="' + closed(pts) + '"/></clipPath></defs>';
+    h += '<path d="' + closed(pts) + '" fill="url(#gSac)"/>';
+    if (fill > 0) {
+        // the fluid line is never level: it leans and wavers
+        const ys = pts.map(function (p) { return p[1]; });
+        const top = Math.min.apply(null, ys), bot = Math.max.apply(null, ys);
+        const lvl = bot - (bot - top) * fill;
+        const R = rng(seed + 9);
+        const surf = [];
+        for (let k = 0; k <= 8; k++) surf.push([x - rr * 2 + k * rr / 2, lvl + (R() - 0.5) * 3 + (k - 4) * 0.6]);
+        h += '<g clip-path="url(#' + id + ')"><g class="slosh">';
+        h += '<path d="' + d(surf) + ' L ' + (x + rr * 2) + ' ' + (bot + 4) + ' L ' + (x - rr * 2) + ' ' + (bot + 4) + ' Z" fill="#050608"/>';
+        h += '<path d="' + d(surf) + '" fill="none" style="stroke:' + PULSE + '" stroke-width="1.4" opacity="0.8"/>';
+        h += '<path class="beat" d="' + d(surf.map(function (p) { return [p[0], p[1] + 4]; })) + '" fill="none" style="stroke:' + PULSE + '" stroke-width="5" opacity="0.25"/>';
+        h += '</g></g>';
+    }
+    h += '<path d="' + closed(pts) + '" fill="none" stroke="#a9bac4" stroke-width="0.9" opacity="0.55"/>';
+    // a wet highlight on one shoulder only
+    const R2 = rng(seed + 3);
+    const hl = pts.slice(1, 4).map(function (p) { return [p[0] + (x - p[0]) * 0.18 + R2(), p[1] + (y - p[1]) * 0.18]; });
+    h += '<path d="' + d(hl) + '" fill="none" stroke="#ffffff" stroke-width="1.1" opacity="0.4" stroke-linecap="round"/>';
+    return h;
+}
+function styleB() {
+    const r = rng(202);
+    let under = '', over = '';
+    let k = 0;
+    // the membrane: translucent, laid over the whole corner, its own edge never straight
+    const mem = blobPts(540, 400, 190, 0.3, 17, 15, 1.3, 1.15);
+    over += '<path d="' + closed(mem) + '" fill="#8ea2ae" opacity="0.07"/>';
+    over += '<path d="' + closed(mem) + '" fill="none" stroke="#b6c6cf" stroke-width="0.8" opacity="0.35"/>';
+    // flaps over the overgrown squares (the square shows through)
+    [[O1, 23, 31], [O2, 26, 37]].forEach(function (q) {
+        const s = q[0];
+        const p = blobPts(s.x + 8, s.y + 9, q[1], 0.35, q[2], 10, 1.1, 0.9);
+        over += '<path d="' + closed(p) + '" fill="#b9c8d1" opacity="0.16" stroke="#c9d6dd" stroke-width="0.8"/>';
+    });
+    // the fused pair inside one envelope
+    const a = sqPos(F1), b = sqPos(F2);
+    const env = blobPts((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 4, 78, 0.22, 33, 12, 1, 0.55);
+    over += '<path d="' + closed(env) + '" fill="#b9c8d1" opacity="0.11" stroke="#c9d6dd" stroke-width="0.9"/>';
+    // veins, and the pulse in the big ones
+    const vs = [];
+    V.forEach(function (v, i) {
+        const pts = vein(v, i === 0 ? 7 : 5, 70 + i, 1, vs, r);
+        vs.push(pulseOn(d(pts), 2.2, 6.5, i * 0.9, 'pulse soft'));
+    });
+    vein([[a[0] + 6, a[1] + 16], [HY[0], HY[1] + 20], [b[0] - 6, b[1] + 16]], 3.6, 91, 2, vs, r);
+    vein([[O1.x - 20, O1.y - 8], [O1.x + 2, O1.y + 4], [O1.x + 24, O1.y + 22]], 3, 92, 2, vs, r);
+    vein([[O2.x - 12, O2.y + 22], [O2.x + 6, O2.y + 4], [O2.x + 28, O2.y - 4]], 3, 93, 2, vs, r);
+    over += vs.join('');
+    // sacs: alveoli pressed into the corner and between the fused squares, squeezed flat by them
+    [[560, 380, 14, 0.5], [534, 404, 11, 0.7], [586, 352, 10, 0.3], [520, 372, 9, 0.6], [552, 352, 8, 0.2],
+     [356, 330, 10, 0.4], [330, 338, 8, 0.6]].forEach(function (s) {
+        over += sac(s[0], s[1], s[2], 120 + k, 1, 1, s[3], 'b' + k++);
+    });
+    [[HY[0] - 6, HY[1] - 6, 11, 0.6, 1.3], [HY[0] + 10, HY[1] + 8, 9, 0.5, 1.4], [HY[0] - 2, HY[1] + 16, 7, 0.4, 1.2]].forEach(function (s) {
+        over += sac(s[0], s[1], s[2], 160 + k, 0.62, s[4], s[3], 'b' + k++);
+    });
+    // the pure growth: one sac, half full
+    over += sac(BIO[0], BIO[1], 30, 211, 1.15, 0.9, 0.5, 'b' + k++);
+    vs.length = 0;
+    vein([[BIO[0] - 30, BIO[1] - 12], [BIO[0] - 6, BIO[1] - 22], [BIO[0] + 22, BIO[1] - 10]], 2.2, 95, 3, vs, r);
+    over += vs.join('');
+    return { under: under, over: over };
+}
+
+/* ================================================================ C · SINEW
+   Striated muscle bellies between tendons; tendons wrap the squares and pull; nodes are knots
+   of fibre. Level: how thick the bundle is. */
+function bundle(P, wMid, nF, seed, r, tendon) {
+    const pts = wob(P, 2, seed, 14);
+    const prof = function (t) { return wMid * (0.32 + 0.68 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, t))), 0.7)); };
+    let h = '<path d="' + ribbon(pts, prof) + '" fill="#191820"/>';
+    const N = normals(pts);
+    for (let k = 0; k < nF; k++) {
+        const base = k / (nF - 1) - 0.5;
+        const n = noiseFn(seed * 13 + k);
+        const fp = pts.map(function (p, i) {
+            const t = i / (pts.length - 1);
+            const o = (base * 0.86 + n(i * 3) * 0.06) * prof(t);
+            return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+        });
+        const c = ['#3e3a46', '#4b4655', '#565162', '#433f4c'][Math.floor(r() * 4)];
+        h += '<path d="' + d(fp) + '" fill="none" stroke="' + c + '" stroke-width="' + f1(0.9 + r() * 0.8) + '" stroke-linecap="round"/>';
+    }
+    // striations: slanted, uneven, never a ruled hatch
+    for (let i = 3; i < pts.length - 3; i += 2) {
+        const t = i / (pts.length - 1), w = prof(t) * (0.15 + r() * 0.3), p = pts[i], q = N[i];
+        if (r() < 0.55) continue;
+        const sl = (r() - 0.5) * 3;
+        h += '<path d="M ' + f1(p[0] + q[0] * w + sl) + ' ' + f1(p[1] + q[1] * w) + ' L ' + f1(p[0] - q[0] * w * (0.6 + r() * 0.4)) + ' ' + f1(p[1] - q[1] * w * (0.6 + r() * 0.4) + sl) + '" stroke="#0e0d12" stroke-width="0.7" opacity="0.6"/>';
+    }
+    // a wet sheen down one flank
+    h += '<path d="' + d(pts.map(function (p, i) { const w = prof(i / (pts.length - 1)) * 0.36; return [p[0] + N[i][0] * w, p[1] + N[i][1] * w]; })) + '" fill="none" stroke="#c9cfd8" stroke-width="0.7" opacity="0.3"/>';
+    if (tendon) {
+        // tendons at the ends: silver, smooth, narrower
+        [[0, 0.16], [0.84, 1]].forEach(function (rg, k) {
+            const seg = pts.filter(function (p, i) { const t = i / (pts.length - 1); return t >= rg[0] && t <= rg[1]; });
+            if (seg.length < 2) return;
+            h += '<path d="' + ribbon(seg, function () { return wMid * 0.24; }) + '" fill="#a9b2b9"/>';
+            h += '<path d="' + d(seg) + '" fill="none" stroke="#ffffff" stroke-width="0.7" opacity="0.5" transform="translate(-0.5,-0.7)"/>';
+        });
+    }
+    // the pulse runs along one fibre
+    h += pulseOn(d(pts), f1(Math.max(1.2, wMid * 0.12)), 6.5 + r() * 2, r() * 6, 'pulse soft');
+    return h;
+}
+function band(P, w, seed) {
+    const pts = wob(P, 1.2, seed, 10);
+    return '<path d="' + ribbon(pts, function (t) { return w * (0.7 + 0.3 * Math.sin(t * 3 + seed)); }) + '" fill="#9ea8af"/>' +
+        '<path d="' + d(pts) + '" fill="none" stroke="#ffffff" stroke-width="0.6" opacity="0.45" transform="translate(-0.4,-0.6)"/>';
+}
+function knot(x, y, scale, seed, r) {
+    // loops of fibre wound round each other, each tilted its own way
+    let h = '<path d="' + blob(x, y, 15 * scale, 0.5, seed, 10, 1.2, 0.9) + '" fill="#141319"/>';
+    for (let k = 0; k < 14; k++) {
+        const pts = blobPts(x + (r() - 0.5) * 6 * scale, y + (r() - 0.5) * 5 * scale, (7 + r() * 9) * scale, 0.5, seed + k * 3, 9, 1 + r() * 0.6, 0.5 + r() * 0.5);
+        const rot = r() * 180;
+        h += '<path d="' + closed(pts) + '" transform="rotate(' + f1(rot) + ' ' + x + ' ' + y + ')" fill="none" stroke="' + ['#4a4553', '#5a5465', '#3c3846'][k % 3] + '" stroke-width="' + f1((1 + r() * 1.4) * scale) + '"/>';
+    }
+    h += '<path class="beat" d="' + blob(x + 2, y + 1, 4 * scale, 0.6, seed + 99, 8) + '" style="fill:' + PULSE + '" opacity="0.8"/>';
+    return h;
+}
+function styleC() {
+    const r = rng(303);
+    let over = '';
+    // bundles along the courses, thick near the corner, thinner as they reach
+    V.forEach(function (v, i) {
+        over += bundle(v, i === 0 || i === 6 ? 30 : i === 5 ? 22 : 16, i === 0 ? 15 : 11, 30 + i, r, i > 0 && i < 5);
+    });
+    // tendons gripping the overgrown squares: hooked round the corner that faces the growth
+    over += band([[O1.x + 30, O1.y + 26], [O1.x + 22, O1.y + 8], [O1.x + 8, O1.y - 2], [O1.x - 6, O1.y + 2]], 8, 61);
+    over += band([[O1.x + 18, O1.y + 34], [O1.x + 8, O1.y + 16], [O1.x - 4, O1.y + 12]], 6, 62);
+    over += band([[O2.x + 34, O2.y + 18], [O2.x + 14, O2.y + 10], [O2.x + 2, O2.y - 2], [O2.x - 4, O2.y - 14]], 8, 63);
+    over += band([[O2.x + 26, O2.y + 32], [O2.x + 10, O2.y + 20], [O2.x - 8, O2.y + 14]], 6, 64);
+    // the fused pair: a short, thick belly between them, tendons gripping both, a knot forming
+    const a = sqPos(F1), b = sqPos(F2);
+    over += bundle([[a[0] + 6, a[1] + 4], [HY[0] - 20, HY[1] + 6], [HY[0] + 18, HY[1] - 2], [b[0] - 6, b[1] + 2]], 24, 12, 71, r, true);
+    over += band([[a[0] + 30, a[1] + 6], [a[0] + 12, a[1] - 10], [a[0] - 6, a[1] - 12], [a[0] - 14, a[1]]], 7, 72);
+    over += band([[b[0] - 30, b[1] + 10], [b[0] - 12, b[1] + 16], [b[0] + 6, b[1] + 12], [b[0] + 14, b[1] - 2]], 7, 73);
+    over += knot(HY[0] + 2, HY[1] + 3, 0.95, 80, r);
+    // the pure growth: a knot at half its thickness
+    over += knot(BIO[0], BIO[1], 1.5, 90, r);
+    return { under: '', over: over };
+}
+
+/* ================================================================ D · CORAL
+   A porous, calcified lattice grown over the board like reef: pale bone on black. The pulse is
+   seen only through the pores. Level: how far the lattice has closed. */
+function styleD(id) {
+    const r = rng(404);
+    let h = '';
+    const shapes = [];        // [path, poreScale]
+    shapes.push([closed(blobPts(566, 396, 118, 0.42, 7, 14, 1.25, 1.05)), 0.55]);
+    V.forEach(function (v, i) {
+        const pts = wob(v, 4, 50 + i, 10);
+        shapes.push([ribbon(pts, function (t) { return (i === 0 ? 34 : 20) * (1.1 - 0.55 * t) * (0.75 + 0.5 * Math.abs(Math.sin(t * 9 + i))); }), 0.8 + i * 0.05]);
+    });
+    // a crust over half of each overgrown square
+    shapes.push([closed(blobPts(O1.x + 11, O1.y + 9, 21, 0.45, 71, 10, 1.1, 0.9)), 0.75]);
+    shapes.push([closed(blobPts(O2.x + 10, O2.y + 12, 23, 0.45, 72, 10, 1.15, 0.9)), 0.75]);
+    // the bridge calcifying the fused pair together
+    const a = sqPos(F1), b = sqPos(F2);
+    shapes.push([closed(blobPts(HY[0] + 1, HY[1] + 4, 40, 0.35, 73, 13, 1.35, 0.7)), 0.7]);
+    // the pure growth: a dome half closed
+    shapes.push([closed(blobPts(BIO[0], BIO[1], 34, 0.32, 74, 12, 1.15, 0.95)), 0.62]);
+
+    // pores: scattered over the whole growing area, sized by how open each part still is
+    const pores = [];
+    // a jittered grid, so the struts between pores stay thin and every pore is its own shape
+    const STEP = 7.4;
+    for (let gy = 100; gy < H + 6; gy += STEP) {
+        for (let gx = 140; gx < W + 6; gx += STEP) {
+            const x = gx + (r() - 0.5) * 4.4 + ((gy / STEP) % 2) * STEP / 2, y = gy + (r() - 0.5) * 4.4;
+            const dist = Math.hypot(600 - x, 420 - y);
+            // old near the corner: nearly closed; young at the front: open and delicate
+            let s = 0.9 + Math.min(1, dist / 300) * 2.2 + r() * 0.8;
+            if (Math.hypot(x - BIO[0], y - BIO[1]) < 36) s = 1.5 + r() * 0.9;      // level 3 of 6: half closed
+            pores.push([x, y, s, dist]);
+        }
+    }
+    const clipId = 'reef-' + id, maskId = 'pores-' + id;
+    h += '<defs><clipPath id="' + clipId + '">' + shapes.map(function (s) { return '<path d="' + s[0] + '"/>'; }).join('') + '</clipPath>';
+    h += '<mask id="' + maskId + '" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '"><rect width="' + W + '" height="' + H + '" fill="#fff"/>';
+    pores.forEach(function (p) { h += '<ellipse cx="' + f1(p[0]) + '" cy="' + f1(p[1]) + '" rx="' + f1(p[2] * (0.8 + r() * 0.5)) + '" ry="' + f1(p[2] * (0.7 + r() * 0.5)) + '" transform="rotate(' + Math.round(r() * 180) + ' ' + f1(p[0]) + ' ' + f1(p[1]) + ')" fill="#000"/>'; });
+    h += '</mask>';
+    h += '<radialGradient id="bone-' + id + '" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#dfe4e1"/><stop offset="0.55" stop-color="#959e9b"/><stop offset="1" stop-color="#3f4644"/></radialGradient></defs>';
+    // under the reef: black, and the pulse moving through, wave by wave from the corner
+    h += '<g clip-path="url(#' + clipId + ')">';
+    // a faint stain of the pulse colour, and the pulse itself: a wave rolling out of the corner,
+    // seen only where the lattice is open (one element, so the sheet stays light)
+    h += '<rect width="' + W + '" height="' + H + '" style="fill:' + PULSE + '" opacity="0.14"/>';
+    [0, 2.25].forEach(function (delay) {
+        h += '<circle cx="600" cy="420" r="0" fill="none" style="stroke:' + PULSE_HI + '" stroke-width="46" opacity="0.85">' +
+             '<animate attributeName="r" values="0;470" dur="4.5s" begin="-' + delay + 's" repeatCount="indefinite"/>' +
+             '<animate attributeName="stroke-width" values="20;70" dur="4.5s" begin="-' + delay + 's" repeatCount="indefinite"/></circle>';
+    });
+    // the bone itself, holed
+    h += '<g mask="url(#' + maskId + ')">' + shapes.map(function (s) { return '<path d="' + s[0] + '" fill="url(#bone-' + id + ')"/>'; }).join('') + '</g>';
+    // depth round each pore: a dark lip on one side
+    pores.forEach(function (p) {
+        h += '<circle cx="' + f1(p[0] + 0.5) + '" cy="' + f1(p[1] + 0.6) + '" r="' + f1(p[2] + 0.5) + '" fill="none" stroke="#2a302f" stroke-width="0.7" opacity="0.5"/>';
+    });
+    h += '</g>';
+    return { under: '', over: h };
+}
+
+/* ================================================================ E · TUBES
+   Biomechanical, with no face: ribbed hoses and cabling that sag and loop over the board,
+   pistons half swallowed, no nodes at all. The function sits where hoses knot. Level: how
+   many hoses have joined the knot. */
+function hose(P, w, seed, r, pulse) {
+    const pts = wob(P, 2.2, seed, 14);
+    const n = noiseFn(seed + 5);
+    w *= 1.45;
+    const wf = function (t, i) { return w * (0.86 + 0.28 * n(i * 4)); };
+    const N = normals(pts);
+    let h = '<path d="' + ribbon(pts, wf) + '" fill="#050607"/>';
+    h += '<path d="' + ribbon(pts, function (t, i) { return wf(t, i) * 0.74; }) + '" fill="#272d33"/>';
+    h += '<path d="' + ribbon(pts, function (t, i) { return wf(t, i) * 0.2; }, function (t, i) { return -wf(t, i) * 0.17; }) + '" fill="#9aa3aa" opacity="0.55"/>';
+    // ribs, bowed and uneven, spaced by hand
+    let acc = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+        acc += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        if (acc < 3.2 + r() * 1.6) continue;
+        acc = 0;
+        const hw = wf(i / pts.length, i) / 2, p = pts[i], q = N[i];
+        const tx = pts[i + 1][0] - pts[i - 1][0], ty = pts[i + 1][1] - pts[i - 1][1], tl = Math.hypot(tx, ty) || 1;
+        const bow = hw * (0.4 + r() * 0.3);
+        const path = 'M ' + f1(p[0] + q[0] * hw) + ' ' + f1(p[1] + q[1] * hw) + ' Q ' + f1(p[0] + tx / tl * bow) + ' ' + f1(p[1] + ty / tl * bow) + ' ' + f1(p[0] - q[0] * hw) + ' ' + f1(p[1] - q[1] * hw);
+        h += '<path d="' + path + '" fill="none" stroke="#000" stroke-width="1.2" opacity="0.75"/>';
+        h += '<path d="' + path + '" fill="none" stroke="#cfd5da" stroke-width="0.45" opacity="0.32" transform="translate(-0.6,-0.6)"/>';
+    }
+    if (pulse) h += pulseOn(d(pts), f1(w * 0.3), 6 + r() * 2, r() * 6);
+    return h;
+}
+function cable(P, seed, w) {
+    // cables hang: each span sags under its own weight before the wander
+    const S = [];
+    for (let i = 0; i < P.length - 1; i++) {
+        const a = P[i], b = P[i + 1];
+        S.push(a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.14]);
+    }
+    S.push(P[P.length - 1]);
+    const pts = wob(S, 2.4, seed, 8);
+    return '<path d="' + d(pts) + '" fill="none" stroke="#050607" stroke-width="' + (w || 1.6) + '" stroke-linecap="round"/>' +
+        '<path d="' + d(pts) + '" fill="none" stroke="#68727a" stroke-width="0.5" opacity="0.5" transform="translate(-0.5,-0.5)"/>';
+}
+function clampAt(x, y, ang, w, seed) {
+    const R = rng(seed);
+    const pts = [[-3, -w * 0.62], [3.2, -w * 0.58], [3.6 + R(), w * 0.6], [-2.8, w * 0.64 + R()]];
+    const c = Math.cos(ang), s = Math.sin(ang);
+    const tp = pts.map(function (p) { return [x + p[0] * c - p[1] * s, y + p[0] * s + p[1] * c]; });
+    return '<path d="' + d(tp) + ' Z" fill="#8d969d" stroke="#050607" stroke-width="0.8"/>';
+}
+function piston(a, b, w, sink) {
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    let h = '<g transform="translate(' + f1(a[0]) + ',' + f1(a[1]) + ') rotate(' + f1(ang) + ')">';
+    h += '<path d="M 0 ' + (-w / 2) + ' L ' + f1(len * 0.55) + ' ' + f1(-w / 2 + 0.6) + ' L ' + f1(len * 0.56) + ' ' + f1(w / 2 - 0.3) + ' L 0 ' + (w / 2) + ' Z" fill="#30363c" stroke="#050607" stroke-width="0.8"/>';
+    h += '<path d="M ' + f1(len * 0.5) + ' ' + f1(-w * 0.2) + ' L ' + f1(len) + ' ' + f1(-w * 0.17) + ' L ' + f1(len) + ' ' + f1(w * 0.2) + ' L ' + f1(len * 0.5) + ' ' + f1(w * 0.2) + ' Z" fill="#b8c0c6" stroke="#050607" stroke-width="0.6"/>';
+    h += '</g>';
+    if (sink) h += '<path d="' + blob(b[0], b[1], w * 0.9, 0.5, Math.round(a[0] + b[1]), 8, 1.3, 0.9) + '" fill="#0a0c0e"/>';
+    return h;
+}
+function styleE() {
+    const r = rng(505);
+    let over = '';
+    const a = sqPos(F1), b = sqPos(F2);
+    // pistons half swallowed, under the hoses
+    over += piston([O2.x + 58, O2.y + 40], [O2.x + 8, O2.y + 6], 13, true);
+    over += piston([O1.x + 64, O1.y + 46], [O1.x + 10, O1.y + 8], 12, true);
+    over += piston([b[0] + 10, b[1] + 34], [a[0] + 10, a[1] + 24], 10, false);
+    over += piston([560, 300], [512, 316], 11, true);
+    // cables running loose beside the hoses
+    over += cable([[600, 398], [540, 360], [470, 340], [380, 344], [320, 318]], 11);
+    over += cable([[600, 404], [548, 372], [500, 300], [460, 220], [446, 196]], 12, 1.2);
+    over += cable([[590, 420], [520, 390], [380, 330], [260, 220], [218, 168]], 13);
+    // hoses that sag across the board and over the squares
+    over += hose([[600, 410], [560, 380], [520, 360], [496, 340]], 13, 21, r, true);
+    over += hose([[586, 420], [548, 404], [508, 372], [490, 344]], 9, 22, r, true);
+    over += hose([[600, 368], [560, 350], [528, 336], [500, 330]], 10, 23, r, true);
+    over += hose([[566, 420], [560, 392], [584, 372], [600, 382]], 9, 29, r, false);
+    over += hose([[600, 330], [574, 318], [552, 342], [574, 362], [600, 350]], 7, 30, r, false);
+    over += hose([[530, 420], [512, 398], [536, 380], [560, 404], [548, 420]], 8, 38, r, false);
+    // over the overgrown squares: draped, looping back on itself
+    over += hose([[478, 316], [500, 260], [470, 206], [436, 186], [412, 196], [420, 214], [446, 206], [470, 186]], 8, 24, r, true);
+    over += hose([[470, 330], [400, 344], [330, 330], [300, 304], [284, 316], [296, 330], [318, 318]], 9, 25, r, true);
+    // and on to the fused pair: hoses wound round both, pulling them in
+    over += hose([[300, 300], [262, 246], [226, 196], [204, 164]], 8, 26, r, true);
+    over += hose([[436, 180], [380, 160], [300, 168], [248, 152], [220, 146]], 7, 27, r, true);
+    over += hose([[a[0] - 26, a[1] + 8], [a[0] - 8, a[1] + 26], [HY[0] - 4, HY[1] + 22], [b[0] + 4, b[1] + 26], [b[0] + 24, b[1] + 4], [b[0] + 4, b[1] - 22], [HY[0] + 6, HY[1] - 20], [a[0] - 4, a[1] - 22], [a[0] - 24, a[1] - 4]], 6, 28, r, true);
+    over += clampAt(a[0] - 18, a[1] + 16, 0.8, 7, 31) + clampAt(b[0] + 20, b[1] + 12, -0.6, 7, 32);
+    // the knot between the fused squares: two hoses
+    over += hose([[HY[0] - 18, HY[1] + 10], [HY[0] - 2, HY[1] - 10], [HY[0] + 14, HY[1] + 4], [HY[0] - 4, HY[1] + 16], [HY[0] - 12, HY[1] + 2]], 7, 33, r, true);
+    // the pure growth is a knot of three hoses, three sockets still empty
+    over += hose([[BIO[0] - 30, BIO[1] + 18], [BIO[0] - 4, BIO[1] - 12], [BIO[0] + 20, BIO[1] + 6], [BIO[0] + 2, BIO[1] + 22], [BIO[0] - 12, BIO[1] + 4], [BIO[0] + 6, BIO[1] - 22]], 9, 34, r, true);
+    over += hose([[BIO[0] + 34, BIO[1] - 8], [BIO[0] + 10, BIO[1] + 14], [BIO[0] - 16, BIO[1] - 2], [BIO[0] - 2, BIO[1] - 18], [BIO[0] + 18, BIO[1] - 4]], 8, 35, r, true);
+    over += hose([[BIO[0] + 6, BIO[1] + 40], [BIO[0] + 14, BIO[1] + 12], [BIO[0] - 8, BIO[1] + 8], [BIO[0] - 22, BIO[1] + 22]], 7, 36, r, true);
+    [[BIO[0] - 30, BIO[1] - 22, 0.6], [BIO[0] + 28, BIO[1] + 26, 2.4], [BIO[0] - 34, BIO[1] + 34, 1.9]].forEach(function (s, k) {
+        // an empty socket: a short stub with a collar, open and dark
+        const c = Math.cos(s[2]), sn = Math.sin(s[2]);
+        over += hose([[s[0], s[1]], [s[0] + c * 7, s[1] + sn * 7], [s[0] + c * 12 + 1, s[1] + sn * 12]], 6, 40 + k, r, false);
+        over += '<path d="' + blob(s[0] - c * 1, s[1] - sn * 1, 4.2, 0.55, 70 + k, 7, 1.4, 0.8) + '" fill="#000"/>';
+    });
+    over += clampAt(BIO[0] - 4, BIO[1] + 2, 0.3, 14, 37);
+    return { under: '', over: over };
+}
+
+/* ---------------------------------------------------------------- the sheet */
+const PANELS = [
+    ['A', 'MYCELIUM', styleA, 'level: how many nodules have fruited'],
+    ['B', 'SACS', styleB, 'level: how full the sac is'],
+    ['C', 'SINEW', styleC, 'level: how thick the bundle'],
+    ['D', 'CORAL', styleD, 'level: how far the lattice has closed'],
+    ['E', 'TUBES', styleE, 'level: how many hoses in the knot']
+];
+const sheet = document.getElementById('sheet');
+PANELS.forEach(function (p) {
+    const id = p[0].toLowerCase();
+    const s = p[2](id);
+    // the squares in their order: the tissue grows over all of them
+    let h = board(id) + s.under;
+    [F1, F2, O1, O2].forEach(function (q) { h += square(q); });
+    h += s.over + labels();
+    const fig = document.createElement('figure');
+    fig.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '">' + h + '</svg>' +
+        '<figcaption><span class="l">' + p[0] + '</span><span class="w">' + p[1] + '</span><span class="lv">' + p[3] + '</span></figcaption>';
+    sheet.appendChild(fig);
+});
+const key = document.createElement('div');
+key.className = 'key';
+key.innerHTML = '<b>THE SCENE, THE SAME IN ALL FIVE</b><br>' +
+    'a patch of the board, four won squares and their traces<br>' +
+    'the tissue comes in from the lower right corner<br>' +
+    '<b>OUTPUT</b> and <b>FEED</b>, upper left: being fused, pulled in from where they stood (dotted)<br>' +
+    '<b>YIELD</b> and <b>BEDS</b>: overgrown<br>' +
+    'lower right: the pure growth, at level 3 of 6<br>' +
+    'the vessels between them carry the pulse<br><br>' +
+    '<b>ALL FIVE</b>: no symmetry, nothing ruled, no gauges, no eyes';
+sheet.appendChild(key);
+
+document.querySelectorAll('.toggle button').forEach(function (b) {
+    b.addEventListener('click', function () {
+        document.body.dataset.pulse = b.dataset.p;
+        document.querySelectorAll('.toggle button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    });
+});
+})();
+</script>
+</body>
+</html>
