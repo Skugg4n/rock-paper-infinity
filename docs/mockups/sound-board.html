@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ljudtavla · akt 1 (mockup 1)</title>
+<style>
+  /* Sound board for B162. Everything is synthesised in the browser (Web Audio):
+     no sound files. Ola judges the sounds here before anything enters the game. */
+  :root { --ink: #0f172a; --mid: #475569; --soft: #94a3b8; --line: #cbd5e1; --tile: #e2e8f0; --bg: #f1f5f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; font-weight: 600; margin: 0 0 14px; }
+  p { font-size: 13px; line-height: 1.55; color: var(--mid); margin: 0 0 12px; max-width: 64ch; }
+  section { background: #fff; border-radius: 20px; padding: 22px; margin-top: 18px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07); }
+  .pads { display: flex; flex-wrap: wrap; gap: 10px; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 0; border-radius: 9999px; padding: 10px 18px; cursor: pointer; transition: transform 0.12s ease, background 0.15s ease; }
+  button:hover { background: var(--tile); transform: translateY(-1px); }
+  button:active { transform: scale(0.96); }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover { background: #1e293b; }
+  .hint { font-size: 12px; color: var(--soft); margin: 10px 0 0; }
+  .grid { display: grid; grid-template-columns: 130px 1fr 92px; gap: 12px 14px; align-items: center; margin-top: 16px; }
+  .grid label { font-size: 13px; }
+  .grid output { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.08em; padding: 7px 12px; border-radius: 9999px; background: var(--bg); color: var(--soft); cursor: pointer; user-select: none; border: 1px solid transparent; }
+  .chip.on { background: var(--ink); color: #fff; }
+  .chip.muted { text-decoration: line-through; border-color: var(--line); background: #fff; color: var(--soft); }
+  .rowline { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+  .readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); }
+  .tog { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ljudtavla · akt 1</h1>
+  <p>Allt ljud skapas i webbläsaren, inga ljudfiler. Tryck och lyssna. Säg vad som är fel i klangen (för vasst, för mjukt, för mycket bas, fel känsla) så ändrar jag. Inget av detta finns i spelet än.</p>
+
+  <section>
+    <h2>ENSKILDA LJUD</h2>
+    <div class="pads">
+      <button data-sfx="click">Klick (knapp)</button>
+      <button data-sfx="pling">Pling (vinst)</button>
+      <button data-sfx="streak">Fem vinster i rad</button>
+      <button data-sfx="thunk">Köp</button>
+      <button data-sfx="rise">Något nytt dyker upp</button>
+      <button data-sfx="lucky">Klövern</button>
+      <button data-sfx="knock">Batteriet tomt</button>
+      <button data-sfx="swell">Kapitelkort</button>
+    </div>
+    <p class="hint">Plingen stiger en ton för varje vinst i rad och börjar om efter en paus.</p>
+  </section>
+
+  <section>
+    <h2>MASKINEN</h2>
+    <p>När vinsterna kommer för tätt för att plinga en och en tar maskinen över: en puls som följer farten, sedan bas, sedan skimmer. Batteriet är hjärtat: svagt batteri ger svagt hjärta, tomt batteri blir nästan tyst. Energiverket brummar. Varje bräde är en stämma till.</p>
+    <div class="rowline">
+      <button class="primary" id="run">Starta maskinen</button>
+      <button id="demo">Spela akt 1 på 75 sekunder</button>
+      <span class="readout" id="readout">stilla</span>
+    </div>
+    <div class="grid">
+      <label for="gps">Fart</label><input id="gps" type="range" min="0" max="1000" value="80"><output id="gps-out"></output>
+      <label for="battery">Batteri</label><input id="battery" type="range" min="0" max="100" value="100"><output id="battery-out"></output>
+      <label for="gen">Energiverk</label><input id="gen" type="range" min="0" max="50" value="0"><output id="gen-out"></output>
+      <label for="boards">Bräden</label><input id="boards" type="range" min="1" max="9" value="1"><output id="boards-out"></output>
+      <label for="luck">Tur</label><span class="tog"><input id="luck" type="checkbox"> dubbelt så många vinster</span><output></output>
+    </div>
+    <div class="chips" id="chips">
+      <span class="chip" data-layer="pling">PLING</span>
+      <span class="chip" data-layer="pulse">PULS</span>
+      <span class="chip" data-layer="hat">TICK</span>
+      <span class="chip" data-layer="bass">BAS</span>
+      <span class="chip" data-layer="arp">SKIMMER</span>
+      <span class="chip" data-layer="pad">STÄMMOR</span>
+      <span class="chip" data-layer="hum">BRUM</span>
+    </div>
+    <p class="hint">Svart = lagret spelar just nu. Klicka på ett lager för att tysta det och höra resten utan det.</p>
+  </section>
+
+  <section>
+    <h2>VOLYM (BLIR AV/PÅ I ☰-MENYN)</h2>
+    <div class="grid">
+      <label for="vol-sfx">Ljud</label><input id="vol-sfx" type="range" min="0" max="100" value="80"><output id="vol-sfx-out"></output>
+      <label for="vol-music">Musik</label><input id="vol-music" type="range" min="0" max="100" value="70"><output id="vol-music-out"></output>
+    </div>
+  </section>
+</main>
+
+<script>
+// ---------------------------------------------------------------- audio graph
+let ctx = null, master, sfxBus, musicBus, reverb, noiseBuf, hum = null;
+const $ = (id) => document.getElementById(id);
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+function ensure() {
+  if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
+  master = ctx.createGain(); master.gain.value = 0.9;
+  master.connect(comp); comp.connect(ctx.destination);
+  sfxBus = ctx.createGain(); musicBus = ctx.createGain();
+  sfxBus.connect(master); musicBus.connect(master);
+  // a small synthesised room: decaying noise as an impulse response
+  const len = Math.floor(ctx.sampleRate * 1.8);
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+  }
+  reverb = ctx.createConvolver(); reverb.buffer = ir;
+  const wet = ctx.createGain(); wet.gain.value = 0.22;
+  reverb.connect(wet); wet.connect(master);
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  applyVolumes();
+}
+
+/** A gain node with a short attack and an exponential decay; returns it. */
+function env(t, peak, attack, decay, dest) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+  g.connect(dest);
+  return g;
+}
+function osc(type, freq, t, stopAt, dest) {
+  const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+  o.connect(dest); o.start(t); o.stop(stopAt); return o;
+}
+function noise(t, dur, dest) {
+  const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+  n.connect(dest); n.start(t, Math.random() * 0.5); n.stop(t + dur); return n;
+}
+function send(node, amount) { const s = ctx.createGain(); s.gain.value = amount; node.connect(s); s.connect(reverb); }
+
+// ---------------------------------------------------------------- the words
+const PENTA = [0, 3, 5, 7, 10];                  // D minor pentatonic
+const pentaNote = (i, base = 74) => base + 12 * Math.floor(i / 5) + PENTA[((i % 5) + 5) % 5];
+
+function click(t = ctx.currentTime, dest = sfxBus) {
+  const g = env(t, 0.18, 0.001, 0.035, dest);
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400; hp.connect(g);
+  noise(t, 0.05, hp);
+  osc('sine', 1900, t, t + 0.04, env(t, 0.05, 0.001, 0.03, dest));
+}
+function pling(t = ctx.currentTime, midi = 74, level = 1, dest = sfxBus) {
+  const f = mtof(midi);
+  const g = env(t, 0.2 * level, 0.003, 0.42, dest);
+  osc('sine', f, t, t + 0.5, g);
+  osc('sine', f * 2.005, t, t + 0.3, env(t, 0.06 * level, 0.003, 0.2, dest));
+  osc('sine', f * 3.01, t, t + 0.15, env(t, 0.02 * level, 0.002, 0.09, dest));
+  send(g, 0.5);
+}
+function thunk(t = ctx.currentTime) {
+  const g = env(t, 0.5, 0.003, 0.16, sfxBus);
+  const o = osc('sine', 150, t, t + 0.22, g);
+  o.frequency.exponentialRampToValueAtTime(58, t + 0.14);
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+  lp.connect(env(t, 0.22, 0.001, 0.05, sfxBus));
+  noise(t, 0.07, lp);
+}
+function rise(t = ctx.currentTime) { [0, 2, 5].forEach((n, i) => pling(t + i * 0.09, pentaNote(n), 0.9)); }
+function lucky(t = ctx.currentTime) { pling(t, pentaNote(3), 0.7); pling(t + 0.07, pentaNote(6), 0.8); }
+function knock(t = ctx.currentTime) {
+  [0, 0.13].forEach((d) => {
+    const g = env(t + d, 0.32, 0.002, 0.07, sfxBus);
+    const o = osc('sine', 170, t + d, t + d + 0.1, g);
+    o.frequency.exponentialRampToValueAtTime(110, t + d + 0.07);
+  });
+}
+function swell(t = ctx.currentTime) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.28, t + 1.7);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+  g.connect(sfxBus); send(g, 0.6);
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.8;
+  lp.frequency.setValueAtTime(160, t); lp.frequency.exponentialRampToValueAtTime(2600, t + 1.8);
+  lp.connect(g); noise(t, 3.3, lp);
+  const sub = ctx.createGain(); sub.gain.setValueAtTime(0.0001, t);
+  sub.gain.exponentialRampToValueAtTime(0.3, t + 1.6); sub.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+  sub.connect(sfxBus); osc('sine', mtof(38), t, t + 3.3, sub);
+}
+let streak = 0, streakAt = 0;
+function nextPlingNote() {
+  const now = performance.now();
+  streak = now - streakAt > 2500 ? 0 : (streak + 1) % 10;
+  streakAt = now;
+  return pentaNote(streak);
+}
+const SFX = {
+  click: () => click(), pling: () => pling(ctx.currentTime, nextPlingNote()), thunk: () => thunk(),
+  streak: () => { for (let i = 0; i < 5; i++) pling(ctx.currentTime + i * 0.38, pentaNote(i)); },
+  rise: () => rise(), lucky: () => lucky(), knock: () => knock(), swell: () => swell(),
+};
+document.querySelectorAll('[data-sfx]').forEach((b) => b.addEventListener('click', () => { ensure(); SFX[b.dataset.sfx](); }));
+
+// ---------------------------------------------------------------- the machine
+// i, VI, III, VII in D minor: one chord a bar. Roots as MIDI notes, thirds as semitones.
+const CHORDS = [{ root: 38, third: 3 }, { root: 34, third: 4 }, { root: 41, third: 4 }, { root: 36, third: 4 }];
+const S = { running: false, gps: 1, battery: 1, gen: 0, boards: 1, luck: false, step: 0, next: 0, timer: null };
+const muted = new Set();
+
+const sliderToGps = (v) => 0.5 * Math.pow(800, v / 1000);            // 0.5 .. 400 games a second
+const gpsToSlider = (g) => Math.round(1000 * Math.log(g / 0.5) / Math.log(800));
+const bpm = () => Math.max(58, Math.min(128, 58 + 26 * Math.log10(S.gps / 0.5)));
+const winRate = () => S.gps * (S.luck ? 2 / 3 : 1 / 3);
+
+/** Which layers play, from the state alone. */
+function layers() {
+  const alive = S.battery > 0;
+  const wins = winRate();
+  return {
+    pling: alive && wins < 5,
+    pulse: S.gps >= 3,
+    hat: alive && S.gps >= 3,
+    bass: alive && S.gps >= 10,
+    arp: alive && wins >= 5,
+    pad: alive && S.boards >= 2,
+    hum: alive && S.gen > 0,
+  };
+}
+const on = (L, name) => L[name] && !muted.has(name);
+
+function kick(t, level, soft) {
+  const g = env(t, 0.55 * level, 0.004, soft ? 0.13 : 0.2, musicBus);
+  const o = osc('sine', soft ? 92 : 118, t, t + 0.3, g);
+  o.frequency.exponentialRampToValueAtTime(soft ? 52 : 44, t + 0.11);
+}
+function hat(t, level) {
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7000;
+  hp.connect(env(t, 0.05 * level, 0.001, 0.03, musicBus));
+  noise(t, 0.04, hp);
+}
+function bass(t, midi, dur) {
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2;
+  lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(220, t + Math.max(0.08, dur * 0.8));
+  const g = env(t, 0.26, 0.006, Math.max(0.1, dur), musicBus);
+  lp.connect(g);
+  osc('sawtooth', mtof(midi), t, t + dur + 0.2, lp);
+  osc('sine', mtof(midi - 12), t, t + dur + 0.2, env(t, 0.16, 0.006, Math.max(0.1, dur), musicBus));
+}
+function pad(t, chord, dur, voices) {
+  const tones = [0, 7, 12, 12 + chord.third, 19, 24, 24 + chord.third, 31, 36].slice(0, voices);
+  tones.forEach((semi, i) => {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.028, t + dur * 0.3);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur * 1.05);
+    g.connect(musicBus); send(g, 0.7);
+    const o = osc('triangle', mtof(chord.root + 12 + semi), t, t + dur * 1.1, g);
+    o.detune.value = (i % 2 ? 6 : -6);
+  });
+}
+function arp(t, step, rate) {
+  const span = rate > 60 ? 10 : rate > 20 ? 8 : 5;                       // brighter and wider with the rate
+  const pattern = [0, 2, 4, 1, 3, 5, 2, 4, 6, 3, 5, 7, 4, 6, 8, 5];
+  const idx = pattern[step % 16] % span + (rate > 120 ? 5 : 0);
+  pling(t, pentaNote(idx), rate > 60 ? 0.3 : 0.38, musicBus);
+}
+function startHum() {
+  const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(musicBus);
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 120; lp.Q.value = 1.2; lp.connect(g);
+  const a = ctx.createOscillator(), b = ctx.createOscillator();
+  a.type = b.type = 'sawtooth'; a.detune.value = -8; b.detune.value = 8;
+  a.frequency.value = b.frequency.value = mtof(26);
+  a.connect(lp); b.connect(lp); a.start(); b.start();
+  hum = { g, lp, a, b };
+}
+function updateHum(L, chord) {
+  if (!hum) return;
+  const t = ctx.currentTime;
+  hum.g.gain.setTargetAtTime(on(L, 'hum') ? 0.03 + 0.07 * S.gen : 0.0001, t, 0.25);
+  hum.lp.frequency.setTargetAtTime(90 + 520 * S.gen, t, 0.3);
+  const f = mtof(chord.root - 12);
+  hum.a.frequency.setTargetAtTime(f, t, 0.2); hum.b.frequency.setTargetAtTime(f, t, 0.2);
+}
+
+function scheduleStep(step, t) {
+  const dur = 60 / bpm() / 4;
+  const s16 = step % 16;
+  const chord = CHORDS[Math.floor(step / 16) % 4];
+  const L = layers();
+  const alive = S.battery > 0;
+  if (on(L, 'pulse')) {
+    if (alive) {
+      const heart = 0.45 + 0.55 * Math.min(1, S.battery / 0.25);          // a weak battery is a weak heart
+      if (s16 === 0 || s16 === 8) kick(t, heart, false);
+      if ((s16 === 3 || s16 === 11) && S.battery > 0.12) kick(t, 0.5 * heart, true);
+    } else if (s16 === 0) kick(t, 0.35, true);                            // empty: one faint beat a bar
+  }
+  if (alive) {
+    if (on(L, 'hat') && (S.gps >= 10 || s16 % 2 === 0)) hat(t, s16 % 4 === 2 ? 1 : 0.55);
+    if (on(L, 'bass') && (s16 % 4 === 0 || s16 === 6 || s16 === 14)) bass(t, chord.root + (s16 === 6 || s16 === 14 ? 7 : 0), dur * 1.7);
+    if (on(L, 'pad') && s16 === 0) pad(t, chord, dur * 16, S.boards);
+    const wins = winRate();
+    if (on(L, 'pling') && Math.random() < wins * dur) pling(t + Math.random() * dur, nextPlingNote());
+    if (on(L, 'arp') && (wins >= 20 || s16 % 2 === 0)) arp(t, step, wins);
+  }
+  if (s16 === 0 || s16 === 8) updateHum(L, chord);
+}
+function pump() {
+  if (!S.running) return;
+  while (S.next < ctx.currentTime + 0.14) {
+    scheduleStep(S.step, S.next);
+    S.next += 60 / bpm() / 4;
+    S.step++;
+  }
+}
+function start() {
+  ensure();
+  if (S.running) return;
+  S.running = true; S.step = 0; S.next = ctx.currentTime + 0.06;
+  if (!hum) startHum();
+  S.timer = setInterval(pump, 25);
+  $('run').textContent = 'Stoppa maskinen';
+}
+function stop() {
+  S.running = false; clearInterval(S.timer);
+  if (hum) hum.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.1);
+  $('run').textContent = 'Starta maskinen';
+}
+$('run').addEventListener('click', () => { if (S.running) { stopDemo(); stop(); } else start(); });
+
+// ---------------------------------------------------------------- controls
+function readState() {
+  S.gps = sliderToGps(+$('gps').value);
+  S.battery = +$('battery').value / 100;
+  S.gen = +$('gen').value / 50;
+  S.boards = +$('boards').value;
+  S.luck = $('luck').checked;
+  paint();
+}
+function paint() {
+  $('gps-out').textContent = `${S.gps < 10 ? S.gps.toFixed(1) : Math.round(S.gps)} spel/s`;
+  $('battery-out').textContent = `${Math.round(S.battery * 100)} %`;
+  $('gen-out').textContent = `nivå ${Math.round(S.gen * 50)}`;
+  $('boards-out').textContent = `${S.boards}`;
+  const L = layers();
+  document.querySelectorAll('.chip').forEach((c) => {
+    const name = c.dataset.layer;
+    c.classList.toggle('muted', muted.has(name));
+    c.classList.toggle('on', S.running && L[name] && !muted.has(name));
+  });
+  $('readout').textContent = S.running ? `${Math.round(bpm())} slag/min · ${winRate() < 10 ? winRate().toFixed(1) : Math.round(winRate())} vinster/s` : 'stilla';
+}
+['gps', 'battery', 'gen', 'boards', 'luck'].forEach((id) => $(id).addEventListener('input', readState));
+document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
+  const name = c.dataset.layer;
+  if (muted.has(name)) muted.delete(name); else muted.add(name);
+  paint();
+}));
+function applyVolumes() {
+  const a = +$('vol-sfx').value / 100, b = +$('vol-music').value / 100;
+  $('vol-sfx-out').textContent = a === 0 ? 'av' : `${Math.round(a * 100)} %`;
+  $('vol-music-out').textContent = b === 0 ? 'av' : `${Math.round(b * 100)} %`;
+  if (!ctx) return;
+  sfxBus.gain.setTargetAtTime(a * a, ctx.currentTime, 0.03);
+  musicBus.gain.setTargetAtTime(b * b, ctx.currentTime, 0.03);
+}
+['vol-sfx', 'vol-music'].forEach((id) => $(id).addEventListener('input', applyVolumes));
+setInterval(paint, 200);
+
+// ---------------------------------------------------------------- chapter I in 75 seconds
+// [second, what happens]. Between the marks the values glide.
+const DEMO = [
+  { t: 0,  gps: 0.6, battery: 1,    gen: 0,  boards: 1, luck: false },
+  { t: 12, gps: 1.6, battery: 0.45, gen: 0,  boards: 1, luck: false },
+  { t: 20, gps: 2.6, battery: 0,    gen: 0,  boards: 1, luck: false, sfx: 'knock' },
+  { t: 23, gps: 2.6, battery: 1,    gen: 0,  boards: 1, luck: false, sfx: 'click' },
+  { t: 28, gps: 3.2, battery: 0.7,  gen: 0,  boards: 1, luck: true,  sfx: 'rise' },
+  { t: 36, gps: 10,  battery: 0.3,  gen: 0,  boards: 1, luck: true,  sfx: 'thunk' },
+  { t: 40, gps: 16,  battery: 0.05, gen: 0,  boards: 2, luck: true,  sfx: 'thunk' },
+  { t: 42, gps: 22,  battery: 1,    gen: 0,  boards: 2, luck: true,  sfx: 'rise' },
+  { t: 48, gps: 40,  battery: 0.2,  gen: 0,  boards: 3, luck: true,  sfx: 'thunk' },
+  { t: 50, gps: 60,  battery: 1,    gen: 0.1, boards: 4, luck: true, sfx: 'rise' },
+  { t: 60, gps: 200, battery: 1,    gen: 0.7, boards: 7, luck: true, sfx: 'thunk' },
+  { t: 68, gps: 370, battery: 1,    gen: 1,  boards: 9, luck: true,  sfx: 'thunk' },
+  { t: 73, gps: 370, battery: 1,    gen: 1,  boards: 9, luck: true,  sfx: 'swell' },
+  { t: 76, gps: 370, battery: 1,    gen: 1,  boards: 9, luck: true,  end: true },
+];
+let demoTimer = null;
+function stopDemo() { clearInterval(demoTimer); demoTimer = null; $('demo').textContent = 'Spela akt 1 på 75 sekunder'; }
+$('demo').addEventListener('click', () => {
+  if (demoTimer) { stopDemo(); stop(); return; }
+  start();
+  $('demo').textContent = 'Avbryt';
+  const t0 = performance.now(); let fired = -1;
+  demoTimer = setInterval(() => {
+    const t = (performance.now() - t0) / 1000;
+    let i = DEMO.findIndex((m) => m.t > t) - 1;
+    if (i < 0) i = DEMO.length - 1;
+    const a = DEMO[i], b = DEMO[Math.min(i + 1, DEMO.length - 1)];
+    const k = b.t > a.t ? Math.min(1, (t - a.t) / (b.t - a.t)) : 1;
+    S.gps = a.gps * Math.pow(b.gps / a.gps, k);
+    S.battery = a.battery + (b.battery - a.battery) * k;
+    S.gen = a.gen + (b.gen - a.gen) * k;
+    S.boards = Math.round(a.boards + (b.boards - a.boards) * k);
+    S.luck = a.luck;
+    if (i > fired) { fired = i; if (a.sfx) SFX[a.sfx](); if (a.end) { stopDemo(); stop(); } }
+    $('gps').value = gpsToSlider(S.gps); $('battery').value = Math.round(S.battery * 100);
+    $('gen').value = Math.round(S.gen * 50); $('boards').value = S.boards; $('luck').checked = S.luck;
+    paint();
+  }, 100);
+});
+
+readState();
+applyVolumes();
+</script>
+</body>
+</html>

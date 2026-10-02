@@ -1548,6 +1548,8 @@ items:
     notes: |
       Design dialogue first. Earlier proposal: docs/superpowers/specs/2026-09-27-sound-design.md
       (it said no music; Ola's idea of the machine's rhythm as music replaces that for chapter I).
+      2026-10-02: sound board built, docs/mockups/sound-board.html (single sounds, the machine with
+      speed/battery/generator/boards, chapter I in 75 seconds). Ola judges it; nothing in the game yet.
 
   - id: B163
     added: 2026-10-02
