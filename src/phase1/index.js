@@ -115,9 +115,14 @@ const resetBtn = document.getElementById('reset-btn');
             // Persist phase change immediately so a reload during the chapter card
             // doesn't leave the player stranded in Phase 1 with bank already purchased.
             localStorage.setItem(PHASE_KEY, phases.CITY);
+            // The chapter's music ends here: everything falls away and one note
+            // rings out into silence as CAPITAL comes up. Without music the
+            // card has its usual swell.
+            const rangOut = audio.finale();
             playChapterCard({
                 roman: 'II',
                 title: 'CAPITAL',
+                silent: rangOut,
                 // Drawn out: white, a rest, II, a rest, CAPITAL, a long hold, then the city.
                 slow: true, pause: 1400, hold: 2400,
                 onMidpoint: () => setPhase(phases.CITY),
@@ -255,6 +260,7 @@ function scheduleUIUpdate() {
             listenerController = new AbortController();
             const signal = listenerController.signal;
 
+            audio.begin();
             loadGame();
             if (gameBoards.length === 0) createGameBoard();
             setupDashes(upgrades.speed.element, upgrades.speed.maxLevel);
@@ -825,8 +831,9 @@ const uiState = {
                 if(upgrade.level !== undefined && upgrade.level >= upgrade.maxLevel) return;
 
                 starBalance -= currentCost;
-                // The recharge button is clicked all the time: a click. Everything else is a purchase.
-                if (key === 'manualRecharge') audio.click(); else audio.thunk();
+                // The recharge button is clicked all the time: a click. Everything else is a purchase,
+                // except the bank: there the last note of the chapter is the sound.
+                if (key === 'manualRecharge') audio.click(); else if (key !== 'bank') audio.thunk();
                 if (upgrade.level === undefined && !upgrade.consumable) {
                     upgrade.purchased = true;
                 }

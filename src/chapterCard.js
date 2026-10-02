@@ -30,11 +30,12 @@ function delay(ms) {
  * @param {number} [opts.hold] - Hold time in ms (default PHASE_DURATIONS.hold); a click ends the hold early
  * @param {boolean} [opts.slow=false] - Ominous pacing: long fades, the numeral before the title
  * @param {number} [opts.pause=0] - ms on the empty veil before the numeral, and between numeral and title (slow cards)
+ * @param {boolean} [opts.silent=false] - no swell: the caller plays its own sound over the card
  * @returns {Promise<void>} Resolves after the card exits (normal mode only; never resolves for to-come)
  */
-export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false, pause = 0 } = {}) {
+export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false, pause = 0, silent = false } = {}) {
     if (_cardActive) return Promise.resolve();
-    audio.swell(dark);
+    if (!silent) audio.swell(dark);
 
     const card = el('#chapter-card');
     if (!card) {

@@ -88,7 +88,7 @@ export function readPrefs(raw) {
 
 let ctx = null, master, sfxBus, musicBus, reverb, noiseBuf, hum = null;
 let prefs = { sfx: true, music: true };
-const M = { running: false, gps: 0, wins: 0, battery: 1, gen: 0, boards: 1, plings: false, step: 0, next: 0, timer: null };
+const M = { running: false, ended: false, gps: 0, wins: 0, battery: 1, gen: 0, boards: 1, plings: false, step: 0, next: 0, timer: null };
 // What is actually heard: the tempo and every layer glide toward what the state
 // asks for, so a jump in the game (speed ten, a new board) arrives over seconds.
 const LAYERS = ['pulse', 'hat', 'hat16', 'bass', 'arp', 'arp16', 'wide', 'high', 'pad', 'hum'];
@@ -359,13 +359,14 @@ function stopMachine() {
  *        plings: the machine rings single wins itself (bulk play)
  */
 function machine(s) {
-    if (!s.running || !prefs.music || !ensureIfUnlocked()) { stopMachine(); return; }
+    if (!s.running || M.ended || !prefs.music || !ensureIfUnlocked()) { stopMachine(); return; }
     M.gps = s.gps ?? 0; M.wins = s.wins ?? 0;
     M.battery = Math.max(0, Math.min(1, s.battery ?? 1));
     M.gen = Math.max(0, Math.min(1, s.gen ?? 0));
     M.boards = Math.max(1, Math.min(9, Math.round(s.boards ?? 1)));
     M.plings = !!s.plings;
     if (M.running) return;
+    applyPrefs();           // the music bus may have been faded out by a finale
     M.running = true; M.step = 0; M.next = ctx.currentTime + 0.06;
     // A start is quiet: the tempo is right at once, the layers come in from nothing.
     H.bpm = bpmFor(M.gps); H.at = ctx.currentTime;
@@ -373,6 +374,34 @@ function machine(s) {
     if (!hum) startHum();
     M.timer = setInterval(pump, 25);
 }
+
+/**
+ * The end of a chapter's music: everything falls away at once and a single
+ * note is struck, the key's own, and rings out into silence (about seven
+ * seconds, so it is gone as the next chapter's name stands on the card).
+ * After it the machine stays silent until `begin()`.
+ *
+ * @returns {boolean} true if the note was played (music is on and sound is allowed)
+ */
+function finale() {
+    M.ended = true;
+    if (!prefs.music || !ensureIfUnlocked()) { stopMachine(); return false; }
+    const t = ctx.currentTime;
+    stopMachine();
+    // what is already sounding (voices, hum, tails) goes with the machine
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setTargetAtTime(0, t, 0.06);
+    const out = ctx.createGain(); out.gain.value = MUSIC_LEVEL * 1.6; out.connect(master); send(out, 0.9);
+    const f = mtof(62);                                               // D, where the music has been heading all along
+    osc('sine', f, t, t + 7.8, env(t, 0.5, 0.006, 7.4, out));
+    osc('sine', f / 2, t, t + 5.4, env(t, 0.25, 0.01, 5, out));
+    osc('sine', f * 2, t, t + 3.8, env(t, 0.16, 0.004, 3.4, out));
+    osc('sine', f * 3.01, t, t + 1.9, env(t, 0.05, 0.003, 1.6, out));
+    return true;
+}
+
+/** A chapter begins (again): the machine may play. */
+function begin() { M.ended = false; }
 
 // ---------------------------------------------------------------- choices and unlocking
 
@@ -392,4 +421,4 @@ if (typeof window !== 'undefined') {
     window.addEventListener('keydown', unlock, { capture: true });
 }
 
-export const audio = { click, pling, thunk, rise, lucky, knock, swell, machine, stopMachine, getPrefs, setPref };
+export const audio = { click, pling, thunk, rise, lucky, knock, swell, machine, stopMachine, finale, begin, getPrefs, setPref };

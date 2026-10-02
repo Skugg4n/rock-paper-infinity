@@ -78,6 +78,8 @@ describe('sound: the rules', () => {
             audio.click(); audio.pling(); audio.thunk(); audio.rise(); audio.lucky(); audio.knock(); audio.swell(true);
             audio.machine({ running: true, gps: 20, wins: 10, battery: 1, gen: 0.5, boards: 3 });
             audio.stopMachine();
+            expect(audio.finale()).toBe(false);
+            audio.begin();
         }).not.toThrow();
     });
 });
