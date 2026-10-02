@@ -110,13 +110,23 @@ upgrades (boards in chapter I) produce exactly this: long climb, burst, long cli
 
 Beside the line run **helpers**: mechanics that come, do their job, and are outgrown.
 
-- **Energy in chapter I.** First you click the recharge button. When that gets tedious,
-  the battery arrives: a pack that lasts minutes. The line keeps climbing, the pack is
-  eaten in seconds, and then the generator arrives as the next relief. Each helper is
-  the right answer for a while and then too small. That is the dynamic, not a bug.
-- **One-offs.** Luck is a single purchase that doubles the win rate. A helper can be a
-  one-off or a small track of its own; the point is that it is *beside* the line, not
-  the line.
+Every helper has three beats *(Ola, 2026-10-02)*: **it is good** (the new thing solves
+the problem), **it becomes a slog** (the line outgrows it and the player works to keep
+up), **an upgrade makes it good again**. This runs through the whole game. The next
+helper must never arrive before the slog of the previous one has been felt, so a
+helper is unlocked by *use of the previous one*, not by a star count that a fast
+player reaches too early.
+
+- **Energy in chapter I.** First you click the recharge button on the ordinary battery.
+  When that has become a slog (six clicks), the big battery arrives: a pack that lasts
+  minutes. The line keeps climbing, the pack is eaten in seconds, and after the fifth
+  pack the generator arrives as the next relief. Each helper is the right answer for a
+  while and then too small. That is the dynamic, not a bug.
+- **Luck in chapter I.** The little clover is something to fiddle with while the
+  machine plays: a click is three seconds of luck. The big clover is the upgrade that
+  makes luck permanent and retires the little one.
+- **One-offs.** A helper can be a one-off or a small track of its own; the point is
+  that it is *beside* the line, not the line.
 - **Other currencies.** Chapter II introduces space: a limited amount of land to build
   on, spent and freed. Later chapters may add others. A second currency is a helper
   with its own economy, and it can be spent on the line.

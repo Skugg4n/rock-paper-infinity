@@ -1434,7 +1434,8 @@ items:
     request: |
       Chapter I: a small four-leaf clover that raises the player's luck.
       Maybe one click gives 3 seconds of luck.
-    status: open
+    status: done
+    resolved_in: v1.53.0
     notes: "Design dialogue first. Related: B020 (luck as a small track)."
 
   - id: B154
@@ -1444,7 +1445,8 @@ items:
       Chapter I: rethink the battery. It has become unnecessary: the order of
       things is off, the generator arrives so early that the battery is never
       needed.
-    status: open
+    status: done
+    resolved_in: v1.53.0
     notes: |
       Confirmed by scripts/sim-phase1.mjs new: batteries=0, 11 recharge clicks,
       generator at 4m01s. Design dialogue first.

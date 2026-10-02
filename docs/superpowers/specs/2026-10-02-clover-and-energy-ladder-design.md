@@ -34,7 +34,8 @@ arrive before the slog of the previous one has been felt.
 - Not saved. A reload starts with the clover idle.
 - **The big clover** is today's luck purchase, unchanged (50★ after 100 games).
   When it is bought the little clover stays lit for good and stops being
-  clickable; it is now the sign that luck is always on.
+  clickable; it is now the sign that luck is always on. It leaves with the
+  boards when the factory is built.
 
 ## The energy ladder
 
@@ -58,7 +59,7 @@ unlocked.
 
 ## What the simulation says
 
-Scratch simulation (the repo's sim with clover uptime, use-based unlocks and a
+`node scripts/sim-phase1.mjs` (v1.53.0: clover uptime, use-based unlocks and a
 player who saves up for the battery and for luck). "Lazy" never clicks the clover,
 "fiddler" keeps it lit 80 % of the time.
 
@@ -79,9 +80,9 @@ With the same player model on today's balance the bank comes at 13:57 (lazy) and
 11:36 (fiddler), so the chapter gets about a minute shorter; the fiddler is two
 minutes ahead of the lazy player, which is the reward for fiddling.
 
-These numbers are the starting point. The implementation ports the scratch changes
-into `scripts/sim-phase1.mjs`, re-runs both players, and this table is updated with
-the final times before the release.
+These are the times from the shipped simulation. One more big battery is bought
+after the generator arrives (the first generator levels do not cover speed 20+ on
+two boards), then the generator has outgrown it.
 
 ## Out of scope
 

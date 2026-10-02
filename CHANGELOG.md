@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.53.0 - 2026-10-02 (chapter I)
+
+### The little clover and the energy ladder
+
+Spec: docs/superpowers/specs/2026-10-02-clover-and-energy-ladder-design.md. Rule in vision.md: every helper is good, becomes a slog, and is made good again by an upgrade.
+
+- **The little clover.** A small clover by the board, there as soon as auto-play is bought, free. A click is three seconds of luck (win rate 2/3); a click while it runs refills it, it never stacks. Green with a draining ring while it lasts. The big clover (the luck upgrade, unchanged) leaves it lit for good.
+- **The energy ladder unlocks by use.** The big battery arrives after six recharge clicks (was 40★ earned) and costs 20★ (was 30★). The generator arrives after five big batteries (was 100★ earned). Before this the generator came about 90 seconds after the battery and the simulated player bought no batteries at all.
+- **The big battery's bar** is hidden until the first big battery is bought.
+- **Old saves** keep what they had: 40★ earned counts as the battery unlocked, 100★ as the generator.
+- **Simulation**: `node scripts/sim-phase1.mjs` now plays a lazy player and one who fiddles with the clover. Lazy: big battery 3:20, generator 6:50, bank 12:54. Fiddler: 2:59, 4:52, 10:55. The first big battery lasts minutes, the ones after the speed-10 jump 27, 13 and 14 seconds, then the generator. The v1.19.2 "old" mode is gone from the script.
+
 ## v1.52.0 - 2026-09-28 (chapter IV, slice 9)
 
 ### The cut: sanity is the snap, biological is a choice you can see, one voice at a time
