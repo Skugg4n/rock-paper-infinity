@@ -34,7 +34,7 @@ import {
     CRYO, CRYO_TOP, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
     tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedCost, feedShare,
 } from './deep.js';
-import { NIGHTS, nightsSaid } from './surface.js';
+import { NIGHTS, nightsSaid, visitDue } from './surface.js';
 import {
     LADDER, RUNGS, has as watcherHas, nextStep, stepNeed, buyStep, peopleFor, firstSleep,
 } from './watcher.js';
@@ -167,6 +167,70 @@ export function bioOpen(state) {
     if (gift(state, 'question')) return true;
     const w = state.watcher;
     return !!(w && ((w.bought || []).some((id) => LADDER.some((u) => u.id === id && u.rung === 2)) || w.sealing));
+}
+
+/* ---- WHAT THE NEXT NIGHT WAITS FOR (deep-night, step 3b) ------------------------------------
+   Ola on v1.61.0: "it is hard to tell whether things are unfinished, or just hard to play, or must
+   be played longer". The night log ends with one line that says, in plain words, what the next
+   night waits for; the same line is said once on a wake that brought no night. And under the
+   Watcher one quiet line says where the sleep world stands. */
+/** The biological steps, in all, and how many of them the body has taken. */
+export const BODY_STEPS = LADDER.filter((u) => u.rung === 2).length;
+export const bodyTaken = (w) => ((w && w.bought) || []).filter((id) => LADDER.some((u) => u.id === id && u.rung === 2)).length;
+/** How far ahead nightNext() looks for Surface's next visit, in sleeps. */
+const SLEEPS_AHEAD = 40;
+/**
+ * What the next night waits for: a cryo tier, sleeps (the visits still to come on the game's own
+ * schedule, quiet ones first), the body, or nothing. Null before Surface has spoken at all: the
+ * first night is not announced.
+ * @param {object} state
+ * @param {{asleep?:boolean}} [o] - asleep, a visit not yet come in this sleep may still come in it
+ * @returns {{kind:'tier'|'sleep'|'body'|'none', text:string, tier?:number, sleeps?:number}|null}
+ */
+export function nightNext(state, { asleep = !!(state && state.asleep) } = {}) {
+    const w = state && state.watcher;
+    const sf = w && w.surface;
+    const n = sf ? sf.night | 0 : 0;
+    if (n < 1) return null;
+    if (n >= NIGHTS.length) {
+        return bioOpen(state) && bodyTaken(w) < BODY_STEPS
+            ? { kind: 'body', text: 'next: the body' }
+            : { kind: 'none', text: 'next: nothing more from the Surface' };
+    }
+    const next = NIGHTS[n];
+    if ((state.cryo ?? -1) < next.tier) return { kind: 'tier', tier: next.tier, text: `next: after ${cryoName(next.tier)}` };
+    // the visits to come, as surface.js schedules them: the quiet ones still owed, then the line
+    const sim = { ...sf, visit: null };
+    let owed = Math.max(0, sf.toLine | 0);
+    const now = w.sleeps | 0;
+    let k = asleep && !sf.visit ? 0 : 1;
+    for (; k <= SLEEPS_AHEAD; k++) {
+        if (!visitDue(sim, now + k)) continue;
+        sim.visits += 1;
+        sim.lastSleep = now + k;
+        if (owed > 0) { owed -= 1; continue; }
+        break;
+    }
+    const sooner = (sf.toLine | 0) > 0 ? ' (sooner if you win its game)' : '';
+    const text = k === 0 ? 'next: Surface comes in this sleep'
+        : k === 1 ? 'next: Surface comes when you sleep again'
+            : `next: Surface speaks in ${k} sleeps${sooner}`;
+    return { kind: 'sleep', sleeps: k, text };
+}
+/** May a night still come? (A wake that brought none says what it waits for, once.) */
+export const nightAhead = (state) => { const x = nightNext(state); return !!x && (x.kind === 'tier' || x.kind === 'sleep'); };
+/**
+ * The one line under the Watcher: "night 3 of 6" while Surface's script runs, "the question is
+ * open" after the sixth, then the body as it is taken. '' before the first night.
+ * @param {object} state
+ */
+export function nightArc(state) {
+    const w = state && state.watcher;
+    const n = w && w.surface ? w.surface.night | 0 : 0;
+    if (n < 1) return '';
+    if (n < NIGHTS.length) return `night ${n} of ${NIGHTS.length}`;
+    if (!bioOpen(state)) return 'the question is open';
+    return `the body ${bodyTaken(w)} of ${BODY_STEPS}`;
 }
 /** The node of a Watcher step (its id in watcher.js's LADDER is the node's id too). */
 export const STEP_NODE = Object.fromEntries(NODES.filter((n) => n.step).map((n) => [n.step, n.id]));

@@ -40,6 +40,15 @@
 //    window at the home view; the old floating glyph on the lid is gone; under the cursor it says
 //    "The machine plays. N energy a day. Each win is a star." with the live N; and the stars a day
 //    (and the machine's tempo) change when the feed changes (debug_deep('feed', n)).
+// deep-night (step 3b): focus in the night.
+// V. also: while the forced night's line types, the game is not on screen; it comes after the line.
+// N. From "IV · cryo I" (awake): sleep. Two seconds into it the bars, the
+//    BUILD buttons, the queue strip, the feed and the rates are hidden, and the year, the Watcher,
+//    the wake pill and the TREE button are not. Force a night: while its line types, Surface's game
+//    is not on screen (nor the sentence); a second after the line is whole, it is, under the line,
+//    and the Watcher's one line reads "night 1 of 6". Wake: within two seconds everything is back.
+//    The tree's night log ends with what the next night waits for ("next: after Cryo II"). Sleep
+//    again and wake with no night: the alarm line, then that same sentence for five seconds, once.
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -156,6 +165,19 @@ try {
     const nodeAt = (id) => centre(`#deep-tree g.tn[data-id="${id}"] .plate`);
     const COLUMN_RECTS = `(() => [...document.querySelectorAll('.deep-btn-col .btn')].filter((b) => b.offsetParent)
         .map((b) => { const r = b.getBoundingClientRect(); return b.id + ':' + Math.round(r.left) + ',' + Math.round(r.top); }).join(' '))()`;
+    /** Is Surface's game on screen: there, and not waiting for its line? */
+    const CARD = `(() => { const e = document.getElementById('deep-surface'); return !e.hidden && getComputedStyle(e).visibility !== 'hidden'; })()`;
+    /** What the night hides and keeps: 'shown', 'hidden' or 'fading' for each. */
+    const SEEN = `(() => { const v = (sel) => { const e = document.querySelector(sel); if (!e) return 'missing';
+        const cs = getComputedStyle(e);
+        // the queue strip is not drawn at all when it is empty: what the night does to it is its visibility
+        if (sel === '#deep-queue') return cs.visibility === 'hidden' ? 'hidden' : (parseFloat(cs.opacity) > 0.99 ? 'shown' : 'fading');
+        if (e.hidden) return 'hidden';
+        if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.01) return 'hidden';
+        return parseFloat(cs.opacity) > 0.99 ? 'shown' : 'fading'; };
+        return { bars: v('#deep-columns'), build: v('#deep-group-build'), queue: v('#deep-queue'), feed: v('#deep-feed'),
+            rate: v('#deep-stars-rate'), year: v('#deep-year'), watcher: v('#deep-watcher'), wake: v('#deep-wake-btn'),
+            tree: v('#deep-tree-btn'), reset: v('#deep-reset-view') }; })()`;
     const info = () => evaluate(`(() => { const q = (c) => document.querySelector('#deep-tree-info .' + c).textContent;
         return { name: q('ib-name'), lvl: q('ib-lvl'), cost: q('ib-cost'), eff: q('ib-eff'), x: q('ib-x') }; })()`);
 
@@ -248,7 +270,7 @@ try {
     check(v0.night === 3 && !v0.voice && !v0.mark, `IV · Surface: three lines said (${v0.night}), no line on screen, no mark on the tree button`);
     await evaluate('debug_deep("night")');
     await sleepMs(250);
-    const v1 = await evaluate(`({ v: rpiDeep.voice, card: !document.getElementById('deep-surface').hidden,
+    const v1 = await evaluate(`({ v: rpiDeep.voice, card: ${CARD},
         lamps: document.getElementById('deep-puzzle').classList.contains('is-on'),
         pe: getComputedStyle(document.getElementById('deep-voice')).pointerEvents,
         mark: document.getElementById('deep-tree-btn').classList.contains('has-night'),
@@ -258,13 +280,15 @@ try {
     check(v1.night === 4 && v1.opened.includes('quiet'), `the forced night is night 4 and opens Quiet hands (${v1.opened.join(', ')})`);
     check(!!v1.v && v1.v.shown && v1.v.typing && v1.v.typed.length > 0 && v1.v.typed.length < v1.v.text.length && v1.v.text.startsWith(v1.v.typed),
         `the line types itself: "${v1.v?.typed}" of "${v1.v?.text}"`);
-    check(v1.card && !v1.lamps, `the game with Surface shares the screen with it (card ${v1.card}), the lamps do not (${v1.lamps})`);
+    // deep-night: the line first, alone; the game only once it has finished (it was beside it)
+    check(!v1.card && !v1.lamps, `while the line types, neither the game (${v1.card}) nor the lamps (${v1.lamps}) are on screen`);
     check(v1.pe === 'none' && v1.size > v1.feedSize, `nothing on the line can be clicked (pointer-events ${v1.pe}); its mono is larger (${v1.size} px against the feed's ${v1.feedSize})`);
     check(v1.mark, 'the tree button carries the night\'s mark');
     await shot('V-1-the-voice-typing');
     await sleepMs(Math.ceil(v1.v.text.length * 35) + 2500);
-    const v2 = await evaluate(`({ v: rpiDeep.voice, asleep: rpiDeep.state.asleep })`);
+    const v2 = await evaluate(`({ v: rpiDeep.voice, asleep: rpiDeep.state.asleep, card: ${CARD} })`);
     check(v2.asleep && v2.v && v2.v.shown && !v2.v.typing && v2.v.typed === v2.v.text, `the line is whole and stays while they sleep: "${v2.v?.typed}"`);
+    check(v2.card, 'and the game has come under it');
     await shot('V-2-the-voice-stays');
     await evaluate('debug_deep("alarm")');
     for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.asleep')); i++) await sleepMs(100);
@@ -311,6 +335,74 @@ try {
     check(fuel1.fuel < fuel0.fuel / 4 && fuel1.need < fuel0.need, `the rule's output changes: the generators burn ${fuel0.fuel.toPrecision(3)} to ${fuel1.fuel.toPrecision(3)} ore a day, the rooms draw ${fuel0.need.toPrecision(3)} to ${fuel1.need.toPrecision(3)} energy`);
     await key('Escape');
     await sleepMs(200);
+
+    // ================= N. IV · cryo I: the night strips the screen, Surface's visit is a sequence ==================
+    // (no orders: a dig finished in the sleep is an alarm, and it would wake the colony at once)
+    await jump('iv-cryo', { asleep: false });
+    const nt0 = await evaluate(SEEN);
+    check(nt0.bars === 'shown' && nt0.build === 'shown' && nt0.queue === 'shown' && nt0.feed === 'shown',
+        `awake: the bars ${nt0.bars}, BUILD ${nt0.build}, the queue strip ${nt0.queue}, the feed ${nt0.feed}`);
+    await mouse('mouseMoved', 5, 5);
+    await evaluate('debug_deep("sleep")');
+    for (let i = 0; i < 40 && !(await evaluate('rpiDeep.state.asleep')); i++) await sleepMs(100);
+    await sleepMs(2000);
+    const nt1 = await evaluate(SEEN);
+    await shot('N-1-the-night-room');
+    check(nt1.bars === 'hidden' && nt1.build === 'hidden' && nt1.queue === 'hidden' && nt1.feed === 'hidden' && nt1.rate === 'hidden',
+        `2 s into the sleep the awake chrome is gone: bars ${nt1.bars}, BUILD ${nt1.build}, queue ${nt1.queue}, feed ${nt1.feed}, rates ${nt1.rate}`);
+    check(nt1.year === 'shown' && nt1.watcher === 'shown' && nt1.wake === 'shown' && nt1.tree === 'shown' && (await evaluate('rpiDeep.state.asleep')),
+        `asleep, what stays: the year ${nt1.year}, the Watcher ${nt1.watcher}, the wake pill ${nt1.wake}, the TREE button ${nt1.tree}`);
+    await evaluate('debug_deep("night")');
+    await sleepMs(200);
+    const nt2 = await evaluate(`({ v: rpiDeep.voice, card: ${CARD}, words: document.getElementById('deep-surface-words').textContent,
+        night: rpiDeep.state.watcher.surface.night, asleep: rpiDeep.state.asleep })`);
+    check(nt2.asleep && nt2.night === 1 && !!nt2.v && nt2.v.typing && nt2.v.typed.length < nt2.v.text.length,
+        `a forced night (${nt2.night}) types its line: "${nt2.v?.typed}" of "${nt2.v?.text}"`);
+    check(!nt2.card && !nt2.words, `while it types, nothing else of Surface's is on screen (game ${nt2.card}, sentence "${nt2.words}")`);
+    await shot('N-2-the-line-alone');
+    // the line is whole after its letters; the game comes a second after that
+    const whole = Math.ceil(nt2.v.text.length * 35);
+    await sleepMs(Math.max(0, whole - 200 + 300));
+    const nt3 = await evaluate(`({ v: rpiDeep.voice, card: ${CARD} })`);
+    check(!!nt3.v && !nt3.v.typing && !nt3.card, `the line is whole and the game still waits (${nt3.card})`);
+    await sleepMs(1100);
+    const nt4 = await evaluate(`(() => { const g = document.getElementById('deep-surface').getBoundingClientRect(),
+        l = document.getElementById('deep-voice').getBoundingClientRect();
+        return { card: ${CARD}, below: g.top >= l.bottom - 1, arc: document.getElementById('deep-watcher-arc').textContent,
+            asleep: rpiDeep.state.asleep, words: document.getElementById('deep-surface-words').textContent }; })()`);
+    await shot('N-3-the-game-under-the-line');
+    check(nt4.asleep && nt4.card && nt4.below, `a second after the line, the game is there, under it (below ${nt4.below})`);
+    check(nt4.arc === 'night 1 of 6' && !nt4.words, `under the Watcher one line: "${nt4.arc}"; no sentence before a win ("${nt4.words}")`);
+    await evaluate('debug_deep("alarm")');
+    for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.asleep')); i++) await sleepMs(50);
+    await sleepMs(2000);
+    const nt5 = await evaluate(SEEN);
+    check(nt5.bars === 'shown' && nt5.build === 'shown' && nt5.queue === 'shown' && nt5.feed === 'shown' && nt5.rate === 'shown',
+        `within 2 s of the wake it is all back: bars ${nt5.bars}, BUILD ${nt5.build}, queue ${nt5.queue}, feed ${nt5.feed}, rates ${nt5.rate}`);
+    const tn = await centre('#deep-tree-btn');
+    await click(tn.x, tn.y);
+    await sleepMs(500);
+    const nt6 = await evaluate(`({ next: rpiDeep.treeLogNext, drawn: [...document.querySelectorAll('#deep-tree .tt-log text.log-next')].map((t) => t.textContent).join(' ') })`);
+    await shot('N-4-the-log-says-what-is-next');
+    check(nt6.next === 'next: after Cryo II' && nt6.drawn === nt6.next, `the night log ends with what the next night waits for: "${nt6.drawn}"`);
+    await key('Escape');
+    await sleepMs(300);
+    // a sleep with no night: the alarm line, then the same sentence for five seconds, once
+    await evaluate('debug_deep("sleep")');
+    for (let i = 0; i < 40 && !(await evaluate('rpiDeep.state.asleep')); i++) await sleepMs(100);
+    await sleepMs(2200);        // past the spin of falling asleep, which no alarm interrupts
+    await evaluate('debug_deep("alarm")');
+    const nWoke = Date.now();
+    for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.asleep')); i++) await sleepMs(50);
+    const adv = () => evaluate(`document.getElementById('deep-advisor').textContent`);
+    await sleepMs(Math.max(0, nWoke + 1800 - Date.now()));
+    const a1 = await adv();
+    await sleepMs(Math.max(0, nWoke + 8200 - Date.now()));
+    const a2 = await adv();
+    await sleepMs(Math.max(0, nWoke + 13200 - Date.now()));
+    const a3 = await adv();
+    check(/Woke:/.test(a1) && a2 === 'next: after Cryo II' && a3 !== a2 && !/^next:/.test(a3),
+        `a wake with no night: "${a1}", then "${a2}", then "${a3}"`);
 
     // ================= 1. IV · Surface: one demand at a time, the snap holds ==================
     await jump('iv-surface');

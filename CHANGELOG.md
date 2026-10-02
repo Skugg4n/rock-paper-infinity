@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.66.0 - 2026-10-03 (chapter IV, focus in the night)
+
+### Chapter IV: focus in the night (step 3b, from Ola's playtest of v1.61.0)
+
+"I like the contact with the Surface, but it is a bit fragmented now." (B196 to B199)
+
+- **The night strips the screen.** Pressing Sleep fades the awake chrome out over 1.5 s: the four bars and their flows, the BUILD buttons, the group words, the scout and way-up pills, the counters' rates, the build queue and the advisor's feed. What stays is the year (larger), the Watcher, Surface when it visits, the wake pill, the TREE button (gifts can still be bought) and the reset view, over the dark colony and its lamps. Nothing that stays moves. Waking fades it all back. While the body takes its people, the H bar alone comes up for the drop.
+- **Surface's visit is a sequence.** Its line types itself alone; a second after the last letter the rock, paper, scissors game appears under it, as the reply. The won words of the sentence show only after a win, as its reward; between visits the sentence is in the tree's night log.
+- **Is it broken or slow?** The night log ends with what the next night waits for: "next: after Cryo III", "next: Surface comes when you sleep again", "next: Surface speaks in 3 sleeps (sooner if you win its game)", "next: nothing more from the Surface", later "next: the body". A wake that brought no night, with one still to come, says the same line once for 5 s after the alarm line. Under the Watcher one quiet line: "night 3 of 6", then "the question is open", then "the body 1 of 4".
+- **Acceptance** (scripts/accept-iv-cut.mjs, section N): from "IV · cryo I", 2 s into a sleep the bars, BUILD and the queue are hidden and back within 2 s of the wake; a forced night's game is absent while the line types and there after it, under it; the tree's log ends with "next: after Cryo II"; a wake with no night says it after the alarm line.
+
 ## v1.65.0 - 2026-10-03 (chapter II has sound)
 
 ### The city's sound, as Ola approved it on the board

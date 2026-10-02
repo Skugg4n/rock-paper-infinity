@@ -1990,3 +1990,57 @@ items:
     status: done
     resolved_in: v1.65.0
     notes: "The margin between the grids is 160 px (was 112): 62 px of water between the shores, room for a pier and a hull on each side."
+
+    status: open
+
+  - id: B196
+    added: 2026-10-03
+    source: "Ola, playtest of v1.61.0 (chapter IV step 3b, focus in the night)"
+    request: |
+      "Maybe some things can disappear from the screen during cryo so the focus is on our madness."
+      While the colony sleeps the awake chrome fades out over about 1.5 s and stays out: the four bars
+      and their flows, the BUILD buttons, the group words, the scout and way-up pills, the counters'
+      rates, the build queue strip and the advisor's feed. What stays: the year (larger), the Watcher,
+      Surface when it visits, the wake pill, the TREE button, the reset view, and the dark colony with
+      its lamps. Everything fades back on waking.
+    status: done
+    resolved_in: deep-night (version at merge)
+    notes: "style-deep.css (is-night), index.js (startSleep, wake). The places are kept, so nothing that stays moves. The H bar alone comes up while the body's people roll off it."
+
+  - id: B197
+    added: 2026-10-03
+    source: "Ola, playtest of v1.61.0"
+    request: |
+      "The Surface seems to want to play rock paper scissors with us and at the same time says several
+      things." A visit is a sequence: the line types itself alone; a second after it is whole the game
+      appears under it, as the reply. The sentence of won words shows only after a win, as its reward;
+      between visits it is in the tree's night log. Nothing of Surface's shares the screen with the lamps.
+    status: done
+    resolved_in: deep-night (version at merge)
+    notes: "index.html #deep-night (one stage: line, then the game); index.js gameShown(); tree-view.js THE SENTENCE in the log."
+
+  - id: B198
+    added: 2026-10-03
+    source: "Ola, playtest of v1.61.0"
+    request: |
+      "It is hard to tell whether things are unfinished, or just hard to play, or must be played longer."
+      The night log ends with what the next night waits for ("next: after Cryo III", "next: Surface comes
+      when you sleep again", "next: Surface speaks in 3 sleeps (sooner if you win its game)", "next:
+      nothing more from the Surface", "next: the body"); a wake that brought no night, with one still to
+      come, says the same line once for 5 s; one line under the Watcher says where the sleep world stands
+      ("night 3 of 6", "the question is open", "the body 1 of 4").
+    status: done
+    resolved_in: deep-night (version at merge)
+    notes: "tree.js nightNext, nightAhead, nightArc (pure, voice.test.js); acceptance section N."
+
+  - id: B199
+    added: 2026-10-03
+    source: "deep-night (for Ola's eye)"
+    request: |
+      Decisions taken in step 3b, to overrule on screen: (1) on a wake with no night the "next:" line
+      comes AFTER the alarm line has had its 6 s, in the same place, rather than instead of it (the alarm
+      says why they woke); (2) the ore and star counters stay asleep (only their rates go); (3) the
+      first sleep's "Something stayed awake while they slept." is no longer seen asleep, it is in the
+      feed on waking; (4) Surface's line now sits higher, over the colony's lower plates, to make room
+      for the game under it.
+    status: open

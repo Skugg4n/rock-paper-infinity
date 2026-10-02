@@ -8,9 +8,10 @@ import {
     upkeepMultiplier, roomMultiplier, outputMultiplier, upkeepFor, FOOD_PER_HUMAN,
 } from './deep.js';
 import { initialWatcher, openSurface, LADDER, capacityMax } from './watcher.js';
-import { NIGHTS, initialSurface } from './surface.js';
+import { NIGHTS, initialSurface, visitDue, openVisit, closeVisit } from './surface.js';
 import {
     canBuy, buy, nodeStatus, nodeVisible, GIFT_PRICE, nightLog, levelOf, buyableCount, normalizeTree,
+    nightNext, nightAhead, nightArc, BODY_STEPS,
 } from './tree.js';
 import { deserializeDeep, SCHEMA_VERSION } from './persistence.js';
 import { rateWords, buySentence } from './readout.js';
@@ -175,5 +176,67 @@ describe('the save (schema 7)', () => {
     test('a broken tree in a save is mended: a gift bought must have been opened', () => {
         expect(normalizeTree({ opened: ['cold', 'seam'], bought: ['cold', 'quiet'], unseen: 1 }))
             .toEqual({ opened: ['cold'], bought: ['cold'], unseen: true });
+    });
+});
+
+/* deep-night (step 3b): "is it broken or slow?" The night log ends with what the next night waits
+   for, and one line under the Watcher says where the sleep world stands. */
+describe('what the next night waits for (deep-night)', () => {
+    /** The sleeps until the next line, played out on surface.js's own schedule. */
+    function sleepsToLine(s) {
+        const sf = clone(s.watcher.surface);
+        for (let k = 1; k <= 60; k++) {
+            const at = s.watcher.sleeps + k;
+            if (!visitDue(sf, at)) continue;
+            const v = openVisit(sf, at, { tier: s.cryo });
+            closeVisit(sf);
+            if (v.night) return k;
+        }
+        return null;
+    }
+    test('nothing is announced before Surface has spoken', () => {
+        const s = colony(0);
+        expect(nightNext(s)).toBeNull();
+        expect(nightAhead(s)).toBe(false);
+        expect(nightArc(s)).toBe('');
+    });
+    test('after night 1 at Cryo I, the next night waits for Cryo II', () => {
+        const s = colony(0);
+        openSurface(s.watcher, s, { force: true });
+        s.watcher.surface.visit = null;
+        expect(nightNext(s)).toMatchObject({ kind: 'tier', tier: 1, text: 'next: after Cryo II' });
+        expect(nightAhead(s)).toBe(true);
+        expect(nightArc(s)).toBe('night 1 of 6');
+    });
+    test('with the tier in hand it counts the sleeps, the quiet visits first, as the game schedules them', () => {
+        for (const [visits, lastSleep, sleeps, toLine] of [[1, 2, 2, 1], [1, 2, 4, 0], [3, 10, 12, 1], [6, 20, 20, 0], [6, 20, 21, 1]]) {
+            const s = colony(4);
+            Object.assign(s.watcher, { sleeps });
+            Object.assign(s.watcher.surface, { visits, lastSleep, night: 2, toLine });
+            const x = nightNext(s, { asleep: false });
+            expect(x.kind).toBe('sleep');
+            expect(x.sleeps).toBe(sleepsToLine(s));
+            if (x.sleeps === 1) expect(x.text).toBe('next: Surface comes when you sleep again');
+            else expect(x.text).toBe(`next: Surface speaks in ${x.sleeps} sleeps${toLine ? ' (sooner if you win its game)' : ''}`);
+        }
+    });
+    test('asleep, before Surface has come in this sleep, it may come in this one', () => {
+        const s = colony(4);
+        Object.assign(s.watcher, { sleeps: 5 });
+        Object.assign(s.watcher.surface, { visits: 1, lastSleep: 2, night: 2, toLine: 0 });
+        expect(nightNext(s, { asleep: true })).toMatchObject({ sleeps: 0, text: 'next: Surface comes in this sleep' });
+    });
+    test('after night 6: nothing more from the Surface, then the body', () => {
+        const s = colony(6);
+        for (let i = 0; i < NIGHTS.length; i++) { openSurface(s.watcher, s, { force: true }); s.watcher.surface.visit = null; }
+        expect(nightNext(s).text).toBe('next: nothing more from the Surface');
+        expect(nightAhead(s)).toBe(false);
+        expect(nightArc(s)).toBe('the question is open');
+        s.tree.bought = ['question'];
+        expect(nightNext(s).text).toBe('next: the body');
+        expect(nightArc(s)).toBe(`the body 0 of ${BODY_STEPS}`);
+        s.watcher.bought = LADDER.map((u) => u.id);
+        expect(nightArc(s)).toBe(`the body ${BODY_STEPS} of ${BODY_STEPS}`);
+        expect(nightNext(s).text).toBe('next: nothing more from the Surface');
     });
 });
