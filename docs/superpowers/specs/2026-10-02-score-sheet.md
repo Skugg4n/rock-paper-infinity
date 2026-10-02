@@ -2,7 +2,8 @@
 
 Status: **shared working document**. It replaces the 2026-09-27 proposal (which said "no
 music"; chapter I proved that wrong, the music is the number). Chapter I is built
-(`src/audio.js`), chapter II has an approved board (`docs/mockups/sound-board-city.html`).
+(`src/audio.js`), chapter II has a board (`docs/mockups/sound-board-city.html`; Ola approved the direction on
+mockup 1, mockup 2 is with him to judge by ear).
 Each session that builds an act's sound fills in its row here **before** building.
 Rows marked *proposal* are mine (the WAR session) and are for Ola and the owners to change.
 
@@ -48,14 +49,23 @@ Rows marked *proposal* are mine (the WAR session) and are for Ola and the owners
 |---|---|---|---|---|---|
 | **what the machine is** | the game itself | the factory, far back in a large room | the arms factory under the war | the machine room on the lid, slow | whatever comes up with us |
 | **pulse comes from** | games a second (58 to 128 bpm) | the gap between bass hits (calm city = long gap) | the clock to the next landing | the day tick; cryo winds it up | the owner decides |
-| **layers** | heartbeat, tick, bass, shimmer, generator hum, a voice per board | bass, tones, factory, murmur, traffic, computer, rival | their drum, our drum, bass, tones with holes, arms factory, murmur, drone, shells | drone, drips, the machine, the Surface's voice, the tree | |
-| **what bends the harmony** | nothing: home | the rival, in five steps: a foreign note, F→Gm, B♭→E♭, C→A major, the tones chafe | the war keeps step five's chords (Dm, E♭, Gm, A) and the doomsday drone pulls home itself upward | the Watcher: slow detuning as it changes state | the major third arrives |
+| **layers** | heartbeat, tick, bass, shimmer, generator hum, a voice per board | bass, tones, factory, life (short voices, small steps, a far choir in a large city; no noise), traffic, computer, rival (a tone out of key and their drum) | their drum, our drum, bass, tones with holes, arms factory, murmur, drone, shells | drone, drips, the machine, the Surface's voice, the tree | |
+| **what bends the harmony** | nothing: home | the rival, in five steps: a foreign note (E♭) and a faint drum halfway between our bass hits, F→Gm, B♭→E♭, C→A major and the drum strikes twice, the tones chafe (minor ninth, tritone, wider beating) and the people go quiet. A raid: the city holds its breath | the war keeps step five's chords (Dm, E♭, Gm, A) and the doomsday drone pulls home itself upward | the Watcher: slow detuning as it changes state | the major third arrives |
 | **carried over from the act before** | | the three rising notes, the key, the chords | the rival's drum and the bent chords, the murmur, the factory | the last note of the war, the machine | the deep's low D |
-| **ending note** | **D** (struck once, rings 7 s) | **C♯** (*proposal:* the A major chord's cutting third, left hanging on the WAR card) | **E♭** (*proposal:* the drone has reached it when the surface is dead) | **D, two octaves down** (*proposal*) | **F♯** (*proposal:* the first major third in the game) |
+| **ending note** | **D** (struck once, rings 7 s) | **C♯** (*proposal:* the A major chord's cutting third, left hanging on the WAR card; the CAPITAL session agrees, Ola decides) | **E♭** (*proposal:* the drone has reached it when the surface is dead) | **D, two octaves down** (*proposal*) | **F♯** (*proposal:* the first major third in the game) |
 
 **The melody of endings:** D · C♯ · E♭ · low D · F♯. Home, a semitone under home (longing),
 a semitone over home (the wound), home again far below, and at last the note that turns
 the key to major. It should never be played as a tune until the very end.
+
+### II · CAPITAL: words by material (on the board, mockup 2)
+
+Every purchase begins with the same thunk as in I; the material after it says what kind.
+Build, level up, sell = **wood**. Research = **glass** (a small bell, fifths stacked upward).
+Industry (tool case, car, computer) = **metal** and a motor that spins up to the home note.
+Food (stall, crop, hand harvest) = **grain**. Land = **earth**, low and wide. "Something
+new" is chapter I's three notes, unchanged. Metal is the factory's material, so the war's
+metal thunk (below) continues it: the factory turns to arms.
 
 ## 4. III · WAR in detail (*proposal*)
 
