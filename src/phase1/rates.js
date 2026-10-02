@@ -131,6 +131,17 @@ export function heroPlacement(anchor, natural, scale, gap) {
 }
 
 /**
+ * A star balance as the tracker counts it: a crown is 10 000 stars, a gem 100.
+ *
+ * @param {number} balance
+ * @returns {{ crowns: number, gems: number, stars: number }}
+ */
+export function trackerParts(balance) {
+    const b = Math.max(0, Math.floor(balance));
+    return { crowns: Math.floor(b / 10000), gems: Math.floor((b % 10000) / 100), stars: b % 100 };
+}
+
+/**
  * Returns the number of win-tracker dots to display based on total stars earned.
  * Progressive disclosure: starts at 5 dots, unlocks more as the player earns stars.
  *

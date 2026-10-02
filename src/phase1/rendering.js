@@ -9,13 +9,17 @@
  */
 
 import { getIcon } from "../icons.js";
-import { getSPS, getVisibleDots, formatCount, formatRate, fillFraction } from "./rates.js";
+import { getSPS, getVisibleDots, formatCount, formatRate, fillFraction, trackerParts } from "./rates.js";
 
 // --- Icon templates (built once, cloned per use) ---
 const crownTemplate = getIcon('crown', 'lucide-crown-xl text-slate-800');
 const gemLargeTemplate = getIcon('gem', 'lucide-gem-large text-slate-800');
 const gemMediumTemplate = getIcon('gem', 'lucide-gem-medium text-slate-800');
 const starSmallTemplate = getIcon('star', 'lucide-star-small text-slate-800');
+// Compact tracker (narrow windows): one symbol and a number
+const compactCrown = getIcon('crown', 'tracker-compact-icon text-slate-800');
+const compactGem = getIcon('gem', 'tracker-compact-icon text-slate-800');
+const compactStar = getIcon('star', 'tracker-compact-icon text-slate-800');
 
 // ---- Win tracker -------------------------------------------------------
 
@@ -31,10 +35,30 @@ const starSmallTemplate = getIcon('star', 'lucide-star-small text-slate-800');
  * @param {number} [opts.landIndex] - index of a star that was just won (it lands in its slot), or -1
  * @param {{ from: number, staggerMs: number, elapsedMs: number } | null} [opts.plopp] - slots from
  *        this index plop in one after another; elapsedMs keeps a re-render in step
+ * @param {boolean} [opts.compact] - no room beside the boards: one row of symbol and number
+ *        (★ ×56) instead of every star drawn
  */
-export function renderWinTracker(refs, starBalance, totalStarsEarned, { hero = false, landIndex = -1, plopp = null } = {}) {
+export function renderWinTracker(refs, starBalance, totalStarsEarned, { hero = false, landIndex = -1, plopp = null, compact = false } = {}) {
     const { winTracker } = refs;
     winTracker.innerHTML = '';
+    winTracker.classList.toggle('tracker-compact', compact);
+    if (compact) {
+        const { crowns, gems, stars } = trackerParts(starBalance);
+        const part = (template, n, filled) => {
+            const el = document.createElement('div');
+            el.className = 'tracker-compact-part';
+            const icon = template.cloneNode(true);
+            if (filled) { icon.setAttribute('fill', 'currentColor'); icon.setAttribute('stroke', 'none'); }
+            const num = document.createElement('span');
+            num.textContent = `×${formatCount(n)}`;
+            el.append(icon, num);
+            return el;
+        };
+        if (crowns > 0) winTracker.appendChild(part(compactCrown, crowns, false));
+        if (crowns > 0 || gems > 0) winTracker.appendChild(part(compactGem, gems, false));
+        winTracker.appendChild(part(compactStar, stars, true));
+        return;
+    }
     const crowns = Math.floor(starBalance / 10000);
     const gems = Math.floor((starBalance % 10000) / 100);
     const smallStars = starBalance % 100;

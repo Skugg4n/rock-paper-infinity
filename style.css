@@ -572,6 +572,22 @@ input[type=range]:focus-visible {
 }
 #player-controls-container.hands-rest > .choice-btn svg { width: 16px; height: 16px; }
 
+/* The compact tracker (rendering.js, renderWinTracker with compact): when there
+   is no room beside the boards the stars are not drawn one by one. One row,
+   symbol and number: crown x36, gem x6, star x2. It sits in the band above
+   the boards, so it never lies on top of them. */
+#win-tracker.tracker-compact { flex-direction: row; align-items: center; gap: 14px; }
+.tracker-compact-part {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: #1e293b;
+}
+.tracker-compact-icon { width: 18px; height: 18px; }
+
 /* The first stars (index.js, placeHero): the tracker is carried, enlarged, to
    just above the player's controls by a transform. A star that is won lands
    in its slot; after the fifth the next slots plop in, one after another. */

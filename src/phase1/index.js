@@ -97,6 +97,7 @@ const resetBtn = document.getElementById('reset-btn');
         let passiveInterval = null;
         let lastStarBalance = -1;
         let lastTotalStarsEarned = -1;
+        let lastCompact = null;
         let gameBoards = [];
         let isMetaBoardActive = false;
         let factoryView = null;
@@ -272,7 +273,7 @@ function scheduleUIUpdate() {
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
             cloverBtn.addEventListener('pointerup', (e) => { e.preventDefault(); clickClover(); }, { signal });
-            window.addEventListener('resize', () => { if (heroState === 'hero') placeHero(); }, { signal });
+            window.addEventListener('resize', () => { if (heroState === 'hero') placeHero(); else scheduleUIUpdate(); }, { signal });
             heroState = totalStarsEarned < HERO_STARS ? 'hero' : 'done';
             resetBtn.addEventListener('click', resetGame, { signal });
 
@@ -404,8 +405,25 @@ function scheduleUIUpdate() {
             if (autoPlayInterval) restartAutoPlay();
         }
 
+        /**
+         * Is there room for the drawn tracker beside the boards? The full one
+         * (five crowns across, the hundred gem slots) needs about 240 px; with
+         * less it would lie on top of the boards, so it turns into one row of
+         * symbol and number.
+         */
+        const TRACKER_ROOM = 240;
+        function trackerIsCramped() {
+            const first = gameBoardContainer.firstElementChild;
+            const home = winTracker.parentElement;
+            if (!first || !home) return false;
+            const room = first.getBoundingClientRect().left - home.getBoundingClientRect().left;
+            return room < TRACKER_ROOM;
+        }
+
         function updateWinVisuals() {
-            if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned) return;
+            const compact = heroState === 'done' && trackerIsCramped();
+            if (starBalance === lastStarBalance && totalStarsEarned === lastTotalStarsEarned && compact === lastCompact) return;
+            lastCompact = compact;
             const gained = lastStarBalance >= 0 && starBalance > lastStarBalance;
             const leavingNow = heroState === 'hero' && totalStarsEarned >= HERO_STARS;
             if (leavingNow) startHeroExit();
@@ -418,6 +436,7 @@ function scheduleUIUpdate() {
                 plopp: heroState === 'leaving'
                     ? { from: HERO_STARS, staggerMs: PLOPP_STAGGER_MS, elapsedMs: performance.now() - heroExitAt }
                     : null,
+                compact,
             });
             if (heroState === 'hero') placeHero();
             else if (leavingNow) placeHero({ animate: true });   // make room for the new slots
@@ -572,7 +591,7 @@ const uiState = {
             if (upgradesChanged) tasks.push(updateUpgrades);
             if (foamChanged) tasks.push(() => updateCollapseFoam(foamPercent, foamReady));
 
-            if (!tasks.length) return;
+            if (!tasks.length) { updateWinVisuals(); return; }   // it returns at once unless the room beside the boards changed
 
             tasks.push(updateWinVisuals);
             tasks.forEach(fn => fn());

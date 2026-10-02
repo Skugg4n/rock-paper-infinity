@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import {
     getSPS, getEPS, getGamesPerSecond, roundTiming, updateMeasuredRate, pickOutcome,
-    getVisibleDots, formatCount, formatRate, BASE_WIN_RATE, LUCK_WIN_RATE, currentWinRate, heroPlacement,
+    getVisibleDots, formatCount, formatRate, BASE_WIN_RATE, LUCK_WIN_RATE, currentWinRate, heroPlacement, trackerParts,
 } from './rates.js';
 
 describe('rates', () => {
@@ -174,6 +174,20 @@ describe('rates', () => {
             expect(pickOutcome(0.6, LUCK_WIN_RATE)).toBe('win');
             expect(pickOutcome(0.75, LUCK_WIN_RATE)).toBe('draw');
             expect(pickOutcome(0.95, LUCK_WIN_RATE)).toBe('lose');
+        });
+    });
+
+    describe('trackerParts (crowns, gems and stars)', () => {
+        test('splits a balance into crowns of 10 000, gems of 100 and stars', () => {
+            expect(trackerParts(0)).toEqual({ crowns: 0, gems: 0, stars: 0 });
+            expect(trackerParts(56)).toEqual({ crowns: 0, gems: 0, stars: 56 });
+            expect(trackerParts(602)).toEqual({ crowns: 0, gems: 6, stars: 2 });
+            expect(trackerParts(360602)).toEqual({ crowns: 36, gems: 6, stars: 2 });
+        });
+
+        test('fractions and negatives do not leak in', () => {
+            expect(trackerParts(199.9)).toEqual({ crowns: 0, gems: 1, stars: 99 });
+            expect(trackerParts(-5)).toEqual({ crowns: 0, gems: 0, stars: 0 });
         });
     });
 

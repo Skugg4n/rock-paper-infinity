@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.59.5 - 2026-10-02 (chapter I, narrow windows)
+
+### The star tracker counts instead of drawing when there is no room
+
+Ola, with a screenshot of a 700 px window where the crowns, the gem slots and the star dots lay on top of the factory: on smaller screens show a symbol and a number, like ★ ×56 (B181).
+
+- **Compact tracker.** When there is less than 240 px beside the boards the tracker becomes one row: crown ×36, gem ×6, star ×2 (only the kinds you have, the star always). It sits in the band above the boards, so it never covers them. With room beside the boards the drawn tracker is back; it switches as the window is resized or a board is added.
+- The first five stars under the board are unchanged.
+- `trackerParts()` in rates.js (tested), `compact` option in `renderWinTracker`.
+- This is chapter I only. The wider question of small screens in the other chapters is still open.
+
 ## v1.59.4 - 2026-10-02 (sound, the end of chapter I)
 
 ### The lightning is a boom
