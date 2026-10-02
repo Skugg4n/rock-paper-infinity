@@ -9,8 +9,9 @@ import { normalizeLayout } from './layout.js';
 import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START } from './deep.js';
 import { initialWatcher, normalizeWatcher } from './watcher.js';
 import { normalizeTree } from './tree.js';
+import { impliedNight, nightGift, NIGHTS, SENTENCE_LINE } from './surface.js';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -70,6 +71,29 @@ const MIGRATIONS = {
         const st = p.state || {};
         st.watcher = normalizeWatcher(st.watcher || initialWatcher());
         st.tree = normalizeTree(st.tree);
+        p.state = st;
+        return p;
+    },
+    /* deep-voice (step 2 of the tree): Surface speaks a script, one line a night, and its nights
+       open gifts in the tree. A save from before starts at the night its Surface progress implies:
+       its visits counted under the new pacing at the tier it has now (surface.js impliedNight). The
+       gifts of those nights are opened, none bought; the words already won are kept as they are. A
+       visit open at the save keeps its game but says nothing new (its line was the old table's). */
+    6: (p) => {
+        const st = p.state || {};
+        st.watcher = normalizeWatcher(st.watcher || initialWatcher());
+        const sf = st.watcher.surface;
+        const at = impliedNight(sf.visits, st.cryo ?? -1);
+        sf.night = at.night;
+        sf.toLine = at.toLine;
+        if (sf.visit) sf.visit = { ...sf.visit, night: 0, line: sf.visit.line === SENTENCE_LINE ? SENTENCE_LINE : '' };
+        if (sf.night >= 1) st.watcher.stage = Math.max(st.watcher.stage | 0, 1);
+        const tree = normalizeTree(st.tree);
+        for (let n = 1; n <= Math.min(sf.night, NIGHTS.length); n++) {
+            const g = nightGift(n);
+            if (g && !tree.opened.includes(g)) tree.opened.push(g);
+        }
+        st.tree = tree;
         p.state = st;
         return p;
     },

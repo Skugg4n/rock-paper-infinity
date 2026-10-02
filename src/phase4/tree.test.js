@@ -5,7 +5,7 @@
  * button did.
  */
 import {
-    initialDeepState, levelCost, automationCost, CRYO, QUEUE_MAX, isQueued, MAX_AUTO, startBuild,
+    initialDeepState, levelCost, automationCost, CRYO, QUEUE_MAX, isQueued, MAX_AUTO, startBuild, CRYO_TOP,
 } from './deep.js';
 import { initialWatcher, LADDER, buyStep, capacityMax, nextStep } from './watcher.js';
 import { deserializeDeep, SCHEMA_VERSION } from './persistence.js';
@@ -44,7 +44,8 @@ describe('the board', () => {
             expect(NODE_BY_ID[AUTO_NODE[t]]).toMatchObject({ kind: 'auto', type: t, max: MAX_AUTO });
         }
         for (const step of LADDER) expect(NODE_BY_ID[STEP_NODE[step.id]]).toBeDefined();
-        CRYO.forEach((_, i) => expect(NODE_BY_ID[cryoNode(i)]).toMatchObject({ kind: 'cryo', tier: i }));
+        CRYO.slice(0, CRYO_TOP + 1).forEach((_, i) => expect(NODE_BY_ID[cryoNode(i)]).toMatchObject({ kind: 'cryo', tier: i }));
+        expect(cryoNode(CRYO_TOP + 1)).toBe('longcount');     // the tier past VII is Surface's gift
         const surface = NODES.filter((n) => n.kind === 'surface').map((n) => n.id).sort();
         expect(surface).toEqual(['cold', 'longcount', 'lossless', 'question', 'quiet']);
     });
@@ -156,7 +157,7 @@ describe('cryo: a chain of single nodes with today\'s gates', () => {
 });
 
 describe('Surface\'s nodes and the teasers', () => {
-    test('greyed with the hollow ring, never buyable in this step', () => {
+    test('greyed with the hollow ring, never buyable until Surface opens them', () => {
         const s = start();
         s.stars = 1e30;
         for (const id of ['lossless', 'cold', 'longcount', 'quiet', 'question']) {
@@ -209,6 +210,7 @@ describe('the Watcher\'s branch', () => {
         s.watcher.grown = 100;
         s.humans = 400;
         s.stars = 1e30;
+        s.tree = { opened: ['question'], bought: ['question'] };       // deep-voice: BIOLOGICAL grows out of The question
         const r = buy(s, 'brain', { slots: ['mine', 'farm', 'generator', 'dorm'], choose: true });
         expect(r.step.pending).toBe(true);
         expect(s.watcher.sealing).toBe('brain');
@@ -238,8 +240,8 @@ describe('the badge and the save', () => {
             watcher: { ...initialWatcher(), sleeps: 6, bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling'] },
         };
         const back = deserializeDeep(JSON.stringify({ schemaVersion: 5, state: old, layout: { slots: ['mine', 'farm', 'generator', 'dorm', 'cryo'] } }));
-        expect(SCHEMA_VERSION).toBe(6);
-        expect(back.state.tree).toEqual({ opened: [] });
+        expect(SCHEMA_VERSION).toBe(7);
+        expect(back.state.tree).toEqual({ opened: [], bought: [], unseen: false });
         const lv = treeLevels(back.state);
         expect([lv.seam, lv.yield, lv.output, lv.beds]).toEqual([7, 6, 8, 5]);
         expect([lv.drill, lv.farmauto, lv.genauto, lv.creche]).toEqual([3, 4, 2, 1]);

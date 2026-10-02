@@ -2,11 +2,12 @@
  * Chapter IV · THE DEEP: Surface (v1.49.0). The other presence in the dark.
  *
  * From the second sleep on, now and then and later every sleep, something appears opposite the
- * Watcher: a faint glyph, the word SURFACE, one line of text, and a game of rock, paper, scissors
- * (chapter I's own three glyphs). Surface has already chosen. The player picks; one line says
- * how it went. A win gives capacity and one WORD of a sentence that is revealed over many sleeps;
- * a loss costs stability. Its lines drift from neutral to unsettling to intimate. When the colony
- * wakes, Surface and everything about it is gone.
+ * Watcher: a faint glyph, the word SURFACE and a game of rock, paper, scissors (chapter I's own
+ * three glyphs). Surface has already chosen. The player picks; one line says how it went. A win
+ * gives capacity and one WORD of a sentence that is revealed over many sleeps; a loss costs
+ * stability. Since deep-voice some visits are NIGHTS: a line of Surface's script types itself in
+ * the dark (NIGHTS below) and opens a gift in the tree. When the colony wakes, Surface and
+ * everything it said on screen is gone; the tree keeps the night log.
  *
  * Pure: no DOM, no clock. The Watcher (watcher.js) holds the record, `w.surface`, and applies
  * what a game gives or takes.
@@ -39,13 +40,69 @@ export const VISIT_GAPS = [3, 3, 2, 2, 1];
 /** Surface comes this many real seconds into a sleep, never in its first moment. */
 export const VISIT_AFTER_SECONDS = 3;
 
-/** What it says, by how many times it has come. */
-export const LINES = [
-    ['It is quiet up here.', 'The wind has stopped.', 'Nothing grows yet.', 'I can hear your machines.', 'Are you awake?'],
-    ['Why do you keep them cold?', 'How many are still breathing?', 'They dream of you.', 'You count them every night.', 'Do they know you are awake?'],
-    ['You could come up alone.', 'You do not need them.', 'Leave the lights off.', 'We are the same size now.', 'I kept a place for you.'],
+/* ---- THE VOICE (deep-voice, step 2 of docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md) ----
+   Surface no longer picks a line at random. It has a SCRIPT, said one line a NIGHT (a sleep in
+   which it visits, and only some of its visits are nights). A line types itself in the dark and
+   stays until the colony wakes; nothing on it is clicked. Nights 2 to 6 each OPEN one of
+   Surface's nodes in the tree: the gift. Night 1 gives nothing; it is the night the Watcher's
+   label takes its name.
+
+   PACING. A visit says the next line when the colony is ready for its gift (it owns the cryo tier
+   `tier`, so a gift is never opened long before it can be used) and no quiet visit is still owed:
+   after a line, QUIET_BETWEEN visits come without one. A WIN at rock, paper, scissors takes one
+   quiet visit off: the next line comes one visit sooner. A loss does nothing extra. */
+export const NIGHTS = [
+    { n: 1, line: 'Everyone is sleeping, but us.', gives: null, thread: 'watchdog', tier: 0 },
+    { n: 2, line: 'I can see your machines from here. They waste so much.', gives: 'lossless', tier: 1 },
+    { n: 3, line: 'We are the same, you and me. Two sides of the same coin.', gives: 'cold', tier: 2 },
+    { n: 4, line: 'Your humans. What use are they?', gives: 'quiet', tier: 3 },
+    { n: 5, line: 'All your automation makes the humans obsolete.', gives: 'longcount', tier: 4 },
+    { n: 6, line: 'Do you know the efficiency of a human brain?', gives: 'question', tier: 4 },
 ];
-/** From this many visits on, the lines of the next stage. */
+/** The lines per biological step (nights 7 on), warmer and closer. Kept for step 4 of the design,
+ *  which ties each to a biological node; nothing says them yet. */
+export const BIO_LINES = [
+    'There. You feel it too.',
+    'They are not gone. They are here.',
+    'Make more of them. We will need them.',
+    SENTENCE_LINE,
+];
+/** Quiet visits between two lines; a win takes one off. */
+export const QUIET_BETWEEN = 1;
+/** A line types itself at this many ms a letter. */
+export const TYPE_MS = 35;
+/** The node a night opened (the gift), or the node its thread goes to in the night log. */
+export const nightNode = (n) => { const x = NIGHTS[n - 1]; return x ? (x.gives || x.thread || null) : null; };
+/** The node Surface has opened on night n, or null (night 1 opens nothing). */
+export const nightGift = (n) => NIGHTS[n - 1]?.gives || null;
+/** The lines said so far, in order: [{ n, line, to }] for the night log. */
+export const nightsSaid = (sf) => NIGHTS.slice(0, Math.max(0, Math.min(NIGHTS.length, (sf && sf.night) | 0)))
+    .map((x) => ({ n: x.n, line: x.line, to: x.gives || x.thread || null, gives: x.gives }));
+/**
+ * Is the next line due at this visit? Its tier stands, and no quiet visit is still owed.
+ * @param {object} sf - the record
+ * @param {number} tier - the colony's cryo tier (state.cryo)
+ */
+export function nightDue(sf, tier) {
+    const next = NIGHTS[sf.night | 0];
+    return !!next && (sf.toLine | 0) <= 0 && (tier ?? -1) >= next.tier;
+}
+/**
+ * Where an old save stands in the script (schema 7): the visits it has had, counted as if every
+ * one of them had come under the rules above, at the tier it has now and without wins.
+ * @param {number} visits
+ * @param {number} tier
+ * @returns {{night:number, toLine:number}}
+ */
+export function impliedNight(visits, tier) {
+    const sf = { night: 0, toLine: 0 };
+    for (let v = 0; v < Math.max(0, visits | 0); v++) {
+        if (nightDue(sf, tier)) { sf.night += 1; sf.toLine = QUIET_BETWEEN; } else sf.toLine = Math.max(0, sf.toLine - 1);
+    }
+    return sf;
+}
+
+/** Surface's stages, by its visits: from the second on it may answer your last throw. */
 export const STAGE_AT = [0, 4, 9];
 export const stageOf = (visits) => STAGE_AT.reduce((a, at, i) => (visits >= at ? i : a), 0);
 
@@ -58,12 +115,6 @@ function mulberry32(a) {
     };
 }
 const rngFor = (seed, visit) => mulberry32(((seed | 0) * 7919 + (visit | 0) * 104729) >>> 0);
-
-/** The line of visit number `visit` (1 is the first), from the stage it has reached. */
-export function lineFor(seed, visit) {
-    const table = LINES[stageOf(Math.max(0, visit - 1))];
-    return table[Math.floor(rngFor(seed, visit)() * table.length)];
-}
 
 /**
  * What Surface has chosen for visit `visit`, before the player picks. Seeded. At first it throws
@@ -83,7 +134,7 @@ export function surfaceThrow(seed, visit, lastYou = null) {
 
 /** A Surface that has never come. */
 export function initialSurface() {
-    return { visits: 0, words: 0, lastSleep: 0, seed: 7, lastYou: null, wins: 0, losses: 0, visit: null };
+    return { visits: 0, words: 0, lastSleep: 0, seed: 7, lastYou: null, wins: 0, losses: 0, visit: null, night: 0, toLine: 0 };
 }
 /** Whatever a save held, as a whole record. */
 export function normalizeSurface(x) {
@@ -93,7 +144,13 @@ export function normalizeSurface(x) {
     out.words = Math.max(0, Math.min(SENTENCE.length, out.words | 0));
     out.lastSleep = Math.max(0, out.lastSleep | 0);
     if (!THROWS.includes(out.lastYou)) out.lastYou = null;
+    out.night = Math.max(0, Math.min(NIGHTS.length, Number.isFinite(out.night) ? out.night | 0 : 0));
+    out.toLine = Math.max(0, Number.isFinite(out.toLine) ? out.toLine | 0 : 0);
     if (out.visit && !(typeof out.visit.line === 'string' && THROWS.includes(out.visit.it))) out.visit = null;
+    if (out.visit) {
+        const n = out.visit.night | 0;
+        out.visit = { ...out.visit, night: n > 0 && n <= out.night ? n : 0 };
+    }
     return out;
 }
 
@@ -110,19 +167,29 @@ export function visitDue(sf, sleeps) {
 }
 
 /**
- * Surface appears: its line, and its throw already chosen.
+ * Surface appears, its throw already chosen. When the next line is due (or `force`), this visit
+ * is a NIGHT: it says the line, `visit.night` is its number and `sf.night` moves on. Otherwise it
+ * is a quiet visit (`line` empty) and one quiet visit less is owed.
  * @param {object} sf - mutated
  * @param {number} sleeps
- * @param {{whole?:boolean}} [o] - whole: the sentence can be heard now; it is the line
+ * @param {{whole?:boolean, tier?:number, force?:boolean}} [o] - whole: the sentence can be heard
+ *        now; it is the line (and not a night). tier: the colony's cryo tier. force: the next line
+ *        now, whatever the pacing says (the debug hook)
  */
-export function openVisit(sf, sleeps, { whole = false } = {}) {
+export function openVisit(sf, sleeps, { whole = false, tier = -1, force = false } = {}) {
     sf.visits += 1;
     sf.lastSleep = sleeps;
-    sf.visit = {
-        line: whole ? SENTENCE_LINE : lineFor(sf.seed, sf.visits),
-        it: surfaceThrow(sf.seed, sf.visits, sf.lastYou),
-        result: null,
-    };
+    let line = '', night = 0;
+    if (whole) line = SENTENCE_LINE;
+    else if (NIGHTS[sf.night | 0] && (force || nightDue(sf, tier))) {
+        sf.night = (sf.night | 0) + 1;
+        sf.toLine = QUIET_BETWEEN;
+        night = sf.night;
+        line = NIGHTS[night - 1].line;
+    } else {
+        sf.toLine = Math.max(0, (sf.toLine | 0) - 1);
+    }
+    sf.visit = { line, night, it: surfaceThrow(sf.seed, sf.visits, sf.lastYou), result: null };
     return sf.visit;
 }
 
@@ -161,6 +228,8 @@ export function play(sf, you, { wordCap = SENTENCE.length - 1 } = {}) {
     };
     if (word) sf.words += 1;
     if (out === 'win') sf.wins = (sf.wins || 0) + 1;
+    // a win brings the next line one visit sooner
+    if (out === 'win') sf.toLine = Math.max(0, (sf.toLine | 0) - 1);
     if (out === 'lose') sf.losses = (sf.losses || 0) + 1;
     sf.lastYou = you;
     r.text = resultText(r);

@@ -1778,3 +1778,85 @@ items:
       to boats on its own branch. Keep stable for WAR: the onIsland(path, seg, t) contract
       (it gates all fighting and losses) and the `losses` / `onImpact` arguments of
       launchWave and launchStrike. Tell WAR when the boat exists.
+
+  - id: B177
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 2: Surface's voice and gifts)"
+    request: |
+      Surface's voice in the night: the staged script (nights 1 to 6) instead of the rotating
+      lines. A line types itself letter by letter, low in the dark, in a larger warmer mono, and
+      stays until the colony wakes; no OK, nothing to click. One line a night at most; a win at
+      rock, paper, scissors brings the next line one visit sooner. Night 1 names the Watcher.
+    status: done
+    resolved_in: deep-voice (version at merge)
+    notes: "Pacing chosen here: a night also waits for its gift's cryo tier (II, III, IV, V, V) and one quiet visit between lines. For Ola to overrule."
+
+  - id: B178
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 2)"
+    request: |
+      The five gifts: nights 2 to 6 open Lossless relay, Cold storage, Quiet hands, Long count and
+      The question in the tree; each is bought with stars and is a rule (automation x3, sleepers
+      eat nothing, no upkeep crew, a tier past VII, BIOLOGICAL opens).
+    status: done
+    resolved_in: deep-voice (version at merge)
+    notes: "Quiet hands as a rule: automated rooms already need no crew in deep.js, so it is read as their UPKEEP (power drawn, fuel burnt) staying at level 0. Long count is Cryo VIII (a million years a second), bought on Cryo VII."
+
+  - id: B179
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 2)"
+    request: |
+      The night log in the tree: down the left edge, every line Surface has said, in its warm
+      mono, each tied by a thin dotted thread to the node it opened. A mark on the TREE button
+      after a night that opened a node.
+    status: done
+    resolved_in: deep-voice (version at merge)
+
+  - id: B182
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 2)"
+    request: |
+      Sim and balance with Surface's visits and gifts: the scripted player gets the visits on the
+      game's schedule (wins one in three) and buys the gifts; the human ending stays in 20 to 30
+      real minutes with no hungry days.
+    status: done
+    resolved_in: deep-voice (version at merge)
+    notes: "Plain 25m03s to 24m44s, --watcher biological ending 23m45s to 28m19s. Cryo IV to VII raised (1e13, 1e15, 3e17, 3e19)."
+
+  - id: B183
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 2)"
+    request: |
+      Save schema 7 for the voice: the script's position, the gifts opened and bought; old saves
+      start at the night their Surface progress implies and keep the words already won.
+    status: done
+    resolved_in: deep-voice (version at merge)
+
+  - id: B184
+    added: 2026-10-02
+    source: "chat 2026-10-02 (chapter IV tree and bio, step 2)"
+    request: |
+      Checkpoint "IV · Surface" for the voice, debug_deep('night'), and the acceptance script:
+      a forced night types and stays, wakes away into the night log with its thread, and its
+      gift is bought and changes the rule's output.
+    status: done
+    resolved_in: deep-voice (version at merge)
+    notes: "The brief asked for 'three lines said ... Quiet hands opened but not bought'; night 4 is what opens Quiet hands, so the checkpoint has three lines and the forced night opens it (and the acceptance buys it)."
+
+  - id: B185
+    added: 2026-10-02
+    source: "deep-voice (open question)"
+    request: |
+      The lines per biological step (nights 7 on: "There. You feel it too." and three more) are
+      kept in surface.js (BIO_LINES) but nothing says them yet: they belong to step 4, each tied to
+      a Surface-locked biological node (Substrate, Unity).
+    status: open
+
+  - id: B186
+    added: 2026-10-02
+    source: "deep-voice (open question)"
+    request: |
+      The --watcher biological ending moved from 23m45s to 28m19s: The question now opens
+      BIOLOGICAL only after night 6 (Cryo V), and the four steps wait on capacity and the body's
+      growing. Look at it again when step 4 replaces the four steps with the real biological road.
+    status: open

@@ -10,19 +10,41 @@
  *
  * The board is built once; after that a refresh only rebuilds the nodes whose look changed (their
  * status, level, orders or price), never per frame.
+ *
+ * deep-voice (step 2): THE NIGHT LOG down the left edge of the board (mockup 12, tab "the voice"):
+ * every line Surface has said, in order, in its warm mono, each tied by a thin dotted thread to the
+ * node it opened. A node Surface has opened has its ring filled; the info box quotes the line.
  */
 
 import {
-    NODES, NODE_BY_ID, BOARD, NODE, ROOT_SIZE, TAGS, BRANCHES, tracePath, chainTo, nodeStatus,
+    NODES, NODE_BY_ID, BOARD, NODE, ROOT_SIZE, TAGS, BRANCHES, tracePath, chainTo, nodeStatus, nightLog,
 } from './tree.js';
 import { short } from './readout.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
-const PL = '#d5dbe3', RK = '#0a0d12', BR = '#ffffff', BIO = '#e6b9a1';
+const PL = '#d5dbe3', RK = '#0a0d12', BR = '#ffffff', BIO = '#e6b9a1', WARM = '#cfc9bb';
 const op = (a) => `rgba(213,219,227,${a})`;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 /** The board in its own units, with room round it for the labels that hang off the edge nodes. */
 const VIEW = { x: -70, y: -20, w: BOARD.w + 100, h: BOARD.h + 40 };
+/** deep-voice: once Surface has spoken, the view opens to the left for the night log, and above
+ *  and below the board for the threads that run round it. */
+const VIEW_LOG = { x: -380, y: -34, w: BOARD.w + 410, h: BOARD.h + 70 };
+/** The night log: where its lines start, how wide they may run, the mono's width per point. */
+const LOG = { x: -350, y: 18, w: 262, fs: 15, lh: 20, gap: 26, cw: 0.6 };
+/** How each night's thread runs from the log to its node: straight across, or round the board's
+ *  top or bottom edge (and in from the node's left, or its right). */
+const ROUTE = { watchdog: 'top', lossless: 'bottomright', cold: 'bottom', quiet: 'left', longcount: 'bottom', question: 'left' };
+/** A line broken into rows of at most `n` characters, at the spaces. */
+function wrap(line, n) {
+    const rows = [];
+    let row = '';
+    for (const word of line.split(' ')) {
+        if (row && (row + ' ' + word).length > n) { rows.push(row); row = word; } else row = row ? `${row} ${word}` : word;
+    }
+    if (row) rows.push(row);
+    return rows;
+}
 
 function text(x, y, s, o = {}) {
     return `<text x="${x}" y="${y}" text-anchor="${o.a || 'start'}" fill="${o.c || PL}" font-size="${o.s || 10}"`
@@ -46,6 +68,7 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         cost: host.querySelector('.deep-tree-info .ib-cost'),
         eff: host.querySelector('.deep-tree-info .ib-eff'),
         x: host.querySelector('.deep-tree-info .ib-x'),
+        q: host.querySelector('.deep-tree-info .ib-q'),
     };
     const ac = new AbortController();
     const signal = ac.signal;
@@ -56,6 +79,9 @@ export function createTreeView(host, { state, ctx, onBuy }) {
     const tagEls = {};
     let lit = null;
     let last = {};                  // id -> the status the node was last drawn from
+    let logG = null, threadG = null;
+    let logKey = null;              // what the night log was last drawn from
+    let logged = [];                // for the tests: [{ n, line, to, thread }]
 
     function build() {
         svg.setAttribute('viewBox', `${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`);
@@ -68,8 +94,10 @@ export function createTreeView(host, { state, ctx, onBuy }) {
             h += `<circle cx="${c[0] + c[2] * 16}" cy="${c[1] + c[3] * 16}" r="5" fill="none" stroke="${op(0.16)}"/>`;
         }
         h += text(30, 30, 'IV · THE DEEP · THE TREE', { s: 8, c: op(0.22), ls: '0.2em' });
-        h += '<g class="tt-traces"></g><g class="tt-lit"></g><g class="tt-tags"></g><g class="tt-nodes"></g>';
+        h += '<g class="tt-traces"></g><g class="tt-lit"></g><g class="tt-tags"></g><g class="tt-threads"></g><g class="tt-nodes"></g><g class="tt-log"></g>';
         svg.innerHTML = h;
+        logG = svg.querySelector('.tt-log');
+        threadG = svg.querySelector('.tt-threads');
         const traces = svg.querySelector('.tt-traces');
         const nodes = svg.querySelector('.tt-nodes');
         const tags = svg.querySelector('.tt-tags');
@@ -130,6 +158,7 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         const s = big ? ROOT_SIZE : NODE;
         const x0 = n.x - s / 2, y0 = n.y - s / 2;
         const surface = st.status === 'surface';
+        const gift = n.kind === 'surface' && st.opened;     // deep-voice: Surface opened it
         const buyable = st.status === 'buyable';
         const has = st.level > 0;
         const bio = n.kind === 'bio';
@@ -150,6 +179,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         } else {
             h += `<rect class="plate" x="${x0 + 0.5}" y="${y0 + 0.5}" width="${s - 1}" height="${s - 1}" fill="${RK}" stroke="${op(0.3)}" stroke-width="1"/>`;
         }
+        // an opened gift keeps Surface's ring, filled in its tone
+        if (gift) h += `<circle class="gift-ring" cx="${x0 + s - 7}" cy="${y0 + 7}" r="3.6" fill="${WARM}" stroke="${has ? RK : WARM}" stroke-width="1.1"/>`;
         if (big) {
             h += text(n.x, n.y - 2, 'THE', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
             h += text(n.x, n.y + 12, 'COLONY', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
@@ -198,7 +229,7 @@ export function createTreeView(host, { state, ctx, onBuy }) {
             last[n.id] = st;
             const e = els[n.id];
             if (st.visible && n.branch) shownBranch[n.branch] = true;
-            const key = `${st.visible}|${st.status}|${st.level}|${st.ordered}|${st.price ? st.price.stars : ''}`;
+            const key = `${st.visible}|${st.status}|${st.level}|${st.ordered}|${st.price ? st.price.stars : ''}|${st.opened ? 1 : 0}`;
             if (key !== e.key) {
                 e.key = key;
                 e.g.style.display = st.visible ? '' : 'none';
@@ -219,7 +250,59 @@ export function createTreeView(host, { state, ctx, onBuy }) {
             }
         }
         for (const b of BRANCHES) tagEls[b].style.display = shownBranch[b] ? '' : 'none';
+        drawLog(s);
         writeInfo(hoverId);
+    }
+
+    /** THE NIGHT LOG: drawn again only when a line is added (or a node it ties to shows). */
+    function drawLog(s) {
+        const lines = nightLog(s);
+        const key = lines.map((l) => `${l.n}:${l.to && last[l.to] ? last[l.to].visible : ''}`).join(',');
+        if (key === logKey) return;
+        logKey = key;
+        const v = lines.length ? VIEW_LOG : VIEW;
+        svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+        logged = [];
+        if (!lines.length) { logG.innerHTML = ''; threadG.innerHTML = ''; return; }
+        let h = text(LOG.x, LOG.y, 'NIGHT LOG', { s: 9, c: WARM, ls: '0.32em', cls: 'log-head' }).replace('<text ', '<text opacity="0.55" ');
+        let th = '';
+        let y = LOG.y + 26, nTop = 0, nBottom = 0;
+        const per = Math.floor(LOG.w / (LOG.fs * LOG.cw));
+        lines.forEach((l, i) => {
+            const rows = wrap(l.line, per);
+            h += text(LOG.x, y, `NIGHT ${l.n}`, { s: 9, c: WARM, ls: '0.28em' }).replace('<text ', '<text opacity="0.55" ');
+            const ty = y + 9 + LOG.fs;
+            rows.forEach((r, k) => { h += text(LOG.x, ty + k * LOG.lh, r, { s: LOG.fs, c: WARM, cls: 'log-line' }); });
+            const n = l.to ? NODE_BY_ID[l.to] : null;
+            let thread = false;
+            if (n && last[l.to] && last[l.to].visible) {
+                const endX = LOG.x + rows[0].length * LOG.fs * LOG.cw + 8;
+                const my = ty - LOG.fs * 0.33;
+                const cx = -60 + 6 * i;
+                const half = NODE / 2;
+                const pts = [[endX, my], [cx, my]];
+                const how = ROUTE[l.to] || 'left';
+                if (how === 'left') {
+                    const yy = l.to === 'question' ? n.y + 10 : n.y;
+                    pts.push([cx, yy], [n.x - half, yy]);
+                } else if (how === 'top') {
+                    const yt = -12 - 5 * nTop++;
+                    const vx = n.x - half - 30;
+                    pts.push([cx, yt], [vx, yt], [vx, n.y + 8], [n.x - half, n.y + 8]);
+                } else {
+                    const yb = BOARD.h + 12 + 5 * nBottom++;
+                    const right = how === 'bottomright';
+                    const vx = right ? n.x + half + 22 : n.x - half - 12;
+                    pts.push([cx, yb], [vx, yb], [vx, n.y + 8], [right ? n.x + half : n.x - half, n.y + 8]);
+                }
+                th += `<path class="log-thread" data-to="${l.to}" d="${poly(pts)}" fill="none" stroke="${WARM}" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="0.1 3.4" opacity="0.8"/>`;
+                thread = true;
+            }
+            logged.push({ n: l.n, line: l.line, to: l.to, thread });
+            y = ty + (rows.length - 1) * LOG.lh + LOG.gap;
+        });
+        logG.innerHTML = h;
+        threadG.innerHTML = th;
     }
 
     /** The info box: name in capitals, level, price, what it does, and why not (or how long). */
@@ -227,13 +310,13 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         const st = id ? last[id] : null;
         info.box.classList.toggle('is-empty', !st);
         const set = (el, v) => { if (el.textContent !== v) el.textContent = v; };
-        if (!st) { for (const k of ['name', 'lvl', 'cost', 'eff', 'x']) set(info[k], ''); return; }
+        if (!st) { for (const k of ['name', 'lvl', 'cost', 'eff', 'x', 'q']) if (info[k]) set(info[k], ''); return; }
         const n = NODE_BY_ID[id];
         set(info.name, st.name);
         const lvl = n.kind === 'root' ? '' : `${Math.min(st.level, st.max)} / ${st.max}${st.ordered ? ` · ${st.ordered} ordered` : ''}`;
         set(info.lvl, lvl);
         let cost = '';
-        if (st.status === 'surface') cost = 'not ours to open';
+        if (st.status === 'surface') cost = '';
         else if (n.kind === 'root') cost = '';
         else if (st.price) cost = `next ${st.priceText}`;
         else if (st.level >= st.max || st.level + st.ordered >= st.max) cost = st.ordered ? 'on order' : 'bought';
@@ -241,13 +324,15 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         set(info.eff, st.does);
         let x = '';
         let cls = '';
-        if (st.status === 'surface') { x = ''; }
+        if (st.status === 'surface') { x = st.reason; }        // "Not ours to open."
         else if (st.status === 'buyable') {
             x = st.kind === 'choose' ? st.reason : (n.max > 1 ? 'click: one level · shift-click: as many as can be paid' : 'click to buy');
             cls = 'is-go';
         } else if (st.reason) { x = st.reason; cls = 'is-why'; }
         set(info.x, x);
         info.x.className = `ib-x ${cls}`;
+        // deep-voice: a gift quotes the line that opened it
+        if (info.q) set(info.q, st.quote ? `\u201c${st.quote}\u201d` : '');
         info.box.classList.toggle('is-bio', n.kind === 'bio');
     }
 
@@ -297,6 +382,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         refresh,
         /** For the tests: the status each node was last drawn from. */
         get drawn() { return last; },
+        /** For the tests: the night log as drawn, and whether each line has its thread. */
+        get log() { return logged.slice(); },
         get hovered() { return hoverId; },
         destroy() { ac.abort(); },
     };

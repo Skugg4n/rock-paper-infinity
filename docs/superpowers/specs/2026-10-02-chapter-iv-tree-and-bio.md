@@ -282,3 +282,92 @@ box on Seam reads "SEAM | 0 / 20 | next ★ 4.4 k | Doubles every mine..." and a
 the level (paid, in the queue, built), Escape closes, no button moved; from "IV · Surface" the
 WATCHER branch shows and Surface's nodes are greyed with the ring; from "IV · the body" the
 biological step is bought on the tree and the sector choice works as before.
+
+## Built: step 2, the voice (deep-voice branch)
+
+Opus, 2026-10-02. Surface's typed lines, the five gifts, the night log in the tree.
+
+**The script** (`src/phase4/surface.js`, `NIGHTS`). The rotating lines are gone. A night is a
+visit that says the next line; at most one a night. A line is due when (1) its gift can be used:
+the colony owns its cryo tier (night 2 on Cryo II, 3 on III, 4 on IV, 5 and 6 on V; night 1 at
+the first visit), and (2) one quiet visit (a game, no line) has passed since the last line. A win
+takes the quiet visit off, so the next line comes one visit sooner; a loss does nothing extra.
+The visits keep their old schedule (second sleep, then gaps 3, 3, 2, 2, then every sleep). Night 1
+gives nothing and names the Watcher (the century of slept years no longer does). The lines per
+biological step are kept as `BIO_LINES` for step 4 (B185); after night 6 the visits are games
+only, and the skin's sentence is still heard as before.
+
+**On screen** (`index.js`, `#deep-voice`). The line types itself at 35 ms a letter, centred low
+over the Watcher, 22 px warm mono (#cfc9bb), laid out whole from the first letter so it never
+moves, a caret only while it types, pointer-events none. It stays until the wake; the visit is one
+demand, so the game card shares the screen with it and the lamps never do. The card itself no
+longer carries a line. After a night that opened a node, the TREE button has a small still warm
+ring until the tree is opened.
+
+**The gifts** (rules in `deep.js`, bought in `tree.js`, kept in `state.tree.bought`):
+
+| gift | night | rule | price |
+|---|---|---|---|
+| Lossless relay | 2 | an automated room makes ×3 (`outputMultiplier`) | ★ 1e8 |
+| Cold storage | 3 | sleepers eat nothing (`sleepFood`) | ★ 1e10 |
+| Quiet hands | 4 | an automated room's upkeep (power, fuel) stays at level 0 (`upkeepFor`) | ★ 5e15 |
+| Long count | 5 | Cryo VIII, a million years a second; needs Cryo VII | ★ 1e20 |
+| The question | 6 | BIOLOGICAL shows and can be bought | ★ 1e17 |
+
+Decisions for Ola to overrule:
+- **Quiet hands**: automated rooms already need no crew in the rules, so "no upkeep crew" is read
+  as their upkeep, the power they draw and the fuel they burn, no longer growing with their levels.
+  It is the strongest gift: in the plain run Cryo VI comes eight seconds after it at the old prices.
+- **Long count** is a tier (CRYO[7], `cryo-viii`), bought on its node; it is never the next tier
+  on the chain (`CRYO_TOP`, `nextCryo`). Its line comes at Cryo V; the node then says "Needs Cryo
+  VII first." until VII stands.
+- **The question** gates the four biological steps of step 1 (hidden until bought); a save that
+  owns one keeps the branch. Prices are about a minute of play at the night that opens each gift
+  (`sim-phase4.mjs --gifts` prints that minute), so most are bought within seconds to a minute.
+- Gifts can be bought awake or asleep.
+
+**The night log** (`tree-view.js`). Down the left edge of the board (the view widens to the left
+once Surface has spoken): "NIGHT LOG", then each line under "NIGHT n" in 15-unit warm mono,
+wrapped; a dotted thread (0.1 / 3.4, round caps) runs from the end of its first row to the node it
+opened, straight across or round the board's top or bottom edge as in the mockup. Night 1's thread
+goes to the Watcher's first node. An opened node's ring is filled in Surface's tone; the info box
+quotes the line in a fifth row; an unopened node's info box says "Not ours to open."
+
+**Save**: schema 7. An old save starts at the night its visits imply under these rules at its
+present tier (`impliedNight`), those nights' gifts opened and none bought, its words kept; a visit
+open at the save keeps its game but says nothing new.
+
+**Sim** (`scripts/sim-phase4.mjs`). In both runs Surface visits on the game's schedule; in a sleep
+it is due in, the player stays under until it has come (3 s), the game is played (1.5 s, a win, a
+draw, a loss in turn) and a night's line has typed and been read; every gift is bought the moment
+it can be paid. The plain player now waits out the mourning as the --watcher one did (it met it
+too, after Surface's longer sleeps; the old plain run moves 2 s with it). Levels stop at the
+tree's 20.
+
+| run | before | after (gifts, old prices) | after (re-tuned) |
+|---|---|---|---|
+| plain, to year 802 701 | 25m03s | 20m56s | **24m44s**, 0 hungry days, longest stall 76 s |
+| --watcher, biological ending | 23m45s | 29m33s | **28m19s** (the ring at 25m46s) |
+
+Nights in the plain run: 1 at 6m50s, 2 at 10m39s, 3 at 12m26s, 4 at 17m26s, 5 at 18m29s, 6 at
+20m20s; gifts bought 10m42s, 12m27s, 18m27s, 24m43s (Long count, on Cryo VII), 20m20s. Seeds 2 to
+5: 24m38s to 24m55s. Holding the sleeps for Surface alone (no gifts) is 23m50s; Lossless relay is
+most of the rest (21m07s alone).
+
+The re-tune: Cryo IV 2e12 to 1e13, V 2e14 to 1e15, VI 2e16 to 3e17, VII 2e18 to 3e19. END_YEAR,
+the healing curve and the gifts are unchanged. The --watcher ending is later because The question
+now comes after night 6 and the four biological steps still wait on capacity and growth (B186).
+
+**Checkpoints**: "IV · Surface" has nights 1 to 3 said, Lossless relay and Cold storage bought,
+and Surface already come in this sleep, so `debug_deep('night')` brings night 4 (Quiet hands) at
+once, or it comes in the next sleep. (The brief asked for Quiet hands already open; night 4 is what
+opens it, so the forced night does.) "IV · the body" has all six nights said, every gift but Long
+count bought, BIOLOGICAL open.
+
+**Acceptance** (`scripts/accept-iv-cut.mjs`, section V): from "IV · Surface", a forced night is
+night 4; the line types (part of it shown, then all of it), stays while they sleep, shares the
+screen with the game and not the lamps, cannot be clicked and is larger than the feed; the tree
+button is marked; a wake takes the line off the screen; the tree's night log has four lines, the
+fourth tied to Quiet hands with its thread; Quiet hands' ring is filled, it can be bought, its
+info box quotes the line, Long count's says "Not ours to open."; a click buys it and the
+generators burn 77.5 to 15.3 ore a day, the rooms draw 457 to 93 energy.

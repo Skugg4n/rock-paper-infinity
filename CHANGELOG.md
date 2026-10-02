@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.61.0 - 2026-10-02 (chapter IV, the voice in the night)
+
+### Chapter IV: Surface's voice and gifts (step 2 of the tree and bio design)
+
+Built from docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md, section 2, look per mockup 12 tab "the voice" (B177, B178, B179, B182 to B186).
+
+- **The voice in the night.** Surface's random lines are gone. It speaks a script, one line a night (a sleep in which it visits): "Everyone is sleeping, but us." and five more. The line types itself letter by letter (35 ms a letter) low in the dark, over the Watcher, in a larger, warmer mono than anything else, and stays until the colony wakes. Nothing on it can be clicked. Rock, paper, scissors with Surface is as it was and shares the screen with the line (one visit); the lamps never do.
+- **Pacing.** A night comes when its gift can be used (it waits for the cryo tier: night 2 on Cryo II, 3 on III, 4 on IV, 5 and 6 on V) and one quiet visit (a game, no line) has passed since the last line. A win takes the quiet visit off: the next line comes one visit sooner. A loss does nothing extra. Night 1 gives nothing; it is the night the Watcher's label takes its name (it used to be a century of slept years).
+- **The gifts.** Each of nights 2 to 6 opens one of Surface's nodes in the tree: its ring fills, it gets a price in stars, and buying it (awake or asleep) is a rule. Lossless relay: an automated room makes three times as much. Cold storage: sleepers eat nothing. Quiet hands: an automated room's upkeep stops growing with its levels (it draws and burns as at level 0). Long count: the tier past Cryo VII, a million years a second ("1 000 000 y/s", Cryo VIII), bought once Cryo VII stands. The question: opens BIOLOGICAL, which stays hidden until it is bought (a save that already owns a biological step keeps the branch). A node Surface has not opened says "Not ours to open." in the info box; an opened one quotes the line that opened it.
+- **The night log** down the left edge of the tree: every line Surface has said, in order, in its warm mono, each tied by a thin dotted thread to the node it opened. After a night that opened a node the TREE button carries a small warm ring until the tree is looked at.
+- **Balance** (scripts/sim-phase4.mjs): the scripted player now gets Surface's visits on the game's schedule, stays under for them, wins one game in three and buys every gift the moment it can be paid. Plain run 25m03s before, 24m44s after; --watcher biological ending 23m45s before, 28m19s after. Cryo IV to VII cost more (2e12, 2e14, 2e16, 2e18 to 1e13, 1e15, 3e17, 3e19); the gifts are as the design says. The player waits out the mourning in the plain run too (it was --watcher only; the old plain run moves 2 s with it). `--gifts` prints what a minute of play earns at each night.
+- **Save**: schema 7. An old save starts at the night its Surface visits imply at its tier, with those nights' gifts opened (none bought) and its words kept.
+- **Checkpoints**: "IV · Surface" has three lines said and Lossless relay and Cold storage bought; `debug_deep('night')` brings the next line now (night 4, Quiet hands). "IV · the body" has all six lines said and The question answered.
+- **Acceptance** (scripts/accept-iv-cut.mjs): a forced night types and stays, wakes away, sits in the night log with its thread, and its gift is bought and changes the rule's output.
+
 ## v1.60.0 - 2026-10-02 (chapter IV, the skill tree)
 
 ### Chapter IV: the skill tree, mechanical state (step 1 of the tree and bio design)
