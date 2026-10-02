@@ -1731,3 +1731,14 @@ items:
       The design gives Seam, Yield, Output and Beds ten levels; the simulated run buys up to 18 of a
       room type, so the tree draws 20 to change nothing. Decide the real cap (a balance change).
     status: open
+
+  - id: B176
+    added: 2026-10-02
+    source: "DEEP session browser check of v1.60.0"
+    request: |
+      The tree panel in a narrow window (about 800 px wide): the board is scaled
+      down to a small rectangle at the left and the info box sits under the menu
+      and pause buttons. Fine at desktop width. Make the board fill the window and
+      keep the info box clear of the bottom-left buttons at narrow widths.
+    status: open
+    resolved_in: null
