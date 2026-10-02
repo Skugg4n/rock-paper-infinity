@@ -646,6 +646,9 @@
                 <span class="deep-watcher-track"><span class="deep-watcher-fill" id="deep-stab-fill"></span></span>
                 <span class="deep-mono deep-watcher-val" id="deep-stab-val">100</span>
             </div>
+            <!-- deep-night: where the sleep world stands, in one line that changes rarely:
+                 "night 3 of 6", then "the question is open", then the body -->
+            <span class="deep-mono deep-watcher-arc" id="deep-watcher-arc"></span>
             <!-- v1.51.0: the lamps, when they come: one line, what they ask and how far along -->
             <div class="deep-puzzle" id="deep-puzzle">
                 <span class="deep-mono deep-puzzle-q" id="deep-puzzle-q"></span>
@@ -656,35 +659,43 @@
             <button class="deep-watcher-ask deep-mono" id="deep-watcher-ask" hidden>BIOLOGICAL · Choose a sector to seal</button>
         </div>
 
-        <!-- v1.49.0: Surface, opposite the Watcher, only in some sleeps. A line, and a game.
-             v1.51.0: the game is played out: both fists shake, Surface's throw turns over, the
-             loser cracks, the winner pulses, then the line; a won word slides into the sentence -->
-        <div class="deep-chrome" id="deep-surface" hidden>
-            <div class="deep-surface-head">
-                <span class="deep-surface-glyph"></span>
-                <span class="deep-mono deep-surface-name">SURFACE</span>
+        <!-- deep-night (step 3b): SURFACE'S VISIT IS A SEQUENCE. One stage over the Watcher holds
+             its line and, under it, the game: the line types itself alone; only once it has finished
+             (and a second has passed) does the game appear beneath it, as the reply. The game's place
+             is kept while it waits, so the line never moves. -->
+        <div class="deep-chrome deep-night-stage" id="deep-night">
+            <!-- deep-voice: Surface's line of the night. It types itself low in the dark, in a larger,
+                 warmer mono than anything else, and stays until the colony wakes; nothing on it is
+                 clicked. Awake it lives in the tree's night log -->
+            <div class="deep-voice" id="deep-voice" hidden aria-live="polite"><span id="deep-voice-text"></span><span class="deep-voice-caret"></span><span class="deep-voice-rest" id="deep-voice-rest"></span></div>
+            <!-- v1.49.0: Surface, only in some sleeps: a game of rock, paper, scissors.
+                 v1.51.0: the game is played out: both fists shake, Surface's throw turns over, the
+                 loser cracks, the winner pulses, then the line. deep-night: the sentence shows only
+                 after a win, as its reward; between visits it is in the tree's night log -->
+            <div id="deep-surface" hidden>
+                <div class="deep-surface-head">
+                    <span class="deep-surface-glyph"></span>
+                    <span class="deep-mono deep-surface-name">SURFACE</span>
+                </div>
+                <div class="deep-surface-play">
+                    <div class="deep-surface-rps" id="deep-surface-rps">
+                        <button class="deep-rps-btn" data-throw="rock" aria-label="Rock"><i data-lucide="gem" class="w-4 h-4"></i></button>
+                        <button class="deep-rps-btn" data-throw="paper" aria-label="Paper"><i data-lucide="file-text" class="w-4 h-4"></i></button>
+                        <button class="deep-rps-btn" data-throw="scissors" aria-label="Scissors"><i data-lucide="scissors" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="deep-rps-duel" id="deep-rps-duel" hidden>
+                        <span class="deep-fist is-you" id="deep-fist-you"></span>
+                        <span class="deep-mono deep-duel-vs">·</span>
+                        <span class="deep-fist is-it" id="deep-fist-it">
+                            <span class="deep-fist-face is-back"></span>
+                            <span class="deep-fist-face is-front" id="deep-fist-it-front"></span>
+                        </span>
+                    </div>
+                </div>
+                <div class="deep-mono deep-surface-said" id="deep-surface-said"></div>
+                <div class="deep-mono deep-surface-words" id="deep-surface-words"></div>
             </div>
-            <div class="deep-surface-rps" id="deep-surface-rps">
-                <button class="deep-rps-btn" data-throw="rock" aria-label="Rock"><i data-lucide="gem" class="w-4 h-4"></i></button>
-                <button class="deep-rps-btn" data-throw="paper" aria-label="Paper"><i data-lucide="file-text" class="w-4 h-4"></i></button>
-                <button class="deep-rps-btn" data-throw="scissors" aria-label="Scissors"><i data-lucide="scissors" class="w-4 h-4"></i></button>
-            </div>
-            <div class="deep-rps-duel" id="deep-rps-duel" hidden>
-                <span class="deep-fist is-you" id="deep-fist-you"></span>
-                <span class="deep-mono deep-duel-vs">·</span>
-                <span class="deep-fist is-it" id="deep-fist-it">
-                    <span class="deep-fist-face is-back"></span>
-                    <span class="deep-fist-face is-front" id="deep-fist-it-front"></span>
-                </span>
-            </div>
-            <div class="deep-mono deep-surface-said" id="deep-surface-said"></div>
-            <div class="deep-mono deep-surface-words" id="deep-surface-words"></div>
         </div>
-
-        <!-- deep-voice: Surface's line of the night. It types itself low in the dark, in a larger,
-             warmer mono than anything else, and stays until the colony wakes; nothing on it is
-             clicked. Awake it lives in the tree's night log -->
-        <div class="deep-chrome deep-voice" id="deep-voice" hidden aria-live="polite"><span id="deep-voice-text"></span><span class="deep-voice-caret"></span><span class="deep-voice-rest" id="deep-voice-rest"></span></div>
 
         <!-- v1.52.0: over a sealed plate, what it is now; nothing else says so -->
         <div id="deep-body-tip" class="deep-mono" hidden>part of the body</div>

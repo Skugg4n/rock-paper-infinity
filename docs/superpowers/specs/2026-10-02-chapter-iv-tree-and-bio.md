@@ -447,3 +447,68 @@ games, the hover reads "The machine plays. 1 energy a day. Each win is a star.",
 `debug_deep('feed', 6)` takes it from 1.0 to 8.4 energy a day, 81 to 541 stars a day and 1.10 to 1.46
 throws a second, the hover following; back to 0, back to 81.
 
+## Built: step 3b, focus in the night (deep-night branch)
+
+Opus, 2026-10-03, from Ola's playtest of v1.61.0: "I like the contact with the Surface, but it is a
+bit fragmented now. The Surface seems to want to play rock paper scissors with us and at the same
+time says several things. A bit messy. Maybe some things can disappear from the screen during cryo
+so the focus is on our madness. ... it is hard to tell whether things are unfinished, or just hard
+to play, or must be played longer." No rule changed; no balance change.
+
+**The night strips the screen** (`style-deep.css`, class `is-night` on `#phase-deep`, set the moment
+Sleep is pressed so the room changes while the colony walks into the hall, taken off at the wake).
+Out over 1.5 s, by opacity and then visibility, so every place is kept and nothing that stays moves:
+the four bars with their flows and the stars a day, the BUILD group, the group words (BUILD, TREE,
+ACT), the scout and way-up pills, the rates under the two counters, the build queue strip, the
+advisor's feed (`FEED_ASLEEP` is 0). Stays: the year, scaled 1.3 from its corner; the ore and star
+counters; the Watcher; Surface; the wake pill; the TREE button with its badge; the reset view; the
+colony, dimmed, with its lamps. The advisor's line stays in its place (asleep it is empty; the alarm
+line comes with the wake). One exception: while a biological step's people roll off the H bar
+(`dropPeople`), that column alone comes up for the drop (the cut's item 4: people fall visibly on the H bar).
+
+**Surface's visit is a sequence** (`index.html` `#deep-night`, `index.js` `gameShown`). One stage
+over the Watcher, anchored at its foot (bottom 160 px), holds the line and, under it, the game. While
+a line types, the game is in its place but not seen (`is-waiting`: visibility hidden, not clickable);
+`GAME_AFTER_LINE_MS` (1 s) after the last letter it fades in under the line. A quiet visit (no line)
+shows the game at once. The throws and the duel take turns in one 34 px row, and the sentence keeps
+its row, so the card never grows and the line never moves. The sentence of won words shows only after
+a win, once the result line is said (the new word sliding in); otherwise it is not on screen, and the
+night log carries it under "THE SENTENCE". The lamps never share the screen with any of this (the
+scheduler's one demand, unchanged).
+
+**What the next night waits for** (`tree.js`, pure: `nightNext`, `nightAhead`, `nightArc`,
+`voice.test.js`). After the night log's lines (and the sentence), one last line:
+
+| state | line |
+|---|---|
+| the next night's tier not owned | next: after Cryo III |
+| asleep, Surface not come yet in this sleep and due | next: Surface comes in this sleep |
+| the line comes at the next sleep's visit | next: Surface comes when you sleep again |
+| later (the quiet visits owed first, on surface.js's own schedule) | next: Surface speaks in 3 sleeps (sooner if you win its game) |
+| after night 6 | next: nothing more from the Surface |
+| after night 6, The question bought, the body not whole | next: the body |
+
+Nothing is announced before the first night. The count is played out on `visitDue` (the test plays the
+same states through `openVisit` and gets the same number). On a wake from a sleep that brought no night,
+with a night still to come (tier or sleeps), the same line is said once, `NEXT_LINE_MS` (5 s), in the
+advisor's place once the alarm line has had its 6 s (straight away after a reboot, which has no alarm
+line). A purchase or a new sleep cancels it.
+
+Under the Watcher's meter one mono line, 10 px, that changes rarely (`nightArc`): "night 3 of 6" while
+the script runs, "the question is open" after the sixth, "the body 1 of 4" once BIOLOGICAL is open.
+Empty (and taking no room) before the first night.
+
+Decisions for Ola to overrule (B199): the "next:" line on waking comes after the alarm line, not
+instead of it; the counters stay asleep, only their rates go; the first sleep's "Something stayed
+awake while they slept." is no longer seen asleep (it is in the feed on waking); Surface's line now
+sits about 120 px higher than in step 2, over the colony's lower plates, to leave room for the game.
+
+**Acceptance** (`scripts/accept-iv-cut.mjs`): section V now checks that the game is absent while the
+forced night's line types and present once it is whole. New section N, from "IV · cryo I": awake the
+bars, BUILD, the queue strip and the feed are shown; 2 s into the sleep they and the rates are hidden,
+and the year, the Watcher, the wake pill and the TREE button are not; a forced night (night 1) types
+with no game and no sentence on screen, the game still waits once the line is whole and is there, under
+the line, a second later; the Watcher's line reads "night 1 of 6"; within 2 s of the wake everything is
+back; the tree's log ends with "next: after Cryo II"; a second sleep woken with no night says "Year 1.
+Woke: a test alarm.", then "next: after Cryo II", then the advisor's own line. All checks hold, no
+console errors.

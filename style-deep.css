@@ -747,18 +747,15 @@ body.in-deep #version-info { z-index: 1400; }
 /* ---- v1.49.0: SURFACE ------------------------------------------------------
    Opposite the Watcher: a faint ring, its name, one line, and a game of rock, paper,
    scissors with chapter I's glyphs. It is fainter than the Watcher, and gone at the wake. */
-/* bottom right, on the Watcher's baseline: the top centre is the crust's ring, and a tall colony
-   frames the ring close to the top of the window */
+/* deep-night: no longer bottom right, but under Surface's line on the night stage (below), centred */
 #deep-surface {
-    right: 232px;
-    bottom: 34px;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
     gap: 7px;
     color: #b9b3a5;
-    animation: deep-watcher-in 2400ms ease;
-    z-index: 14;
+    pointer-events: auto;
+    transition: opacity 700ms ease;
 }
 #deep-surface[hidden] { display: none; }
 .deep-surface-head { display: flex; align-items: center; gap: 10px; }
@@ -1192,9 +1189,6 @@ body.in-deep #version-info { z-index: 1400; }
    warmer mono than anything else (Surface's tone #cfc9bb), and stays until the colony wakes. It is
    never clicked: no box, no button, no pointer events. The caret blinks only while it types. */
 .deep-voice {
-    left: 50%;
-    bottom: 168px;
-    transform: translateX(-50%);
     width: max-content;
     max-width: min(760px, calc(100vw - 32px));
     text-align: center;
@@ -1206,7 +1200,6 @@ body.in-deep #version-info { z-index: 1400; }
     text-shadow: 0 0 18px rgba(207, 201, 187, 0.18);
     pointer-events: none;
     user-select: none;
-    z-index: 13;
 }
 .deep-voice[hidden] { display: none; }
 .deep-voice-rest { visibility: hidden; }
@@ -1222,7 +1215,7 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-voice.is-typing .deep-voice-caret { display: inline-block; animation: deep-voice-caret 1s steps(1) infinite; }
 @keyframes deep-voice-caret { 50% { opacity: 0; } }
 @media (max-width: 760px) {
-    .deep-voice { font-size: 17px; line-height: 24px; bottom: 150px; }
+    .deep-voice { font-size: 17px; line-height: 24px; }
 }
 /* the tree button after a night in which Surface opened a node: a small warm ring in its corner,
    still (no loop), until the tree is looked at */
@@ -1242,3 +1235,66 @@ body.in-deep #version-info { z-index: 1400; }
 /* the info box: the line that opened a gift, in Surface's tone */
 .deep-tree-info .ib-q { color: #cfc9bb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .deep-tree-board .tt-log text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* ---- deep-night (step 3b): FOCUS IN THE NIGHT -------------------------------------------------
+   Ola on v1.61.0: "Maybe some things can disappear from the screen during cryo so the focus is on
+   our madness." Asleep, the awake chrome fades out over 1.5 s and stays out: the four bars and
+   their flows, the BUILD buttons, the group words, the scout and way-up pills, the rates under the
+   counters, the build queue and the advisor's feed. What stays: the year (larger), the counters,
+   the Watcher, Surface when it visits, the wake pill, the TREE button and the reset view, over the
+   dark colony and its lamps. The places are kept (visibility, not display), so nothing that stays
+   moves. On waking it all fades back. `is-night` is set the moment the sleep is pressed. */
+#deep-columns, #deep-group-build, .deep-group-word, #deep-probe-btn, #deep-ascend-btn,
+#deep-queue, #deep-feed, #phase-deep .deep-rate {
+    transition: opacity 1500ms ease, visibility 0s linear 0s, transform 0.2s ease-in-out;
+}
+#phase-deep.is-night #deep-columns,
+#phase-deep.is-night #deep-group-build,
+#phase-deep.is-night .deep-group-word,
+#phase-deep.is-night #deep-probe-btn,
+#phase-deep.is-night #deep-ascend-btn,
+#phase-deep.is-night #deep-queue,
+#phase-deep.is-night #deep-feed,
+#phase-deep.is-night .deep-rate {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 1500ms ease, visibility 0s linear 1500ms, transform 0.2s ease-in-out;
+}
+/* the people the body takes still roll off the H bar while they sleep: that column alone comes up
+   for as long as the drop shows (index.js dropPeople) */
+#phase-deep.is-night #deep-columns.is-drop { opacity: 1; visibility: visible; transition: opacity 300ms ease, visibility 0s; }
+#phase-deep.is-night #deep-columns.is-drop .deep-col-heads > :not(:last-child),
+#phase-deep.is-night #deep-columns.is-drop .deep-bars > :not(:last-child),
+#phase-deep.is-night #deep-columns.is-drop .deep-col-feet > :not(:last-child),
+#phase-deep.is-night #deep-columns.is-drop .deep-col-flows,
+#phase-deep.is-night #deep-columns.is-drop .deep-per-day { visibility: hidden; }
+/* the year is the room's one big number */
+#deep-time .deep-clock { transform-origin: left top; transition: transform 1500ms ease; }
+#phase-deep.is-night #deep-time .deep-clock { transform: scale(1.3); }
+
+/* SURFACE'S VISIT IS A SEQUENCE: one stage over the Watcher, the line on top, the game under it.
+   The stage is anchored at its foot, and the game's place is held while it waits (visibility), so
+   the line types in one place and stays there when the game comes. */
+.deep-night-stage {
+    left: 50%;
+    bottom: 160px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    pointer-events: none;
+    z-index: 14;
+}
+/* the game waits for the line: there, but not seen and not clickable */
+#deep-surface.is-waiting { opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+#deep-surface:not(.is-waiting) { animation: deep-watcher-in 900ms ease; }
+/* the throws and the duel take turns in one row of one height */
+.deep-surface-play { height: 34px; display: flex; align-items: center; justify-content: center; }
+#deep-surface.is-played .deep-surface-rps { display: none; }
+/* the sentence only after a win, as its reward; its row is kept so the card never grows */
+.deep-surface-words { min-height: 12px; }
+/* the one line under the Watcher: where the sleep world stands */
+.deep-watcher-arc { font-size: 10px; letter-spacing: 0.22em; color: #8d877b; line-height: 12px; }
+.deep-watcher-arc:empty { display: none; }

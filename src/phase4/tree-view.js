@@ -14,11 +14,15 @@
  * deep-voice (step 2): THE NIGHT LOG down the left edge of the board (mockup 12, tab "the voice"):
  * every line Surface has said, in order, in its warm mono, each tied by a thin dotted thread to the
  * node it opened. A node Surface has opened has its ring filled; the info box quotes the line.
+ *
+ * deep-night (step 3b): under the lines, the sentence as far as it is known (it is no longer on
+ * screen between visits), and a last line that says what the next night waits for.
  */
 
 import {
-    NODES, NODE_BY_ID, BOARD, NODE, ROOT_SIZE, TAGS, BRANCHES, tracePath, chainTo, nodeStatus, nightLog,
+    NODES, NODE_BY_ID, BOARD, NODE, ROOT_SIZE, TAGS, BRANCHES, tracePath, chainTo, nodeStatus, nightLog, nightNext,
 } from './tree.js';
+import { sentenceShown } from './surface.js';
 import { short } from './readout.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -82,6 +86,7 @@ export function createTreeView(host, { state, ctx, onBuy }) {
     let logG = null, threadG = null;
     let logKey = null;              // what the night log was last drawn from
     let logged = [];                // for the tests: [{ n, line, to, thread }]
+    let loggedNext = '';            // for the tests: the log's last line, what the next night waits for
 
     function build() {
         svg.setAttribute('viewBox', `${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`);
@@ -257,12 +262,17 @@ export function createTreeView(host, { state, ctx, onBuy }) {
     /** THE NIGHT LOG: drawn again only when a line is added (or a node it ties to shows). */
     function drawLog(s) {
         const lines = nightLog(s);
-        const key = lines.map((l) => `${l.n}:${l.to && last[l.to] ? last[l.to].visible : ''}`).join(',');
+        const sf = s.watcher && s.watcher.surface;
+        const words = sf && sf.words > 0 ? sentenceShown(sf) : '';
+        const next = lines.length ? nightNext(s) : null;
+        const key = lines.map((l) => `${l.n}:${l.to && last[l.to] ? last[l.to].visible : ''}`).join(',')
+            + `|${words}|${next ? next.text : ''}`;
         if (key === logKey) return;
         logKey = key;
         const v = lines.length ? VIEW_LOG : VIEW;
         svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
         logged = [];
+        loggedNext = '';
         if (!lines.length) { logG.innerHTML = ''; threadG.innerHTML = ''; return; }
         let h = text(LOG.x, LOG.y, 'NIGHT LOG', { s: 9, c: WARM, ls: '0.32em', cls: 'log-head' }).replace('<text ', '<text opacity="0.55" ');
         let th = '';
@@ -301,6 +311,19 @@ export function createTreeView(host, { state, ctx, onBuy }) {
             logged.push({ n: l.n, line: l.line, to: l.to, thread });
             y = ty + (rows.length - 1) * LOG.lh + LOG.gap;
         });
+        // deep-night: the sentence lives here between visits; on screen it is only a win's reward
+        if (words) {
+            h += text(LOG.x, y, 'THE SENTENCE', { s: 9, c: WARM, ls: '0.28em' }).replace('<text ', '<text opacity="0.55" ');
+            const rows = wrap(words, Math.floor(LOG.w / (11 * LOG.cw + 1.4)));
+            rows.forEach((r, k) => { h += text(LOG.x, y + 22 + k * 16, r, { s: 11, c: WARM, ls: '0.13em', cls: 'log-words' }); });
+            y += 22 + (rows.length - 1) * 16 + LOG.gap;
+        }
+        // deep-night: and what the next night waits for, so a slow night never reads as a broken one
+        if (next) {
+            const rows = wrap(next.text, Math.floor(LOG.w / (12 * LOG.cw)));
+            rows.forEach((r, k) => { h += text(LOG.x, y + k * 17, r, { s: 12, c: WARM, cls: 'log-next' }).replace('<text ', '<text opacity="0.8" '); });
+            loggedNext = next.text;
+        }
         logG.innerHTML = h;
         threadG.innerHTML = th;
     }
@@ -384,6 +407,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         get drawn() { return last; },
         /** For the tests: the night log as drawn, and whether each line has its thread. */
         get log() { return logged.slice(); },
+        /** For the tests: the log's last line, what the next night waits for ('' when there is none). */
+        get logNext() { return loggedNext; },
         get hovered() { return hoverId; },
         destroy() { ac.abort(); },
     };

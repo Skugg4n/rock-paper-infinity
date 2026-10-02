@@ -55,7 +55,9 @@ import {
     sealCandidates, sealSector, choosingSector, bodyGlyph, inBody,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS } from './surface.js';
-import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, buyableCount, normalizeTree } from './tree.js';
+import {
+    NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, buyableCount, normalizeTree, nightNext, nightAhead, nightArc,
+} from './tree.js';
 import { machineTempo, machineSays } from './machine.js';
 import { createTreeView } from './tree-view.js';
 import { playChapterCard } from '../chapterCard.js';
@@ -79,8 +81,14 @@ const SLEEP_TICK_MS = 100;
  * The line of what woke the colony stays ALARM_LINE_MS, then the advisor says where we stand.
  */
 export const FEED_AWAKE = 3;
-export const FEED_ASLEEP = 1;
+/** deep-night (step 3b): asleep the feed is gone with the rest of the awake chrome. */
+export const FEED_ASLEEP = 0;
 export const ALARM_LINE_MS = 6000;
+/** deep-night: a wake that brought no night says what the next one waits for, this long, once,
+ *  in the advisor's place after the alarm line. */
+export const NEXT_LINE_MS = 5000;
+/** deep-night: Surface's game appears this long after its line has finished typing. */
+export const GAME_AFTER_LINE_MS = 1000;
 /** The people a biological step takes: the red delta over the H bar, and the number rolling down. */
 const DROP_MS = { roll: 1200, fade: 2400 };
 
@@ -211,6 +219,9 @@ export function init() {
         bodyTip: document.getElementById('deep-body-tip'),
         machineTip: document.getElementById('deep-machine-tip'),
         stabVal: document.getElementById('deep-stab-val'),
+        // deep-night: the one line under the Watcher, where the sleep world stands
+        arc: document.getElementById('deep-watcher-arc'),
+        columns: document.getElementById('deep-columns'),
         // v1.51.0: the lamps' one line under the Watcher (the riddle cards are gone)
         card: {
             el: document.getElementById('deep-puzzle'),
@@ -260,6 +271,8 @@ export function init() {
     let busy = false;
     let advisorLine = '';           // what woke the colony, until the next purchase
     let advisorUntil = 0;           // v1.52.0: an alarm line goes after ALARM_LINE_MS (0: it stays)
+    let nextLine = '';              // deep-night: what the next night waits for, said once after the alarm line
+    let nightAtSleep = 0;           // deep-night: Surface's night count when this sleep began
     let feed = [];                  // the advisor's last lines, oldest first
     let toldAbout = null;           // the conditions the last feed line was written about
     let hovering = null;            // { kind, type } of the button under the cursor, for the preview
@@ -433,7 +446,12 @@ export function init() {
                 d.textContent = '';
             }
         }
-        if (advisorLine && advisorUntil && performance.now() > advisorUntil) { advisorLine = ''; advisorUntil = 0; }
+        if (advisorLine && advisorUntil && performance.now() > advisorUntil) {
+            advisorLine = '';
+            advisorUntil = 0;
+            // deep-night: then, once, what the next night waits for
+            if (nextLine) { advisorLine = nextLine; advisorUntil = performance.now() + NEXT_LINE_MS; nextLine = ''; }
+        }
         // v1.52.0: asleep the advisor is quiet (the one line it has is the feed's last); the first
         // sleep's WATCHER_HELLO goes to the feed
         const advice = state.asleep ? ''
@@ -614,6 +632,9 @@ export function init() {
                 const shape = bodyGlyph(w);
                 const cls = `deep-watcher-pulse${shape ? ` is-body is-${shape}` : ''}`;
                 if (ui.pulse && ui.pulse.className !== cls) ui.pulse.className = cls;
+                // deep-night: one line, where the sleep world stands; it changes rarely
+                const arc = nightArc(state);
+                if (ui.arc && ui.arc.textContent !== arc) ui.arc.textContent = arc;
             }
             drawAsk();
             drawLampCard();
@@ -762,6 +783,7 @@ export function init() {
         void d.offsetWidth;             // restart the one-shot fade
         d.textContent = hDrop.text;
         d.classList.add('is-on', 'is-down', 'is-drop');
+        ui.columns?.classList.add('is-drop');      // deep-night: asleep, the H bar comes up for it
         stepDrop();
     }
     /** Once a frame while it shows: the number rolls down, the delta fades (CSS), then both let go. */
@@ -771,6 +793,7 @@ export function init() {
         if (t >= DROP_MS.fade) {
             hDrop = null;
             ui.deltas.H.classList.remove('is-on', 'is-down', 'is-drop');
+            ui.columns?.classList.remove('is-drop');
             ui.deltas.H.textContent = '';
             updateChrome();
             return;
@@ -810,19 +833,23 @@ export function init() {
         ui.surface.hidden = !v;
         drawVoice(v);
         if (!v) { surfaceKey = ''; return; }
+        // deep-night: A SEQUENCE. While a line types, nothing else of Surface's is seen; the game
+        // comes under it a second after the last letter (its place is held, so the line never moves)
+        const waiting = !gameShown(v);
+        ui.surface.classList.toggle('is-waiting', waiting);
         const r = v.result;
         const stage = rps ? rps.stage : (r ? 'line' : 'open');
-        const key = `${sf.visits}|${stage}|${sf.words}|${v.line}`;
+        const key = `${sf.visits}|${stage}|${sf.words}|${v.line}|${waiting}`;
         if (key === surfaceKey) return;
         surfaceKey = key;
         ui.surface.classList.toggle('is-played', !!r);
         const said = !!r && stage === 'line';
         ui.surfaceSaid.textContent = said ? r.text : '';
         ui.surfaceSaid.classList.toggle('is-in', said && !!rps);
-        // the word a win gives is held back until the line is said, then it slides in
-        const holding = !!r && r.word && !said;
+        // the sentence is a win's reward (deep-night): only after a win, once its line is said, the
+        // word just won sliding in; otherwise it is in the tree's night log
         const fresh = said && rps && r.word ? sf.words - 1 : -1;
-        drawWords(holding ? sf.words - 1 : sf.words, fresh);
+        drawWords(said && r.outcome === 'win' ? sf.words : 0, fresh);
         for (const b of ui.rpsBtns) {
             b.disabled = !!r;
             b.classList.remove('is-you', 'is-it');
@@ -852,7 +879,13 @@ export function init() {
        A night's line types itself, letter by letter (TYPE_MS a letter), low in the dark, in a larger
        and warmer mono than anything else, and stays until the colony wakes. Nothing on it can be
        clicked. Awake it is gone: the tree's night log keeps it. The caret shows only while it types. */
-    let voice = null;               // { key, text, t0 } of the line on screen
+    let voice = null;               // { key, text, t0, doneAt } of the line on screen
+    /** deep-night: may the game show? At once on a quiet visit; after a line, a second after it is whole. */
+    function gameShown(v) {
+        if (!v.line) return true;
+        if (v.result || rps) return true;            // already played (a reload mid-game)
+        return !!voice && voice.doneAt > 0 && performance.now() - voice.doneAt >= GAME_AFTER_LINE_MS;
+    }
     function drawVoice(v) {
         if (!ui.voice) return;
         const line = v && v.line ? v.line : '';
@@ -863,7 +896,7 @@ export function init() {
         }
         const key = `${state.watcher.surface.visits}|${line}`;
         if (!voice || voice.key !== key) {
-            voice = { key, text: line, t0: performance.now() };
+            voice = { key, text: line, t0: performance.now(), doneAt: 0 };
             ui.voiceText.textContent = '';
             ui.voiceRest.textContent = line;        // held in place, unseen, so the line never moves as it types
             ui.voice.classList.add('is-typing');
@@ -879,7 +912,13 @@ export function init() {
             ui.voiceText.textContent = voice.text.slice(0, n);
             ui.voiceRest.textContent = voice.text.slice(n);
         }
-        if (n >= voice.text.length && ui.voice.classList.contains('is-typing')) ui.voice.classList.remove('is-typing');
+        if (n >= voice.text.length && ui.voice.classList.contains('is-typing')) {
+            ui.voice.classList.remove('is-typing');
+            voice.doneAt = performance.now();
+        }
+        // deep-night: the game comes a second after the last letter
+        if (voice.doneAt && !ui.surface.hidden && ui.surface.classList.contains('is-waiting')
+            && performance.now() - voice.doneAt >= GAME_AFTER_LINE_MS) ui.surface.classList.remove('is-waiting');
     }
     function stopRps() {
         for (const t of rpsTimers) clearTimeout(t);
@@ -888,6 +927,8 @@ export function init() {
     }
     function throwAtSurface(you) {
         if (!state.asleep || busy || paused() || rps || !THROWS.includes(you)) return;
+        const v = state.watcher.surface.visit;
+        if (!v || !gameShown(v)) return;                 // deep-night: the line first, then the game
         const r = playSurface(state.watcher, you);
         if (!r) return;
         rps = { you, it: r.it, outcome: r.outcome, word: r.word, stage: 'shake', log: [['throw', performance.now()]] };
@@ -1094,7 +1135,7 @@ export function init() {
     }
 
     // --- buying: the price now, the thing itself in a few days ---------------
-    function bought() { advisorLine = ''; advisorUntil = 0; said.key = ''; }
+    function bought() { advisorLine = ''; advisorUntil = 0; nextLine = ''; said.key = ''; }
     /* Since v1.49.0 every order goes through the queue (deep.js `orderBuild`): paid now, at the
        price after the orders already on the books, started when its lane and its chamber are free.
        A room takes whichever chamber is empty the day it starts. */
@@ -1257,7 +1298,10 @@ export function init() {
         stopClock();
         replay.hide();
         advisorLine = '';
+        nextLine = '';
         hovering = null;
+        // deep-night: the awake chrome fades out as they walk into the hall: a different room
+        ui.root.classList.add('is-night');
         await (scene ? scene.gather(SLEEP_TIMING.gather) : Promise.resolve());
         state.asleep = true;
         ui.root.classList.add('is-sleeping');
@@ -1265,6 +1309,7 @@ export function init() {
         sleepSum = freshSum();
         sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
         sealedThisSleep.length = 0;
+        nightAtSleep = state.watcher.surface.night | 0;
         // the first sleep says one thing, once, what the label under the scene is (v1.52.0: in the
         // feed, the one line the sleep world shows)
         if (beginSleep(state.watcher, state.cryo)) feed = pushFeed(feed, [WATCHER_HELLO]);
@@ -1365,6 +1410,10 @@ export function init() {
         // the reboot line is said once, in the feed; the advisor's line keeps saying where we stand
         advisorLine = alarm.kind === 'reboot' ? '' : `Year ${group(calendar(state.day).year)}. ${line}`;
         advisorUntil = advisorLine ? performance.now() + ALARM_LINE_MS : 0;
+        // deep-night: a sleep that brought no night, with one still to come, says what it waits for,
+        // once, in the alarm line's place when that has had its time
+        nextLine = (w.surface.night | 0) === nightAtSleep && nightAhead(state) ? nightNext(state, { asleep: false }).text : '';
+        if (nextLine && !advisorLine) { advisorLine = nextLine; advisorUntil = performance.now() + NEXT_LINE_MS; nextLine = ''; }
         const t = sleepSum || freshSum();
         // lives lost in the ice are mourned: no one is born for a year after the wake (v1.48.0)
         if (t.died >= 0.5) mourn(state);
@@ -1376,7 +1425,7 @@ export function init() {
         roll = null;
         drawCounters(snapshot());
         saveGame();
-        ui.root.classList.remove('is-sleeping');
+        ui.root.classList.remove('is-sleeping', 'is-night');
         scene?.setState(state, layout);
         await (scene ? scene.release(SLEEP_TIMING.release) : Promise.resolve());
         if (alarm.kind === 'scouts') for (const l of alarm.landed || []) if (l.back > 0) scene?.scoutsDown(l.back);
@@ -1415,7 +1464,7 @@ export function init() {
         if (roll?.done) clearTimeout(roll.done);
         roll = null;
         drawCounters(snapshot());
-        ui.root.classList.remove('is-sleeping');
+        ui.root.classList.remove('is-sleeping', 'is-night');
         scene?.setState(state, layout);
         report = dryRun();
         const from = sleepFrom || { ore: state.minerals, food: state.food, stars: state.stars };
@@ -1726,7 +1775,8 @@ export function init() {
 
     // A colony that was asleep when the tab closed is still asleep: the years roll on.
     if (state.asleep && state.cryo >= 0) {
-        ui.root.classList.add('is-sleeping');
+        ui.root.classList.add('is-sleeping', 'is-night');
+        nightAtSleep = state.watcher.surface.night | 0;
         sleepSum = freshSum();
         sleepFrom = { ore: state.minerals, food: state.food, stars: state.stars };
         runSleep();
@@ -1765,6 +1815,9 @@ export function init() {
         // deep-machine, for the tests: the machine's hover as it reads now, and whether it shows
         get machineTip() { return { text: machineText, shown: !!ui.machineTip && !ui.machineTip.hidden }; },
         get treeLog() { return treeView ? treeView.log : []; },
+        // deep-night, for the tests: the night log's last line, and what the next night waits for now
+        get treeLogNext() { return treeView ? treeView.logNext : ''; },
+        get nightNext() { return nightNext(state); },
         openTree: () => openTree(),
         closeTree: () => closeTree(),
     };
