@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.54.0 - 2026-10-02 (chapter III → IV)
+
+### The gate before THE DEEP
+
+- **The player chooses.** At the end of the war a click on the shovel no longer starts the descent at once. A black gate asks first: "IV · THE DEEP · Unfinished. Continue at your own peril." with two answers, **Go deep** and **Stay**. Stay (or Escape) closes the gate and leaves the end of the war as it is; the shovel can be clicked again. Go deep runs the descent as before. Asked before anything irreversible (the hatch, the people leaving). A save that already chose the way down still goes straight down.
+- Rules in the new `src/deepGate.js` (`askDeepGate()`), tested in `deepGate.test.js`; markup `#deep-gate` in index.html, look `.deep-gate` in style.css.
+- **New checkpoint** "III · war over, the shovel" (`iii-end`) in the debug menu's Jump to.
+
 ## v1.53.0 - 2026-10-02 (chapter I)
 
 ### The little clover and the energy ladder

@@ -2,6 +2,7 @@
 
 import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { playChapterCard } from '../chapterCard.js';
+import { askDeepGate } from '../deepGate.js';
 import { phases, setPhase } from '../gamePhase.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
@@ -1396,8 +1397,12 @@ export function init() {
               updateAllUI();
           }, { signal });
           ui.armsSlider.addEventListener('input', (e) => { if (gameState.war?.active) gameState.war.armsShare = e.target.value / 100; updateAllUI(); }, { signal });
-          ui.shipBtn.addEventListener('click', () => {
+          ui.shipBtn.addEventListener('click', async () => {
               const w = gameState.war; if (!w?.shipReady || gameState.shipChosen) return;
+              // Chapter IV is playable but unfinished: the player chooses, before
+              // anything irreversible. "Stay" leaves the war's end as it is.
+              if (!(await askDeepGate())) return;
+              if (gameState.shipChosen) return;
               gameState.shipChosen = true;
               logWar('Go deep.');
               saveGameState();

@@ -1459,4 +1459,5 @@ items:
       on to THE DEEP, with a short, clean notice that the chapter is not
       finished ("Chapter not finalized. Continue at your own peril", or
       something neater).
-    status: open
+    status: done
+    resolved_in: v1.54.0

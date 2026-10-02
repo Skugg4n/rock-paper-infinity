@@ -97,6 +97,15 @@ export const CHECKPOINTS = [
             war: { active: true, startedAt: 0, t: 600, arms: 2500, armsShare: 0.5, defence: 70, force: 30, tier: 4, enemyTier: 4, enemyDefence: 60, waveCount: 18, lastWaveAt: 590, nextTierAt: 700, scorchOurs: 500, scorchTheirs: 900, salvage: 4000, enemyLeft: false, shipReady: false, auto: false, scienceRate0: pop * 0.5, lastTierAt: 500, enemyRazedUntil: [0, 0, 0, 0, 0] } }));
         set(PHASE_KEY, 'CITY');
     } },
+    { id: 'iii-end', label: 'III · war over, the shovel', apply: () => {
+        clearAll(); set(P1, p1Save({ isMetaBoardActive: true, starMultiplier: 10, upgrades: { mergeGameBoard: { purchased: true }, bank: { purchased: true } } }));
+        const pop = 150000; const b = completeCity();
+        b[5] = { ...b[5], razed: true, population: 0 }; b[10] = { ...b[10], razed: true, population: 0 }; b[17] = { ...b[17], population: 50000 };
+        for (const x of b) if (x && !x.razed && x.type !== 'factory' && x.type !== 'bank') { x.fort = 2; x.hp = 40; }
+        set(P2, p2Save({ stars: 2e11, science: 8e7, population: pop, supplies: 3e8, buildings: b, ...completeFlags, ...competitor(5, 900), warReady: true, warChosen: true,
+            war: { active: true, startedAt: 0, t: 600, arms: 2500, armsShare: 0.5, defence: 70, force: 30, tier: 4, enemyTier: 4, enemyDefence: 60, waveCount: 18, lastWaveAt: 590, nextTierAt: 700, scorchOurs: 500, scorchTheirs: 900, salvage: 4000, enemyLeft: true, leaveStage: 3, leaveAt: 580, shipReady: true, auto: false, scienceRate0: pop * 0.5, lastTierAt: 500, enemyRazedUntil: [0, 0, 0, 0, 0] } }));
+        set(PHASE_KEY, 'CITY');
+    } },
     { id: 'iv-start', label: 'IV · the deep', apply: () => {
         clearAll();
         // The day the exit was blown: the salvage the war left, and a surface

@@ -715,7 +715,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.53.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.54.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">
@@ -724,6 +724,20 @@
         <div class="chapter-card__roman"></div>
         <div class="chapter-card__title"></div>
         <div class="chapter-card__suffix" hidden>to come</div>
+      </div>
+    </div>
+
+    <!-- The gate before IV · THE DEEP: the chapter is playable but unfinished,
+         so the player chooses at the shovel (src/deepGate.js). -->
+    <div id="deep-gate" class="deep-gate" role="dialog" aria-modal="true" aria-labelledby="deep-gate-title" aria-hidden="true">
+      <div class="deep-gate__panel">
+        <div class="deep-gate__roman">IV</div>
+        <div id="deep-gate-title" class="deep-gate__title">THE DEEP</div>
+        <div class="deep-gate__line">Unfinished. Continue at your own peril.</div>
+        <div class="deep-gate__actions">
+          <button type="button" class="deep-gate__go" data-deep-gate="go">Go deep</button>
+          <button type="button" class="deep-gate__stay" data-deep-gate="stay">Stay</button>
+        </div>
       </div>
     </div>
 
