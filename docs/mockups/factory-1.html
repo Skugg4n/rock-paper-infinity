@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabriken · tre riktningar (mockup 1)</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  /* Mockup for B163: the factory at the end of chapter I. Three directions,
+     all in the game's own language: slate greys, round shapes, dashes, no colour. */
+  :root { --ink: #0f172a; --mid: #475569; --soft: #94a3b8; --line: #cbd5e1; --tile: #e2e8f0; --bg: #f1f5f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; margin: 0 0 4px; }
+  .lead { font-size: 13px; color: var(--mid); margin: 0 0 28px; max-width: 62ch; line-height: 1.5; }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; }
+  figure { margin: 0; width: 336px; }
+  .stage { position: relative; width: 336px; height: 336px; overflow: hidden; border-radius: 24px; }
+  figcaption { padding: 14px 4px 0; }
+  figcaption b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; font-weight: 600; }
+  figcaption span { display: block; margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--mid); }
+  svg.lucide { display: block; }
+
+  /* ---------- A · THE CHASE ---------- */
+  .chase .ring { position: absolute; inset: 0; }
+  .chase .dashes { animation: spin 48s linear infinite; transform-origin: 50% 50%; }
+  .chase .orbit { position: absolute; inset: 0; animation: spin 2.7s linear infinite; }
+  .chase .slot { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  .chase .slot:nth-child(1) { transform: rotate(0deg) translate(112px) rotate(0deg); }
+  .chase .slot:nth-child(2) { transform: rotate(120deg) translate(112px) rotate(-120deg); }
+  .chase .slot:nth-child(3) { transform: rotate(240deg) translate(112px) rotate(-240deg); }
+  .chase .glyph {
+    position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 9999px;
+    background: #fff; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    display: flex; align-items: center; justify-content: center; color: var(--mid);
+    animation: spin-rev 2.7s linear infinite;
+  }
+  .chase .glyph svg { width: 20px; height: 20px; }
+  .chase .core { position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; color: var(--ink); animation: mint 0.9s ease-out infinite; }
+  .chase .core svg { width: 96px; height: 96px; fill: currentColor; stroke: none; }
+  .chase .ripple { position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 9999px; border: 2px solid var(--ink); opacity: 0; animation: ripple 0.9s ease-out infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes spin-rev { to { transform: rotate(-360deg); } }
+  @keyframes mint { 0% { transform: scale(1.12); } 35% { transform: scale(1); } 100% { transform: scale(1); } }
+  @keyframes ripple { 0% { transform: scale(0.9); opacity: 0.5; } 100% { transform: scale(2.9); opacity: 0; } }
+
+  /* ---------- B · THE MONOLITH ---------- */
+  .mono .block {
+    position: absolute; left: 50%; top: 50%; width: 136px; height: 136px; margin: -68px 0 0 -68px;
+    background: var(--ink); border-radius: 30px; z-index: 2;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.18), 0 8px 10px -6px rgb(0 0 0 / 0.18);
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    animation: breathe 0.7s ease-out infinite;
+  }
+  .mono .block svg { width: 40px; height: 40px; fill: currentColor; stroke: none; }
+  .mono .in, .mono .out { position: absolute; top: 50%; left: 0; z-index: 1; }
+  .mono .in { color: var(--soft); animation: feed 2.1s linear infinite; }
+  .mono .in svg { width: 22px; height: 22px; }
+  .mono .out { color: var(--ink); animation: march 2.8s linear infinite; }
+  .mono .out svg { width: 26px; height: 26px; fill: currentColor; stroke: none; }
+  @keyframes breathe { 0% { transform: scale(1.035); } 40% { transform: scale(1); } 100% { transform: scale(1); } }
+  @keyframes feed { 0% { transform: translate(-30px, var(--y)); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(150px, var(--y)); opacity: 1; } }
+  @keyframes march { 0% { transform: translate(170px, -13px); opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(350px, -13px); opacity: 0; } }
+
+  /* ---------- C · BOARDS ALL THE WAY DOWN ---------- */
+  .deep .grid { position: absolute; inset: 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .deep .board { background: #fff; border-radius: 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08); padding: 9px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .deep .cell { border-radius: 6px; background: var(--tile); display: flex; align-items: center; justify-content: center; color: #fff; transition: background 0.5s ease, transform 0.5s ease; }
+  .deep .cell svg { width: 60%; height: 60%; fill: currentColor; stroke: none; opacity: 0; transition: opacity 0.5s ease; }
+  .deep .cell.won { background: var(--ink); transform: scale(1.08); transition-duration: 0.08s; }
+  .deep .cell.won svg { opacity: 1; transition-duration: 0.08s; }
+  .deep .cell.play { background: var(--line); transition-duration: 0.05s; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fabriken · tre riktningar</h1>
+  <p class="lead">Mockup för B163. Fabriken gör stjärnor av sten, sax och påse. Alla tre håller sig till spelets språk: grått, runt, streck, ingen färg, inget som flyger över skärmen. Välj en riktning, eller säg vad som saknas.</p>
+
+  <div class="row">
+    <figure>
+      <div class="stage chase">
+        <svg class="ring" viewBox="0 0 336 336" aria-hidden="true">
+          <circle cx="168" cy="168" r="112" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+          <circle class="dashes" cx="168" cy="168" r="152" fill="none" stroke="#334155" stroke-width="3" stroke-linecap="round" stroke-dasharray="9.9 10"/>
+        </svg>
+        <div class="ripple"></div>
+        <div class="ripple" style="animation-delay: 0.45s"></div>
+        <div class="core"><i data-lucide="star"></i></div>
+        <div class="orbit">
+          <div class="slot"><div class="glyph"><i data-lucide="gem"></i></div></div>
+          <div class="slot"><div class="glyph"><i data-lucide="scissors"></i></div></div>
+          <div class="slot"><div class="glyph"><i data-lucide="file-text"></i></div></div>
+        </div>
+      </div>
+      <figcaption>
+        <b>A · JAKTEN</b>
+        <span>Sten jagar sax, sax jagar påse, påse jagar sten. Jakten tar aldrig slut, och den är motorn: varje varv präglar stjärnor i mitten. Rock, paper, infinity. Ringen av streck är samma streck som runt knapparna, fast stor.</span>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="stage mono">
+        <div class="in" style="--y: -51px; animation-delay: -0.2s"><i data-lucide="gem"></i></div>
+        <div class="in" style="--y: -11px; animation-delay: -0.9s"><i data-lucide="file-text"></i></div>
+        <div class="in" style="--y: 29px; animation-delay: -1.6s"><i data-lucide="scissors"></i></div>
+        <div class="in" style="--y: -51px; animation-delay: -1.25s"><i data-lucide="scissors"></i></div>
+        <div class="in" style="--y: -11px; animation-delay: -1.95s"><i data-lucide="gem"></i></div>
+        <div class="in" style="--y: 29px; animation-delay: -0.55s"><i data-lucide="file-text"></i></div>
+        <div class="block"><i data-lucide="star"></i></div>
+        <div class="out" style="animation-delay: 0s"><i data-lucide="star"></i></div>
+        <div class="out" style="animation-delay: -0.7s"><i data-lucide="star"></i></div>
+        <div class="out" style="animation-delay: -1.4s"><i data-lucide="star"></i></div>
+        <div class="out" style="animation-delay: -2.1s"><i data-lucide="star"></i></div>
+      </div>
+      <figcaption>
+        <b>B · MONOLITEN</b>
+        <span>Ett enda svart block, det första mörka föremålet i spelet. Sten, sax och påse går in i tre led till vänster, stjärnor marscherar ut i takt till höger. Blocket slår som ett hjärta för varje stjärna. Det pekar framåt mot de svarta korten i WAR och THE DEEP.</span>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="stage deep">
+        <div class="grid" id="deep-grid"></div>
+      </div>
+      <figcaption>
+        <b>C · BRÄDEN HELA VÄGEN NER</b>
+        <span>Dina nio bräden krymper och visar sig vara rutor i ett större bräde: nio bräden med nio spel i varje. Vinster tänds som svarta stjärnrutor och går som vågor över hela ytan. Fabriken är inte en ny sak, den är samma spel i industriell skala.</span>
+      </figcaption>
+    </figure>
+  </div>
+</main>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+
+  // C: 9 boards x 9 cells. Cells flicker as games are played; wins light up
+  // dark with a star, and every couple of seconds a wave of wins crosses it all.
+  const grid = document.getElementById('deep-grid');
+  const cells = [];
+  for (let b = 0; b < 9; b++) {
+    const board = document.createElement('div');
+    board.className = 'board';
+    for (let c = 0; c < 9; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      // position in the 9 x 9 whole, for the waves
+      cell.dataset.x = (b % 3) * 3 + (c % 3);
+      cell.dataset.y = Math.floor(b / 3) * 3 + Math.floor(c / 3);
+      board.appendChild(cell);
+      cells.push(cell);
+    }
+    grid.appendChild(board);
+  }
+  const flash = (cell, cls, ms) => { cell.classList.add(cls); setTimeout(() => cell.classList.remove(cls), ms); };
+  setInterval(() => {
+    for (let i = 0; i < 6; i++) flash(cells[Math.floor(Math.random() * cells.length)], 'play', 90);
+    if (Math.random() < 0.55) flash(cells[Math.floor(Math.random() * cells.length)], 'won', 260);
+  }, 70);
+  function wave() {
+    const ox = Math.random() * 8, oy = Math.random() * 8;
+    for (const cell of cells) {
+      const d = Math.hypot(cell.dataset.x - ox, cell.dataset.y - oy);
+      setTimeout(() => flash(cell, 'won', 240), d * 75);
+    }
+  }
+  setInterval(wave, 2600);
+  setTimeout(wave, 600);
+</script>
+</body>
+</html>

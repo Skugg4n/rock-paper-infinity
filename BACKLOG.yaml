@@ -1548,3 +1548,26 @@ items:
     notes: |
       Design dialogue first. Earlier proposal: docs/superpowers/specs/2026-09-27-sound-design.md
       (it said no music; Ola's idea of the machine's rhythm as music replaces that for chapter I).
+
+  - id: B163
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      Chapter I: the factory at the end needs much better graphics. The idea
+      is a factory that makes stars out of rock, paper, scissors; today it is
+      a lame placeholder for something cleaner, cooler and mightier. Come up
+      with something new.
+    status: open
+    notes: "Mockups first: docs/mockups/factory-1.html (three directions). Ola picks, then build."
+
+  - id: B164
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      The change to CAPITAL must be more drawn out, slower, more feeling:
+      fade to white, pause, pause, II, pause, CAPITAL, pause, pause, fade to
+      the city. The city has to begin with only the factory (which needs a
+      better animation here) and the bank. An animation that opens the empty
+      building plots. An animation that opens the choice to buy a house. The
+      store comes when the food starts to run low.
+    status: open
