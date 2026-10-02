@@ -844,3 +844,23 @@ body.tilt #city-area {
 #competitor-island .enemy-rocket .rocket-build { opacity: 0; transition: opacity 800ms ease; }
 #competitor-island.enemy-rocket-building .enemy-rocket .rocket-build { opacity: 1; }
 #competitor-island.enemy-launch .enemy-rocket .rocket-build, #competitor-island.enemy-left .enemy-rocket .rocket-build { opacity: 0; }
+
+/* ---- war by boat (v1.63.0) ------------------------------------------------- */
+/* Our pier: built when the war starts (index.js ourPier), on our south coast near
+   the south-west corner, out into the water toward their island. Like theirs: a
+   plank in the coast's grey, no line. Our boat (ants.js) lies at its end. */
+#our-pier {
+    position: absolute;
+    width: 10px;
+    height: 76px;
+    border-radius: 4px;
+    background: #94a3b8;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 1500ms ease-in;
+}
+@media (min-width: 640px) { #our-pier { height: 86px; } }
+#phase-city.war #our-pier { opacity: 1; }
+/* The ◆ on every plate arrives with the same pop as a button */
+#phase-city .fort-btn.btn-arrive { animation: btn-arrive 700ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }

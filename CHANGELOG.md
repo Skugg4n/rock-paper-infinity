@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.64.0 - 2026-10-03 (chapter III, war by boat)
+
+### Landings and strikes sail, guards meet them on the beach, controls arrive with effect
+
+Ola: "mer verkligt, mer känsla". The war now moves like the neighbour's raid in II (B200 to B203).
+
+- **Their landings come by boat.** When a landing is sighted the party walks from the tiles nearest their pier to the coast road beside it; at the end of the four-second warning the boat casts off ("Radar: their boat has left the pier ..."), sails the water lanes round our island to the beach nearest the plate (5 to 9 s, longer with distance), they go ashore in pairs and walk the streets to the plate. The impact resolves as before. Push waves fill a bigger hull. One boat: a second landing waits on the pier until the boat is home. A landing whose plate falls before it sails walks back into town.
+- **Our strikes come by boat.** The war builds our own pier on the south coast near the south-west corner. A strike gathers at it from the nearest plates, sails to the shore of their island nearest the tile, goes ashore, and their watchmen and people meet it on their beach. The survivors walk back, sail home and go indoors; the force counter shows them only when they are back (the rule gave them back at the impact, as before).
+- **The guards meet the landing on the beach.** As the boat casts off, the nearest guards walk the coast to the beach it is heading for and stand there; the fight starts at the first step ashore, and the losses the rule scripts fall on the beach and the first street. The guards walk back to their posts afterwards.
+- **Drawn out.** The first landing of the war sails at the slow end (9 s) and its blow waits one second after the party reaches the plate. After it, three seconds of nothing new before the ◆ arrives. Every war control that opens arrives with the same pop as the swords (the ◆ on the plates too), with its war-room line; the reveal order and its six-second gap are unchanged.
+- **Unchanged:** the rules (`src/phase3/war.js` untouched, `sim-phase3.mjs 1` prints the same line), air waves and ranged strikes as arcs, air defence, the raid in II, regroup, rocket, doomsday, pause, the descent.
+- Tests: rounded courses keep their ends and cut their corners, a course is eased with a heading along it, a crossing takes 5 to 9 s.
+
 ## v1.63.0 - 2026-10-03 (chapter IV, the machine)
 
 ### Chapter IV: the machine (step 3 of the tree and bio design)

@@ -1,6 +1,6 @@
 /* eslint-env jest */
 import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge } from './ants.js';
-import { boatCourse } from './ants.js';
+import { boatCourse, roundCourse, courseAt, courseLength, sailSeconds } from './ants.js';
 
 describe('ants', () => {
     test('antCount grows with the square root and is capped', () => {
@@ -136,5 +136,32 @@ describe('boatCourse', () => {
         expect(Math.abs(mid.y)).toBeGreaterThan(1);
         expect(boatCourse(from, to, 0.1).x).toBeLessThan(10);
         expect(boatCourse(from, to, 0.9).x).toBeGreaterThan(90);
+    });
+});
+
+describe('the war by boat: courses', () => {
+    test('roundCourse keeps the ends, merges duplicates and rounds the corners', () => {
+        const pts = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
+        const poly = roundCourse(pts, 20);
+        expect(poly[0]).toEqual({ x: 0, y: 0 });
+        expect(poly[poly.length - 1]).toEqual({ x: 100, y: 100 });
+        // the corner itself is cut: no point of the course lies on (100, 0)
+        expect(poly.some(p => p.x === 100 && p.y === 0)).toBe(false);
+        // and never further than the radius from the straight legs
+        for (const p of poly) expect(Math.min(Math.abs(p.y), Math.abs(p.x - 100))).toBeLessThanOrEqual(20);
+    });
+    test('courseAt starts and ends on the course, eased, with a heading along it', () => {
+        const poly = roundCourse([{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 200 }]);
+        expect(courseAt(poly, 0)).toMatchObject({ x: 0, y: 0 });
+        const end = courseAt(poly, 1);
+        expect(Math.abs(end.x - 200) + Math.abs(end.y - 200)).toBeLessThan(1e-6);
+        expect(courseAt(poly, 0.1).x).toBeLessThan(0.1 * courseLength(poly));   // slow out of the harbour
+        expect(Math.abs(courseAt(poly, 0.05).angle)).toBeLessThan(1e-9);       // heading east on the first leg
+        expect(courseAt(poly, 0.95).angle).toBeCloseTo(Math.PI / 2, 6);         // heading south on the last
+    });
+    test('a crossing takes 5 to 9 real seconds, longer with distance', () => {
+        expect(sailSeconds(10)).toBe(5);
+        expect(sailSeconds(1e4)).toBe(9);
+        expect(sailSeconds(385)).toBeCloseTo(7, 6);
     });
 });

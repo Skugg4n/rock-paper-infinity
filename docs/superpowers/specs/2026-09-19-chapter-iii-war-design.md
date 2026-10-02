@@ -389,3 +389,37 @@ Ola, v1.44.0: very pleased with the war and its levelling; one bug and two wishe
 - **Reach decides the picture.** Fists and swords (reach 0): the clinch, a small burst where the dots touch, never a line. Gunpowder and up: tracers, from a defender on that island (the nearest guard, or the nearest of their dots), else from a point inland.
 - **Pause** is a shell feature (`window.__rpiPaused`, main.js): the loops keep ticking but return early, so game time and the war clock stand still and resuming is instant; saving continues. Chapter cards are not paused.
 - **Debug** is reachable only by `?debug` or five quick clicks on the version label.
+
+## War by boat (2026-10-03, v1.64.0)
+
+Ola: "mer verkligt, mer känsla". The war should move like the neighbour's raid
+in chapter II: nobody walks on the water.
+
+- **Their landings** (`launchWave`, melee): sighted → the party musters from the
+  tiles nearest their pier to the coast road beside it (`musterLanding`); the
+  boat casts off when the four-second warning is up (`onCastOff`, the radar line
+  "their boat has left the pier"); it sails the **water lanes** (a rectangle
+  round each island, off the coast by the island's pad plus 14 px, the channel
+  between the islands on the facing side) to the beach nearest the plate; the
+  party steps ashore in pairs and walks the streets. Crossings take
+  `sailSeconds` (5 to 9 s by distance). Push waves fill a bigger hull. One boat:
+  landings queue on the pier.
+- **Our strikes** sail from **our pier** (built from JS at war start, south coast
+  near the south-west corner) to the shore of their island nearest the tile. The
+  survivors (`onImpact` returns the share) walk back, sail home and go indoors;
+  `onHome` fires at our pier. The force counter waits for them; the rule does not.
+- **Guards** respond as the boat casts off and stand on the beach; the shore walk
+  marks its first leg as water (`crossFrom` 0, `ourCoast` 1), so `onIsland` and
+  every fight and scripted loss start at the first step ashore. Losses fall on the
+  beach and the first street.
+- **Beats**: the first landing sails 9 s and holds its impact one second; three
+  seconds of nothing after the first landing before the next control; every
+  control arrives with `arrive()` and its war-room line (the six-second
+  `REVEAL_GAP_S` already gives more than the 1.2 s beat asked for).
+- Air waves and ranged strikes stay arcs. No rule changed: `sim-phase3.mjs 1`
+  prints the same line before and after.
+
+Open: the two islands nearly touch at 1440 px (our pad 48 + their pad 50 against
+the 96 px margin between the grids), so the channel is a strait a hull's width
+wide and their pier ends on our beach. Widening the margin is the islands' job
+(CAPITAL), not the war's (B203).

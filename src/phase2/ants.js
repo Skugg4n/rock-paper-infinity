@@ -4,7 +4,9 @@
  * once the car is researched, and the competitor's red dots on their island.
  * The neighbour's watchmen walk their coast; when the city is complete they
  * board the boat, cross the water, raze one of our outer houses and sail home.
- * That is the opening of III·WAR (B191: nobody walks on the water).
+ * That is the opening of III·WAR (B191: nobody walks on the water). In the
+ * war itself their landings and our strikes sail too, each side from its own
+ * pier, and our guards meet a landing on the beach (v1.63.0).
  *
  * Rendering is a canvas overlay (`#ants-canvas`) over the city area; the
  * simulation reads building slot rectangles from the DOM once a second. Pure
@@ -217,6 +219,62 @@ export function boatCourse(from, to, k, bend = 0.08) {
     return { x: from.x + dx * e - dy / L * side, y: from.y + dy * e + dx / L * side };
 }
 
+/**
+ * A course through several points with the corners rounded (radius r), so a
+ * hull turns instead of pivoting. Points closer than half a pixel are merged.
+ * @param {Array<{x:number,y:number}>} points
+ * @param {number} [r=28]
+ * @returns {Array<{x:number,y:number}>} a dense polyline from the first point to the last
+ */
+export function roundCourse(points, r = 28) {
+    const pts = [];
+    for (const p of points) if (!pts.length || Math.hypot(p.x - pts[pts.length - 1].x, p.y - pts[pts.length - 1].y) > 0.5) pts.push({ x: p.x, y: p.y });
+    if (pts.length < 3) return pts;
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length - 1; i++) {
+        const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+        const l1 = Math.hypot(b.x - a.x, b.y - a.y), l2 = Math.hypot(c.x - b.x, c.y - b.y);
+        const rr = Math.min(r, l1 / 2, l2 / 2);
+        const p0 = { x: b.x + (a.x - b.x) * rr / l1, y: b.y + (a.y - b.y) * rr / l1 };
+        const p2 = { x: b.x + (c.x - b.x) * rr / l2, y: b.y + (c.y - b.y) * rr / l2 };
+        for (let k = 0; k <= 6; k++) {
+            const t = k / 6, u = 1 - t;
+            out.push({ x: u * u * p0.x + 2 * u * t * b.x + t * t * p2.x, y: u * u * p0.y + 2 * u * t * b.y + t * t * p2.y });
+        }
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+}
+/** Length of a polyline in px. */
+export const courseLength = (poly) => poly.reduce((s, p, i) => (i ? s + Math.hypot(p.x - poly[i - 1].x, p.y - poly[i - 1].y) : 0), 0);
+/**
+ * Where a boat is at k (0-1) of a course (a polyline from roundCourse), eased
+ * at both ends like boatCourse, with its heading in radians.
+ * @param {Array<{x:number,y:number}>} poly
+ * @param {number} k
+ * @returns {{x:number,y:number,angle:number|undefined}}
+ */
+export function courseAt(poly, k) {
+    const kk = Math.max(0, Math.min(1, k));
+    const e = kk < 0.5 ? 2 * kk * kk : 1 - Math.pow(-2 * kk + 2, 2) / 2;
+    if (poly.length < 2) return { x: poly[0]?.x ?? 0, y: poly[0]?.y ?? 0, angle: undefined };
+    let left = e * courseLength(poly);
+    for (let i = 1; i < poly.length; i++) {
+        const a = poly[i - 1], b = poly[i], L = Math.hypot(b.x - a.x, b.y - a.y);
+        if (left <= L || i === poly.length - 1) {
+            const t = L > 0 ? Math.min(1, left / L) : 1;
+            return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, angle: L > 0 ? Math.atan2(b.y - a.y, b.x - a.x) : undefined };
+        }
+        left -= L;
+    }
+    return { x: poly[poly.length - 1].x, y: poly[poly.length - 1].y, angle: undefined };
+}
+/**
+ * How long a crossing takes: real seconds that grow with the distance, 5 to 9.
+ * @param {number} px - length of the course
+ */
+export const sailSeconds = (px) => Math.max(5, Math.min(9, px / 55));
+
 /** Reverses a crossPath, keeping its markers pointing at the same places. */
 export function reversePath(path) {
     const r = [...path].reverse();
@@ -238,8 +296,9 @@ export function reversePath(path) {
  * @param {function(): Element[]} [opts.getCivilTiles] - their visible civil tiles (houses, store): walked between, never targets
  * @param {function(): Element|null} [opts.getTown] - the element that holds all their tiles (their island's bounding box)
  * @param {function(): Element|null} [opts.getPier] - their pier; the boat lies at its end
+ * @param {function(): Element|null} [opts.getOurPier] - our pier (chapter III); our boat lies at its end
  */
-export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getCivilTiles = () => [], getTown = () => null, getPier = () => null }) {
+export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getCivilTiles = () => [], getTown = () => null, getPier = () => null, getOurPier = () => null }) {
     const ctx = canvas.getContext('2d');
     const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const ants = [];
@@ -249,6 +308,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     let civilRects = [];     // their civil tiles (walked between, never targets)
     let townRect = null;     // their whole island's tiles
     let pierRect = null;
+    let ourPierRect = null;
     let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [], war: false };
     let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
@@ -312,6 +372,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         civilRects = getCivilTiles().map(el => layoutRect(el, area));
         const town = getTown(); townRect = town ? layoutRect(town, area) : null;
         const pier = getPier(); pierRect = pier ? layoutRect(pier, area) : null;
+        const ourPier = getOurPier(); ourPierRect = ourPier ? layoutRect(ourPier, area) : null;
         dpr = window.devicePixelRatio || 1;
         const w = area.offsetWidth, h = area.offsetHeight;
         if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
@@ -427,6 +488,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         }
         stepWatchmen(dt);
         stepRaid(dt);
+        stepLandings(dt);
+        stepSorties(dt);
         stepWar(dt);
         draw();
         drawWar();
@@ -526,39 +589,62 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     // `sailBoat` is the shared building block: it carries `boat.aboard` dots
     // from one point to another over `seconds`, with the heading along the
     // course and a wake while it moves. The war can use it for its landings.
-    const boat = { x: 0, y: 0, angle: -Math.PI / 2, aboard: 0, shown: 0, trip: null, moored: true };
+    // In the war (v1.63.0) there are two hulls: theirs at their pier, ours at
+    // the pier we build on our south coast. `owner` is the landing or sortie
+    // that holds a boat; one boat carries one party at a time, the rest queue.
+    const boat = { x: 0, y: 0, angle: -Math.PI / 2, aboard: 0, shown: 0, trip: null, moored: true, owner: null, scale: 1, crew: COLORS.watchman };
+    const ourBoat = { x: 0, y: 0, angle: Math.PI / 2, aboard: 0, shown: 0, trip: null, moored: true, owner: null, scale: 1, crew: COLORS.person };
     const dockPoint = () => (pierRect ? { x: pierRect.x + pierRect.w / 2, y: pierRect.y - 10 } : null);
-    function sailBoat(from, to, seconds, onArrive) {
-        boat.trip = { from, to, seconds, t: 0, onArrive };
-        boat.moored = false;
+    /** Where our boat lies: past the end of our pier, which runs from our south coast into the water. */
+    const ourDockPoint = () => (ourPierRect ? { x: ourPierRect.x + ourPierRect.w / 2, y: ourPierRect.y + ourPierRect.h + 10 } : null);
+    /**
+     * Sends a hull on its way. Without `via` the course is boatCourse (a
+     * straight line with a bow); with `via` (water lanes) it is a rounded
+     * course through those points.
+     */
+    function sail(b, from, to, seconds, onArrive, via) {
+        b.trip = { from, to, seconds, t: 0, onArrive, poly: via ? roundCourse([from, ...via, to]) : null };
+        b.moored = false;
+    }
+    function sailBoat(from, to, seconds, onArrive, via) { sail(boat, from, to, seconds, onArrive, via); }
+    function stepOneBoat(b, dock, want, mooredAngle, dt) {
+        if (b.moored && dock) { b.x = dock.x; b.y = dock.y; b.angle = mooredAngle; }
+        b.shown += (want - b.shown) * Math.min(1, dt * 1.2);
+        const trip = b.trip; if (!trip) return;
+        trip.t += dt;
+        const k = Math.min(1, trip.t / trip.seconds);
+        if (trip.poly) {
+            const p = courseAt(trip.poly, k);
+            if (p.angle !== undefined) b.angle = p.angle;
+            b.x = p.x; b.y = p.y;
+        } else {
+            const p = boatCourse(trip.from, trip.to, k), q = boatCourse(trip.from, trip.to, Math.min(1, k + 0.01));
+            if (Math.hypot(q.x - p.x, q.y - p.y) > 0.01) b.angle = Math.atan2(q.y - p.y, q.x - p.x);
+            b.x = p.x; b.y = p.y;
+        }
+        if (k >= 1) { b.trip = null; trip.onArrive?.(); }
     }
     function stepBoat(dt) {
         const dock = dockPoint();
-        if (boat.moored && dock) { boat.x = dock.x; boat.y = dock.y; boat.angle = -Math.PI / 2; }
-        const want = state.enemyStage >= 5 && !enemiesGone && dock ? 1 : 0;
-        boat.shown += (want - boat.shown) * Math.min(1, dt * 1.2);
-        const trip = boat.trip; if (!trip) return;
-        trip.t += dt;
-        const k = Math.min(1, trip.t / trip.seconds);
-        const p = boatCourse(trip.from, trip.to, k), q = boatCourse(trip.from, trip.to, Math.min(1, k + 0.01));
-        if (Math.hypot(q.x - p.x, q.y - p.y) > 0.01) boat.angle = Math.atan2(q.y - p.y, q.x - p.x);
-        boat.x = p.x; boat.y = p.y;
-        if (k >= 1) { boat.trip = null; trip.onArrive?.(); }
+        stepOneBoat(boat, dock, state.enemyStage >= 5 && !enemiesGone && dock ? 1 : 0, -Math.PI / 2, dt);
+        const ours = ourDockPoint();
+        stepOneBoat(ourBoat, ours, state.war && !peopleGone && ours ? 1 : 0, Math.PI / 2, dt);
     }
-    function drawBoat() {
-        if (boat.shown < 0.02) return;
+    function drawOneBoat(b) {
+        if (b.shown < 0.02) return;
         ctx.save();
-        ctx.translate(boat.x, boat.y); ctx.rotate(boat.angle + Math.PI / 2); ctx.globalAlpha = boat.shown;
+        ctx.translate(b.x, b.y); ctx.rotate(b.angle + Math.PI / 2); ctx.scale(b.scale || 1, b.scale || 1); ctx.globalAlpha = b.shown;
         ctx.fillStyle = 'rgba(15, 23, 42, 0.10)'; ctx.beginPath(); ctx.ellipse(2, 3, 9, 17, 0, 0, Math.PI * 2); ctx.fill();   // its shadow on the water
         ctx.fillStyle = '#475569';
         ctx.beginPath(); ctx.moveTo(0, -18); ctx.bezierCurveTo(9, -8, 8, 10, 6, 15); ctx.lineTo(-6, 15); ctx.bezierCurveTo(-8, 10, -9, -8, 0, -18); ctx.fill();
         ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.ellipse(0, 1, 4.5, 10.5, 0, 0, Math.PI * 2); ctx.fill();            // the deck
-        for (let i = 0; i < Math.min(boat.aboard, 12); i++) {
-            ctx.fillStyle = COLORS.watchman; ctx.beginPath(); ctx.arc(i % 2 ? 2.1 : -2.1, -7 + Math.floor(i / 2) * 3.4, 1.6, 0, Math.PI * 2); ctx.fill();
+        for (let i = 0; i < Math.min(b.aboard, 12); i++) {
+            ctx.fillStyle = b.crew; ctx.beginPath(); ctx.arc(i % 2 ? 2.1 : -2.1, -7 + Math.floor(i / 2) * 3.4, 1.6, 0, Math.PI * 2); ctx.fill();
         }
-        if (boat.trip) { ctx.globalAlpha = 0.45 * boat.shown; ctx.fillStyle = '#eef3f8'; ctx.beginPath(); ctx.moveTo(-5, 16); ctx.lineTo(0, 36); ctx.lineTo(5, 16); ctx.fill(); }   // the wake
+        if (b.trip) { ctx.globalAlpha = 0.45 * b.shown; ctx.fillStyle = '#eef3f8'; ctx.beginPath(); ctx.moveTo(-5, 16); ctx.lineTo(0, 36); ctx.lineTo(5, 16); ctx.fill(); }   // the wake
         ctx.restore();
     }
+    function drawBoat() { drawOneBoat(boat); drawOneBoat(ourBoat); }
 
     // --- The raid (the war's opening) ------------------------------------------
     // The watchmen walk the coast to the pier and board; the boat crosses to the
@@ -598,7 +684,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         return { x: land.x + dx / L * out, y: land.y + dy / L * out };
     }
     function startAttack(onRazed, onOver) {
-        if (raid) return false;
+        if (raid || boat.owner) return false;      // the boat is out with a landing (III)
         measure();
         const targets = homes();
         const R = townRing(), dock = dockPoint();
@@ -684,7 +770,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     /** The enemy pulls every dot back to `tileEl` (its rocket). onDone when all are there. */
     function withdraw(tileEl, onDone) {
         measure();
-        raid = null; boat.trip = null; boat.moored = true;
+        raid = null;
+        if (!boat.owner) { boat.trip = null; boat.moored = true; }   // a landing already at sea finishes and sails home
         watchmen.length = 0;      // they board the rocket with everyone else
         const rect = layoutRect(tileEl, area);
         withdrawing = { rect, onDone };
@@ -703,9 +790,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     }
 
     /**
-     * A wave against one of our plates. Melee: red dots march from the island
-     * and hit the plate; ranged/area: one arc through the air per few units.
-     * `onImpact()` fires once, when the first dots land or the arc lands.
+     * A wave against one of our plates. Melee: a landing by boat (see the war
+     * by boat above; `push` fills the boat, `first` sails slowly and holds the
+     * impact a second, `onCastOff(seconds)` fires as the boat leaves their
+     * pier). Ranged/area: one arc through the air per few units.
+     * `onImpact()` fires once, when the survivors reach the plate or the arc lands.
      */
     /**
      * Marks `losses` (0-1) of the dots to fall: what the other side's defence
@@ -724,10 +813,283 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             d.fallSeg = lo + Math.random() * (hi - lo);
         });
     }
-    function launchWave({ targetBuildingId, count, mode, losses = 0, onImpact }) {
+    // --- The war by boat (v1.63.0) -------------------------------------------
+    // A landing musters on their pier, sails the water lanes to the beach
+    // nearest the target, goes ashore and walks the streets to the plate. Our
+    // strikes do the same from our pier to their island, and the survivors sail
+    // home. Nobody walks on the water. The rules are untouched: `losses` are
+    // scripted to fall on the beach and the first street (onIsland from the first
+    // step ashore) and `onImpact` fires when the survivors reach the plate.
+    const landings = [];      // theirs, in order: { targetId, dots, phase, go, push, first, ... }
+    const sorties = [];       // ours, in order
+    const MUSTER_SPEED = 60, BOARD_SPEED = 55, RETURN_SPEED = 44;
+    const SEA_OFF = ISLAND_PAD + 14;
+    const boatFree = (b) => b.moored && !b.trip && !b.owner && !(b === boat && raid);
+    /** The water between the islands: halfway from our plates to theirs. */
+    function channelY() {
+        const t = townBox();
+        if (!t || !rects.length) return null;
+        const g = gridBox();
+        return (g.y + g.h + t.y) / 2;
+    }
+    /** The lanes round our island: off the coast on three sides, the channel on the south. */
+    function seaOurs() {
+        const R = ring(), ch = channelY();
+        const low = R.y + R.h + SEA_OFF;
+        const bottom = ch === null ? low : Math.max(R.y + R.h + 10, Math.min(low, ch));
+        return { x: R.x - SEA_OFF, y: R.y - SEA_OFF, w: R.w + 2 * SEA_OFF, h: bottom - (R.y - SEA_OFF) };
+    }
+    /** The lanes round their island: the channel on the north, off the coast elsewhere. */
+    function seaTheirs() {
+        const R = townRing(); if (!R) return null;
+        const ch = channelY();
+        const high = R.y - SEA_OFF;
+        const top = ch === null ? high : Math.min(R.y - 10, Math.max(high, ch));
+        return { x: R.x - SEA_OFF, y: top, w: R.w + 2 * SEA_OFF, h: R.y + R.h + SEA_OFF - top };
+    }
+    /** Where a boat lies for a beach at L on coast `edge`: straight out on the lane. */
+    function shoreOf(S, L, edge) {
+        if (edge === 'n') return { x: L.x, y: S.y };
+        if (edge === 'e') return { x: S.x + S.w, y: L.y };
+        if (edge === 'w') return { x: S.x, y: L.y };
+        return { x: L.x, y: S.y + S.h };
+    }
+    /** The points a boat passes between a and b along the lanes S (corners included). */
+    const lane = (S, a, b) => ringWalk(S, ringCoord(S, a), ringCoord(S, b));
+    /** Their pier's foot on their coast road, and ours on ours. */
+    function theirFoot() { const R = townRing(); return R && pierRect ? ringPoint(R, ringCoord(R, { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h })) : null; }
+    function ourFoot() { const R = ring(); return ourPierRect ? ringPoint(R, ringCoord(R, { x: ourPierRect.x + ourPierRect.w / 2, y: ourPierRect.y })) : null; }
+    /** Marks a shore walk: the first leg (boat to beach) is water, everything after is the island. */
+    function ashorePath(shore, inland) {
+        const path = [shore, ...inland];
+        path.crossFrom = 0; path.ourCoast = 1; path.land = 1;
+        return path;
+    }
+    /** A party gathers on the coast road before a pier: walkers to a queue, a pair at a time. */
+    function musterParty(n, R, foot, starts, kind) {
+        const sFoot = ringCoord(R, foot);
+        return Array.from({ length: n }, (_, i) => {
+            const a = starts[i % starts.length];
+            const spot = sFoot - 6 - Math.floor(i / 2) * 5;
+            const path = [a, ...ringWalk(R, ringCoord(R, a), spot)];
+            const end = path[path.length - 1];
+            path[path.length - 1] = { x: end.x, y: end.y + (i % 2 ? 2.5 : -2.5) };   // side by side on the road
+            return { kind, path, seg: 0, t: 0, wait: Math.random() * 1.2 };
+        });
+    }
+    /**
+     * Their landing party for a target starts to gather on their pier (at the
+     * radar's sighting). launchWave casts it off. Returns false if they have no pier.
+     */
+    function musterLanding({ targetBuildingId, count = 10, push = false } = {}) {
+        measure();
+        const R = townRing(), foot = theirFoot();
+        if (!R || !foot || !dockPoint() || !theirTiles().length) return false;
+        if (landings.some(l => l.targetId === targetBuildingId && !l.go)) return true;
+        const n = Math.min(push ? 16 : 10, Math.max(3, Math.round(count / 3)));
+        // from the tiles nearest their pier, so the party is aboard by the time the warning is up
+        const near = [...theirTiles()].sort((x, y) => Math.hypot(c(x).x - foot.x, c(x).y - foot.y) - Math.hypot(c(y).x - foot.x, c(y).y - foot.y)).slice(0, 3);
+        const starts = near.map(c);
+        landings.push({ targetId: targetBuildingId, dots: musterParty(n, R, foot, starts, 'enemy'), phase: 'muster', go: false, push });
+        return true;
+    }
+    /**
+     * A landing that will not sail (its plate fell before the boat left): the
+     * party leaves the pier and walks back into town. The boat is free again.
+     */
+    function cancelLanding(targetBuildingId) {
+        const l = landings.find(x => x.targetId === targetBuildingId && !x.go);
+        if (!l) return;
+        landings.splice(landings.indexOf(l), 1);
+        if (boat.owner === l) { boat.owner = null; boat.aboard = 0; boat.scale = 1; }
+        const R = townRing(), foot = theirFoot(), dock = dockPoint();
+        if (!R || !foot) return;
+        disbanded.push(...l.dots.map((d, i) => {
+            const at = d.aboard ? dock : (d.path ? pos(d) : d.end) || foot;
+            const home = c(pick(theirTiles().length ? theirTiles() : [{ x: foot.x, y: foot.y, w: 0, h: 0 }]));
+            const path = d.aboard || d.boarding ? [at, foot] : [at];
+            path.push(...ringWalk(R, ringCoord(R, foot), ringCoord(R, home)), home);
+            return { kind: 'enemy', path, seg: 0, t: 0, wait: pairDelay(i, 0.2) };
+        }));
+    }
+    const disbanded = [];     // walkers on their way back into town
+    function stepLandings(dt) {
+        for (let i = disbanded.length - 1; i >= 0; i--) if (advance(disbanded[i], dt, MUSTER_SPEED)) disbanded.splice(i, 1);
+        const dock = dockPoint(), foot = theirFoot();
+        for (let li = landings.length - 1; li >= 0; li--) {
+            const l = landings[li];
+            if (l.phase === 'muster' && l === landings[0] && boatFree(boat) && dock && foot) {
+                // the boat is theirs to take: whoever has reached the pier goes aboard
+                l.phase = 'board'; boat.owner = l; boat.aboard = 0; boat.scale = l.push ? 1.25 : 1;
+            }
+            if (l.phase === 'muster' || l.phase === 'board') boardParty(l.dots, l.phase === 'board', boat, foot, dock, dt);
+            if (l.phase === 'board' && l.go && l.dots.every(d => d.aboard)) castOff(l);
+            else if (l.phase === 'ashore') {
+                // they step off in pairs; the hull empties as they go
+                for (const d of l.dots) if (d.boarded && !(d.wait > 0)) d.boarded = false;
+                boat.aboard = l.dots.filter(d => d.boarded && !d.dead).length;
+                if (!boat.aboard) { l.phase = 'leave'; l.leaveAt = clock + 0.6; }
+            } else if (l.phase === 'leave' && clock >= l.leaveAt) {
+                l.phase = 'return';
+                const back = [...l.via].reverse();
+                sail(boat, l.shore, dock || l.dock, Math.max(4, Math.min(8, courseLength(roundCourse([l.shore, ...back, l.dock])) / 70)), () => {
+                    boat.moored = true; boat.owner = null; boat.scale = 1;
+                    landings.splice(landings.indexOf(l), 1);
+                }, back);
+            }
+        }
+    }
+    /**
+     * Moves a party along: to the queue by the pier, and once `boarding` (the
+     * boat is theirs), each one at the queue walks the pier and steps aboard.
+     */
+    function boardParty(dots, boarding, b, foot, dock, dt) {
+        for (const d of dots) {
+            if (d.aboard) continue;
+            const done = advance(d, dt, d.boarding ? BOARD_SPEED : MUSTER_SPEED);
+            if (!done || !boarding) continue;
+            if (!d.boarding) { d.boarding = true; d.path = [d.end, foot, dock]; d.seg = 0; d.t = 0; d.wait = 0.15; }
+            else { d.aboard = true; d.boarding = false; b.aboard++; }
+        }
+    }
+    function castOff(l) {
+        measure();
+        const target = rects.find(r => r.building.id === l.targetId) || l.target;
+        const route = cross(pierRect, target.rect);
+        const land = route[route.land];
+        const S = seaOurs(), dock = dockPoint();
+        const shore = shoreOf(S, land, route.edge);
+        const via = lane(S, dock, shore);
+        const seconds = l.first ? 9 : sailSeconds(courseLength(roundCourse([dock, ...via, shore])));
+        Object.assign(l, { phase: 'sail', target, route, land, shore, dock, via });
+        // sighted: the nearest guards walk the coast to the beach it is heading for
+        l.responders = respond(land);
+        l.onCastOff?.(seconds);
+        sail(boat, dock, shore, seconds, () => {
+            l.phase = 'ashore';
+            boat.angle = Math.atan2(land.y - shore.y, land.x - shore.x);
+            const streets = route.slice(route.land + 1);
+            l.dots.forEach((d, i) => {
+                Object.assign(d, { kind: 'enemy', at: target, path: ashorePath(shore, [land, ...streets]), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, boarded: true, aboard: false });
+            });
+            // our guards meet them on the beach; the fallen fall there and in the first street
+            scriptLosses(l.dots, l.losses, 1, 2.9);
+            waves.push({ dots: l.dots, target, onImpact: l.onImpact, done: false, kind: 'enemy', responders: l.responders, hold: l.first ? 1 : 0 });
+            combat = true;
+        }, via);
+    }
+
+    /**
+     * Our strike by boat: the force gathers at our pier from the nearest plates,
+     * sails to the shore of their island nearest the tile, goes ashore and walks
+     * to the tile. Their watchmen and people meet it on their beach. The
+     * survivors (the share `onImpact` returns) walk back, sail home and go
+     * indoors; `onHome` fires when our boat is back at the pier.
+     */
+    function launchSortie({ tile, tileIndex, count, losses, onImpact, onHome }) {
+        const R = ring(), foot = ourFoot();
+        const standing = rects.filter(r => !r.building.razed);
+        if (!foot || !standing.length) return false;
+        const bottom = Math.max(...standing.map(r => r.rect.y));
+        const near = standing.filter(r => Math.abs(r.rect.y - bottom) < 1).sort((a, b) => Math.abs(c(a.rect).x - foot.x) - Math.abs(c(b.rect).x - foot.x)).slice(0, 3);
+        const n = Math.min(14, Math.max(3, Math.round(count / 3)));
+        sorties.push({ tile, tileIndex, dots: musterParty(n, R, foot, near.map(r => c(r.rect)), 'person'), phase: 'muster', losses, onImpact, onHome, home: [] });
+        return true;
+    }
+    function stepSorties(dt) {
+        const dock = ourDockPoint(), foot = ourFoot();
+        for (let si = sorties.length - 1; si >= 0; si--) {
+            const s = sorties[si];
+            if (s.phase === 'muster' && s === sorties.find(x => x.phase !== 'home') && boatFree(ourBoat) && dock && foot) {
+                s.phase = 'board'; ourBoat.owner = s; ourBoat.aboard = 0;
+            }
+            if (s.phase === 'muster' || s.phase === 'board') boardParty(s.dots, s.phase === 'board', ourBoat, foot, dock, dt);
+            if (s.phase === 'board' && s.dots.every(d => d.aboard)) sortieCastOff(s);
+            else if (s.phase === 'ashore') {
+                for (const d of s.dots) if (d.boarded && !(d.wait > 0)) d.boarded = false;
+                ourBoat.aboard = s.dots.filter(d => d.boarded && !d.dead).length;
+                // the boat waits off their beach until the fighting is over
+                if (s.wave.done && s.dots.every(d => d.dead)) {
+                    const share = typeof s.homeShare === 'number' ? Math.max(0, Math.min(1, s.homeShare)) : 0;
+                    const m = share > 0 ? Math.max(1, Math.min(s.dots.length, Math.round(s.dots.length * share))) : 0;
+                    const back = [...s.path].reverse();
+                    s.back = Array.from({ length: m }, (_, i) => ({ kind: 'person', path: back.map(p => ({ x: p.x, y: p.y })), seg: 0, t: 0, wait: 0.4 + pairDelay(i, 0.3) }));
+                    s.phase = 'regroup';
+                }
+            } else if (s.phase === 'regroup') {
+                for (const d of s.back) { if (!d.aboard && advance(d, dt, RETURN_SPEED)) { d.aboard = true; ourBoat.aboard++; } }
+                if (s.back.every(d => d.aboard)) {
+                    s.phase = 'return';
+                    const back = [...s.via].reverse();
+                    sail(ourBoat, s.shore, dock || s.dock, sailSeconds(courseLength(roundCourse([s.shore, ...back, s.dock]))), () => {
+                        ourBoat.moored = true; ourBoat.owner = null;
+                        // home: down the gangway, along the pier and indoors
+                        const R = ring();
+                        const indoors = rects.filter(r => !r.building.razed).sort((a, b) => Math.hypot(c(a.rect).x - foot.x, c(a.rect).y - foot.y) - Math.hypot(c(b.rect).x - foot.x, c(b.rect).y - foot.y))[0];
+                        const inPt = indoors ? ringPoint(R, ringCoord(R, c(indoors.rect))) : foot;
+                        s.home = s.back.map((d, i) => ({ kind: 'person', path: [s.dock, foot, ...ringWalk(R, ringCoord(R, foot), ringCoord(R, inPt)).slice(1), indoors ? c(indoors.rect) : foot], seg: 0, t: 0, wait: pairDelay(i, 0.3) }));
+                        ourBoat.aboard = 0;
+                        s.phase = 'home';
+                        s.onHome?.();
+                    }, back);
+                }
+            } else if (s.phase === 'home') {
+                for (const d of s.home) if (!d.inside && advance(d, dt, BOARD_SPEED)) d.inside = true;
+                if (s.home.every(d => d.inside)) sorties.splice(si, 1);
+            }
+        }
+    }
+    function sortieCastOff(s) {
+        measure();
+        const tile = enemyRects[s.tileIndex] ?? s.tile;
+        const Rt = townRing(), S = seaTheirs(), dock = ourDockPoint();
+        const edge = nearestEdge(tile, townBox(), 'n');
+        const inland = landingRoute(tile, Math.max(6, getGap() / 2), Rt, edge);
+        const land = inland[0], shore = shoreOf(S, land, edge);
+        const via = lane(S, dock, shore);
+        const seconds = sailSeconds(courseLength(roundCourse([dock, ...via, shore])));
+        const path = ashorePath(shore, inland);
+        Object.assign(s, { phase: 'sail', tile, land, shore, dock, via, path });
+        sail(ourBoat, dock, shore, seconds, () => {
+            s.phase = 'ashore';
+            ourBoat.angle = Math.atan2(land.y - shore.y, land.x - shore.x);
+            s.dots.forEach((d, i) => {
+                Object.assign(d, { kind: 'person', at: { rect: tile }, path: ashorePath(shore, inland), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, strike: true, boarded: true, aboard: false });
+            });
+            // their defence meets them on their beach and in the first street
+            scriptLosses(s.dots, s.losses, 1, Math.min(3, inland.length));
+            s.wave = { dots: s.dots, target: { rect: tile }, done: false, kind: 'ours',
+                onImpact: (f) => { const share = s.onImpact?.(f); s.homeShare = typeof share === 'number' ? share : 0; } };
+            waves.push(s.wave);
+        }, via);
+    }
+    /** Mustering, boarding and homecoming dots (the ones not yet in a wave). */
+    function drawParties() {
+        const dot = (p, color) => { ctx.beginPath(); ctx.fillStyle = color; ctx.globalAlpha = 0.9; ctx.arc(p.x, p.y, RADIUS.enemy, 0, Math.PI * 2); ctx.fill(); };
+        for (const l of landings) if (l.phase === 'muster' || l.phase === 'board') for (const d of l.dots) { if (d.aboard) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.enemy); }
+        for (const d of disbanded) { const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.enemy); }
+        for (const s of sorties) {
+            if (s.phase === 'muster' || s.phase === 'board') for (const d of s.dots) { if (d.aboard) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.person); }
+            if (s.phase === 'regroup') for (const d of s.back) { if (d.aboard || d.wait > 0) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.person); }
+            if (s.phase === 'home') for (const d of s.home) { if (d.inside || d.wait > 0) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.person); }
+        }
+    }
+
+    function launchWave({ targetBuildingId, count, mode, losses = 0, onImpact, push = false, first = false, onCastOff }) {
         measure();
         const target = rects.find(r => r.building.id === targetBuildingId);
         if (!target) { onImpact?.(); return; }
+        if (mode === 'melee' && pierRect && dockPoint() && townRing() && theirTiles().length) {
+            // By boat: the party already gathering for this plate (musterLanding), or a new one
+            let l = landings.find(x => x.targetId === targetBuildingId && !x.go);
+            if (!l) { musterLanding({ targetBuildingId, count, push }); l = landings.find(x => x.targetId === targetBuildingId && !x.go); }
+            if (l) {
+                Object.assign(l, { go: true, target, losses, onImpact, onCastOff, first: !!first });
+                const edge = nearestEdge(target.rect, gridBox(), 's');
+                if (edge !== 's' && !state.hitEdges.includes(edge)) state.hitEdges = [...state.hitEdges, edge];
+                return edge;
+            }
+        }
         const from = enemyRects.length ? pick(enemyRects) : { x: canvas.width / dpr / 2, y: canvas.height / dpr, w: 0, h: 0 };
         if (mode === 'melee') {
             const dots = [];
@@ -775,11 +1137,14 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         return Array.from({ length: n }, (_, i) => ringPoint(R, (i + 0.5) * P / n));
     }
 
-    /** Our strike on an enemy tile (by index in enemyRects). Same shapes, blue. */
-    function launchStrike({ tileIndex, count, mode, losses = 0, onImpact }) {
+    /** Our strike on an enemy tile (by index in enemyRects). Melee by boat from our pier, blue; ranged/area as arcs. */
+    function launchStrike({ tileIndex, count, mode, losses = 0, onImpact, onHome }) {
         measure();
         const tile = enemyRects[tileIndex] ?? enemyRects[0];
         if (!tile) { onImpact?.(); return; }
+        // By boat from our pier, when we have one (chapter III builds it)
+        // ('boat': onHome will fire when the survivors are back at our pier)
+        if (mode === 'melee' && ourPierRect && ourDockPoint() && townRing() && launchSortie({ tile, tileIndex, count, losses, onImpact, onHome })) return 'boat';
         // they set out from the standing plate on our south coast closest to the tile
         const standing = rects.filter(r => !r.building.razed);
         const lowest = Math.max(...standing.map(r => r.rect.y), -Infinity);
@@ -821,7 +1186,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
                 // Never at sea (onIsland), and with fists or swords there is no
                 // shot at all: only the clinch, a small burst where they meet.
                 if (d.fallSeg !== undefined && d.path && d.seg + d.t >= d.fallSeg && onIsland(d.path, d.seg, d.t)) {
-                    const p = pos(d); d.killed = true; d.dead = true;
+                    const p = pos(d); d.killed = true; d.dead = true; d.fellAt = d.seg + d.t;
                     if (p) {
                         const color = d.strike ? COLORS.enemy : COLORS.person;
                         const r = reach(d.strike ? state.enemyTier : state.ourTier);
@@ -837,10 +1202,16 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             }
             const alive = w.dots.filter(d => !d.killed).length;
             if (w.responders && w.dots.every(d => d.dead)) { w.responders.forEach(g => { g.resp = null; }); w.responders = null; }
-            if (!w.done && alive === 0) { w.done = true; w.onImpact?.(0); }
-            if (!w.done && arrived >= Math.ceil(alive / 2)) { w.done = true; w.onImpact?.(alive / w.dots.length); flash(c(w.target.rect), 30, w.kind === 'ours' ? COLORS.person : COLORS.enemy); }
+            // The first landing holds its impact a second (`hold`): everything keeps moving, only the blow waits.
+            const due = !w.done && (alive === 0 || arrived >= Math.ceil(alive / 2));
+            if (due && w.hold > 0 && w.heldAt === undefined) w.heldAt = clock;
+            if (due && (!(w.hold > 0) || clock - w.heldAt >= w.hold)) {
+                w.done = true;
+                if (alive === 0) w.onImpact?.(0);
+                else { w.onImpact?.(alive / w.dots.length); flash(c(w.target.rect), 30, w.kind === 'ours' ? COLORS.person : COLORS.enemy); }
+            }
         }
-        for (let i = waves.length - 1; i >= 0; i--) if (waves[i].dots.every(d => d.dead)) waves.splice(i, 1);
+        for (let i = waves.length - 1; i >= 0; i--) if (waves[i].done && waves[i].dots.every(d => d.dead)) waves.splice(i, 1);
         combat = waves.some(w => w.kind === 'enemy');
         // arcs and flashes
         for (const e of effects) {
@@ -1039,8 +1410,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.globalAlpha = 0.95 * (g.fade ?? 1);
             ctx.arc(g.x, g.y, RADIUS.person + 0.3, 0, Math.PI * 2); ctx.fill();
         }
+        drawParties();
         for (const w of waves) for (const d of w.dots) {
-            if (d.dead) continue;
+            if (d.dead || d.boarded) continue;            // still on the boat
             const p = pos(d); if (!p) continue;
             ctx.beginPath(); ctx.fillStyle = d.strike ? COLORS.person : COLORS.enemy; ctx.globalAlpha = 0.9;
             ctx.arc(p.x, p.y, RADIUS.enemy, 0, Math.PI * 2); ctx.fill();
@@ -1078,5 +1450,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
     function setState(next) { state = { ...state, ...next }; }
 
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, withdraw, gatherAt, measure, sailBoat, _debug: () => ({ raid: raid?.phase, boat: { x: Math.round(boat.x), y: Math.round(boat.y), aboard: boat.aboard, shown: +boat.shown.toFixed(2), trip: !!boat.trip }, watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
+    const boatInfo = (b) => ({ x: Math.round(b.x), y: Math.round(b.y), aboard: b.aboard, shown: +b.shown.toFixed(2), trip: !!b.trip, moored: b.moored, owner: !!b.owner });
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, musterLanding, cancelLanding, withdraw, gatherAt, measure, sailBoat, dockPoint, ourDockPoint, _debug: () => ({ raid: raid?.phase, boat: boatInfo(boat), ourBoat: boatInfo(ourBoat),
+        landings: landings.map(l => ({ phase: l.phase, go: l.go, dots: l.dots.length, shore: l.shore && [Math.round(l.shore.x), Math.round(l.shore.y)], land: l.land && [Math.round(l.land.x), Math.round(l.land.y)] })),
+        sorties: sorties.map(s => ({ phase: s.phase, dots: s.dots.length, back: s.back?.length ?? 0, shore: s.shore && [Math.round(s.shore.x), Math.round(s.shore.y)] })), watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, fellAt: w.dots.filter(d => d.killed).map(d => +(d.fellAt ?? -1).toFixed(2)), segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

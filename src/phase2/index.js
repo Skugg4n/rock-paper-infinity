@@ -13,6 +13,7 @@ import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY, formatCount,
 } from './economy.js';
 import { createAnts } from './ants.js';
+import { layoutRect } from './layout.js';
 import { createIsland } from './islands.js';
 import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap, waveStandingK, defenceStandingK,
@@ -323,7 +324,36 @@ export function init() {
               ui.competitorIsland.classList.toggle('enemy-rubble', w.leaveStage >= 3);
               renderWarRoom();
               gameState.buildings.forEach((b, i) => { if (b) renderGridSlot(i); });
+              placeOurPier();
           }
+          /**
+           * Our pier (v1.63.0): built when the war starts, on our south coast near
+           * the south-west corner, facing their island. Our boat lies at its end.
+           * Built from here (the shell is not this chapter's); placed in layout
+           * coordinates under the plates, so the tilt carries it like the coast.
+           */
+          function ourPier() {
+              return once('our-pier', () => {
+                  const el = document.createElement('div');
+                  el.id = 'our-pier'; el.setAttribute('aria-hidden', 'true');
+                  ui.landGrid.after(el);
+                  return el;
+              });
+          }
+          let ourPierAt = '';
+          function placeOurPier() {
+              if (!gameState.war?.active) return;
+              const el = ourPier();
+              const g = layoutRect(ui.landGrid, ui.cityArea);
+              const at = `${Math.round(g.x + 18)},${Math.round(g.y + g.h + 4)}`;
+              if (at === ourPierAt) return;
+              ourPierAt = at;
+              const [x, y] = at.split(',');
+              el.style.left = `${x}px`; el.style.top = `${y}px`;
+          }
+          // Survivors of a strike by boat who are still on their way home: the
+          // rule has already given them back to the force; the counter waits for them.
+          let forceAway = 0;
 
           function warTick() {
               const w = gameState.war;
@@ -372,12 +402,16 @@ export function init() {
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       if (w.radar && targetEl) targetEl.classList.add('targeted');
                       const skyward = isAirMode(w.pendingWave.mode);
-                      if (w.radar) logWar(push ? `Intel: a large ${skyward ? 'salvo' : 'force'} is heading for ${target.type}.` : skyward ? `Radar: a salvo is on its way to ${target.type}.` : `Radar: landing party heading for ${target.type}.`, push);
+                      // A landing gathers on their pier while the radar watches; the boat casts off at launchAt.
+                      if (!skyward) _ants?.musterLanding({ targetBuildingId: target.id, count: size, push });
+                      if (w.radar && skyward) logWar(push ? `Intel: a large salvo is heading for ${target.type}.` : `Radar: a salvo is on its way to ${target.type}.`, push);
+                      else if (w.radar) logWar(push ? `Intel: a large force is gathering on their pier for ${target.type}.` : `Radar: a landing party is gathering on their pier.`, push);
                   }
               }
               if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
                   const { targetId, size } = w.pendingWave;
                   const mode = w.pendingWave.mode || TIERS[w.enemyTier].mode;
+                  const launched = w.pendingWave;
                   w.pendingWave = null;
                   const b = gameState.buildings.find(x => x && x.id === targetId);
                   if (b && !b.razed) {
@@ -389,11 +423,20 @@ export function init() {
                       // defence that can reach it absorbs (guards on the ground, air defence in the sky).
                       const losses = landingLosses({ size, enemyTier: w.enemyTier, ourTier: w.tier, defence: w.defence, airDefence: w.air || 0, mode });
                       const impact = () => { targetEl?.classList.remove('targeted'); resolveWave(targetId, size, enemy, mode); };
+                      // The first landing of the war is drawn out: the boat sails slowly and the blow waits a second.
+                      const { push } = launched;
+                      const first = !isAirMode(mode) && !w.firstLanding;
+                      if (first) w.firstLanding = true;
+                      const castOff = () => {
+                          const ww = gameState.war; if (!ww?.active) return;
+                          if (ww.radar) logWar(`Radar: their boat has left the pier. ${size} ${enemy.id} heading for ${b.type}.`, push);
+                          else if (first) logWar('Status: their boat has left the pier. It is heading for us.', true);
+                      };
                       if (_ants) {
-                          const edge = _ants.launchWave({ targetBuildingId: targetId, count: size, mode, losses, onImpact: impact });
+                          const edge = _ants.launchWave({ targetBuildingId: targetId, count: size, mode, losses, onImpact: impact, push, first, onCastOff: castOff });
                           if (edge && edge !== 's' && !(w.hitEdges || []).includes(edge)) w.hitEdges = (w.hitEdges || []).concat([edge]);
                       } else impact();
-                  }
+                  } else _ants?.cancelLanding(targetId);   // the plate fell before they sailed: the party goes home
               }
               // food and land suffer: scorch cuts production, and the war room says so once
               const doom = doomsday(w.scorchOurs + w.scorchTheirs);
@@ -449,10 +492,14 @@ export function init() {
                   if (hardest > 0 && canRazeTile(w.force, w.tier, w.enemyTier, w.enemyDefence, hardest)) tryStrike();
               }
               // One control at a time, teased grey until it can be afforded.
-              const opened = revealNext(w);
+              // After the first landing has struck, three seconds of nothing new (revealHoldUntil).
+              const opened = w.t >= (w.revealHoldUntil || 0) ? revealNext(w) : null;
               if (opened) {
                   if (REVEAL_LINES[opened]) logWar(REVEAL_LINES[opened]);
-                  if (opened === 'fort') gameState.buildings.forEach((b, i) => { if (b) renderGridSlot(i); });
+                  if (opened === 'fort') {
+                      gameState.buildings.forEach((b, i) => { if (b) renderGridSlot(i); });
+                      ui.landGrid.querySelectorAll('.fort-btn').forEach(btn => arrive(btn));
+                  }
               }
               // The first minute: if nothing is coming out of the factory, the slider says so, once.
               if (!w.sliderPulsed && w.t >= 6 && w.t <= 60 && w.arms < UNIT_COST && w.defence + w.force === 0) {
@@ -486,6 +533,7 @@ export function init() {
               const i = gameState.buildings.findIndex(b => b && b.id === targetId);
               const b = gameState.buildings[i];
               w.landings = (w.landings || 0) + 1;
+              if (w.landings === 1) w.revealHoldUntil = w.t + 3;
               if (!b || b.razed) return;
               const hp = b.hp ?? plateMaxHp(b.type, b.fort || 0);
               const ratio = relativePower(w.enemyTier, w.tier);
@@ -533,12 +581,15 @@ export function init() {
               const losses = Math.min(1, Math.min(force * strikeRatio, enemyDefence0) / (force * strikeRatio));
               w.force = 0; // released
               w.strikes = (w.strikes || 0) + 1;
+              let byBoat = false, coming = 0;
               const impact = () => {
-                  const ww = gameState.war; if (!ww?.active) return;
+                  const ww = gameState.war; if (!ww?.active) return 0;
                   const hp = ww.enemyTileHp?.[pickIdx] ?? ENEMY_TILE_HP;
                   const enemyDefenceAtImpact = ww.enemyDefence;
                   const r = resolveOurStrike({ force, ourTier, enemyTier: ww.enemyTier, enemyDefence: ww.enemyDefence, tileHp: hp });
                   ww.force += r.forceLeft; ww.enemyDefence = r.enemyDefenceLeft;
+                  // by boat the survivors are still over there: the rule has them back, the counter waits
+                  if (byBoat) { coming = r.forceLeft; forceAway += coming; }
                   ww.enemyTileHp = ww.enemyTileHp || [0, 0, 0, 0, 0].map(() => ENEMY_TILE_HP);
                   ww.enemyTileHp[pickIdx] = r.tileHpLeft;
                   ww.scorchTheirs += tier.scorch * 3;
@@ -557,8 +608,14 @@ export function init() {
                       logWar(`Interior: ${story}. Nothing reached their ${names[pickIdx]}.`);
                   }
                   updateAllUI();
+                  return force > 0 ? r.forceLeft / force : 0;     // the share that sails home
               };
-              if (_ants) _ants.launchStrike({ tileIndex: pickIdx, count: force, mode: tier.mode, losses, onImpact: impact }); else impact();
+              const home = () => {
+                  forceAway = Math.max(0, forceAway - coming); coming = 0;
+                  updateAllUI();
+              };
+              if (_ants) byBoat = _ants.launchStrike({ tileIndex: pickIdx, count: force, mode: tier.mode, losses, onImpact: impact, onHome: home }) === 'boat';
+              else impact();
               updateAllUI();
               return true;
           }
@@ -567,9 +624,10 @@ export function init() {
               const w = gameState.war;
               const active = !!w?.active;
               [ui.buyDefenceBtn, ui.buyForceBtn].forEach(btn => btn.classList.toggle('hidden', !active));
-              ui.strikeBtn.classList.toggle('hidden', !active || !isShown(w, 'strike'));
-              ui.tierBtn.classList.toggle('hidden', !active || !isShown(w, 'tier'));
-              ui.autoStrikeBtn.classList.toggle('hidden', !active || !isShown(w, 'autoStrike') || w.enemyLeft);
+              // Controls that open during the war arrive with the same pop as the swords (showBtn → arrive)
+              showBtn(ui.strikeBtn, active && isShown(w, 'strike'));
+              showBtn(ui.tierBtn, active && isShown(w, 'tier'));
+              showBtn(ui.autoStrikeBtn, active && isShown(w, 'autoStrike') && !w.enemyLeft);
               if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); ui.raidBtn.classList.add('hidden'); }
               ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
               if (!active) return;
@@ -578,18 +636,18 @@ export function init() {
               const airOpen = isShown(w, 'air');
               ui.warAirRow.classList.toggle('hidden', !airOpen);
               ui.warAir.textContent = Math.round(w.air || 0).toLocaleString('en-US');
-              ui.buyAirBtn.classList.toggle('hidden', !airOpen);
+              showBtn(ui.buyAirBtn, airOpen);
               ui.buyAirBtn.disabled = w.arms < AIR_UNIT_COST;
               {
                   const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
                   setTooltip(ui.buyAirBtn, { effect: `+${n} <i data-lucide='shield-half' class='w-4 h-4'></i> <span class='tip-note'>stops shells</span>`, armsCost: n * AIR_UNIT_COST });
               }
-              ui.warForce.textContent = Math.round(w.force).toLocaleString('en-US');
+              ui.warForce.textContent = Math.round(Math.max(0, w.force - forceAway)).toLocaleString('en-US');
               ui.warArms.textContent = Math.floor(w.arms).toLocaleString('en-US');
               ui.warArmsRate.textContent = `+${(armsPerSecond(w.tier) * w.armsShare).toFixed(0)}/s`;
               ui.warTier.textContent = `${tier.numeral} ${tier.id}`;
               ui.warEnemyTier.textContent = w.intel ? `${TIERS[w.enemyTier].numeral} ${TIERS[w.enemyTier].id}` : '?';
-              ui.intelBtn.classList.toggle('hidden', !active || !!w.intel || !isShown(w, 'intel'));
+              showBtn(ui.intelBtn, active && !w.intel && isShown(w, 'intel'));
               ui.intelBtn.disabled = w.arms < INTEL_COST;
               setTooltip(ui.intelBtn, { effect: `<i data-lucide='eye' class='w-4 h-4'></i> intel`, armsCost: INTEL_COST });
               ui.tierBadge.textContent = w.tier < TIERS.length - 1 ? TIERS[w.tier + 1].numeral : tier.numeral;
@@ -604,7 +662,7 @@ export function init() {
               const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0, w.enemyTier - w.tier) : null;
               const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
               ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
-              ui.autoBtn.classList.toggle('hidden', !active || !isShown(w, 'auto'));
+              showBtn(ui.autoBtn, active && isShown(w, 'auto'));
               ui.autoBtn.classList.toggle('toggled', !!w.autoBought && (w.stance || 'balanced') !== 'off');
               // The quartermaster's stance, a ratio defence : force (shield 3:1, scale 1:1, sword 1:3), or off
               {
@@ -620,13 +678,13 @@ export function init() {
               }
               // Raiding party: a helper you send in; while it is there their defence is nothing
               const raidLeft = Math.max(0, Math.ceil((w.raidUntil || 0) - w.t));
-              ui.raidBtn.classList.toggle('hidden', !active || w.enemyLeft || !isShown(w, 'raid'));
+              showBtn(ui.raidBtn, active && !w.enemyLeft && isShown(w, 'raid'));
               ui.raidBtn.disabled = raidLeft > 0 || w.arms < raidCost(w.raids || 0);
               ui.raidBtn.classList.toggle('active-raid', raidLeft > 0);
               setTooltip(ui.raidBtn, raidLeft > 0 ? { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> ${raidLeft} s` } : { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> their <i data-lucide='shield' class='w-4 h-4'></i> → 0 for ${RAID_S} s`, armsCost: raidCost(w.raids || 0) });
               // Radar: a purchase, then an instrument: the badge counts down to the next landing,
               // the tooltip says how big it is and where it is heading once it is spotted.
-              ui.radarBtn.classList.toggle('hidden', !active || w.enemyLeft || !isShown(w, 'radar'));
+              showBtn(ui.radarBtn, active && !w.enemyLeft && isShown(w, 'radar'));
               ui.radarBtn.classList.toggle('radar-on', !!w.radar);
               if (w.radar) {
                   const p = w.pendingWave;
@@ -808,6 +866,7 @@ export function init() {
                   : [],
               getTown: () => ui.competitorIsland.querySelector('.enemy-grid'),
               getPier: () => ui.competitorIsland.querySelector('.enemy-pier'),
+              getOurPier: () => (gameState.war?.active ? document.getElementById('our-pier') : null),
               getGap: () => parseFloat(getComputedStyle(ui.landGrid).columnGap) || 8,
           });
 
@@ -1198,6 +1257,7 @@ export function init() {
               if (gameState.competitorSpawned && !skipGrowth) gameState.competitorTicks = (gameState.competitorTicks || 0) + 1;
               applyCompetitorStage(gameState.population);
               updateIslands();
+              placeOurPier();
               _ants?.setState({
                   population: gameState.population,
                   carUnlocked: !!gameState.carUnlocked,
