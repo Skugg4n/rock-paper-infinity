@@ -152,6 +152,24 @@ so events are sparse by design; the fight flashes of fists and swords stay silen
   gain lifts them; give dry cracks a 4 ms attack.
 - In the 90 s demo the clock runs 2.5 times fast, or only two landings fit.
 
+**From board 2 (`docs/mockups/sound-board-war-2.html`, after Ola: "too Gameboy, the ending weak, not in sync").**
+- Weight instead of notes: their drum is a sub kick (90 to 45 Hz in 120 ms, a soft click, a
+  faint room tail), ours the same an octave up and dry; a landing is a far detonation
+  (transient, 120 to 60 Hz body, noise tail into a room pre-delayed 250 ms); purchases ring
+  out as struck metal; the tones are an organ with one voice per plate, so a razed plate
+  fades out over seconds. The rise is the only melody left in the war.
+- Everything on their drum's grid: the radar ticks on beat subdivisions that count down to
+  the landing beat, shells hit on it (or are cracked on it), strikes land a beat later, the
+  raid starts on a beat and lets its held breath out (6 dB and a dry room) on the beat the
+  drum returns. At the game's tempo 105 s holds three landings.
+- The ending: rumble and crackle from 55 %, the drum tightens (16 to a bar from 75 %) and
+  rises; a nine second ramp swallows the music; then three seconds of true silence
+  (measured: the whole master, room included, at -120 dB); out of it two voices on E♭,
+  0.3 Hz apart, fall to the low D at -46 rising to -22 dBFS RMS.
+- Levels: demo peak -3.6 dBFS before the ending, -2.9 at the end of the ramp; RMS about -18.
+  RMS does not show the ramp as louder than the middle (the approved bass holds the floor
+  at about -20); it reads as bigger through brightness, the rising drum and the silence after.
+
 ## 4b. IV · THE DEEP in detail (*proposal*, from the DEEP session, 2026-10-02)
 
 Written against the locked design (`2026-10-02-chapter-iv-tree-and-bio.md`). Two
