@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.59.3 - 2026-10-02 (sound, the end of chapter I)
+
+### The music ends on one note
+
+Ola: when the chapter ends the music should stop, all but one note that is struck and fades to silence under the CAPITAL text or just before (B169).
+
+- **At the bank** everything in the music falls away at once and a single note is struck: D, the key's own note. It rings out over about seven seconds, so it is gone as CAPITAL stands on the card.
+- **Nothing else sounds there**: no purchase thunk on the bank and no swell on this card. With music switched off the card keeps its usual swell.
+- The machine stays silent for the rest of the chapter's last seconds and may play again when a chapter I begins (`audio.finale()`, `audio.begin()`; `playChapterCard` has a `silent` option).
+- The sound board has a button for it: "Aktens slut (sista tonen)".
+- The code went out one commit earlier (d198d19) still marked v1.59.2; this entry and the version number follow it.
+
 ## v1.59.2 - 2026-10-02 (sound, chapter I)
 
 ### The music creeps in instead of taking steps

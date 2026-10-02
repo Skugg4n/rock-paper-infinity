@@ -1619,3 +1619,13 @@ items:
       certain points. Can they be sneaked in more? It would feel more magical.
     status: done
     resolved_in: v1.59.2
+
+  - id: B169
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      When the chapter ends the music should end too: everything stops except
+      one note that is struck and then fades to silence under the CAPITAL text
+      or just before.
+    status: done
+    resolved_in: v1.59.3
