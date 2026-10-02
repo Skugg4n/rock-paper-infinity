@@ -188,3 +188,13 @@ by side for Ola to choose.
 Rules for the bio alternatives (Claude): no bilateral symmetry (symmetry is what makes
 faces), no horns, no gauges or tick marks, nothing digital. Level is shown by how
 swollen or filled a growth is. Forms irregular, as if grown, not drawn with a ruler.
+
+## Ola on mockups 11 (2026-10-02): decided
+
+- **Bio = A with C.** Mycelium is closest, combined with sinew: think tendons,
+  muscles and blood vessels together. The pulse is red.
+- **The machine: great.** Tone down the TV look: the picture tube is nice, but it
+  must not look like a television, that turns it into a joke. Keep the puffing smoke.
+  Lower walls or none. Steel, not brass.
+- Mockups 12 lock both looks; the build starts with the mechanical tree (step 1),
+  which Ola approved in mockup 10.
