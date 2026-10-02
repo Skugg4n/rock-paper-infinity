@@ -204,6 +204,32 @@ export function renderReserveBar(reserveEnergyFillEl, percent) {
 }
 
 /**
+ * Shows the big battery's bar only once there is a big battery: before the
+ * first one is bought there is nothing for the bar to say.
+ *
+ * @param {HTMLElement} reserveContainerEl
+ * @param {boolean} show
+ */
+export function renderReserveVisibility(reserveContainerEl, show) {
+    reserveContainerEl.classList.toggle('hidden', !show);
+}
+
+/**
+ * The little clover: there once auto-play is bought, lit for good (and no
+ * longer a button) once the big clover is bought. The 3-second `lucky` state
+ * is owned by the click handler in index.js.
+ *
+ * @param {HTMLButtonElement} cloverEl
+ * @param {{ visible: boolean, evergreen: boolean }} state
+ */
+export function renderClover(cloverEl, { visible, evergreen }) {
+    cloverEl.classList.toggle('invisible', !visible);
+    cloverEl.classList.toggle('evergreen', evergreen);
+    cloverEl.disabled = evergreen;
+    if (evergreen) cloverEl.classList.remove('lucky');
+}
+
+/**
  * Flips the energy bar colour to indicate "empty" state.
  *
  * @param {HTMLElement} energyFillEl

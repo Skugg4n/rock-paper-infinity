@@ -99,6 +99,14 @@
             </main>
 
             <footer id="player-zone" class="h-40 flex-shrink-0 flex flex-col justify-end items-center gap-4 pb-4">
+                <!-- The little clover: a toy by the board. A click is three seconds of luck. -->
+                <button id="clover" aria-label="Lucky clover" class="invisible btn clover-btn w-9 h-9 sm:w-10 sm:h-10 rounded-full flex justify-center items-center">
+                    <svg class="clover-ring" viewBox="0 0 40 40" aria-hidden="true">
+                        <circle class="clover-track" cx="20" cy="20" r="18"></circle>
+                        <circle class="clover-time" cx="20" cy="20" r="18"></circle>
+                    </svg>
+                    <i data-lucide="clover" class="relative w-5 h-5"></i>
+                </button>
                 <div id="player-controls-container" class="flex justify-center items-center gap-1.5 sm:gap-2 w-full max-w-sm">
                     <button data-choice="rock" aria-label="Rock" class="btn choice-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="gem"></i></button>
                     <button data-choice="paper" aria-label="Paper" class="btn choice-btn bg-slate-50 w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-md flex justify-center items-center"><i data-lucide="file-text"></i></button>

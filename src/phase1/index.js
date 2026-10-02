@@ -4,11 +4,11 @@ import { playChapterCard } from "../chapterCard.js";
 import { PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import {
     getSPS, getEPS, getGamesPerSecond, roundTiming, updateMeasuredRate, pickOutcome,
-    BASE_WIN_RATE, LUCK_WIN_RATE,
+    currentWinRate,
 } from "./rates.js";
 import { generateCostVisual } from "./cost-visual.js";
 import { runCountdownAnimation } from "./countdown.js";
-import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber } from "./persistence.js";
+import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber, helperCounters } from "./persistence.js";
 import { fireStarAnimation } from "./star-animation.js";
 import { createUpgrades } from "./upgrades-config.js";
 import { setupDashes, updateDashes, updateProgressDashes, PROGRESS_DASHES } from "./upgrade-dashes.js";
@@ -20,6 +20,8 @@ import {
     renderResourceBarsVisibility,
     renderEnergyBar,
     renderReserveBar,
+    renderReserveVisibility,
+    renderClover,
     renderEnergyEmpty,
     renderGameCounters,
     resetCounterIconState,
@@ -33,6 +35,8 @@ import { timed, counter } from "../perf.js";
         const winTracker = document.getElementById('win-tracker');
         const energyFillEl = document.getElementById('energy-fill');
         const reserveEnergyFillEl = document.getElementById('reserve-energy-fill');
+        const reserveEnergyContainer = document.getElementById('reserve-energy-container');
+        const cloverBtn = document.getElementById('clover');
         const quantumFoamContainer = document.getElementById('quantum-foam-container');
         const collapseFoamBtn = document.getElementById('collapse-foam-btn');
         const collapseFoamFill = document.getElementById('collapse-foam-fill');
@@ -64,7 +68,15 @@ const resetBtn = document.getElementById('reset-btn');
         let totalWins = 0;
         let energy = PHASE1_CONSTANTS.MAX_ENERGY;
         let reserveEnergy = 0;
-        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_COLLAPSES, SAVE_KEY } = PHASE1_CONSTANTS;
+        const { MAX_ENERGY, MAX_RESERVE_ENERGY, MAX_QUANTUM_FOAM, FOAM_BONUS_SECONDS, HYPER_SPEED_THRESHOLD, BANK_GATE_COLLAPSES, CLOVER_MS, SAVE_KEY } = PHASE1_CONSTANTS;
+        // The energy ladder unlocks by use: recharge clicks open the big
+        // battery, big batteries bought open the generator.
+        let rechargeClicks = 0;
+        let batteriesBought = 0;
+        // The little clover: luck until this timestamp (performance.now clock).
+        // Not saved; a reload starts with the clover idle.
+        let cloverUntil = 0;
+        let cloverTimer = null;
         let autoPlayInterval = null;
         let autoPlayWantsToRun = false;
         let gameSpeed = 1;
@@ -98,8 +110,10 @@ const resetBtn = document.getElementById('reset-btn');
         }
 
         const upgrades = createUpgrades({
-            rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); },
-            addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 500); },
+            rechargeEnergy:    () => { energy = Math.min(MAX_ENERGY, energy + 25); rechargeClicks++; },
+            addReserve:        () => { reserveEnergy = Math.min(MAX_RESERVE_ENERGY, reserveEnergy + 500); batteriesBought++; },
+            getRechargeClicks: () => rechargeClicks,
+            getBatteriesBought: () => batteriesBought,
             incrementSpeed:    () => { gameSpeed += 1; },
             createGameBoard:   () => createGameBoard(),
             mergeToMetaBoard:  () => mergeToMetaBoard(),
@@ -110,7 +124,7 @@ const resetBtn = document.getElementById('reset-btn');
             bankGateCollapses: BANK_GATE_COLLAPSES,
         });
 
-        const winRate = () => (upgrades.luck.purchased ? LUCK_WIN_RATE : BASE_WIN_RATE);
+        const winRate = () => currentWinRate(upgrades.luck.purchased, cloverUntil, performance.now());
         const ENERGY_PER_GENERATOR_LEVEL = 10;
 
 const choices = ['rock', 'paper', 'scissors'];
@@ -261,6 +275,7 @@ function scheduleUIUpdate() {
             setupButtons();
             setupDebugButtons();
             collapseFoamBtn.addEventListener('click', collapseFoam, { signal });
+            cloverBtn.addEventListener('pointerup', (e) => { e.preventDefault(); clickClover(); }, { signal });
             resetBtn.addEventListener('click', resetGame, { signal });
 
             updateAnimationSpeed();
@@ -270,6 +285,28 @@ function scheduleUIUpdate() {
             passiveInterval = setInterval(passiveTick, 1000);
             document.addEventListener('visibilitychange', handleVisibilityChange, { signal });
             mountSaveButtons(debugMenu);
+        }
+
+        /**
+         * The little clover: a click is CLOVER_MS of luck. A click while it
+         * runs refills it; it never stacks. The ring animation is restarted
+         * so what the player sees is the time that is left.
+         */
+        function clickClover() {
+            if (!upgrades.autoPlay.purchased || upgrades.luck.purchased) return;
+            cloverUntil = performance.now() + CLOVER_MS;
+            cloverBtn.classList.remove('lucky');
+            void cloverBtn.offsetWidth;
+            cloverBtn.classList.add('lucky');
+            clearTimeout(cloverTimer);
+            cloverTimer = setTimeout(() => cloverBtn.classList.remove('lucky'), CLOVER_MS);
+        }
+
+        function stopClover() {
+            clearTimeout(cloverTimer);
+            cloverTimer = null;
+            cloverUntil = 0;
+            cloverBtn.classList.remove('lucky');
         }
 
         function passiveTick() {
@@ -379,7 +416,10 @@ const uiState = {
     totalStarsEarned: -1,
     isMetaBoardActive: false,
     foamPercent: -1,
-    foamReady: false
+    foamReady: false,
+    showReserve: null,
+    cloverVisible: null,
+    cloverEvergreen: null
 };
 
         function updateUI() {
@@ -397,6 +437,10 @@ const uiState = {
             const energyPaused = autoPlayWantsToRun && energyEmpty;
             const foamPercent = (quantumFoam / MAX_QUANTUM_FOAM) * 100;
             const foamReady = quantumFoam >= MAX_QUANTUM_FOAM;
+            // The big battery's bar has nothing to say before the first big battery.
+            const showReserve = batteriesBought > 0 || reserveEnergy > 0;
+            const cloverVisible = upgrades.autoPlay.purchased && !isMetaBoardActive;
+            const cloverEvergreen = upgrades.luck.purchased;
 
             const wins = Math.floor(totalWins);
             const gamesChanged = games !== uiState.gamesPlayed || wins !== uiState.totalWins;
@@ -407,6 +451,8 @@ const uiState = {
             const rateChanged = sps !== uiState.sps || eps !== uiState.eps || egps !== uiState.egps || autoActive !== uiState.autoPlayActive || energyPaused !== uiState.energyPaused;
             const balanceChanged = starBalance !== uiState.starBalance;
             const foamChanged = isMetaBoardActive && (foamPercent !== uiState.foamPercent || foamReady !== uiState.foamReady);
+            const showReserveChanged = showReserve !== uiState.showReserve;
+            const cloverChanged = cloverVisible !== uiState.cloverVisible || cloverEvergreen !== uiState.cloverEvergreen;
             const upgradesChanged = balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || gamesChanged || rateChanged || isMetaBoardActive !== uiState.isMetaBoardActive || foamChanged;
 
             const tasks = [];
@@ -419,6 +465,16 @@ const uiState = {
             }
             if (energyChanged) tasks.push(() => renderEnergyBar(energyFillEl, energyPercent));
             if (reserveChanged) tasks.push(() => renderReserveBar(reserveEnergyFillEl, reservePercent));
+            if (showReserveChanged) tasks.push(() => renderReserveVisibility(reserveEnergyContainer, showReserve));
+            if (cloverChanged) tasks.push(() => {
+                // Materialize like an upgrade when it first appears in play (not on load).
+                if (cloverVisible && uiState.cloverVisible === false && firstUpgradeUpdateDone) {
+                    cloverBtn.classList.add('materialize');
+                    cloverBtn.addEventListener('animationend', () => cloverBtn.classList.remove('materialize'),
+                        { once: true, signal: listenerController.signal });
+                }
+                renderClover(cloverBtn, { visible: cloverVisible, evergreen: cloverEvergreen });
+            });
             if (emptyChanged) tasks.push(() => renderEnergyEmpty(energyFillEl, energyEmpty));
             if (rateChanged) tasks.push(() => updateRateDisplays(sps, eps, egps, autoActive, energyPaused));
             if (balanceChanged || totalStarsEarned !== uiState.totalStarsEarned || foamChanged) tasks.push(() => updateProgressCircles(starBalance));
@@ -434,6 +490,8 @@ const uiState = {
             if (resourcesChanged) uiState.showResources = showResources;
             if (energyChanged) uiState.energyPercent = energyPercent;
             if (reserveChanged) uiState.reservePercent = reservePercent;
+            if (showReserveChanged) uiState.showReserve = showReserve;
+            if (cloverChanged) { uiState.cloverVisible = cloverVisible; uiState.cloverEvergreen = cloverEvergreen; }
             if (emptyChanged) uiState.energyEmpty = energyEmpty;
             if (rateChanged) { uiState.sps = sps; uiState.eps = eps; uiState.egps = egps; uiState.autoPlayActive = autoActive; uiState.energyPaused = energyPaused; }
             if (balanceChanged) uiState.starBalance = starBalance;
@@ -461,7 +519,8 @@ const uiState = {
                 starBalance, totalStarsEarned, totalGamesPlayed, totalWins,
                 energy, reserveEnergy, gameSpeed, starMultiplier, quantumFoam, foamCollapses,
                 isMetaBoardActive, autoPlayWantsToRun,
-                gameBoardsCount: gameBoards.length
+                gameBoardsCount: gameBoards.length,
+                rechargeClicks, batteriesBought
             };
             saveToStorage(SAVE_KEY, serializeGameState(state, upgrades));
         }
@@ -481,6 +540,7 @@ const uiState = {
                 foamCollapses = sanitizeNumber(data.foamCollapses) ?? foamCollapses;
                 isMetaBoardActive = data.isMetaBoardActive ?? isMetaBoardActive;
                 autoPlayWantsToRun = data.autoPlayWantsToRun ?? autoPlayWantsToRun;
+                ({ rechargeClicks, batteriesBought } = helperCounters(data));
                 measuredLastTotal = totalStarsEarned;
                 if (data.upgrades) {
                     for (const key in data.upgrades) {
@@ -527,6 +587,10 @@ const uiState = {
             totalWins = 0;
             energy = MAX_ENERGY;
             reserveEnergy = 0;
+            rechargeClicks = 0;
+            batteriesBought = 0;
+            stopClover();
+            cloverBtn.classList.remove('evergreen', 'materialize');
             starMultiplier = 1;
             quantumFoam = 0;
             foamCollapses = 0;
@@ -543,6 +607,7 @@ const uiState = {
                 sps: -1, eps: -1, egps: -1, autoPlayActive: false,
                 energyPaused: false, starBalance: -1, totalStarsEarned: -1,
                 isMetaBoardActive: false, foamPercent: -1, foamReady: false,
+                showReserve: null, cloverVisible: null, cloverEvergreen: null,
             });
             quantumFoamContainer.classList.add('hidden');
             quantumFoamContainer.classList.remove('is-locked');
@@ -842,6 +907,7 @@ const uiState = {
 
         export function teardown() {
             stopAutoPlayInterval();
+            stopClover();
             if (passiveInterval) {
                 clearInterval(passiveInterval);
                 passiveInterval = null;

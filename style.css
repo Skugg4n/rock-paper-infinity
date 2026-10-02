@@ -543,6 +543,42 @@ input[type=range]:focus-visible {
     overflow: hidden;
 }
 
+/* The little clover (chapter I): a toy by the board, not a purchase. A click
+   is three seconds of luck; the ring drains while it lasts (3s = CLOVER_MS).
+   The big clover (the luck upgrade) leaves it lit for good. */
+.clover-btn {
+    position: relative;
+    color: #94a3b8;
+    transition: color 0.2s ease, transform 0.15s ease, opacity 0.4s ease;
+}
+.clover-btn:hover:not(:disabled) { color: #64748b; transform: translateY(-2px); }
+.clover-btn:active:not(:disabled) { transform: scale(0.9); }
+.clover-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    overflow: visible;
+}
+.clover-ring circle { fill: none; stroke-width: 2; }
+.clover-track { stroke: #e2e8f0; }
+.clover-time {
+    stroke: #16a34a;
+    stroke-linecap: round;
+    stroke-dasharray: 113.1;
+    stroke-dashoffset: 113.1;
+}
+.clover-btn.lucky,
+.clover-btn.lucky:hover:not(:disabled) { color: #16a34a; }
+.clover-btn.lucky .clover-time { animation: clover-drain 3s linear forwards; }
+@keyframes clover-drain {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: 113.1; }
+}
+.clover-btn.evergreen { color: #16a34a; cursor: default; }
+.clover-btn.evergreen .clover-track { stroke: #bbf7d0; }
+
 /* Pause (main.js): a small round button beside the ☰ button. While paused
    the city sits back a little; nothing is blurred. */
 #pause-btn {
