@@ -135,6 +135,23 @@ fall two octaves to D.
 **Mix.** Music sits under the words as in I. Landings are at least twenty seconds apart,
 so events are sparse by design; the fight flashes of fists and swords stay silent.
 
+**What the board taught (from the board, `docs/mockups/sound-board-war.html`, 2026-10-02).**
+- Their drum is the transition's close, dry war drum (single strokes, not the city's far
+  double stroke); a bar is eight strokes and every landing falls on Dm, so the four chords
+  are one wave. It doubles only on a push. Heavy strokes must be cut to the beat length,
+  or tight bars pile up in the sub.
+- Air or ground is decided when the whistle would start (2.6 s before the landing), not at
+  the bar's start, so a tier reached mid-bar already sends the next wave by air.
+- Holes are heard best as a regular pattern: one tone per plate, stepped through in a ring,
+  a razed plate a missing step. The plates fall in a scattered order, so holes spread.
+- The bass is the transition's (two saws on low D, a sine on D), held steady; it is the
+  loudest thing by RMS, so the drone sits lower than planned (gain 0.03 to 0.12).
+- Levels: the 90 s demo measures RMS about -17 dBFS and peaks -3 to -4.5 dBFS, like the
+  city's own music; the approved II to III transition peaks about -2 dBFS on its WAR boom.
+  Bare clicks (attack under 4 ms) slip past the master compressor's attack and its makeup
+  gain lifts them; give dry cracks a 4 ms attack.
+- In the 90 s demo the clock runs 2.5 times fast, or only two landings fit.
+
 ## 4b. IV · THE DEEP in detail (*proposal*, from the DEEP session, 2026-10-02)
 
 Written against the locked design (`2026-10-02-chapter-iv-tree-and-bio.md`). Two

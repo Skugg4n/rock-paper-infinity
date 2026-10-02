@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ljudtavla · War</title>
+<style>
+  /* Sound board for chapter III (WAR). Everything is synthesised in the browser
+     (Web Audio): no sound files. Same look, room and levels as the board for
+     chapter II (sound-board-city.html). Ola judges the war here by ear before
+     anything enters the game. */
+  :root { --ink: #0f172a; --mid: #475569; --soft: #94a3b8; --line: #cbd5e1; --tile: #e2e8f0; --bg: #f1f5f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; font-weight: 600; margin: 0 0 14px; }
+  p { font-size: 13px; line-height: 1.55; color: var(--mid); margin: 0 0 12px; max-width: 64ch; }
+  section { background: #fff; border-radius: 20px; padding: 22px; margin-top: 18px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07); }
+  .pads { display: flex; flex-wrap: wrap; gap: 10px; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 0; border-radius: 9999px; padding: 10px 18px; cursor: pointer; transition: transform 0.12s ease, background 0.15s ease; }
+  button:hover { background: var(--tile); transform: translateY(-1px); }
+  button:active { transform: scale(0.96); }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover { background: #1e293b; }
+  .hint { font-size: 12px; color: var(--soft); margin: 10px 0 0; }
+  .grid { display: grid; grid-template-columns: 170px 1fr 150px; gap: 12px 14px; align-items: center; margin-top: 16px; }
+  .grid label { font-size: 13px; }
+  .grid output { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.08em; padding: 7px 12px; border-radius: 9999px; background: var(--ink); color: #fff; cursor: pointer; user-select: none; border: 1px solid transparent; }
+  .chip.muted { text-decoration: line-through; border-color: var(--line); background: #fff; color: var(--soft); }
+  .rowline { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+  .readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); }
+  .tog { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+  .cat { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--soft); margin: 16px 0 8px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 104px 1fr 92px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ljudtavla · War</h1>
+  <p>Allt ljud skapas i webbläsaren, inga ljudfiler. Starta kriget, dra i reglagen och lyssna. Lurar eller riktiga högtalare ger trummorna och domedagen rättvisa. Säg vad som är fel i känslan så ändrar jag. Inget av detta finns i spelet än.</p>
+
+  <section>
+    <h2>KRIGET</h2>
+    <p>Kriget börjar där övergången från staden slutar: deras trumma ensam, nära och torr, och vår bas under den på D. Sedan kommer lagren ett i taget, i stadens mörkaste ackord (Dm, E♭, Gm, A). Deras trumma är klockan: en takt är tiden till nästa landstigning, så den slår glest i början och tätare mot slutet, och växer mot slaget. Vår trumma säger vem som leder. Basen håller D så länge plattorna står och sjunker till A när en ligger nere. Tonerna är utspridda över plattorna: en rasad platta blir ett hål i mönstret. Domedagen är en djup ton som drar sig från D upp mot E♭.</p>
+    <div class="rowline">
+      <button class="primary" id="run">Starta kriget</button>
+      <button id="demo">Spela kriget på 90 sekunder</button>
+      <span class="readout" id="readout">stilla</span>
+    </div>
+    <div class="grid">
+      <label for="interval">Till nästa landstigning</label><input id="interval" type="range" min="20" max="40" value="32"><output id="interval-out"></output>
+      <label for="lead">Vem leder</label><input id="lead" type="range" min="-2" max="2" step="1" value="0"><output id="lead-out"></output>
+      <label for="plates">Plattor som står</label><input id="plates" type="range" min="0" max="20" value="20"><output id="plates-out"></output>
+      <label for="arms">Stjärnor ↔ hammare</label><input id="arms" type="range" min="0" max="100" value="50"><output id="arms-out"></output>
+      <label for="pop">Invånare</label><input id="pop" type="range" min="0" max="100" value="70"><output id="pop-out"></output>
+      <label for="doom">Domedagen</label><input id="doom" type="range" min="0" max="100" value="0"><output id="doom-out"></output>
+      <label for="tier">Deras nivå</label><input id="tier" type="range" min="0" max="8" step="1" value="0"><output id="tier-out"></output>
+      <label for="radar">Radar</label><span class="tog"><input id="radar" type="checkbox"> köpt: tickar de sista fyra sekunderna</span><output></output>
+      <label for="airDef">Luftvärn</label><span class="tog"><input id="airDef" type="checkbox"> köpt: granaten bryts av</span><output></output>
+      <label for="raid">Räd</label><span class="tog"><input id="raid" type="checkbox"> pågår: deras trumma tiger</span><output></output>
+      <label for="silent">Ön</label><span class="tog"><input id="silent" type="checkbox"> tyst: de är utbombade</span><output></output>
+      <label for="down">Platta nere</label><span class="tog"><input id="down" type="checkbox"> en platta ligger rasad</span><output></output>
+    </div>
+    <div class="chips" id="chips">
+      <span class="chip" data-layer="theirs">DERAS TRUMMA</span>
+      <span class="chip" data-layer="ours">VÅR TRUMMA</span>
+      <span class="chip" data-layer="bass">BAS</span>
+      <span class="chip" data-layer="tones">TONER</span>
+      <span class="chip" data-layer="arms">VAPENFABRIK</span>
+      <span class="chip" data-layer="folk">FOLKLIV</span>
+      <span class="chip" data-layer="shells">GRANATER</span>
+      <span class="chip" data-layer="drone">DOMEDAG</span>
+    </div>
+    <p class="hint">Tryck på ett lager för att tysta det. I demot går klockan två och en halv gånger fortare än i spelet, annars hinns bara två landstigningar.</p>
+  </section>
+
+  <section>
+    <h2>ENSKILDA LJUD, EFTER KATEGORI</h2>
+    <p>Orden från akt 1 och 2 med krigets röst: metall. Ett köp börjar med samma duns som förut; metallen efter säger vad.</p>
+    <div class="cat">KÖPA · metall</div>
+    <div class="pads">
+      <button data-sfx="shield">Köp sköld</button>
+      <button data-sfx="sword">Köp svärd</button>
+      <button data-sfx="airDefence">Köp luftvärn</button>
+      <button data-sfx="fortify">Befäst en platta</button>
+    </div>
+    <div class="cat">ÖPPNAS OCH STOPP</div>
+    <div class="pads">
+      <button data-sfx="rise">Något nytt öppnas</button>
+      <button data-sfx="knock">Hammare saknas</button>
+      <button data-sfx="research">Forskning klar</button>
+    </div>
+    <div class="cat">VI ANFALLER</div>
+    <div class="pads">
+      <button data-sfx="strike">Anfall går iväg och landar</button>
+      <button data-sfx="enemyRazed">Deras platta raserad</button>
+      <button data-sfx="raid">Räden</button>
+    </div>
+    <div class="cat">DE ANFALLER</div>
+    <div class="pads">
+      <button data-sfx="landing">Landstigning träffar</button>
+      <button data-sfx="fallHome">En platta rasas: ett hem</button>
+      <button data-sfx="fallDistrict">En platta rasas: ett distrikt</button>
+      <button data-sfx="radarWarn">Radarn varnar</button>
+      <button data-sfx="shellOpen">Granat utan luftvärn</button>
+      <button data-sfx="shellDefended">Granat med luftvärn</button>
+    </div>
+    <div class="cat">DERAS Ö</div>
+    <div class="pads">
+      <button data-sfx="islandSilent">Ön tystnar</button>
+      <button data-sfx="islandBack">Ön kommer tillbaka</button>
+    </div>
+    <div class="cat">BOM · INGEN VÄG TILLBAKA</div>
+    <div class="pads">
+      <button data-sfx="warChosen">Bom: WAR väljs</button>
+      <button data-sfx="nuke">Bom: första kärnvapnet</button>
+      <button data-sfx="rocket">Raketen</button>
+    </div>
+    <p class="hint">Räden startar kriget om det står still, så att du hör två torra tick och sedan deras trumma tiga i tjugo sekunder.</p>
+  </section>
+
+  <section>
+    <h2>TRÅDEN</h2>
+    <p>Hur kriget hänger ihop med akten före och akten efter, och de fem toner som avslutar varsin akt.</p>
+    <div class="pads">
+      <button data-thread="fromCity">In från staden</button>
+      <button data-thread="toDeep">Ut mot djupet</button>
+    </div>
+    <div class="cat">SLUTTONERNA</div>
+    <div class="pads">
+      <button data-end="0">D</button>
+      <button data-end="1">ciss</button>
+      <button data-end="2">ess</button>
+      <button data-end="3">djupt D</button>
+      <button data-end="4">fiss</button>
+      <button data-end="all">Alla fem i rad</button>
+    </div>
+    <p class="hint">Den här melodin hörs aldrig hel i spelet förrän allra sist.</p>
+  </section>
+
+  <section>
+    <h2>VOLYM (BLIR AV/PÅ I ☰-MENYN)</h2>
+    <div class="grid">
+      <label for="vol-sfx">Ljud</label><input id="vol-sfx" type="range" min="0" max="100" value="80"><output id="vol-sfx-out"></output>
+      <label for="vol-music">Musik</label><input id="vol-music" type="range" min="0" max="100" value="70"><output id="vol-music-out"></output>
+    </div>
+  </section>
+</main>
+
+<script>
+/* The war's sound. One engine that runs live (AudioContext, a timer that
+   schedules a little ahead) or offline (OfflineAudioContext, suspended every
+   tenth of a second) for the level check. Shares key, room and bus levels with
+   the city board; the chords are the city's step five. Quantities from
+   src/phase3/war.js: waveInterval 40 s down to the 20 s floor, PUSH_EVERY 5,
+   RAID_S 20, WAVE_WARNING_S 4, ENEMY_REGROUP_S 90, DOOMSDAY_LEAVE 85, air waves
+   from their tier V, two waves in three. */
+const PENTA = [0, 3, 5, 7, 10];
+const CHORDS = [                                   // the city's step five, where the war starts
+  { name: 'Dm', root: 38, third: 3 }, { name: 'E♭', root: 39, third: 4 },
+  { name: 'Gm', root: 31, third: 3 }, { name: 'A', root: 33, third: 4 },
+];
+const LAYERS = ['theirs', 'ours', 'bass', 'tones', 'arms', 'folk', 'shells', 'drone'];
+const RAID_S = 20, WAVE_WARNING_S = 4, ENEMY_REGROUP_S = 90, DOOMSDAY_LEAVE = 85, PUSH_EVERY = 5, ROCKET_FROM = 55;
+const SHELL_S = 2.6;                               // the whistle before an air impact
+const SLOTS = 20;                                  // one tone per plate
+// Which plate falls first, so the holes are scattered and not just the end of the line.
+const FALL_ORDER = [7, 15, 3, 11, 18, 1, 9, 13, 5, 16, 0, 10, 19, 4, 12, 8, 2, 17, 6, 14];
+// The melody the standing plates make: an index into the chord's tones, slot by slot.
+const CONTOUR = [0, 2, 3, 4, 3, 2, 1, 2, 3, 5, 4, 3, 2, 3, 4, 5, 4, 3, 2, 1];
+const COASTS = [-0.8, -0.35, 0.35, 0.8];
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const ramp = (x, from, to) => clamp((x - from) / (to - from));                   // as in src/audio.js
+const approach = (cur, target, dt, tau) => (tau > 0 ? cur + (target - cur) * (1 - Math.exp(-dt / tau)) : target);
+const pentaNote = (i, base = 74) => base + 12 * Math.floor(i / 5) + PENTA[((i % 5) + 5) % 5];
+
+function makeEngine(ctx) {
+  const S = {
+    interval: 32, speed: 1, lead: 0, plates: 20, arms: 0.5, pop: 0.7, doom: 0, tier: 0,
+    radar: false, airDef: false, raid: false, silent: false, down: false, gone: false, heavy: 0, musicLevel: 0.7,
+  };
+  const present = new Set(LAYERS);
+  const C = { barStart: 0, barLen: 12.8, beats: 8, beat: 0, nextBeat: Infinity, land: Infinity, waves: 0, coast: 0.35, air: false, push: false, first: true };
+  const T = { tone: 0, arms: 0, life: 0, free: 0, radar: Infinity, shell: Infinity };
+  let running = false, chordIdx = 0, toneStep = 0, raidUntil = -1, listener = null;
+
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
+  const master = ctx.createGain(); master.gain.value = 0.9;
+  master.connect(comp); comp.connect(ctx.destination);
+  const sfxBus = ctx.createGain(); sfxBus.gain.value = 0.62;
+  const musicBus = ctx.createGain(); musicBus.gain.value = 0.0001;
+  sfxBus.connect(master); musicBus.connect(master);
+  // The thread (city bars, ending notes) plays at music level but outside the war's bus.
+  const threadOut = ctx.createGain(); threadOut.gain.value = 0.7; threadOut.connect(master);
+
+  // The same large room as the city: the war is heard in it.
+  const len = Math.floor(ctx.sampleRate * 3.6);
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+  }
+  const reverb = ctx.createConvolver(); reverb.buffer = ir;
+  const wet = ctx.createGain(); wet.gain.value = 0.3;
+  reverb.connect(wet); wet.connect(master);
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+
+  // Per layer: sources -> inp (arrives and leaves, glides) -> bus (mute on the board) -> music.
+  const SEND = { theirs: 0.35, ours: 0.6, bass: 0.8, tones: 0.8, arms: 0.9, folk: 0.6, shells: 0.5, drone: 0.5 };
+  const bus = {}, inp = {};
+  for (const name of LAYERS) {
+    const g = ctx.createGain(); g.connect(musicBus);
+    const s = ctx.createGain(); s.gain.value = SEND[name]; g.connect(s); s.connect(reverb);
+    const i = ctx.createGain(); i.gain.value = 0.0001; i.connect(g);
+    bus[name] = g; inp[name] = i;
+  }
+
+  function env(t, peak, attack, decay, dest) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    g.connect(dest);
+    return g;
+  }
+  function osc(type, freq, t, stopAt, dest) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+    o.connect(dest); o.start(t); o.stop(stopAt); return o;
+  }
+  function noise(t, dur, dest) {
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    n.connect(dest); n.start(t, Math.random()); n.stop(t + dur); return n;
+  }
+  function filter(type, f, q, dest) {
+    const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f;
+    if (q != null) b.Q.value = q;
+    if (dest) b.connect(dest);
+    return b;
+  }
+  function pan(value, dest) {
+    if (!ctx.createStereoPanner) return dest;
+    const p = ctx.createStereoPanner(); p.pan.value = value; p.connect(dest); return p;
+  }
+  function send(node, amount) { const s = ctx.createGain(); s.gain.value = amount; node.connect(s); s.connect(reverb); }
+  // Every continuous value glides; the same target twice adds nothing to the timeline.
+  const last = new Map();
+  function glideTo(param, value, tau, t = ctx.currentTime) {
+    const prev = last.get(param);
+    if (prev !== undefined && Math.abs(prev - value) < 1e-5) return;
+    last.set(param, value);
+    param.setTargetAtTime(value, t, tau);
+  }
+
+  const chordNow = () => CHORDS[chordIdx];
+  const barTarget = () => S.interval / S.speed;
+  const clockRunning = () => C.nextBeat !== Infinity;
+  const airNext = () => S.tier >= 4 && (C.waves + 1) % 3 !== 0;
+
+  // ---------------------------------------------------------------- continuous voices
+  // Bass: a D pedal under every chord (the war's darkness), down to the low A while a plate is down.
+  // The recipe is the bass that comes in under their drum at the end of the II -> III transition.
+  const BASS_LEVEL = 0.12;
+  const pedal = (() => {
+    const g = ctx.createGain(); g.gain.value = BASS_LEVEL; g.connect(inp.bass);
+    const lp = filter('lowpass', 260, null, g);
+    const a = ctx.createOscillator(), b = ctx.createOscillator(), c = ctx.createOscillator();
+    a.type = b.type = 'sawtooth'; c.type = 'sine';
+    a.detune.value = -6; b.detune.value = 6;
+    a.connect(lp); b.connect(lp); c.connect(g);
+    a.frequency.value = b.frequency.value = mtof(26); c.frequency.value = mtof(38);
+    [a, b, c].forEach((o) => o.start());
+    return { g, oscs: [[a, 0.5], [b, 0.5], [c, 1]] };
+  })();
+  // Doomsday: a sub D that glides toward E♭ as the clock goes from 0 to 85 %; noise joins it.
+  const drone = (() => {
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(inp.drone);
+    const a = ctx.createOscillator(); a.type = 'sine'; a.connect(g);
+    const b = ctx.createOscillator(); b.type = 'triangle';
+    const bg = ctx.createGain(); bg.gain.value = 0.22; b.connect(bg); bg.connect(g);       // an octave up, for small speakers
+    const c = ctx.createOscillator(); c.type = 'sawtooth';
+    const cl = filter('lowpass', 150, 0.8); const cg = ctx.createGain(); cg.gain.value = 0.25;
+    c.connect(cl); cl.connect(cg); cg.connect(g);
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const nb = filter('bandpass', 120, 0.9); const ng = ctx.createGain(); ng.gain.value = 0.0001;
+    src.connect(nb); nb.connect(ng); ng.connect(inp.drone);
+    const oscs = [[a, 1], [b, 2], [c, 1.004]];
+    oscs.forEach(([o, m]) => { o.frequency.value = mtof(26) * m; o.start(); });
+    src.start();
+    return { g, ng, oscs };
+  })();
+  // The rocket is built from 55 %: a low hum under their drum.
+  const rocketHum = (() => {
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(pan(0.35, inp.theirs));
+    const lp = filter('lowpass', 140, 1.2, g);
+    const a = ctx.createOscillator(), b = ctx.createOscillator();
+    a.type = b.type = 'sawtooth'; a.frequency.value = mtof(39); b.frequency.value = mtof(39) * 1.006;
+    a.connect(lp); b.connect(lp); a.start(); b.start();
+    return { g };
+  })();
+  // Folk life, from the city board: short voices, small steps, a far choir in a large population.
+  const FOLK = 1.4;
+  const folkIn = ctx.createGain(); folkIn.gain.value = FOLK; folkIn.connect(inp.folk);
+  const VOWELS = [[700, 1100], [450, 800], [400, 1600], [320, 870]];
+  function formants(dest, f1, f2) {
+    const a = filter('bandpass', f1, 5, dest);
+    const bg = ctx.createGain(); bg.gain.value = 0.6; bg.connect(dest);
+    const b = filter('bandpass', f2, 7, bg);
+    return [a, b];
+  }
+  const choir = (() => {
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(folkIn);
+    const [a, b] = formants(g, 450, 800);
+    const oscs = [12, 19, 24].map((semi, i) => {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.detune.value = [-7, 6, 0][i];
+      o.frequency.value = mtof(38 + semi); o.connect(a); o.connect(b); o.start();
+      return { o, semi };
+    });
+    return { g, oscs };
+  })();
+
+  // ---------------------------------------------------------------- the drums
+  /** One drum stroke (the city's rival drum recipe). */
+  function drumHit(t, midi, level, dest, lpHz = 300, decay = 1.5) {
+    const f = mtof(midi);
+    const lp = filter('lowpass', lpHz, null, dest);
+    const o = osc('sine', f * 1.5, t, t + decay + 0.3, env(t, 0.3 * level, 0.006, decay, lp));
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.09);
+    osc('triangle', f * 2, t, t + 0.9, env(t, 0.08 * level, 0.006, 0.7, lp));
+    const th = filter('lowpass', 220); th.connect(env(t, 0.22 * level, 0.003, 0.09, dest)); noise(t, 0.12, th);
+  }
+  /** Their war drum, close: dry and hard (the recipe of the II -> III transition, approved). */
+  function warDrum(t, level, dest, midi = 27, decay = 1.3) {
+    const f = mtof(midi);
+    const o = osc('sine', f * 2.2, t, t + decay + 0.3, env(t, 0.75 * level, 0.003, decay, dest));
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.07);
+    osc('triangle', f * 2, t, t + 0.8, env(t, 0.2 * level, 0.003, 0.6, dest));
+    const lp = filter('lowpass', 900); lp.connect(env(t, 0.4 * level, 0.002, 0.08, dest)); noise(t, 0.1, lp);
+  }
+  /** Their drum is the clock: a bar is the time to the next landing; it swells toward the blow, and doubles on a push. */
+  function theirBeat(tb, i) {
+    if (S.silent || S.gone || tb < raidUntil) return;
+    const prog = i / C.beats, down = i === 0 && !C.first;
+    const k = (0.28 + 0.18 * prog + (down ? 0.1 : 0)) * (S.heavy ? 1.15 : 1);
+    const midi = S.heavy ? 25 : 27;                                                    // back from silence: a step lower
+    const dest = pan(0.2, inp.theirs), beatLen = C.barLen / C.beats;
+    const decay = Math.min(S.heavy ? 1.8 : 1.3, beatLen * 1.1);                         // tight strokes must not pile up in the sub
+    warDrum(tb, k, dest, midi, decay);
+    if (C.push) warDrum(tb + Math.min(0.3, beatLen * 0.45), 0.5 * k, dest, midi, Math.min(0.8, beatLen * 0.6));
+  }
+  /** Ours says who leads: answers every beat when ahead, alternates when level, one hit a bar behind. */
+  function ourBeat(tb, i) {
+    const beatLen = C.barLen / C.beats, L = S.lead;
+    const dest = pan(-0.35, inp.ours);
+    const hit = (t, lvl) => drumHit(t, 38, lvl, dest, 560, 0.8);
+    if (L >= 1) {
+      hit(tb + beatLen / 2, L >= 2 ? 0.95 : 0.75);
+      if (L >= 2) hit(tb + beatLen / 2 + Math.min(0.3, beatLen * 0.3), 0.55);
+    } else if (L === 0) {
+      if (i % 2 === 1) hit(tb + beatLen / 2, 0.75);
+    } else if (i === C.beats / 2) hit(tb, L === -1 ? 0.6 : 0.32);
+  }
+  function setChord(i, t) {
+    chordIdx = i;
+    const c = chordNow();
+    for (const { o, semi } of choir.oscs) o.frequency.setTargetAtTime(mtof(c.root + (c.root < 34 ? 12 : 0) + semi), t, 0.9);
+  }
+
+  // ---------------------------------------------------------------- tones with holes
+  const standing = (slot) => FALL_ORDER.indexOf(slot) >= SLOTS - S.plates;
+  function tone(t, slot) {
+    const c = chordNow(), r = c.root < 36 ? c.root + 24 : c.root + 12;
+    const degree = [0, 7, 12, 12 + c.third, 19, 24][CONTOUR[slot]];
+    const f = mtof(r + degree);
+    const level = 0.095 * (degree >= 19 ? 0.75 : 1);
+    const g = env(t, level, 0.02, 1.7, pan(((slot / (SLOTS - 1)) * 2 - 1) * 0.6, inp.tones));
+    const lp = filter('lowpass', 1500, 0.5, g);
+    [-6, 6].forEach((det) => { osc('triangle', f, t, t + 1.9, lp).detune.value = det; });
+    osc('sine', f * 2, t, t + 0.8, env(t, 0.012, 0.01, 0.6, lp));
+  }
+
+  // ---------------------------------------------------------------- the arms factory
+  // The city's distant factory; toward hammers its notes turn to struck metal and it gets louder.
+  function factoryWave(t) {
+    const m = S.arms, k = 0.5 + 0.5 * m;
+    const lp = filter('lowpass', 420 + 2200 * m, null, inp.arms);
+    [0, 0.45].forEach((d, i) => {
+      const o = osc('sine', i ? 84 : 104, t + d, t + d + 0.3, env(t + d, (i ? 0.16 : 0.26) * k, 0.006, 0.2, lp));
+      o.frequency.exponentialRampToValueAtTime(48, t + d + 0.12);
+    });
+    for (let i = 0; i < 5; i++) {
+      const at = t + i * 0.14, f = mtof(pentaNote(i, 62));
+      osc('sine', f, at, at + 0.5, env(at, 0.075 * k * (1 - 0.5 * m), 0.004, 0.4, lp));
+      osc('sine', f * 2.005, at, at + 0.25, env(at, 0.02 * k, 0.004, 0.18, lp));
+      if (m > 0.05) {                                                                   // hammered: inharmonic partials and a strike
+        osc('sine', f * 2.76, at, at + 0.4, env(at, 0.03 * m, 0.001, 0.3, lp));
+        osc('sine', f * 5.4, at, at + 0.2, env(at, 0.014 * m, 0.001, 0.14, lp));
+        const bp = filter('bandpass', 2600, 1.2); bp.connect(env(at, 0.06 * m, 0.001, 0.025, lp)); noise(at, 0.04, bp);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- folk life (city recipe)
+  const courage = () => 0.35 + 0.65 * S.pop;
+  function voice(t, level = 1) {
+    const c = chordNow(), r = c.root + 12;
+    let midi = [r + 7, r + 12, r + 12 + c.third, r + 19][Math.floor(Math.random() * 4)];
+    while (midi > 74) midi -= 12;
+    while (midi < 55) midi += 12;
+    const dur = lerp(0.22, 0.55, Math.random()), f = mtof(midi);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.22 * level * courage(), t + 0.07);
+    g.gain.setValueAtTime(0.22 * level * courage(), t + dur);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.2);
+    g.connect(pan(Math.random() * 1.6 - 0.8, folkIn));
+    const [a, b] = formants(g, ...VOWELS[Math.floor(Math.random() * VOWELS.length)]);
+    const o = osc('sawtooth', f * lerp(0.95, 1, Math.random()), t, t + dur + 0.25, a);
+    o.connect(b);
+    o.frequency.linearRampToValueAtTime(f * lerp(0.97, 1.04, Math.random()), t + dur);
+    if (level === 1 && Math.random() < 0.4) voice(t + dur + lerp(0.1, 0.3, Math.random()), 0.7);
+  }
+  function steps(t) {
+    const c = chordNow(), r = c.root + 36;
+    const n = 1 + Math.floor(Math.random() * 3), every = lerp(0.11, 0.19, Math.random());
+    const f = mtof(r + [0, 7, 12, 12 + c.third, 19][Math.floor(Math.random() * 5)]);
+    const dest = pan(Math.random() * 1.6 - 0.8, folkIn);
+    for (let i = 0; i < n; i++) {
+      const at = t + i * every;
+      osc('sine', f, at, at + 0.14, env(at, 0.13 * courage(), 0.002, 0.1, dest));
+      const hp = filter('highpass', 3200); hp.connect(env(at, 0.05 * courage(), 0.001, 0.02, dest)); noise(at, 0.03, hp);
+    }
+  }
+  const lifeGap = () => lerp(3.6, 0.32, Math.pow(S.pop, 0.7)) * lerp(0.5, 1.5, Math.random());
+  function duckFolk(t) {
+    folkIn.gain.cancelScheduledValues(t);
+    folkIn.gain.setTargetAtTime(0.15 * FOLK, t, 0.05);
+    folkIn.gain.setTargetAtTime(FOLK, t + 0.8, 1.4);
+  }
+
+  // ---------------------------------------------------------------- impacts and shells
+  function thud(t, coast, level, dest) {
+    const p = pan(coast, dest);
+    const o = osc('sine', 95, t, t + 1.3, env(t, 0.42 * level, 0.004, 1.0, p));
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+    const lp = filter('lowpass', 700); lp.frequency.setValueAtTime(700, t); lp.frequency.exponentialRampToValueAtTime(120, t + 0.8);
+    lp.connect(env(t, 0.26 * level, 0.003, 0.8, p)); noise(t, 0.9, lp);
+  }
+  function crack(t, level, dest) {
+    // dry, but with an attack the master compressor can catch (its makeup gain lifts bare clicks)
+    const hp = filter('highpass', 1600); hp.connect(env(t, 0.2 * level, 0.004, 0.045, dest)); noise(t, 0.06, hp);
+    const bp = filter('bandpass', 900, 2); bp.connect(env(t, 0.12 * level, 0.004, 0.03, dest)); noise(t, 0.05, bp);
+  }
+  /** A thin whistle falling in pitch; air defence cuts it short with a dry crack. */
+  function shell(t, defended, coast, dest) {
+    const cut = defended ? 1.65 : SHELL_S;
+    const p = pan(coast, dest);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.035, t + 0.5);
+    g.gain.linearRampToValueAtTime(0.075, t + cut - 0.05);
+    g.gain.linearRampToValueAtTime(0.0001, t + cut + (defended ? 0.008 : 0.06));
+    g.connect(p); send(g, 0.4);
+    const o = osc('sine', 2600, t, t + cut + 0.1, g);
+    o.frequency.exponentialRampToValueAtTime(2600 * Math.pow(620 / 2600, cut / SHELL_S), t + cut);
+    const lfo = osc('sine', 6.5, t, t + cut + 0.1, ctx.createGain());
+    const depth = ctx.createGain(); depth.gain.value = 16; lfo.disconnect(); lfo.connect(depth); depth.connect(o.frequency);
+    if (defended) crack(t + cut, 0.5, p);
+    else { thud(t + SHELL_S, coast, 0.55, dest); crack(t + SHELL_S, 0.4, p); }
+  }
+  /** One landing: the bar's downbeat. */
+  function landing(t) {
+    C.waves++;
+    duckFolk(t);
+    if (!C.air) thud(t + 0.03, C.coast, 0.6, inp.theirs);                               // just after the drum's click, not on it
+    listener?.({ type: 'landing', t, n: C.waves, air: C.air, push: C.push });
+  }
+  function radarTick(t, coast, dest) {
+    const p = pan(coast, dest);
+    osc('sine', mtof(93), t, t + 0.06, env(t, 0.05, 0.001, 0.035, p));
+    osc('sine', mtof(81), t, t + 0.06, env(t, 0.025, 0.001, 0.04, p));
+  }
+
+  // ---------------------------------------------------------------- the clock
+  function startBar(t, first = false) {
+    C.barLen = first ? barTarget() : approach(C.barLen, barTarget(), 1, 0.7);
+    const next = C.waves + 1;
+    C.push = next % PUSH_EVERY === 0;                                                  // every fifth wave they push: the drum doubles
+    C.air = false;                                                                     // decided when the whistle would start
+    C.beats = C.push ? 16 : 8;
+    C.coast = COASTS[Math.floor(Math.random() * COASTS.length)];
+    C.barStart = t; C.beat = 0; C.nextBeat = t; C.first = first;
+    C.land = t + C.barLen;
+    T.radar = C.land - WAVE_WARNING_S;
+    T.shell = C.land - SHELL_S;
+  }
+  function stopClock() { C.nextBeat = Infinity; C.land = Infinity; T.radar = Infinity; T.shell = Infinity; }
+
+  function pump(until) {
+    if (!running) return;
+    const now = ctx.currentTime;
+    if (clockRunning() && C.nextBeat < now - 0.5) startBar(now + 0.05, true);          // a stalled timer plays no backlog
+    for (const k of ['tone', 'arms', 'life', 'free']) if (T[k] < now - 0.5) T[k] = now + 0.05;
+    if (S.raid && raidUntil !== Infinity && now > raidUntil) { S.raid = false; listener?.({ type: 'state' }); }
+    while (T.radar < Math.min(until, C.land - 0.01)) {
+      if (S.radar && !S.silent && !S.gone) radarTick(T.radar, C.coast, sfxBus);
+      T.radar += 0.5;
+    }
+    if (T.shell < until) {
+      C.air = airNext();                                                               // from their V, two waves in three come by air
+      if (C.air && !S.silent && !S.gone) shell(T.shell, S.airDef, C.coast, inp.shells);
+      T.shell = Infinity;
+    }
+    while (C.nextBeat < until) {
+      let tb = C.nextBeat;
+      if (C.beat >= C.beats) { if (!S.silent && !S.gone) landing(tb); startBar(tb); tb = C.nextBeat; }
+      if (C.beat % (C.beats / 4) === 0) setChord((C.beat / (C.beats / 4)) % 4, tb);    // four chords a wave: every landing is on Dm
+      theirBeat(tb, C.beat);
+      ourBeat(tb, C.beat);
+      C.beat++;
+      C.nextBeat = C.barStart + (C.beat * C.barLen) / C.beats;
+    }
+    while (T.free < until) {                                                           // harmony goes on while the island is silent
+      if (!clockRunning()) setChord((chordIdx + 1) % 4, T.free);
+      T.free += C.barLen / 4;
+    }
+    while (T.tone < until) {
+      toneStep++;
+      const slot = toneStep % SLOTS;
+      if (standing(slot)) tone(T.tone, slot);
+      T.tone += C.barLen / 32;
+    }
+    while (T.arms < until) { factoryWave(T.arms); T.arms += 2.7 * lerp(1, 0.75, S.arms); }
+    while (T.life < until) {
+      if (S.pop > 0.02) { if (Math.random() < 0.5) voice(T.life); else steps(T.life); }
+      T.life += lifeGap();
+    }
+  }
+
+  function apply() {
+    const t = ctx.currentTime;
+    for (const name of LAYERS) {
+      const on = running && present.has(name);
+      glideTo(inp[name].gain, on ? 1 : 0.0001, on ? 1.4 : 0.6, t);
+    }
+    const bassNote = S.down ? 33 : 38;
+    for (const [o, m] of pedal.oscs) glideTo(o.frequency, mtof(bassNote) * m, 0.6, t);
+    const d = clamp(S.doom / DOOMSDAY_LEAVE);
+    for (const [o, m] of drone.oscs) glideTo(o.frequency, mtof(26) * Math.pow(2, d / 12) * m, 1.6, t);
+    glideTo(drone.g.gain, running ? 0.03 + 0.09 * d : 0.0001, 1.5, t);
+    glideTo(drone.ng.gain, running ? 0.0001 + 0.2 * d * d : 0.0001, 1.5, t);
+    glideTo(rocketHum.g.gain, running && !S.gone ? 0.0001 + 0.07 * ramp(S.doom, ROCKET_FROM, DOOMSDAY_LEAVE) : 0.0001, S.gone ? 2.5 : 1.5, t);
+    glideTo(choir.g.gain, running ? 0.0001 + 0.085 * ramp(S.pop, 0.45, 1) : 0.0001, 1.5, t);
+  }
+
+  /** The state, from the board or the demo. */
+  function set(patch) {
+    const was = { ...S };
+    Object.assign(S, patch);
+    const t = ctx.currentTime;
+    if ('raid' in patch && patch.raid !== was.raid) raidUntil = patch.raid ? Infinity : -1;
+    if (running && S.silent && !was.silent) stopClock();
+    if (running && !S.silent && was.silent && !S.gone) { S.heavy = 1; startBar(t + 0.3, true); }
+    if (running && S.gone && !was.gone) stopClock();
+    apply();
+  }
+
+  function start(layers = LAYERS) {
+    const t = ctx.currentTime;
+    running = true; toneStep = 0; C.waves = 0;
+    present.clear(); layers.forEach((l) => present.add(l));
+    last.clear();
+    for (const name of LAYERS) { inp[name].gain.cancelScheduledValues(t); inp[name].gain.setValueAtTime(0.0001, t); }
+    T.tone = t + 1.2; T.arms = t + 0.8; T.life = t + 2; T.free = t + 0.3;
+    if (S.silent || S.gone) stopClock(); else startBar(t + 0.3, true);
+    setChord(0, t + 0.3);
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setTargetAtTime(S.musicLevel, t, 0.4);
+    apply();
+  }
+  function stop() {
+    running = false;
+    stopClock();
+    musicBus.gain.cancelScheduledValues(ctx.currentTime);
+    musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5);
+    apply();
+  }
+  function arrive(name) { present.add(name); apply(); }
+  function only(names) { present.clear(); names.forEach((n) => present.add(n)); apply(); }
+
+  // ---------------------------------------------------------------- II -> III, as approved on the city board (mockup 3)
+  const seqBus = ctx.createGain(); seqBus.gain.value = 0.8; seqBus.connect(master);
+  const seqSend = ctx.createGain(); seqSend.gain.value = 0.7; seqBus.connect(seqSend); seqSend.connect(reverb);
+  /** Chapter I's boom (src/audio.js), unchanged, exactly as the city board plays it. */
+  function cityBoom(t, power = 1) {
+    const pw = clamp(power, 1, 2.4);
+    const tail = 2.2 + 1.4 * (pw - 1);
+    const out = ctx.createGain(); out.gain.value = 0.9 + 0.25 * (pw - 1); out.connect(seqBus);
+    const body = osc('sine', 110, t, t + tail + 0.2, env(t, 0.9, 0.004, tail, out));
+    body.frequency.exponentialRampToValueAtTime(pw > 1.5 ? 30 : 38, t + 0.5);
+    const over = osc('triangle', 220, t, t + tail * 0.6, env(t, 0.22, 0.004, tail * 0.5, out));
+    over.frequency.exponentialRampToValueAtTime(pw > 1.5 ? 60 : 76, t + 0.5);
+    const lp = filter('lowpass', 900, 0.7); lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(70, t + tail * 0.8);
+    lp.connect(env(t, 0.5, 0.003, tail * 0.9, out)); noise(t, tail + 0.1, lp);
+    const hp = filter('highpass', 1800); hp.connect(env(t, 0.25, 0.001, 0.06, out)); noise(t, 0.08, hp);
+  }
+  /** A breath drawn in, then the heaviest boom: WAR appears. */
+  function warBoom(t) {
+    const lp = filter('lowpass', 90, 0.8); lp.frequency.setValueAtTime(90, t - 2); lp.frequency.exponentialRampToValueAtTime(1500, t);
+    const sg = ctx.createGain(); sg.gain.setValueAtTime(0.0001, t - 2); sg.gain.exponentialRampToValueAtTime(0.3, t); sg.gain.setTargetAtTime(0.0001, t, 0.02);
+    lp.connect(sg); sg.connect(seqBus); noise(t - 2, 2.1, lp);
+    cityBoom(t, 2.4);
+  }
+  /**
+   * II -> III. The swords are pressed: a boom and the city is gone at once; one
+   * note hangs, C sharp, struck like chapter I's last D. Darkness. Three drum
+   * strokes for III. A breath and the heaviest boom on WAR. Silence. Then their
+   * drum alone, and our bass under it when the card lifts. From there the
+   * war's own music takes over (the engine, started by the caller at `drum`).
+   */
+  function transition(t) {
+    cityBoom(t, 1.6);
+    const f = mtof(61), n = t + 0.25;
+    osc('sine', f, n, n + 7.8, env(n, 0.42, 0.006, 7.2, seqBus));
+    osc('sine', f / 2, n, n + 5.4, env(n, 0.2, 0.01, 5, seqBus));
+    osc('sine', f * 2, n, n + 3.8, env(n, 0.13, 0.004, 3.4, seqBus));
+    osc('sine', f * 3.01, n, n + 1.9, env(n, 0.04, 0.003, 1.6, seqBus));
+    const III = 3.6, WAR = 8.6, LIFT = 14.5;
+    [0, 1.25, 2.5].forEach((d, i) => warDrum(t + III + d, 0.55 + 0.15 * i, seqBus));
+    warBoom(t + WAR);
+    return { III, WAR, LIFT, drum: WAR + 3.6, bass: LIFT + 1.5 };
+  }
+
+  // ---------------------------------------------------------------- words, in metal
+  /** Chapter I's thunk: every purchase still starts with it. */
+  function thunk(t, level = 1) {
+    const o = osc('sine', 150, t, t + 0.22, env(t, 0.5 * level, 0.003, 0.16, sfxBus));
+    o.frequency.exponentialRampToValueAtTime(58, t + 0.14);
+    const lp = filter('lowpass', 700); lp.connect(env(t, 0.22 * level, 0.001, 0.05, sfxBus));
+    noise(t, 0.07, lp);
+  }
+  /** Chapter I's pling, with a faint metal partial: the war's voice. */
+  function pling(t, midi, level = 1, dest = sfxBus) {
+    const f = mtof(midi);
+    const g = env(t, 0.2 * level, 0.003, 0.42, dest);
+    osc('sine', f, t, t + 0.5, g);
+    osc('sine', f * 2.005, t, t + 0.3, env(t, 0.06 * level, 0.003, 0.2, dest));
+    osc('sine', f * 3.01, t, t + 0.15, env(t, 0.02 * level, 0.002, 0.09, dest));
+    osc('sine', f * 2.76, t, t + 0.35, env(t, 0.025 * level, 0.002, 0.28, dest));
+    send(g, 0.5);
+  }
+  /** Struck metal: partials that do not line up, a short strike on top. */
+  function metal(t, f, ratios, amps, decay, dest, sendAmt = 0.5) {
+    const out = ctx.createGain(); out.connect(dest); send(out, sendAmt);
+    ratios.forEach((r, i) => osc('sine', f * r, t, t + decay + 0.05, env(t, amps[i], 0.002, decay * (1 - 0.18 * i), out)));
+    const bp = filter('bandpass', Math.min(6000, f * 4), 1.2); bp.connect(env(t, 0.1, 0.001, 0.025, out)); noise(t, 0.04, bp);
+    return out;
+  }
+  function knockWord(t) {
+    [0, 0.13].forEach((d) => {
+      const o = osc('sine', 170, t + d, t + d + 0.1, env(t + d, 0.32, 0.002, 0.07, sfxBus));
+      o.frequency.exponentialRampToValueAtTime(110, t + d + 0.07);
+      osc('sine', 1180, t + d, t + d + 0.06, env(t + d, 0.03, 0.001, 0.04, sfxBus));    // the hammer's ring
+    });
+  }
+  /** Chapter I's boom with a metal clang in its tail; the music ducks under it. */
+  function boom(t, power = 1) {
+    const p = Math.max(1, Math.min(2, power)), tail = 2.2 + 1.4 * (p - 1);
+    const out = ctx.createGain(); out.gain.value = 0.5 * (0.9 + 0.25 * (p - 1)); out.connect(sfxBus); send(out, 1.1);
+    const body = osc('sine', 110, t, t + tail + 0.2, env(t, 0.9, 0.004, tail, out));
+    body.frequency.exponentialRampToValueAtTime(p > 1.5 ? 30 : 38, t + 0.5);
+    const over = osc('triangle', 220, t, t + tail * 0.6, env(t, 0.22, 0.004, tail * 0.5, out));
+    over.frequency.exponentialRampToValueAtTime(p > 1.5 ? 60 : 76, t + 0.5);
+    const lp = filter('lowpass', 900, 0.7); lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(70, t + tail * 0.8);
+    lp.connect(env(t, 0.5, 0.003, tail * 0.9, out)); noise(t, tail + 0.1, lp);
+    const hp = filter('highpass', 1800); hp.connect(env(t, 0.25, 0.001, 0.06, out)); noise(t, 0.08, hp);
+    metal(t + 0.02, mtof(38), [2.76, 5.4], [0.05, 0.02], tail * 0.6, out, 0.6);
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setTargetAtTime(S.musicLevel * 0.2, t, 0.02);
+    musicBus.gain.setTargetAtTime(running ? S.musicLevel : 0.0001, t + 0.45 * p, 0.5 * p);
+  }
+  /** Chapter I's card swell; the war's is low and long. */
+  function swell(t, dark = true, len = dark ? 4.6 : 3.2) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.28, t + len * 0.53);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    g.connect(sfxBus); send(g, 0.6);
+    const lp = filter('lowpass', dark ? 110 : 160, 0.8, g);
+    lp.frequency.setValueAtTime(dark ? 110 : 160, t);
+    lp.frequency.exponentialRampToValueAtTime(dark ? 1200 : 2600, t + len * 0.56);
+    noise(t, len + 0.1, lp);
+    const sub = ctx.createGain(); sub.gain.setValueAtTime(0.0001, t);
+    sub.gain.exponentialRampToValueAtTime(0.3, t + len * 0.5); sub.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    sub.connect(sfxBus); osc('sine', mtof(dark ? 31 : 38), t, t + len + 0.1, sub);
+  }
+  /** A plate falls: everything holds its breath for a second, then the fall. A district lower. */
+  function plateFall(t, district) {
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setTargetAtTime(S.musicLevel * 0.12, t, 0.08);
+    musicBus.gain.setTargetAtTime(running ? S.musicLevel : 0.0001, t + 1.5, 1.2);
+    thunk(t, 0.7);
+    const f = t + 1.0;
+    const notes = district ? [[38, 0], [37, 0.3]] : [[50, 0], [49, 0.22]];
+    notes.forEach(([m, d]) => {
+      const g = env(f + d, district ? 0.26 : 0.24, 0.004, district ? 1.3 : 0.7, sfxBus);
+      osc('triangle', mtof(m), f + d, f + d + 1.5, g); osc('sine', mtof(m - 12), f + d, f + d + 1.5, g);
+    });
+    const lp = filter('lowpass', district ? 1200 : 1800);
+    lp.frequency.setValueAtTime(district ? 1200 : 1800, f); lp.frequency.exponentialRampToValueAtTime(district ? 90 : 160, f + (district ? 1.6 : 0.9));
+    const ng = env(f, district ? 0.26 : 0.2, 0.01, district ? 1.6 : 0.9, sfxBus); lp.connect(ng); send(ng, 0.6);
+    noise(f, district ? 1.8 : 1, lp);
+  }
+  function sounding() { return chordNow(); }
+
+  const sfx = {
+    shield(t = ctx.currentTime) { thunk(t, 0.9); const lp = filter('lowpass', 1100, null, sfxBus); metal(t + 0.02, 140, [1, 1.58, 2.33, 3.1], [0.34, 0.2, 0.1, 0.05], 0.32, lp, 0.3); },
+    sword(t = ctx.currentTime) {
+      thunk(t, 0.7);
+      let m = sounding().root + 36; while (m < 74) m += 12; while (m > 86) m -= 12;
+      metal(t + 0.02, mtof(m), [1, 2.76, 5.4, 8.93], [0.16, 0.07, 0.035, 0.015], 1.8, sfxBus, 0.8);
+    },
+    airDefence(t = ctx.currentTime) {
+      thunk(t, 0.8);
+      const f = mtof(57), out = ctx.createGain(); out.connect(sfxBus); send(out, 0.6);
+      [[1, 0.2], [3, 0.07], [5, 0.035]].forEach(([h, a]) => {                        // odd partials only: a tube closed at one end
+        const o = osc('sine', f * h * 1.06, t + 0.03, t + 0.9, env(t + 0.03, a, 0.004, 0.7, out));
+        o.frequency.exponentialRampToValueAtTime(f * h, t + 0.12);
+      });
+      const bp = filter('bandpass', f * 2, 9); bp.connect(env(t + 0.03, 0.22, 0.01, 0.25, out)); noise(t + 0.03, 0.3, bp);
+    },
+    fortify(t = ctx.currentTime) {
+      thunk(t, 0.9);
+      const lp = filter('lowpass', 900, null, sfxBus);
+      metal(t + 0.06, 118, [1, 1.58, 2.33], [0.3, 0.16, 0.08], 0.28, lp, 0.3);
+      metal(t + 0.24, 104, [1, 1.58, 2.33], [0.32, 0.17, 0.08], 0.36, lp, 0.3);
+    },
+    // Something new opens: chapter I's three notes, unchanged, with the war's metal in them.
+    rise(t = ctx.currentTime) { [0, 2, 5].forEach((n, i) => pling(t + i * 0.09, pentaNote(n), 0.9)); },
+    knock(t = ctx.currentTime) { knockWord(t); },
+    research(t = ctx.currentTime) {
+      const c = sounding(); thunk(t, 0.5);
+      [36, 43, 50, 55].forEach((s, i) => metal(t + 0.06 + i * 0.16, mtof(c.root + s - (c.root < 34 ? 0 : 12)), [1, 2.76], [0.09 * (1 - i * 0.12), 0.03], 1.4, sfxBus, 1));
+    },
+    strike(t = ctx.currentTime) {
+      const p = pan(0.55, sfxBus);
+      const bp = filter('bandpass', 2600, 1.6); bp.frequency.setValueAtTime(2600, t); bp.frequency.exponentialRampToValueAtTime(260, t + 0.85);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.36, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+      bp.connect(g); g.connect(p); send(g, 0.5); noise(t, 1, bp);
+      const far = ctx.createGain(); far.gain.value = 0.55; far.connect(pan(0.8, sfxBus)); send(far, 1.4);
+      thud(t + 1.5, 0, 0.6, far);                                                      // it lands, far away
+    },
+    enemyRazed(t = ctx.currentTime) {
+      // Our win, in minor and with a tail: winning costs.
+      pling(t, 74, 0.9); pling(t + 0.11, 77, 0.8);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t + 0.11);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 3);
+      g.connect(sfxBus); send(g, 1.3);
+      [-9, 9].forEach((det) => { const o = osc('triangle', mtof(65), t + 0.11, t + 3.1, g); o.detune.value = det; o.detune.linearRampToValueAtTime(det - 30, t + 3); });
+    },
+    raid(t = ctx.currentTime) {
+      [0, 0.16].forEach((d) => {                                                       // two dry ticks, no room
+        const hp = filter('highpass', 2600); hp.connect(env(t + d, 0.22, 0.001, 0.02, sfxBus)); noise(t + d, 0.03, hp);
+        osc('sine', 1900, t + d, t + d + 0.04, env(t + d, 0.07, 0.001, 0.025, sfxBus));
+      });
+      S.raid = true; raidUntil = t + 0.3 + RAID_S / S.speed;
+      listener?.({ type: 'state' });
+    },
+    landing(t = ctx.currentTime) { thud(t, COASTS[Math.floor(Math.random() * 4)], 1, sfxBus); duckFolk(t); },
+    fallHome(t = ctx.currentTime) { plateFall(t, false); },
+    fallDistrict(t = ctx.currentTime) { plateFall(t, true); },
+    radarWarn(t = ctx.currentTime) {
+      const coast = COASTS[Math.floor(Math.random() * 4)];
+      for (let i = 0; i < WAVE_WARNING_S * 2; i++) radarTick(t + i * 0.5, coast, sfxBus);
+      thud(t + WAVE_WARNING_S, coast, 0.8, sfxBus);
+    },
+    shellOpen(t = ctx.currentTime) { shell(t, false, COASTS[Math.floor(Math.random() * 4)], sfxBus); },
+    shellDefended(t = ctx.currentTime) { shell(t, true, COASTS[Math.floor(Math.random() * 4)], sfxBus); },
+    islandSilent(t = ctx.currentTime) {
+      // their last stroke falls in pitch, and then nothing
+      const dest = pan(0.2, sfxBus), f = mtof(27);
+      const o = osc('sine', f * 2.2, t, t + 2.2, env(t, 0.5, 0.003, 2, dest));
+      o.frequency.exponentialRampToValueAtTime(f, t + 0.07); o.frequency.exponentialRampToValueAtTime(f * 0.5, t + 1.8);
+      osc('triangle', f * 2, t, t + 0.8, env(t, 0.13, 0.003, 0.6, dest));
+      const lp = filter('lowpass', 900); lp.connect(env(t, 0.27, 0.002, 0.08, dest)); noise(t, 0.1, lp);
+      set({ silent: true, raid: false });
+    },
+    islandBack(t = ctx.currentTime) {
+      // a low swell, then their drum again: heavier and a step lower
+      const lp = filter('lowpass', 90); lp.frequency.setValueAtTime(90, t); lp.frequency.exponentialRampToValueAtTime(500, t + 1.2);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.24, t + 1.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      lp.connect(g); g.connect(pan(0.35, sfxBus)); noise(t, 1.6, lp);
+      [0, 0.38].forEach((d, i) => warDrum(t + 1.2 + d, i ? 0.4 : 0.6, pan(0.2, sfxBus), 25, 1.8));
+      set({ silent: false, heavy: 1 });
+    },
+    warChosen(t = ctx.currentTime) { warBoom(t + 2); },                               // the breath and the heaviest boom, as on the city board
+    nuke(t = ctx.currentTime) {
+      boom(t, 2);
+      const lp = filter('lowpass', 420); lp.frequency.setValueAtTime(420, t); lp.frequency.exponentialRampToValueAtTime(45, t + 6);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.2, t + 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + 6.5);
+      lp.connect(g); g.connect(sfxBus); send(g, 1); noise(t, 6.6, lp);
+      osc('sine', 3520, t + 0.3, t + 5, env(t + 0.3, 0.008, 0.6, 4, sfxBus));            // the ears ring
+      musicBus.gain.cancelScheduledValues(t);
+      musicBus.gain.setTargetAtTime(S.musicLevel * 0.05, t, 0.02);
+      musicBus.gain.setTargetAtTime(running ? S.musicLevel : 0.0001, t + 3, 1.8);
+    },
+    /** The rocket: a long ramp of noise, their drum rises with it and is gone; the boom is the leaving. */
+    rocket(t = ctx.currentTime) {
+      const L = 7.5, p = pan(0.35, sfxBus);
+      set({ gone: true });
+      const bp = filter('bandpass', 110, 0.9); bp.frequency.setValueAtTime(110, t); bp.frequency.exponentialRampToValueAtTime(2400, t + L);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.13, t + L); g.gain.linearRampToValueAtTime(0.0001, t + L + 0.25);
+      bp.connect(g); g.connect(p); send(g, 0.8); noise(t, L + 0.3, bp);
+      let at = t, gap = 1.1, i = 0;
+      while (at < t + L - 0.1) {                                                        // their drum, faster and higher, into the noise
+        const k = (at - t) / L;
+        warDrum(at, 0.28 + 0.2 * k, p, 27 + Math.round(24 * k), 0.4);
+        at += gap; gap = Math.max(0.09, gap * 0.82); i++;
+      }
+      boom(t + L, 1.1);
+    },
+  };
+
+  return {
+    S, sfx, set, apply, pump, start, stop, arrive, only, bus, inp, sfxBus, musicBus, threadOut, master, transition,
+    isRunning: () => running,
+    present: () => [...present],
+    chordName: () => chordNow().name,
+    clock: () => ({ barLen: C.barLen, waves: C.waves, air: airNext(), push: C.push, running: clockRunning(), land: C.land }),
+    listen: (fn) => { listener = fn; },
+    // used by the thread demos
+    tools: { env, osc, noise, filter, pan, send, drumHit, boom, swell, mtof, reverb },
+  };
+}
+
+// ---------------------------------------------------------------- the thread and the ending notes
+/** The city's last bars (step five): bass hit, the rival's double drum halfway, a sour tone. */
+function cityBars(E, t, bars, gap) {
+  const { env, osc, noise, filter, pan, send, drumHit } = E.tools;
+  const out = E.threadOut.context.createGain(); out.connect(E.threadOut);
+  for (let b = 0; b < bars; b++) {
+    const at = t + b * gap, c = CHORDS[b % 4], f = mtof(c.root);
+    const lp = filter('lowpass', 420, null, out); send(lp, 0.8);
+    const body = osc('sine', f * 1.22, at, at + 4.6, env(at, 0.36, 0.03, 4.2, lp));
+    body.frequency.exponentialRampToValueAtTime(f, at + 0.16);
+    osc('sine', f / 2, at, at + 3.8, env(at, 0.25, 0.05, 3.4, lp));
+    osc('triangle', f * 2, at, at + 2.4, env(at, 0.07, 0.03, 2.0, lp));
+    const dest = pan(0.35, out); send(dest, 0.7);
+    [0, 0.38].forEach((d, i) => drumHit(at + gap / 2 + d, 27, i ? 0.62 : 1, dest));
+    // the tones chafe: a minor ninth or a tritone over the root, dragging into place
+    const r = c.root + 12, m = [r + 13, r + 18, r + 19, r + 12 + c.third][b % 4];
+    const g = out.context.createGain(); g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.07, at + gap * 0.5); g.gain.linearRampToValueAtTime(0.0001, at + gap * 1.6);
+    g.connect(pan(b % 2 ? 0.4 : -0.4, out)); send(g, 0.8);
+    const tl = filter('lowpass', 1100, 0.5, g);
+    [-16, 16].forEach((det) => { const o = osc('triangle', mtof(m + 12), at, at + gap * 1.7, tl); o.detune.value = det; });
+  }
+  // the foreign tone under it all (E♭, beating), as in the city at step five
+  const g = out.context.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + 2); g.gain.setValueAtTime(0.05, t + bars * gap - 1); g.gain.linearRampToValueAtTime(0.0001, t + bars * gap + 0.5);
+  const lp = filter('lowpass', 370, 1.5, g); g.connect(out);
+  [1, 1.007].forEach((m) => osc('sawtooth', mtof(39) * m, t, t + bars * gap + 0.6, lp));
+  return out;
+}
+/** The five ending notes, each the way its act plays it. */
+function endingNote(E, which, t) {
+  const { env, osc, noise, filter, pan, send, mtof: mf } = E.tools, out = E.threadOut, ac = out.context;
+  const o = ac.createGain(); o.gain.value = 0.9; o.connect(out); send(o, 0.9);
+  if (which === 0) {                                                                    // I: D, struck once, rings seven seconds
+    const f = mf(62);
+    osc('sine', f, t, t + 7.8, env(t, 0.5, 0.006, 7.4, o));
+    osc('sine', f / 2, t, t + 5.4, env(t, 0.25, 0.01, 5, o));
+    osc('sine', f * 2, t, t + 3.8, env(t, 0.16, 0.004, 3.4, o));
+    osc('sine', f * 3.01, t, t + 1.9, env(t, 0.05, 0.003, 1.6, o));
+  } else if (which === 1) {                                                             // II: C♯, the A major chord's third, left hanging
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22, t + 0.9); g.gain.setValueAtTime(0.22, t + 3); g.gain.linearRampToValueAtTime(0.0001, t + 7);
+    g.connect(o);
+    const lp = filter('lowpass', 1600, 0.5, g);
+    [-10, 10].forEach((det) => { osc('triangle', mf(61), t, t + 7.1, lp).detune.value = det; });
+    osc('sine', mf(73), t, t + 7.1, env(t + 0.4, 0.04, 0.6, 5, lp));
+    const sub = ac.createGain(); sub.gain.setValueAtTime(0.0001, t); sub.gain.exponentialRampToValueAtTime(0.12, t + 1.2); sub.gain.exponentialRampToValueAtTime(0.0001, t + 5);
+    sub.connect(o); osc('sine', mf(33), t, t + 5.1, sub);
+  } else if (which === 2) {                                                             // III: E♭, where the drone arrives when the surface is dead
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 1.4); g.gain.setValueAtTime(0.3, t + 3.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 7.5);
+    g.connect(o);
+    osc('sine', mf(27), t, t + 7.6, g);
+    const tg = ac.createGain(); tg.gain.value = 0.25; tg.connect(g); osc('triangle', mf(39), t, t + 7.6, tg);
+    const lp = filter('lowpass', 150, 0.8); const cg = ac.createGain(); cg.gain.value = 0.3; lp.connect(cg); cg.connect(g);
+    osc('sawtooth', mf(27) * 1.004, t, t + 7.6, lp);
+    const nb = filter('bandpass', 120, 0.9); const ng = ac.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.18, t + 1.4); ng.gain.exponentialRampToValueAtTime(0.0001, t + 7.5);
+    nb.connect(ng); ng.connect(o); noise(t, 7.6, nb);
+    const f = mf(63); osc('sine', f, t + 0.6, t + 7, env(t + 0.6, 0.12, 0.8, 5.5, o));
+  } else if (which === 3) {                                                             // IV: low D, every voice in the colony on it, in unison
+    const f = mf(38);
+    osc('sine', f, t, t + 7.5, env(t, 0.34, 0.8, 6.5, o));
+    osc('sine', f / 2, t, t + 6, env(t, 0.16, 1, 4.8, o));
+    [[700, 1100], [450, 800], [400, 1600], [320, 870], [450, 800], [700, 1100]].forEach(([f1, f2], i) => {
+      const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t + 0.2 * i); g.gain.linearRampToValueAtTime(0.09, t + 0.2 * i + 1.2); g.gain.setValueAtTime(0.09, t + 4.5); g.gain.linearRampToValueAtTime(0.0001, t + 7);
+      g.connect(pan((i / 5) * 1.4 - 0.7, o));
+      const a = filter('bandpass', f1, 5, g); const bg = ac.createGain(); bg.gain.value = 0.6; bg.connect(g); const b = filter('bandpass', f2, 7, bg);
+      const v = osc('sawtooth', mf(50), t + 0.2 * i, t + 7.1, a); v.connect(b); v.detune.value = (i % 2 ? 1 : -1) * (3 + i);
+    });
+    [0, 0.42].forEach((d, i) => { const hb = osc('sine', 70, t + 0.3 + d, t + 0.7 + d, env(t + 0.3 + d, i ? 0.14 : 0.2, 0.006, 0.25, o)); hb.frequency.exponentialRampToValueAtTime(42, t + 0.45 + d); });
+  } else {                                                                              // V: F♯, the first major third, over a far D
+    const f = mf(66);
+    osc('sine', f, t, t + 7.5, env(t, 0.34, 0.01, 7, o));
+    osc('sine', f * 2.005, t, t + 4, env(t, 0.08, 0.008, 3.5, o));
+    osc('sine', f * 3.01, t, t + 2, env(t, 0.025, 0.004, 1.6, o));
+    osc('sine', mf(50), t, t + 7.5, env(t, 0.1, 1.2, 6, o));
+    osc('sine', mf(38), t, t + 7.5, env(t, 0.1, 1.2, 6, o));
+  }
+}
+/** IV's card: the war's E♭ falls two octaves (and the semitone) to D, and stays. */
+function fallToDeep(E, t) {
+  const { env, osc, filter, mtof: mf, send } = E.tools, out = E.threadOut, ac = out.context;
+  const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.26, t + 0.8); g.gain.setValueAtTime(0.26, t + 4.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 11);
+  g.connect(out); send(g, 0.9);
+  const lp = filter('lowpass', 900, 0.6, g);
+  [[1, 'triangle', 0.8], [1, 'sine', 1], [2, 'sine', 0.2]].forEach(([m, type, a]) => {
+    const vg = ac.createGain(); vg.gain.value = a; vg.connect(lp);
+    const o = osc(type, mf(51) * m, t, t + 11.2, vg);
+    o.frequency.setValueAtTime(mf(51) * m, t + 1.2);
+    o.frequency.exponentialRampToValueAtTime(mf(26) * m, t + 5.8);
+  });
+  osc('sine', mf(38), t + 5.8, t + 11.5, env(t + 5.8, 0.12, 0.6, 5, out));             // home again, far below
+}
+
+// ---------------------------------------------------------------- scripts (live and offline alike)
+/** Chapter III in about 90 seconds; the clock runs 2.5 times faster than in the game. */
+function warDemo() {
+  const SPEED = 2.5, LEN = 93;
+  const fell = { home: 0, district: 0 };
+  return {
+    len: LEN, tail: 4,
+    init(E) {
+      E.set({ interval: 40, speed: SPEED, lead: 0, plates: 20, arms: 0.25, pop: 0.85, doom: 0, tier: 0, radar: false, airDef: false, raid: false, silent: false, down: false, gone: false, heavy: 0 });
+      E.start(['theirs']);                                                             // the opening: their drum alone
+    },
+    each(E, el) {
+      const doom = el < 20 ? 0 : el < 50 ? lerp(0, 22, (el - 20) / 30) : el < 76 ? lerp(22, 62, (el - 50) / 26) : lerp(62, 86, clamp((el - 76) / 5));
+      const pop = el < 76 ? lerp(0.85, 0.3, el / 76) : lerp(0.3, 0.08, clamp((el - 76) / 10));
+      const arms = el < 7 ? 0.25 : el < 20 ? lerp(0.25, 0.75, (el - 7) / 13) : el < 50 ? 0.75 : el < 62 ? 0.95 : 0.65;
+      E.set({ interval: Math.round(Math.max(20, 40 - (el / 80) * 20)), doom: Math.round(doom), pop: Math.round(pop * 100) / 100, arms: Math.round(arms * 100) / 100 });
+    },
+    onLanding(ev, at, later) {
+      if (ev.n === 1) later(at + 1.1, (E) => { E.sfx.fallHome(); E.set({ plates: 19, down: true }); fell.home++; });
+      if (ev.n === 2) { later(at + 1.6, (E) => E.sfx.rise()); later(at + 3.4, (E) => { E.sfx.airDefence(); E.set({ radar: true }); }); }
+      if (ev.n === 4) later(at + 1.2, (E) => { E.sfx.fallDistrict(); E.set({ plates: 18, down: true }); fell.district++; });
+    },
+    actions: [
+      [4, (E) => E.arrive('bass')],                                                    // our bass comes in under it
+      [7, (E) => { E.sfx.rise(); E.arrive('arms'); }],                                  // the arms slider opens
+      [10, (E) => E.arrive('tones')],
+      [13.5, (E) => E.arrive('folk')],
+      [20.5, (E) => { E.sfx.rise(); E.arrive('drone'); }],                              // ◆ opens; the doomsday clock starts
+      [22.5, (E) => E.sfx.fortify()],
+      [25, (E) => { E.set({ down: false, plates: 20 }); E.arrive('ours'); }],          // rebuilt; our drum comes in, level
+      [37, (E) => E.sfx.raid()],                                                        // their drum silent for RAID_S / 2.5
+      [38.2, (E) => E.sfx.strike()],
+      [41, (E) => E.sfx.enemyRazed()],
+      [46.5, (E) => { E.sfx.research(); E.set({ lead: 1 }); }],                          // our lead: our drum answers
+      [50.5, (E) => { E.set({ tier: 4, lead: -1 }); E.arrive('shells'); }],              // their V: they lead, air waves begin
+      [58.5, (E) => { E.sfx.airDefence(); E.set({ airDef: true }); }],
+      [60.5, (E) => E.sfx.strike()],
+      [62.2, (E) => { E.sfx.enemyRazed(); }],
+      [63.4, (E) => E.sfx.islandSilent()],                                              // bombed out: the drum stops altogether
+      [66, (E) => E.set({ down: false, plates: 20 })],
+      [68.5, (E) => { E.sfx.research(); E.set({ lead: 0 }); }],
+      [73, (E) => E.sfx.islandBack()],                                                  // back, heavier and a step lower
+      [83.5, (E) => E.sfx.rocket()],
+      [91.2, (E) => E.only(['drone', 'folk'])],                                         // the drone on E♭ and a thin murmur
+      [92, (E) => endingNote(E, 2, E.threadOut.context.currentTime)],
+    ],
+  };
+}
+function fromCityScript() {
+  const GAP = 3.3, BARS = 8, PRESS = BARS * GAP;
+  let k = null;
+  return {
+    len: PRESS + 36, tail: 2,
+    // the war's clock picks up the transition's drum: a stroke every 2.8 s is a 22.4 s wave
+    init(E) { E.set({ interval: 22.4, speed: 1, lead: 0, plates: 20, arms: 0.5, pop: 0.7, doom: 0, tier: 0, radar: false, airDef: false, raid: false, silent: false, down: false, gone: false, heavy: 0 }); },
+    actions: [
+      [0, (E) => { cityOut = cityBars(E, E.threadOut.context.currentTime + 0.05, BARS, GAP); }],
+      [PRESS, (E) => {                                                                  // the swords are pressed: the city is gone at once
+        const t = E.threadOut.context.currentTime;
+        cityOut.gain.cancelScheduledValues(t); cityOut.gain.setTargetAtTime(0.0001, t, 0.06);
+        k = E.transition(t);
+      }],
+      [PRESS + 12.2 - 0.3, (E) => E.start(['theirs'])],                                // their drum alone
+      [PRESS + 16, (E) => E.arrive('bass')],                                          // the card lifts: our bass under it
+      [PRESS + 35, (E) => E.stop()],
+    ],
+  };
+}
+let cityOut = null;
+function toDeepScript() {
+  return {
+    len: 30, tail: 4,
+    init(E) {
+      E.set({ interval: 22, speed: 1, lead: -1, plates: 15, arms: 0.6, pop: 0.2, doom: 84, tier: 8, radar: false, airDef: true, raid: false, silent: false, down: false, gone: false, heavy: 1 });
+      E.start();
+    },
+    actions: [
+      [3.5, (E) => { E.set({ doom: 86 }); E.sfx.rocket(); }],
+      [11.5, (E) => E.only(['drone'])],                                                 // the drone alone, on E♭
+      [17, (E) => fallToDeep(E, E.threadOut.context.currentTime)],
+      [20, (E) => E.only([])],
+      [24, (E) => E.stop()],
+    ],
+  };
+}
+function endingsScript(which) {
+  const list = which === 'all' ? [0, 1, 2, 3, 4] : [Number(which)];
+  return {
+    len: list.length * 4.6 + 4, tail: 4,
+    init() {},
+    actions: list.map((n, i) => [i * 4.6, (E) => endingNote(E, n, E.threadOut.context.currentTime + 0.02)]),
+  };
+}
+
+/** Runs a script on an engine; `step` is called every tenth of a second, live or offline. */
+function makeRunner(E, scr) {
+  const ac = E.threadOut.context;
+  const t0 = ac.currentTime;
+  const queue = scr.actions.map((a) => [...a]);
+  const later = (at, fn) => queue.push([at, fn]);
+  E.listen((ev) => { if (ev.type === 'landing') { runner.events.push({ n: ev.n, at: +(ev.t - t0).toFixed(2), air: ev.air, push: ev.push }); scr.onLanding?.(ev, ev.t - t0, later); } if (ev.type === 'state') runner.dirty = true; });
+  scr.init(E);
+  const runner = {
+    events: [], dirty: true,
+    step() {
+      const el = ac.currentTime - t0;
+      if (scr.each && E.isRunning()) scr.each(E, el);
+      queue.sort((a, b) => a[0] - b[0]);
+      while (queue.length && queue[0][0] <= el) queue.shift()[1](E);
+      if (E.isRunning()) E.pump(ac.currentTime + 0.35);
+      return el < scr.len;
+    },
+  };
+  return runner;
+}
+
+// ---------------------------------------------------------------- the board
+let ctx = null, E = null, timer = null, runner = null, runnerName = null;
+const $ = (id) => document.getElementById(id);
+const muted = new Set();
+const TIER_NAMES = ['I · nävar', 'II · svärd', 'III · krut', 'IV · repetergevär', 'V · artilleri', 'VI · robotar', 'VII · kemiska vapen', 'VIII · biologiska vapen', 'IX · kärnvapen'];
+const SLIDERS = ['interval', 'lead', 'plates', 'arms', 'pop', 'doom', 'tier'];
+const TOGGLES = ['radar', 'airDef', 'raid', 'silent', 'down'];
+
+function ensure() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    E = makeEngine(ctx);
+    E.set(readInputs());
+    applyVolumes();
+    timer = setInterval(tick, 50);
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+  return E;
+}
+function readInputs() {
+  return {
+    interval: +$('interval').value, lead: +$('lead').value, plates: +$('plates').value, arms: $('arms').value / 100,
+    pop: $('pop').value / 100, doom: +$('doom').value, tier: +$('tier').value,
+    radar: $('radar').checked, airDef: $('airDef').checked, raid: $('raid').checked, silent: $('silent').checked, down: $('down').checked,
+  };
+}
+function paint() {
+  const S = E ? E.S : readInputs();
+  if (E) {
+    $('interval').value = S.interval; $('lead').value = S.lead; $('plates').value = S.plates; $('arms').value = Math.round(S.arms * 100);
+    $('pop').value = Math.round(S.pop * 100); $('doom').value = S.doom; $('tier').value = S.tier;
+    for (const k of TOGGLES) $(k).checked = !!S[k];
+  }
+  $('interval-out').textContent = `${S.interval} s` + (E && S.speed !== 1 ? ` (demo ${String(S.speed).replace('.', ',')}×)` : '');
+  $('lead-out').textContent = S.lead === 0 ? 'jämnt' : S.lead > 0 ? `vi leder ${S.lead} steg` : `de leder ${-S.lead} steg`;
+  $('plates-out').textContent = `${S.plates} av 20`;
+  $('arms-out').textContent = `${Math.round(S.arms * 100)} % hammare`;
+  $('pop-out').textContent = `${Math.round(S.pop * 100)} %`;
+  $('doom-out').textContent = `${S.doom} %` + (S.doom >= DOOMSDAY_LEAVE ? ' · de lämnar' : S.doom >= ROCKET_FROM ? ' · raketen byggs' : '');
+  $('tier-out').textContent = TIER_NAMES[S.tier] + (S.tier >= 4 ? ' · luftvågor' : '');
+  $('vol-sfx-out').textContent = `${$('vol-sfx').value} %`;
+  $('vol-music-out').textContent = `${$('vol-music').value} %`;
+}
+function applyVolumes() {
+  if (!E) return;
+  const t = ctx.currentTime;
+  E.sfxBus.gain.setTargetAtTime(0.62 * $('vol-sfx').value / 80, t, 0.05);
+  const music = $('vol-music').value / 100;
+  if (E.S.musicLevel !== music) { E.S.musicLevel = music; if (E.isRunning()) E.musicBus.gain.setTargetAtTime(music, t, 0.1); }
+  E.threadOut.gain.setTargetAtTime(music, t, 0.1);
+  for (const name of LAYERS) E.bus[name].gain.setTargetAtTime(muted.has(name) ? 0.0001 : 1, t, 0.08);
+}
+function readout() {
+  if (!E || !E.isRunning()) { $('readout').textContent = runner ? 'lyssna' : 'stilla'; return; }
+  const c = E.clock();
+  if (!c.running) { $('readout').textContent = E.S.gone ? 'de har lämnat' : `ön tyst · ackord ${E.chordName()}`; return; }
+  const next = Math.max(0, c.land - ctx.currentTime);
+  $('readout').textContent = `ackord ${E.chordName()} · takt ${c.barLen.toFixed(1)} s · landstigning om ${next.toFixed(0)} s` + (c.air ? ' · luftvåg' : '') + (c.push ? ' · de trycker på' : '');
+}
+function tick() {
+  if (runner) {
+    const more = runner.step();
+    paint();
+    if (!more) endRunner();
+  } else if (E.isRunning()) { E.pump(ctx.currentTime + 0.35); paint(); }
+  readout();
+}
+function labelButtons() {
+  $('run').textContent = E && E.isRunning() && !runner ? 'Stoppa kriget' : 'Starta kriget';
+  $('demo').textContent = runnerName === 'demo' ? 'Stoppa' : 'Spela kriget på 90 sekunder';
+}
+function endRunner() {
+  runner = null; runnerName = null;
+  if (E.isRunning()) E.stop();
+  E.S.speed = 1;
+  E.listen((ev) => { if (ev.type === 'state') paint(); });
+  paint(); labelButtons();
+}
+function startRunner(name, scr) {
+  ensure();
+  if (runner) endRunner();
+  if (E.isRunning()) E.stop();
+  runnerName = name;
+  runner = makeRunner(E, scr);
+  paint(); labelButtons();
+}
+
+$('run').addEventListener('click', () => {
+  ensure();
+  if (runner) endRunner();
+  if (E.isRunning()) E.stop(); else { E.set({ ...readInputs(), speed: 1, gone: false, heavy: 0 }); E.start(); E.listen((ev) => { if (ev.type === 'state') paint(); }); }
+  labelButtons(); paint();
+});
+$('demo').addEventListener('click', () => {
+  if (runnerName === 'demo') { endRunner(); return; }
+  startRunner('demo', warDemo());
+});
+for (const id of SLIDERS) $(id).addEventListener('input', () => { ensure(); E.set({ [id]: id === 'arms' || id === 'pop' ? $(id).value / 100 : +$(id).value }); paint(); });
+for (const id of TOGGLES) $(id).addEventListener('change', () => {
+  ensure();
+  const on = $(id).checked;
+  if (id === 'silent') { if (on) E.sfx.islandSilent(); else E.sfx.islandBack(); }
+  else if (id === 'raid' && on && E.isRunning()) { E.sfx.raid(); E.set({ raid: true }); }
+  else E.set({ [id]: on });
+  paint();
+});
+['vol-sfx', 'vol-music'].forEach((id) => $(id).addEventListener('input', () => { ensure(); applyVolumes(); paint(); }));
+document.querySelectorAll('[data-sfx]').forEach((b) => b.addEventListener('click', () => {
+  ensure();
+  const name = b.dataset.sfx;
+  if (name === 'raid' && !E.isRunning()) {                                              // the raid is a silence: let the drum be heard first
+    E.set({ ...readInputs(), speed: 1, gone: false, raid: false }); E.start();
+    labelButtons();
+    setTimeout(() => { E.sfx.raid(); paint(); }, 4500);
+    return;
+  }
+  E.sfx[name]();
+  paint(); labelButtons();
+}));
+document.querySelectorAll('[data-thread]').forEach((b) => b.addEventListener('click', () => {
+  startRunner(b.dataset.thread, b.dataset.thread === 'fromCity' ? fromCityScript() : toDeepScript());
+}));
+document.querySelectorAll('[data-end]').forEach((b) => b.addEventListener('click', () => startRunner('end', endingsScript(b.dataset.end))));
+$('chips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip'); if (!chip) return;
+  const name = chip.dataset.layer;
+  if (muted.has(name)) muted.delete(name); else muted.add(name);
+  chip.classList.toggle('muted', muted.has(name));
+  applyVolumes();
+});
+paint();
+
+// ---------------------------------------------------------------- level check (no ears needed)
+const dbfs = (v) => (v > 0 ? Number((20 * Math.log10(v)).toFixed(1)) : -Infinity);
+/**
+ * Renders a script offline and returns peak and RMS (whole run and per five
+ * seconds) plus each layer's peak, read at every step. A layer that never
+ * sounds shows up as -Infinity.
+ */
+async function render(makeScript, label, musicOnly = false, solo = null) {
+  const scr = makeScript();
+  const rate = 44100, seconds = scr.len + (scr.tail || 0);
+  const off = new OfflineAudioContext(2, Math.ceil(rate * seconds), rate);
+  const e = makeEngine(off);
+  e.S.musicLevel = 0.7; e.threadOut.gain.value = 0.7; e.sfxBus.gain.value = musicOnly ? 0 : 0.62;
+  const probes = {};
+  for (const name of [...LAYERS, 'sfx']) {
+    const a = off.createAnalyser(); a.fftSize = 8192;
+    (name === 'sfx' ? e.sfxBus : e.bus[name]).connect(a);
+    probes[name] = { a, buf: new Float32Array(8192), peak: 0, sq: 0, n: 0 };
+  }
+  if (solo) for (const name of LAYERS) e.bus[name].gain.value = solo.includes(name) ? 1 : 0;
+  const r = makeRunner(e, scr);
+  r.step();
+  for (let k = 0.1; k < seconds - 0.05; k += 0.1) {
+    off.suspend(Math.round(k * 10) / 10).then(() => {
+      r.step();
+      for (const p of Object.values(probes)) { p.a.getFloatTimeDomainData(p.buf); for (const v of p.buf) { p.sq += v * v; if (Math.abs(v) > p.peak) p.peak = Math.abs(v); } p.n += p.buf.length; }
+      off.resume();
+    });
+  }
+  const buf = await off.startRendering();
+  const L = buf.getChannelData(0), R = buf.getChannelData(1), win = rate * 5, windows = [];
+  let peak = 0, peakAt = 0, sum = 0;
+  for (let w = 0; w < L.length; w += win) {
+    let s = 0; const end = Math.min(L.length, w + win);
+    for (let i = w; i < end; i++) { const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); s += (L[i] * L[i] + R[i] * R[i]) / 2; if (v > peak) { peak = v; peakAt = i / rate; } }
+    sum += s; windows.push(Math.round(10 * Math.log10(s / (end - w) + 1e-12)));
+  }
+  const layers = Object.fromEntries(Object.entries(probes).map(([k, p]) => [k, dbfs(p.peak)]));
+  const layerRms = Object.fromEntries(Object.entries(probes).map(([k, p]) => [k, p.n ? Number((10 * Math.log10(p.sq / p.n + 1e-12)).toFixed(1)) : null]));
+  const out = { label, seconds, peakDbfs: dbfs(peak), peakAtSeconds: Number(peakAt.toFixed(1)), rmsDbfs: Number((10 * Math.log10(sum / L.length + 1e-12)).toFixed(1)), rmsDbPerFiveSeconds: windows, layerPeaksDbfs: layers, layerRmsDbfs: layerRms, landings: r.events };
+  console.log(`[nivå] ${label}: topp ${out.peakDbfs} dBFS, RMS ${out.rmsDbfs} dBFS`, JSON.stringify(out));
+  return out;
+}
+window.renderWar = (musicOnly = false, solo = null) => render(warDemo, solo ? `kriget, bara ${solo.join(' + ')}` : musicOnly ? 'kriget på 90 sekunder, bara musiken' : 'kriget på 90 sekunder', musicOnly || !!solo, solo);
+window.renderThread = (name) => render(name === 'fromCity' ? fromCityScript : name === 'toDeep' ? toDeepScript : () => endingsScript(name), `tråden: ${name}`);
+/** One word offline: its peak in dBFS. */
+window.renderSfx = async (name) => {
+  const off = new OfflineAudioContext(2, 44100 * 12, 44100);
+  const e = makeEngine(off);
+  e.sfx[name](0.05);
+  const b = await off.startRendering();
+  let peak = 0; for (let c = 0; c < 2; c++) for (const v of b.getChannelData(c)) if (Math.abs(v) > peak) peak = Math.abs(v);
+  return dbfs(peak);
+};
+window.levelCheck = async () => {
+  await window.renderWar(true);
+  const war = await window.renderWar();
+  const silent = Object.entries(war.layerPeaksDbfs).filter(([, v]) => !(v > -60)).map(([k]) => k);
+  console.log(`[nivå] lager som aldrig hörs i demot: ${silent.length ? silent.join(', ') : 'inga'}`);
+  return { war, silent };
+};
+</script>
+</body>
+</html>
