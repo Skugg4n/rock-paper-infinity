@@ -150,3 +150,28 @@ droop; fed, it blurs. Stars per day on the HUD is the machine's win rate, nothin
    choice, vats and perfusion, the growth nodes, Unity and the V · UNITY card.
 Sim: sim-phase4 gets the tree as its purchase list; targets hold for the human
 ending; the bio road reported separately.
+
+## Ola on mockups 9 (2026-10-02): "WOW! Älskart."
+
+**The machine**
+- A SCREEN at the top showing the symbol it plays against, instead of a floating
+  icon. A CRT. Perhaps what strikes are screens too: the arms end in small CRTs.
+- It must be able to run much faster later.
+- Energy drawn as dashed lines or blue threads running through the underground
+  construction and up to the machine as it works. When it scores, sparks fly.
+- It stands on top, in a room of its own. The escape hatch becomes a smaller passage
+  up through the surface to the side: hand-hewn, uneven.
+- The rule (each arm in turn against the ring's throw, a win one in three) is fine.
+
+**The tree**
+- Hover tooltips cover things. Use ONE fixed info box where the text appears on
+  hover. Subtle animations on hover.
+- Bio growing OVER parts already won is right; it may also boost them, add to them,
+  and MIX several into new functions (hybrid nodes).
+- The bio nodes read as "eyes": find another way. Not fond of the beige either.
+
+Decision (Claude): the tissue goes Giger proper: cold, dark, biomechanical. Oil
+black and gunmetal with bone-pale ribbing, one arterial colour for the pulse. Nodes
+are ribbed vertebrae with a membrane window that shows fluid level (the level pips
+become chambers filling), never a slit or a pupil. Mockup 10 shows two palettes side
+by side for Ola to choose.
