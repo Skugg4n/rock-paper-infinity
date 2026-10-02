@@ -1448,3 +1448,13 @@ items:
     notes: |
       Confirmed by scripts/sim-phase1.mjs new: batteries=0, 11 recharge clicks,
       generator at 4m01s. Design dialogue first.
+
+  - id: B155
+    added: 2026-10-02
+    source: "chat 2026-10-02"
+    request: |
+      At the end of WAR (chapter III) the player gets to choose whether to go
+      on to THE DEEP, with a short, clean notice that the chapter is not
+      finished ("Chapter not finalized. Continue at your own peril", or
+      something neater).
+    status: open

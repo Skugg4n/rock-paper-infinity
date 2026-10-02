@@ -1,3 +1,7 @@
+import { PHASE1_CONSTANTS } from '../constants.js';
+
+const { BATTERY_UNLOCK_CLICKS, GENERATOR_UNLOCK_BATTERIES } = PHASE1_CONSTANTS;
+
 /**
  * Factory that builds the `upgrades` configuration object for Phase 1.
  *
@@ -9,13 +13,18 @@
  * Balance (v1.21.0, simulated in docs/superpowers/specs/2026-09-18-phase1-avalanche.md):
  * costs grow geometrically so every purchase feels heavier than the last,
  * and unlocks arrive in a fixed order: hands → auto → speed → recharge (15★)
- * → battery (40★) → luck (100 games) → generator (100★) → boards (150★)
- * → factory (everything maxed) → bank (250k lifetime). Energy helpers come and
- * go: clicking → battery packs → generator, each outgrown by the power line.
+ * → luck (100 games) → boards (150★) → factory (everything maxed) → bank.
+ *
+ * The energy ladder (v1.53.0, docs/superpowers/specs/2026-10-02-clover-and-energy-ladder-design.md)
+ * unlocks by USE, not by stars, so each helper is felt before the next one
+ * arrives: recharge clicks → big battery (after 6 clicks) → generator (after
+ * 5 big batteries). Good, then a slog, then the upgrade that makes it good again.
  *
  * @param {object} actions - Callbacks for purchase side-effects
  * @param {function} actions.rechargeEnergy  - Adds energy (manualRecharge)
  * @param {function} actions.addReserve      - Adds reserve energy (buyBattery)
+ * @param {function} actions.getRechargeClicks  - Recharge clicks so far (battery gate)
+ * @param {function} actions.getBatteriesBought - Big batteries bought so far (generator gate)
  * @param {function} actions.incrementSpeed  - Bumps gameSpeed by 1 (speed)
  * @param {function} actions.createGameBoard - Adds a new game board (addGameBoard)
  * @param {function} actions.mergeToMetaBoard - Activates the meta board (mergeGameBoard)
@@ -70,16 +79,22 @@ export function createUpgrades(actions) {
         energyGenerator: {
             level: 0, maxLevel: 50,
             cost: () => geometric(25, 1.07, upgrades.energyGenerator.level),
-            // Arrives when batteries stop keeping up (around the speed-10 jump).
-            unlocksAt: 100, unlocks: [],
+            // Arrives when big batteries stop keeping up: after the speed-10
+            // jump a pack is eaten in seconds, and the fifth one opens this.
+            unlocksAt: 0, unlocks: [],
+            unlockCondition: () =>
+                upgrades.energyGenerator.level > 0 ||
+                actions.getBatteriesBought() >= GENERATOR_UNLOCK_BATTERIES,
             element: document.getElementById('energyGenerator'),
             purchase: function() { this.level++; }
         },
         buyBattery: {
-            // Helper step between clicking recharge and the generator: a pack of
-            // 500 energy lasts minutes in the animated phase, seconds in bulk.
-            cost: 30, consumable: true,
-            unlocksAt: 40, unlocks: [],
+            // The big battery, the step between clicking recharge and the
+            // generator: a pack of 500 energy lasts minutes in the animated
+            // phase, seconds in bulk. Arrives when clicking has become a slog.
+            cost: 20, consumable: true,
+            unlocksAt: 0, unlocks: [],
+            unlockCondition: () => actions.getRechargeClicks() >= BATTERY_UNLOCK_CLICKS,
             element: document.getElementById('buyBattery'),
             purchase: function() {
                 addReserve();
