@@ -1638,3 +1638,20 @@ items:
       a bling bling bling it should be a boooom, building up toward the end.
     status: done
     resolved_in: v1.59.4
+
+  - id: B190
+    added: 2026-10-02
+    source: "chat 2026-10-02 (CAPITAL)"
+    request: |
+      Sound and music for CAPITAL too. More city and industry, but it should
+      hang together with TRIVIAL. Calm tempo. A few tones in the background
+      that drag themselves along, change, shift. A calm, heavy bass far back
+      with a very long time between the hits, every 5 to 8 seconds. Test a bit.
+    status: open
+    notes: |
+      Direction agreed with Ola: chapter I's machine is heard at a distance (the factory in
+      the city), the city grows on top (murmur and voices with the population, glassier with
+      taller houses, the silo is the heart as the battery was, the competitor is a tone out of
+      key). Same key and chords as src/audio.js (D minor, i VI III VII).
+      Sound board: docs/mockups/sound-board-city.html (mockup 1). Ola judges it; nothing in
+      the game yet. CAPITAL uses backlog ids B190 to B199.

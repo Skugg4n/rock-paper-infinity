@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ljudtavla · Capital (mockup 1)</title>
+<style>
+  /* Sound board for chapter II. Everything is synthesised in the browser (Web
+     Audio): no sound files. Ola judges the sounds here before anything enters
+     the game. Same look as the board for chapter I (sound-board.html). */
+  :root { --ink: #0f172a; --mid: #475569; --soft: #94a3b8; --line: #cbd5e1; --tile: #e2e8f0; --bg: #f1f5f9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; font-weight: 600; margin: 0 0 14px; }
+  p { font-size: 13px; line-height: 1.55; color: var(--mid); margin: 0 0 12px; max-width: 64ch; }
+  section { background: #fff; border-radius: 20px; padding: 22px; margin-top: 18px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07); }
+  .pads { display: flex; flex-wrap: wrap; gap: 10px; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 0; border-radius: 9999px; padding: 10px 18px; cursor: pointer; transition: transform 0.12s ease, background 0.15s ease; }
+  button:hover { background: var(--tile); transform: translateY(-1px); }
+  button:active { transform: scale(0.96); }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover { background: #1e293b; }
+  .hint { font-size: 12px; color: var(--soft); margin: 10px 0 0; }
+  .grid { display: grid; grid-template-columns: 150px 1fr 110px; gap: 12px 14px; align-items: center; margin-top: 16px; }
+  .grid label { font-size: 13px; }
+  .grid output { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; letter-spacing: 0.08em; padding: 7px 12px; border-radius: 9999px; background: var(--ink); color: #fff; cursor: pointer; user-select: none; border: 1px solid transparent; }
+  .chip.muted { text-decoration: line-through; border-color: var(--line); background: #fff; color: var(--soft); }
+  .rowline { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+  .readout { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mid); }
+  .tog { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+  @media (max-width: 520px) { .grid { grid-template-columns: 96px 1fr 76px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ljudtavla · Capital</h1>
+  <p>Allt ljud skapas i webbläsaren, inga ljudfiler. Starta staden, dra i reglagen och lyssna. Lurar eller riktiga högtalare ger basen rättvisa. Säg vad som är fel i känslan så ändrar jag. Inget av detta finns i spelet än.</p>
+
+  <section>
+    <h2>STADEN</h2>
+    <p>Lugnt tempo. Några toner som släpar sig fram, byts och växlar. En tung bas långt bak med långt mellan slagen. Fabriken från akt 1 hörs på avstånd. Staden växer ovanpå: fler röster med fler invånare, glasigare klang med högre hus.</p>
+    <div class="rowline">
+      <button class="primary" id="run">Starta staden</button>
+      <button id="demo">Spela Capital på 90 sekunder</button>
+      <span class="readout" id="readout">stilla</span>
+    </div>
+    <div class="grid">
+      <label for="pop">Invånare</label><input id="pop" type="range" min="0" max="100" value="15"><output id="pop-out"></output>
+      <label for="tier">Hus</label><input id="tier" type="range" min="0" max="3" step="1" value="0"><output id="tier-out"></output>
+      <label for="food">Mat i silon</label><input id="food" type="range" min="0" max="100" value="100"><output id="food-out"></output>
+      <label for="research">Industri ↔ forskning</label><input id="research" type="range" min="0" max="100" value="0"><output id="research-out"></output>
+      <label for="gap">Mellan basslagen</label><input id="gap" type="range" min="30" max="100" value="65"><output id="gap-out"></output>
+      <label for="factory">Fabriken</label><input id="factory" type="range" min="0" max="100" value="55"><output id="factory-out"></output>
+      <label for="rival">Konkurrenten</label><input id="rival" type="range" min="0" max="5" step="1" value="0"><output id="rival-out"></output>
+      <label for="cars">Bilar</label><span class="tog"><input id="cars" type="checkbox"> trafik som drar förbi</span><output></output>
+      <label for="computers">Datorer</label><span class="tog"><input id="computers" type="checkbox"> ett ljust, snabbt mönster då och då</span><output></output>
+    </div>
+    <div class="chips" id="chips">
+      <span class="chip" data-layer="bass">BAS</span>
+      <span class="chip" data-layer="tones">TONER</span>
+      <span class="chip" data-layer="factory">FABRIK</span>
+      <span class="chip" data-layer="murmur">SORL</span>
+      <span class="chip" data-layer="traffic">TRAFIK</span>
+      <span class="chip" data-layer="computer">DATOR</span>
+      <span class="chip" data-layer="rival">KONKURRENT</span>
+    </div>
+    <p class="hint">Tryck på ett lager för att tysta det och höra resten utan det.</p>
+  </section>
+
+  <section>
+    <h2>ENSKILDA LJUD</h2>
+    <div class="pads">
+      <button data-sfx="home">Bygg hus</button>
+      <button data-sfx="store">Bygg butik</button>
+      <button data-sfx="upgrade">Levla upp</button>
+      <button data-sfx="sell">Sälj</button>
+      <button data-sfx="research">Forskning köpt</button>
+      <button data-sfx="rise">Något nytt dyker upp</button>
+      <button data-sfx="harvest">Skörda för hand</button>
+      <button data-sfx="knock">Silon tom</button>
+      <button data-sfx="rivalArrives">Konkurrenten dyker upp</button>
+      <button data-sfx="raid">Ett hus rasas</button>
+    </div>
+    <p class="hint">Bygg och levla upp spelar en ton ur ackordet som ligger just nu, så de smälter in i musiken. Levla upp följer reglaget Hus.</p>
+  </section>
+
+  <section>
+    <h2>VOLYM (BLIR AV/PÅ I ☰-MENYN)</h2>
+    <div class="grid">
+      <label for="vol-sfx">Ljud</label><input id="vol-sfx" type="range" min="0" max="100" value="80"><output id="vol-sfx-out"></output>
+      <label for="vol-music">Musik</label><input id="vol-music" type="range" min="0" max="100" value="70"><output id="vol-music-out"></output>
+    </div>
+  </section>
+</main>
+
+<script>
+/* The city's sound, built so the same engine can run live (AudioContext, a
+   timer that schedules a little ahead) or offline (OfflineAudioContext, all
+   scheduled at once) for a level check. Shares key and chords with chapter I's
+   machine (src/audio.js): D minor, i VI III VII. */
+const PENTA = [0, 3, 5, 7, 10];
+const CHORDS = [
+  { name: 'Dm', root: 38, third: 3 }, { name: 'B♭', root: 34, third: 4 },
+  { name: 'F', root: 41, third: 4 }, { name: 'C', root: 36, third: 4 },
+];
+const LAYERS = ['bass', 'tones', 'factory', 'murmur', 'traffic', 'computer', 'rival'];
+const HITS_PER_CHORD = 4;
+const FACTORY_CYCLE = 2.7;                    // the mini-factory's wave in the city (style-stage2.css)
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const pentaNote = (i, base = 74) => base + 12 * Math.floor(i / 5) + PENTA[((i % 5) + 5) % 5];
+
+function makeEngine(ctx) {
+  // pop 0..1, tier 0..3, food 0..1, research 0..1, gap seconds, factory 0..1, rival 0..5
+  const S = { pop: 0.15, tier: 0, food: 1, research: 0, gap: 6.5, factory: 0.55, rival: 0, cars: false, computers: false };
+  const T = { bass: 0, tone: 0, factory: 0, car: 0, computer: 0 };
+  let hits = 0, lastMidi = 62, running = false;
+
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
+  const master = ctx.createGain(); master.gain.value = 0.9;
+  master.connect(comp); comp.connect(ctx.destination);
+  const sfxBus = ctx.createGain(); sfxBus.gain.value = 0.5;
+  const musicBus = ctx.createGain(); musicBus.gain.value = 0.0001;
+  sfxBus.connect(master); musicBus.connect(master);
+
+  // A large synthesised room: the bass and the tones sit far back in it.
+  const len = Math.floor(ctx.sampleRate * 3.6);
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+  }
+  const reverb = ctx.createConvolver(); reverb.buffer = ir;
+  const wet = ctx.createGain(); wet.gain.value = 0.3;
+  reverb.connect(wet); wet.connect(master);
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+
+  // One bus per layer, so a layer can be muted on the board. Each has its own
+  // share of the room.
+  const bus = {};
+  const SEND = { bass: 0.8, tones: 0.8, factory: 0.9, murmur: 0.25, traffic: 0.35, computer: 0.6, rival: 0.7 };
+  for (const name of LAYERS) {
+    const g = ctx.createGain(); g.connect(musicBus);
+    const s = ctx.createGain(); s.gain.value = SEND[name]; g.connect(s); s.connect(reverb);
+    bus[name] = g;
+  }
+
+  function env(t, peak, attack, decay, dest) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    g.connect(dest);
+    return g;
+  }
+  function osc(type, freq, t, stopAt, dest) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+    o.connect(dest); o.start(t); o.stop(stopAt); return o;
+  }
+  function noise(t, dur, dest) {
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    n.connect(dest); n.start(t, Math.random()); n.stop(t + dur); return n;
+  }
+  function pan(value, dest) {
+    if (!ctx.createStereoPanner) return dest;
+    const p = ctx.createStereoPanner(); p.pan.value = value; p.connect(dest); return p;
+  }
+  const chordNow = () => CHORDS[Math.floor(hits / HITS_PER_CHORD) % CHORDS.length];
+  /** The silo is the city's heart, as the battery was the machine's. */
+  const heart = () => (S.food <= 0 ? 0.22 : 0.4 + 0.6 * clamp(S.food / 0.3));
+
+  // ---- the bass: heavy, calm, far back, one hit and then a long wait
+  function bassHit(t) {
+    const chord = chordNow();
+    const k = heart();
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420; lp.connect(bus.bass);
+    const f = mtof(chord.root);
+    const body = osc('sine', f * 1.22, t, t + 4.6, env(t, 0.36 * k, 0.03, 4.2, lp));
+    body.frequency.exponentialRampToValueAtTime(f, t + 0.16);
+    osc('sine', f / 2, t, t + 3.8, env(t, 0.25 * k, 0.05, 3.4, lp));                   // the weight, felt on real speakers
+    osc('triangle', f * 2, t, t + 2.4, env(t, 0.07 * k, 0.03, 2.0, lp));               // so it is heard on small ones
+    const thud = ctx.createBiquadFilter(); thud.type = 'lowpass'; thud.frequency.value = 140;
+    thud.connect(env(t, 0.2 * k, 0.004, 0.16, bus.bass));
+    noise(t, 0.2, thud);
+    hits++;
+  }
+
+  // ---- the tones: slow voices that drag themselves into the note, change, shift
+  function pickNote() {
+    const c = chordNow(), r = c.root + 12;
+    let pool = [r + 7, r + 12, r + 12 + c.third, r + 19];
+    if (S.tier >= 1) pool.push(r, r + 24);
+    if (S.tier >= 2) pool.push(r + 24 + c.third, r + 31);
+    if (S.tier >= 3) pool.push(r + 36, r + 36 + c.third);
+    if (Math.random() < 0.22) pool = [r + 14, r + 17, r + 26];                         // a colour tone now and then (ninth, fourth)
+    let m = pool[Math.floor(Math.random() * pool.length)];
+    if (m === lastMidi) m = pool[(pool.indexOf(m) + 1) % pool.length];
+    return m;
+  }
+  function tone(t) {
+    const midi = pickNote();
+    const glass = clamp(0.12 + S.tier * 0.2 + S.research * 0.4);
+    const dur = lerp(7, 11, Math.random());
+    const starving = S.food <= 0;
+    const level = (0.085 + 0.03 * Math.random()) * (starving ? 0.6 : 1) * (midi > 80 ? 0.6 : 1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(level, t + dur * 0.36);
+    g.gain.setValueAtTime(level, t + dur * 0.5);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    g.connect(pan(Math.random() * 1.3 - 0.65, bus.tones));
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5;
+    lp.frequency.value = 520 + 2800 * glass;
+    lp.connect(g);
+    const from = mtof(lastMidi), to = mtof(midi), glide = lerp(1.2, 2.6, Math.random());
+    const end = t + dur + 0.1;
+    const voices = [
+      ['triangle', 1, 1 - 0.45 * glass, -5],
+      ['triangle', 1, 1 - 0.45 * glass, 5],
+      ['sine', 2, 0.1 + 0.42 * glass, 0],
+      ['sine', 3, glass > 0.55 ? 0.12 * (glass - 0.55) / 0.45 : 0, 0],
+    ];
+    for (const [type, mult, amount, detune] of voices) {
+      if (amount <= 0) continue;
+      const vg = ctx.createGain(); vg.gain.value = amount; vg.connect(lp);
+      const o = osc(type, from * mult, t, end, vg);
+      o.detune.value = detune;
+      o.frequency.exponentialRampToValueAtTime(to * mult, t + glide);                  // it drags itself into the note
+      if (starving) o.detune.linearRampToValueAtTime(detune - 35, end);                // a hungry city sags
+    }
+    lastMidi = midi;
+  }
+  const toneGap = () => lerp(6.0, 1.7, Math.pow(S.pop, 0.7)) * lerp(0.7, 1.3, Math.random());
+
+  // ---- the factory, far away: chapter I's machine heard over the roofs.
+  // The wave that crosses the nine cells is five diagonals: five rising notes.
+  function factoryWave(t) {
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380 + 900 * S.factory; lp.connect(bus.factory);
+    const k = S.factory;
+    [0, 0.45].forEach((d, i) => {                                                      // the heart, muffled
+      const o = osc('sine', i ? 84 : 104, t + d, t + d + 0.3, env(t + d, (i ? 0.16 : 0.26) * k, 0.006, 0.2, lp));
+      o.frequency.exponentialRampToValueAtTime(48, t + d + 0.12);
+    });
+    for (let i = 0; i < 5; i++) {
+      const at = t + i * 0.14, f = mtof(pentaNote(i, 62));
+      osc('sine', f, at, at + 0.5, env(at, 0.075 * k, 0.004, 0.4, lp));
+      osc('sine', f * 2.005, at, at + 0.25, env(at, 0.02 * k, 0.004, 0.18, lp));
+    }
+  }
+
+  // ---- murmur: the sound of people living; level follows the population
+  const murmur = (() => {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const low = ctx.createBiquadFilter(); low.type = 'bandpass'; low.frequency.value = 520; low.Q.value = 0.7;
+    const high = ctx.createBiquadFilter(); high.type = 'bandpass'; high.frequency.value = 1700; high.Q.value = 1.1;
+    const hg = ctx.createGain(); hg.gain.value = 0.3;
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    src.connect(low); src.connect(high); high.connect(hg); low.connect(g); hg.connect(g); g.connect(bus.murmur);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11;
+    const depth = ctx.createGain(); depth.gain.value = 140; lfo.connect(depth); depth.connect(low.frequency);
+    src.start(); lfo.start();
+    return { g };
+  })();
+
+  // ---- the competitor: a tone that does not belong in the key, growing with their island
+  const rival = (() => {
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(bus.rival);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 150; lp.Q.value = 1.5; lp.connect(g);
+    const a = ctx.createOscillator(), b = ctx.createOscillator(), c = ctx.createOscillator();
+    a.type = b.type = 'sawtooth'; c.type = 'sine';
+    a.frequency.value = mtof(39); b.frequency.value = mtof(39) * 1.007;                // E♭: a minor second above the home note, beating
+    c.frequency.value = mtof(56);                                                      // and a tritone above it, faint
+    const cg = ctx.createGain(); cg.gain.value = 0.25; c.connect(cg); cg.connect(g);
+    a.connect(lp); b.connect(lp); a.start(); b.start(); c.start();
+    return { g, lp };
+  })();
+
+  // ---- traffic: something drives past, from one side to the other
+  function passBy(t) {
+    const dur = lerp(2.6, 4.4, Math.random()), dir = Math.random() < 0.5 ? 1 : -1;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.13, t + dur * 0.5);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    let dest = bus.traffic;
+    if (ctx.createStereoPanner) {
+      const p = ctx.createStereoPanner(); p.pan.setValueAtTime(-0.9 * dir, t); p.pan.linearRampToValueAtTime(0.9 * dir, t + dur);
+      p.connect(bus.traffic); dest = p;
+    }
+    g.connect(dest);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9;
+    bp.frequency.setValueAtTime(260, t);
+    bp.frequency.linearRampToValueAtTime(lerp(620, 900, Math.random()), t + dur * 0.5);
+    bp.frequency.linearRampToValueAtTime(220, t + dur);
+    bp.connect(g); noise(t, dur + 0.1, bp);
+  }
+
+  // ---- computers: a quick, light pattern now and then
+  function dataRun(t) {
+    const n = 6 + Math.floor(Math.random() * 6), start = Math.floor(Math.random() * 5), side = Math.random() * 1.6 - 0.8;
+    const dest = pan(side, bus.computer);
+    for (let i = 0; i < n; i++) {
+      const at = t + i * 0.085, f = mtof(pentaNote(start + [0, 2, 1, 3, 2, 4, 3, 5, 4, 6, 5, 7][i], 86));
+      osc('sine', f, at, at + 0.12, env(at, 0.05, 0.002, 0.08, dest));
+    }
+  }
+
+  function apply() {
+    const t = ctx.currentTime;
+    murmur.g.gain.setTargetAtTime(running ? 0.0001 + 0.13 * Math.pow(S.pop, 0.8) : 0.0001, t, 0.8);
+    const r = S.rival / 5;
+    rival.g.gain.setTargetAtTime(running && r > 0 ? 0.012 + 0.045 * r : 0.0001, t, 1.5);
+    rival.lp.frequency.setTargetAtTime(110 + 260 * r, t, 1.5);
+  }
+
+  /** Schedules everything that begins before `until`. */
+  function pump(until) {
+    if (!running) return;
+    const now = ctx.currentTime;
+    for (const key of Object.keys(T)) if (T[key] < now - 0.5) T[key] = now + 0.05;    // a stalled timer plays no backlog
+    while (T.bass < until) { bassHit(T.bass); T.bass += S.gap * lerp(0.94, 1.06, Math.random()); }
+    while (T.tone < until) { tone(T.tone); T.tone += toneGap(); }
+    while (T.factory < until) { if (S.factory > 0.01) factoryWave(T.factory); T.factory += FACTORY_CYCLE; }
+    while (T.car < until) { if (S.cars) passBy(T.car); T.car += lerp(7, 2.4, S.pop) * lerp(0.6, 1.4, Math.random()); }
+    while (T.computer < until) { if (S.computers) dataRun(T.computer); T.computer += lerp(5, 10, Math.random()); }
+  }
+
+  function start() {
+    const t = ctx.currentTime;
+    running = true; hits = 0;
+    T.bass = t + 0.3; T.tone = t + 1.2; T.factory = t + 0.8; T.car = t + 3; T.computer = t + 4;
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setTargetAtTime(S.musicLevel ?? 0.7, t, 0.4);
+    apply();
+  }
+  function stop() {
+    running = false;
+    musicBus.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5);
+    apply();
+  }
+
+  // ---- words. Wood for the city: a soft mallet, a short bright partial on top.
+  function wood(t, midi, level = 1, dest = sfxBus) {
+    const f = mtof(midi);
+    const g = env(t, 0.34 * level, 0.003, 0.55, dest);
+    osc('sine', f, t, t + 0.7, g);
+    osc('sine', f * 3.93, t, t + 0.2, env(t, 0.07 * level, 0.002, 0.11, dest));
+    const s = ctx.createGain(); s.gain.value = 0.45; g.connect(s); s.connect(reverb);
+  }
+  function thunk(t, level = 1) {
+    const o = osc('sine', 150, t, t + 0.22, env(t, 0.5 * level, 0.003, 0.16, sfxBus));
+    o.frequency.exponentialRampToValueAtTime(58, t + 0.14);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+    lp.connect(env(t, 0.22 * level, 0.001, 0.05, sfxBus));
+    noise(t, 0.07, lp);
+  }
+  const sfx = {
+    home() { const t = ctx.currentTime, c = chordNow(); thunk(t, 0.8); wood(t + 0.03, c.root + 24, 0.9); },
+    store() { const t = ctx.currentTime, c = chordNow(); thunk(t, 0.8); wood(t + 0.03, c.root + 31, 0.7); wood(t + 0.13, c.root + 36, 0.7); },
+    upgrade() {
+      const t = ctx.currentTime, c = chordNow(), low = c.root + 24 - (S.tier >= 2 ? 12 : 0);
+      thunk(t, 0.6 + 0.15 * S.tier);
+      [0, 7, 12].concat(S.tier >= 1 ? [12 + c.third] : [], S.tier >= 2 ? [19] : [], S.tier >= 3 ? [24] : [])
+        .forEach((semi, i) => wood(t + 0.04 + i * 0.07, low + semi, 0.75));
+    },
+    sell() { const t = ctx.currentTime, c = chordNow(); wood(t, c.root + 31, 0.55); wood(t + 0.12, c.root + 24, 0.5); },
+    research() { const t = ctx.currentTime, c = chordNow(); thunk(t, 0.7); [24, 24 + c.third, 31, 36].forEach((s, i) => wood(t + 0.05 + i * 0.09, c.root + s, 0.6)); },
+    rise() { const t = ctx.currentTime; [0, 2, 5].forEach((n, i) => wood(t + i * 0.1, pentaNote(n, 62), 0.8)); },
+    harvest() {
+      const t = ctx.currentTime;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.2;
+      bp.connect(env(t, 0.16, 0.002, 0.07, sfxBus)); noise(t, 0.1, bp);
+      wood(t + 0.01, pentaNote(Math.floor(Math.random() * 3), 74), 0.45);
+    },
+    knock() {
+      const t = ctx.currentTime;
+      [0, 0.13].forEach((d) => {
+        const o = osc('sine', 170, t + d, t + d + 0.1, env(t + d, 0.32, 0.002, 0.07, sfxBus));
+        o.frequency.exponentialRampToValueAtTime(110, t + d + 0.07);
+      });
+    },
+    rivalArrives() {
+      const t = ctx.currentTime;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+      const g = env(t, 0.5, 0.01, 1.8, lp); lp.connect(sfxBus);
+      const s = ctx.createGain(); s.gain.value = 0.9; lp.connect(s); s.connect(reverb);
+      const o = osc('sine', 96, t, t + 2, g); o.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+      osc('sawtooth', mtof(39), t + 0.25, t + 3.2, env(t + 0.25, 0.1, 0.8, 2.0, lp));  // the foreign tone, for a moment
+    },
+    raid() {
+      const t = ctx.currentTime;
+      thunk(t, 1);
+      [[50, 0], [49, 0.22]].forEach(([m, d]) => {                                      // a minor second down, dry
+        const g = env(t + d, 0.3, 0.004, 0.7, sfxBus);
+        osc('triangle', mtof(m), t + d, t + d + 0.9, g); osc('sine', mtof(m - 12), t + d, t + d + 0.9, g);
+      });
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(1800, t); lp.frequency.exponentialRampToValueAtTime(160, t + 0.9);
+      lp.connect(env(t, 0.2, 0.01, 0.9, sfxBus)); noise(t, 1, lp);
+    },
+  };
+
+  return {
+    S, sfx, apply, pump, start, stop, bus, sfxBus, musicBus,
+    isRunning: () => running,
+    chordName: () => chordNow().name,
+  };
+}
+
+// ---------------------------------------------------------------- the board
+let ctx = null, E = null, timer = null, demoTimer = null;
+const $ = (id) => document.getElementById(id);
+const muted = new Set();
+const TIER_NAMES = ['hus', 'höghus', 'skyskrapor', 'distrikt'];
+
+function ensure() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    E = makeEngine(ctx);
+    readControls();
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+  return E;
+}
+function readControls() {
+  const pop = $('pop').value / 100;
+  $('pop-out').textContent = Math.round(Math.pow(pop, 3) * 200000).toLocaleString('sv-SE');
+  $('tier-out').textContent = TIER_NAMES[$('tier').value];
+  $('food-out').textContent = `${$('food').value} %`;
+  $('research-out').textContent = `${$('research').value} % forskning`;
+  $('gap-out').textContent = `${($('gap').value / 10).toFixed(1)} s`;
+  $('factory-out').textContent = Number($('factory').value) === 0 ? 'tyst' : `${$('factory').value} %`;
+  $('rival-out').textContent = Number($('rival').value) === 0 ? 'ingen' : `${$('rival').value} av 5 byggen`;
+  $('vol-sfx-out').textContent = `${$('vol-sfx').value} %`;
+  $('vol-music-out').textContent = `${$('vol-music').value} %`;
+  if (!E) return;
+  const wasFed = E.S.food > 0;
+  Object.assign(E.S, {
+    pop, tier: Number($('tier').value), food: $('food').value / 100, research: $('research').value / 100,
+    gap: $('gap').value / 10, factory: $('factory').value / 100, rival: Number($('rival').value),
+    cars: $('cars').checked, computers: $('computers').checked, musicLevel: $('vol-music').value / 100,
+  });
+  if (wasFed && E.S.food <= 0 && E.isRunning()) E.sfx.knock();
+  const t = ctx.currentTime;
+  E.sfxBus.gain.setTargetAtTime(0.62 * $('vol-sfx').value / 80, t, 0.05);
+  if (E.isRunning()) E.musicBus.gain.setTargetAtTime(E.S.musicLevel, t, 0.1);
+  for (const name of LAYERS) E.bus[name].gain.setTargetAtTime(muted.has(name) ? 0.0001 : 1, t, 0.08);
+  E.apply();
+}
+function tick() {
+  E.pump(ctx.currentTime + 0.35);
+  $('readout').textContent = `ackord ${E.chordName()} · basslag var ${E.S.gap.toFixed(1)} s`;
+}
+function run(on) {
+  ensure();
+  if (on === E.isRunning()) return;
+  if (on) { readControls(); E.start(); timer = setInterval(tick, 80); tick(); }
+  else { E.stop(); clearInterval(timer); timer = null; $('readout').textContent = 'stilla'; }
+  $('run').textContent = on ? 'Stoppa staden' : 'Starta staden';
+}
+function stopDemo() { if (demoTimer) { clearInterval(demoTimer); demoTimer = null; $('demo').textContent = 'Spela Capital på 90 sekunder'; } }
+
+$('run').addEventListener('click', () => { stopDemo(); run(!(E && E.isRunning())); });
+document.querySelectorAll('input').forEach((el) => el.addEventListener('input', () => { readControls(); }));
+document.querySelectorAll('[data-sfx]').forEach((b) => b.addEventListener('click', () => { ensure(); readControls(); E.sfx[b.dataset.sfx](); }));
+$('chips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip'); if (!chip) return;
+  const name = chip.dataset.layer;
+  if (muted.has(name)) muted.delete(name); else muted.add(name);
+  chip.classList.toggle('muted', muted.has(name));
+  if (E) readControls();
+});
+
+/** Chapter II in 90 seconds: an empty city fills, starves once, grows tall, and the competitor arrives. */
+$('demo').addEventListener('click', () => {
+  if (demoTimer) { stopDemo(); run(false); return; }
+  const set = (id, v) => { const el = $(id); if (el.type === 'checkbox') el.checked = !!v; else el.value = v; };
+  set('pop', 0); set('tier', 0); set('food', 100); set('research', 0); set('rival', 0); set('cars', false); set('computers', false);
+  run(false); run(true);
+  $('demo').textContent = 'Stoppa';
+  const t0 = performance.now(), LEN = 90;
+  const said = new Set();
+  const once = (key, fn) => { if (!said.has(key)) { said.add(key); fn(); } };
+  demoTimer = setInterval(() => {
+    const p = (performance.now() - t0) / 1000 / LEN;
+    if (p >= 1) { stopDemo(); run(false); return; }
+    set('pop', Math.round(100 * clamp(p / 0.85)));
+    set('tier', p < 0.25 ? 0 : p < 0.5 ? 1 : p < 0.75 ? 2 : 3);
+    set('food', p > 0.28 && p < 0.42 ? Math.round(100 * clamp(Math.abs(p - 0.33) / 0.05 - 0.4)) : 100);
+    set('research', p < 0.2 ? 0 : 50);
+    set('cars', p > 0.4); set('computers', p > 0.6);
+    set('rival', p < 0.7 ? 0 : Math.min(5, 1 + Math.floor((p - 0.7) / 0.05)));
+    if (p > 0.04) once('h1', () => E.sfx.home());
+    if (p > 0.09) once('h2', () => E.sfx.home());
+    if (p > 0.14) once('st', () => E.sfx.store());
+    if (p > 0.2) once('re', () => E.sfx.research());
+    if (p > 0.25) once('u1', () => E.sfx.upgrade());
+    if (p > 0.5) once('u2', () => E.sfx.upgrade());
+    if (p > 0.7) once('ri', () => E.sfx.rivalArrives());
+    if (p > 0.75) once('u3', () => E.sfx.upgrade());
+    if (p > 0.96) once('ra', () => E.sfx.raid());
+    readControls();
+  }, 250);
+});
+
+readControls();
+
+/** Level check without ears: renders the city offline and returns peak and loudness per window. */
+window.renderCity = async (state = {}, seconds = 40, only = null) => {
+  const rate = 44100;
+  const off = new OfflineAudioContext(2, rate * seconds, rate);
+  const e = makeEngine(off);
+  Object.assign(e.S, state, { musicLevel: 0.7 });
+  if (only) for (const name of LAYERS) e.bus[name].gain.value = only.includes(name) ? 1 : 0;
+  e.start();
+  e.musicBus.gain.setValueAtTime(0.7, 0);
+  e.pump(seconds);
+  const buf = await off.startRendering();
+  const d = buf.getChannelData(0), win = rate * 5, out = [];
+  let peak = 0;
+  for (let w = 0; w + win <= d.length; w += win) {
+    let sum = 0;
+    for (let i = w; i < w + win; i++) { const v = d[i]; sum += v * v; if (Math.abs(v) > peak) peak = Math.abs(v); }
+    out.push(Math.round(10 * Math.log10(sum / win + 1e-12)));
+  }
+  return { peak: Number(peak.toFixed(3)), rmsDbPerFiveSeconds: out };
+};
+</script>
+</body>
+</html>
