@@ -198,3 +198,18 @@ swollen or filled a growth is. Forms irregular, as if grown, not drawn with a ru
   Lower walls or none. Steel, not brass.
 - Mockups 12 lock both looks; the build starts with the mechanical tree (step 1),
   which Ola approved in mockup 10.
+
+## Looks locked (Ola on mockups 12, 2026-10-02)
+
+"Everything is AWESOME", with one cut: **no mushrooms and no swollen sacs.** The grey
+caps that fruit on top of the organs and the swollen sacs on the culture vats go.
+Level is shown by the knot itself: how dense and tight the fibre is, and how many
+arteries feed it (one feeding vessel per level), with the pulse stronger at higher
+levels. The number is in the info box anyway.
+
+Approved as they are: the tissue's subtlety at full-board scale, the thin irregular
+breathing outline on buyable organs, the smoke and the gears. The machine, the mast
+and the bare tubes: loved.
+
+**References for the build:** `docs/mockups/deep-tree-12.html` (with the cut above)
+and `docs/mockups/deep-machine-12.html`.
