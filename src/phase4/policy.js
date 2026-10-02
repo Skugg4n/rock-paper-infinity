@@ -17,11 +17,15 @@
  * deep-tree (step 1): the level, automation and cryo buttons are gone; the player buys those on
  * the skill tree (tree.js), and `press()` does it the same way: the node Cryo I's reason names, the
  * level node of the room type the offer picks. Rooms and chambers are still the BUILD buttons.
+ *
+ * deep-machine (step 3): the stars are the machine's wins, and the machine is fed on the tree. When
+ * nothing nearer is being saved for, the player feeds it ("The machine: feed") whenever the stars
+ * cover the next level on top of whatever else it buys that day.
  */
 
 import {
     tickDay, sleepTrouble, ordersDone, CRYO, ROOM_FOR_COLUMN, roomCost, digCost, levelCost,
-    automationCost, freeChambers, buildPending, startBuild,
+    automationCost, freeChambers, buildPending, startBuild, feedCost, FEED_MAX,
 } from './deep.js';
 import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js';
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
@@ -51,7 +55,7 @@ export function screen(state) {
  * One decision: what the player presses today, or null.
  * @param {object} state
  * @param {ReturnType<typeof screen>} [view]
- * @returns {{kind:'cryo'|'level'|'auto'|'room'|'dig', type?:string}[]} in the order pressed
+ * @returns {{kind:'cryo'|'level'|'auto'|'feed'|'room'|'dig', type?:string}[]} in the order pressed
  */
 export function decide(state, view = screen(state)) {
     const out = [];
@@ -76,6 +80,10 @@ export function decide(state, view = screen(state)) {
         const o = offers.level;
         const t = o.type;
         if ((state.rooms[t] || 0) > 0 && !buildPending(state, 'level', t) && state.stars >= priceOf('level', t)) out.push({ kind: 'level', type: t });
+        // and the machine, with what is left over
+        const spent = out.reduce((a, x) => a + priceOf(x.kind, x.type), 0);
+        const feed = state.feed || 0;
+        if (feed < FEED_MAX && state.stars - spent >= feedCost(feed)) out.push({ kind: 'feed' });
     }
     // ore: what the dot marks
     const t = low.column ? ROOM_FOR_COLUMN[low.column] : null;
@@ -102,6 +110,7 @@ export function press(state, a, view = null) {
     if (a.kind === 'cryo') return !!treeBuy(state, cryoNode(state.cryo + 1), ctx);
     if (a.kind === 'level') return !!treeBuy(state, LEVEL_NODE[a.type], ctx);
     if (a.kind === 'auto') return !!treeBuy(state, AUTO_NODE[a.type], ctx);
+    if (a.kind === 'feed') return !!treeBuy(state, 'feed', ctx);
     if (a.kind === 'room') {
         const price = roomCost(a.type, state.rooms[a.type] || 0);
         if (state.minerals < price) return false;

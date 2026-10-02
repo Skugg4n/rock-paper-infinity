@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (deep-machine)
+
+### Chapter IV: the machine (step 3 of the tree and bio design)
+
+Built from docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md, section 4, look per docs/mockups/deep-machine-12.html (B187, B188, B189, B192 to B195).
+
+- **The machine on top.** The rock, paper, scissors machine stands in 3D on its own plate on top of the colony, in a room of its own over the lid (a short neck from the hatch, no walls): a hub on a bolted deck, three arms ending in bare picture tubes in steel cages (gem, file, scissors on their faces), a fixed tube on a mast showing what it plays against, meshing gears, a flywheel with spokes and a chain, pistons that throw the arms, a heat sink and an exhaust that puffs smoke. Steel is the one metal accent. Armoured cables with the energy pulse inside climb from the lid into its base. The floating glyph on the lid is gone. The straight shaft to the crust is gone too: a hand-hewn, uneven passage climbs from the machine's plate out through the crust to the side, and scouts and the ascent take it; the survival ring stands over its mouth.
+- **Stars are its wins.** The machine is fed a share of the spare energy (the E column); the energy fed buys games on a concave curve, one game in three is a win, each win a star. The smallest column no longer sets the stars (the dot keeps its days-of-cover meaning). The POWER branch's "The machine: feed" has its rule: eight levels, each raising the share it may draw (6 % unfed, 99 % at the top), bought with stars, awake or asleep.
+- **What it shows.** Its tempo is the stars a day: starved, the arms hang, it throws slowly, the smoke thins and the tubes dim; fed, it runs toward a blur, the cable pulses race, sparks fly on a win and a small star rises. Hover: "The machine plays. N energy a day. Each win is a star." Asleep it keeps running, slower and quieter unless fed, its lamp in the automated rooms' rhythm.
+- **Balance** (scripts/sim-phase4.mjs): the scripted player feeds the machine on the tree when a level pays for itself within 90 s. Plain run 24m44s before, 24m47s after (seeds 2 to 5: 24m44s to 24m56s); --watcher biological ending 28m19s before, 27m40s after. The longest stall at zero stars a day is gone (76 s before). `stars/day curve` prints when the rate first reaches each power of ten.
+- **Save**: schema 8. An old save is given the feed its cryo tier implies, so its stars a day do not fall away.
+- **Acceptance** (scripts/accept-iv-cut.mjs, section M): from "IV · the deep" the machine stands on top in the home view, the old glyph is gone, its hover reads the live energy, and the stars a day and its tempo follow `debug_deep('feed', n)`.
+
 ## v1.61.0 - 2026-10-02 (chapter IV, the voice in the night)
 
 ### Chapter IV: Surface's voice and gifts (step 2 of the tree and bio design)

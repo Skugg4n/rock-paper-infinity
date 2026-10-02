@@ -296,7 +296,8 @@ const COLUMN_NOUN = { M: 'ore', F: 'food', E: 'energy', H: 'free hands' };
  * the weakest column's room, so a player who followed the game never got to sleep. Now:
  *   1. the NEXT GOAL: what the next cryo tier needs, when this button sells it;
  *   2. for the level button, what runs low (the dot, when a store is falling);
- *   3. the weakest column, which is what makes the stars.
+ *   3. the weakest column: the smallest surplus (since deep-machine it no longer sets the stars,
+ *      the machine does, but it is still what the colony is shortest of).
  * A type is only offered when there is a room of it to improve and no order of this kind for it
  * on the books; a goal that cannot be offered falls through to the next rule.
  *
@@ -319,7 +320,7 @@ export function offerFor(kind, state, report, need, low = null) {
     }
     const t = ROOM_FOR_COLUMN[report.weakest];
     const noun = COLUMN_NOUN[report.weakest];
-    return pick(t, `${noun} ${report.weakest === 'H' ? 'limit' : 'limits'} the stars`, false);
+    return pick(t, `${noun} ${report.weakest === 'H' ? 'are' : 'is'} the smallest surplus`, false);
 }
 
 /** How each column is named when it grows slowest. */
@@ -339,7 +340,8 @@ const TIE = ['E', 'H', 'F', 'M'];
  *   - when nothing falls, the slowest-growing column (the smallest surplus in the rules' one
  *     unit) among the bars that are not full;
  *   - a full bar never carries it, and when every bar is full there is no dot.
- * deep.js's own `weakest` still sets the stars; this is only what the screen marks.
+ * deep.js's own `weakest` is the smallest surplus (since deep-machine it no longer sets the stars:
+ * the machine does); this is only what the screen marks.
  *
  * @param {object} state
  * @param {object} report - a day's report from tickDay
@@ -534,7 +536,7 @@ export function consequence(state, kind, type, { price = 0, currency = 'minerals
     const ra = tickDay(cloneState(after), !!state.asleep).stars;
     const delta = ra - (report?.stars || 0);
     if (delta >= 0.5) return `+${n(delta)} stars a day toward ${goal}.`;
-    if (delta <= -0.5) return `-${n(-delta)} stars a day until the other columns catch up.`;
+    if (delta <= -0.5) return `-${n(-delta)} stars a day: less energy to spare for the machine.`;
     if (type === 'dorm') return 'More beds; the colony grows into them while it is fed.';
-    return 'No change to the stars until the weakest column moves.';
+    return 'No change to the stars: the machine plays on spare energy.';
 }

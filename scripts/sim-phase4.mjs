@@ -19,11 +19,16 @@
 // the player stays under until it has come (VISIT_AFTER_SECONDS in), the game is played and, on a
 // night, the line has typed itself. Every gift Surface opens is bought the moment it can be paid,
 // awake or asleep.
+// deep-machine (step 3 of the tree): the stars are the machine's wins on the spare energy it is fed.
+// In both runs the player feeds it on the tree ("The machine: feed") the moment the next level can be
+// paid and pays for itself within FEED_PAYBACK real seconds (90; env FEED_PAYBACK to try another).
+// The output adds `stars/day curve` (when the rate first reaches each power of ten) and the feed times.
 import {
   ROOMS, COLUMN, ROOM_FOR_COLUMN, ROOM, initialDeepState, tickDay, sleep, surface, canResurface, canAscend,
   roomMultiplier, digCost, roomCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, survival,
   startBuild, completeBuilds, buildPending, BUILD_DAYS, sleepTrouble, launchProbe, resolveDueProbes,
   probeCost, scoutParty, MIN_SLEEPERS, PROBE_ENERGY, repairTick, mourn, mourning, nextCryo,
+  feedCost, FEED_MAX,
 } from '../src/phase4/deep.js';
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, recoverAwake,
@@ -104,6 +109,29 @@ function buyGifts(asleep) {
     treeBuy(s, id, { ...SIM, asleep });
     giftAt[id] = { real, year: s.day / DAYS_PER_YEAR };
     events.push({ real, day: s.day, e: `gift ${id}` });
+  }
+}
+/* deep-machine (step 3): the stars are the machine's wins on the spare energy it is fed. The player
+   feeds it on the tree ("The machine: feed") as it buys anything else: the next level the moment it
+   can be paid AND pays for itself within FEED_PAYBACK real seconds, awake or asleep. */
+const FEED_PAYBACK = Number(process.env.FEED_PAYBACK || 90);
+const feedAt = [];                 // { level, real, year }
+// the stars/day curve: the real second at which the rate (awake, or a sleep's average) first reaches 10^k
+const curve = [];
+const onCurve = (perDay) => { for (let k = 0; k <= 16 && perDay >= 10 ** k; k++) if (curve[k] === undefined) curve[k] = real; };
+function buyFeed(asleep) {
+  let k = 0;
+  while ((s.feed || 0) < FEED_MAX && k < FEED_MAX) {
+    const price = feedCost(s.feed || 0);
+    if (s.stars < price) return;
+    const now = tickDay(JSON.parse(JSON.stringify(s)), asleep).stars;
+    const then = tickDay(JSON.parse(JSON.stringify({ ...s, feed: (s.feed || 0) + 1 })), asleep).stars;
+    const perSecond = (then - now) * (asleep ? CRYO[Math.max(0, s.cryo)].days : 1);
+    if (!(perSecond > 0) || price > perSecond * FEED_PAYBACK) return;
+    onTree('feed', { ...SIM, asleep });
+    feedAt.push({ level: s.feed, real, year: s.day / DAYS_PER_YEAR });
+    events.push({ real, day: s.day, e: `feed ${s.feed}` });
+    k++;
   }
 }
 let bodyEnd = null;                // v1.50.0: the last wake-up, { real, year, were }
@@ -226,6 +254,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
   earned += r.stars; earnedAt.push([real, earned]);
   recoverAwake(w, 1);                   // v1.49.0: awake, the Watcher rests
   recoverAwake(w2, 1);
+  onCurve(r.stars);
   if (!starsDay0 && r.stars > 0) starsDay0 = r.stars;   // the first day the colony makes stars at all
   starsDayEnd = r.stars;
   weakAwake[r.weakest]++;
@@ -237,6 +266,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
   // a human at a wake-up clicks several buttons, not one
   let bought, n = 0;
   buyGifts(false);
+  buyFeed(false);
   while ((bought = buy(r)) && n < 25) { events.push({ real, day: s.day, e: bought }); n++; buysThisWake++; }
   maybeScout(r);
   // Nothing affordable and the wait is long: go to sleep, if a dry run says the colony would
@@ -258,6 +288,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
       const spent = sum.days / rate;
       real += spent; sleepReal += spent;
       earned += sum.stars; earnedAt.push([real, earned]);
+      if (sum.days > 0) onCurve(sum.stars / sum.days);
       watchSleep(w, { days: sum.days, tier: s.cryo, spare: sum.spare });
       if (sum.alarm) alarmHit(w, sum.alarm.kind);
       w2.bought = w.bought.slice();                       // the --watcher player's ladder counts for both
@@ -272,6 +303,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
         voiceLeft = GAME_SECONDS + (v.night ? (v.line.length * TYPE_MS) / 1000 + LINE_READ : 0);
       } else if (voiceLeft > 0) voiceLeft -= spent;
       buyGifts(true);
+      buyFeed(true);
       if (WATCHER) {
         // the ladder: the next step the moment it can be paid
         let id, got;
@@ -307,7 +339,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
   }
   if (real % 60 < 1 && (!log.length || log[log.length - 1].min !== Math.round(real / 60))) {
     log.push({ min: Math.round(real / 60), year: +yr(s.day), surface: +surface(s.doom0, s.day).toFixed(1), humans: Math.round(s.humans),
-      starsDay: +r.stars.toPrecision(3), stars: +s.stars.toPrecision(3), chambers: s.chambers, weakest: r.weakest, cryo: s.cryo, wakeUps });
+      starsDay: +r.stars.toPrecision(3), feed: s.feed || 0, stars: +s.stars.toPrecision(3), chambers: s.chambers, weakest: r.weakest, cryo: s.cryo, wakeUps });
   }
 }
 
@@ -371,6 +403,8 @@ if (process.argv.includes('--gifts')) {
   if (vii) console.log(`Cryo VII at ${fmt(vii.real)}: a minute of play earns ${(earnedBy(vii.real + 60) - earnedBy(vii.real)).toPrecision(3)} stars`);
 }
 const gat = (id) => (giftAt[id] ? fmt(giftAt[id].real) : 'never');
+console.log(`stars/day curve (first reaches 10^k)  ${curve.map((t, k) => (t === undefined ? null : `${k}:${fmt(t)}`)).filter(Boolean).join(' ')}`);
+console.log(`the machine (deep-machine)  fed ${feedAt.map((x) => `${x.level} ${fmt(x.real)}`).join('  ') || 'never'}`);
 console.log(`surface (both runs: wins 1 in 3)  games ${surfaceGames}  nights ${nightAt.map((x) => `${x.n} ${fmt(x.real)}`).join('  ') || 'none'}  |  gifts bought: ${Object.keys(GIFT_PRICE).map((id) => `${id} ${gat(id)}`).join('  ')}  (of ${NIGHTS.length} nights)`);
 console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (night 1)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}  |  ${REF_SLEEP} s sleeps from full, first reboot in sleep: ${absent}`);
 console.log(`watcher (attentive: snap every ${SNAP_EVERY} s)  stability ${Math.round(w2.stability)} at the end, lowest ${Math.round(lowest2)}, ${w2.reboots} reboots  |  ${REF_SLEEP} s sleeps, held (low-high from the third sleep): ${held}`);

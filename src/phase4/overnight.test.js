@@ -69,7 +69,7 @@ describe('the automate and level buttons sell what the next goal needs, and say 
         expect(offerFor('level', s, r, food)).toMatchObject({ type: 'farm', goal: true });
         const plain = offerFor('level', s, r, null);
         expect(plain.goal).toBe(false);
-        expect(plain.head).toMatch(/limits? the stars\)\.$/);
+        expect(plain.head).toMatch(/the smallest surplus\)\.$/);
     });
 });
 

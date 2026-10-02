@@ -18,6 +18,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { placeChamber, floorCount, sectorOf } from './layout.js';
 import { digCost } from './deep.js';
+import { createMachine } from './machine-model.js';
 
 /* TWO COLOURS, and since v1.41.1 they are the other way round (Ola: "we build in
    life and light, buried in black stone"). ROCK is the background and everything cut
@@ -61,20 +62,30 @@ const R_ROOM = 0.55;      // the ring runs at this radius around a room
 const R_HUB = 0.80;       // wider on a landing, so it clears the shaft and the hatch
 const EDGE = 0.97;        // nothing is cut closer than this to the slab's edge
 const MAX_DOTS = 160;     // the colony grows past counting; the crowd does not
-/* THE SHAFT UP AND THE CRUST (v1.45.0). Ola: "we mention a shaft up to the earth but there is
-   nothing graphic." Now there is: a pipe in plate colour from the hatch on the lid up to the
-   crust, a flat slab of burnt ground over the colony that carries the ring. The top of the pipe
-   is rubble until the first party goes out, then a dark opening. Parties are dots that climb a
-   stair wound round the outside of the pipe and vanish into the crust; they come down the same
-   way, or they do not. */
+/* THE CRUST (v1.45.0) AND THE WAY UP (deep-machine). A flat slab of burnt ground over the colony
+   carries the ring. Since deep-machine the straight pipe from the lid to the crust is gone: the
+   hatch on the lid opens into a short neck, the neck into THE MACHINE'S ROOM, a plate of its own on
+   top of the colony with no walls, and from that plate's edge a hand-hewn, uneven passage climbs to
+   the side and out through the crust. Its mouth is rubble until the first party goes out, then a
+   dark opening. Parties are dots that go up the neck, cross the plate and climb the passage into the
+   crust; they come down the same way, or they do not. */
 const CRUST = 0x353e4a;         // burnt ground: darker than a plate, lighter than the rock
 const CRUST_LIT = 0x8b97a8;     // the day the colony goes up and there is a sky
 const RUBBLE = 0x4a5361;
 const CRUST_Y = 4.4;            // the underside of the crust, over the lid
 const CRUST_T = 0.34;
 const CRUST_W = 4.6;
-const SHAFT_UP_R = 0.34;
+const SHAFT_UP_R = 0.34;       // the neck from the hatch up to the machine's plate
 const LID_TOP = PLATE_H / 2 + 0.24;     // the top of the bar across the hatch
+const MACH_Y = 1.75;            // the middle of the machine's plate, over the lid
+const MACH_TOP = MACH_Y + PLATE_H / 2;
+const PASS_R = 0.12;            // the passage's bore
+/* the passage, after mockup 12: from the plate's east edge out and up through the crust, every
+   point nudged by hand. Heights are stretched from the mockup's to reach the crust's top here. */
+const PASS_K = (CRUST_Y + CRUST_T - MACH_TOP) / (2.2 - PLATE_H / 2);
+const PASS_PTS = [[0.98, 0.12, 0.0], [1.28, 0.22, 0.05], [1.52, 0.55, -0.08], [1.66, 1.05, 0.07], [1.78, 1.55, -0.05], [1.84, 2.07, 0.02]]
+    .map(([x, y, z]) => [x, MACH_TOP + y * PASS_K, z]);
+const PASS_TOP = PASS_PTS[PASS_PTS.length - 1];
 const MAX_SCOUT_DOTS = 14;      // a party of sixty is drawn as fourteen
 const SCOUT_BUFFER = MAX_SCOUT_DOTS * 3;   // one party going up while one comes down, and a spare
 const SCOUT_SECONDS = 6;        // the walk to the hatch and the climb, start to finish
@@ -82,12 +93,6 @@ const SCOUT_SECONDS = 6;        // the walk to the hatch and the climb, start to
    plate-coloured pipe would vanish against it */
 const SCOUT = 0xe0a24f;
 const SCOUT_SIZE = 0.17;
-/* Chapter I's own three glyphs (rock is the gem there), and the star a win makes. */
-const MACHINE_HTML = '<span class="deep-machine">'
-    + '<span class="rps is-on"><i data-lucide="gem" class="w-3.5 h-3.5"></i></span>'
-    + '<span class="rps"><i data-lucide="file-text" class="w-3.5 h-3.5"></i></span>'
-    + '<span class="rps"><i data-lucide="scissors" class="w-3.5 h-3.5"></i></span>'
-    + '<span class="win"><i data-lucide="star" class="w-3.5 h-3.5"></i></span></span>';
 
 /* THE BASE SOFTENS (v1.46.0). While the colony sleeps the Watcher keeps the structure, and as
    its stability falls the plates, the lanes cut into them and the shaft lose their rigidity:
@@ -275,39 +280,73 @@ export function createScene(container, opts = {}) {
     peopleMesh.frustumCulled = false;
     scene.add(peopleMesh);
 
-    // ---- the shaft up and the crust: built once, the lid never moves ----
+    // ---- the machine's room, the passage and the crust: built once, the lid never moves ----
     const above = new THREE.Group();
     scene.add(above);
     const crustTop = CRUST_Y + CRUST_T;
     const crustSlab = new THREE.Mesh(new THREE.BoxGeometry(CRUST_W, CRUST_T, CRUST_W), crustMat);
     crustSlab.position.set(0, CRUST_Y + CRUST_T / 2, 0);
     above.add(crustSlab);
-    const shaftUpH = CRUST_Y - LID_TOP + 0.02;
-    const shaftUp = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R, SHAFT_UP_R, shaftUpH, 28, 10), plateMat);
-    shaftUp.position.set(0, LID_TOP + shaftUpH / 2, 0);
-    above.add(shaftUp);
-    // the rubble the boom left on top of the pipe, and the opening under it once it is cleared
+    // the neck: the hatch on the lid opens into it, and it into the underside of the machine's plate.
+    // The room up there is not the base: it stays rigid while the Watcher lets the base go soft.
+    const roomMat = new THREE.MeshLambertMaterial({ color: PLATE });
+    const neckH = MACH_Y - PLATE_H / 2 - LID_TOP + 0.04;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R, SHAFT_UP_R, neckH, 28), roomMat);
+    neck.position.set(0, LID_TOP - 0.02 + neckH / 2, 0);
+    above.add(neck);
+    // THE MACHINE (deep-machine): on its own plate on top of the colony, its cables up from the lid
+    const machine = createMachine({ below: PLATE_H / 2 - MACH_Y });
+    machine.group.position.set(0, MACH_Y, 0);
+    above.add(machine.group);
+    // the passage: a lumpy tube, every vertex pushed by hand, faceted (mockup 12)
+    const passCurve = new THREE.CatmullRomCurve3(PASS_PTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    const passGeo = new THREE.TubeGeometry(passCurve, 46, PASS_R, 8, false);
+    {
+        const pp = passGeo.attributes.position, nor = passGeo.attributes.normal;
+        const r = mulberry32(77);
+        const ringPush = [];
+        for (let i = 0; i <= 46; i++) ringPush.push((r() - 0.5) * 0.05);
+        for (let i = 0; i < pp.count; i++) {
+            const k = (r() - 0.5) * 0.06 + ringPush[Math.floor(i / 9)];
+            pp.setXYZ(i, pp.getX(i) + nor.getX(i) * k, pp.getY(i) + nor.getY(i) * k, pp.getZ(i) + nor.getZ(i) * k);
+        }
+        passGeo.computeVertexNormals();
+    }
+    const passMat = new THREE.MeshLambertMaterial({ color: CRUST, flatShading: true, side: THREE.DoubleSide });
+    const passage = new THREE.Mesh(passGeo, passMat);
+    above.add(passage);
+    // a rough landing outside the doorway
+    {
+        const r = mulberry32(91);
+        for (let i = 0; i < 4; i++) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(0.16 + r() * 0.1, 0.08 + r() * 0.05, 0.16 + r() * 0.12), passMat);
+            m.position.set(1.05 + r() * 0.2, MACH_TOP - 0.02 + r() * 0.04, -0.12 + r() * 0.24);
+            m.rotation.set((r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.3);
+            above.add(m);
+        }
+    }
+    // the rubble the boom left over the passage's mouth, and the opening under it once it is cleared
     const rubble = new THREE.Group();
     const rr = mulberry32(8012);
     for (let i = 0; i < 9; i++) {
-        const w = 0.16 + rr() * 0.26, h = 0.1 + rr() * 0.2, d = 0.16 + rr() * 0.26;
+        const w = 0.08 + rr() * 0.14, h = 0.06 + rr() * 0.1, d = 0.08 + rr() * 0.14;
         const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), rubbleMat);
-        const a = rr() * Math.PI * 2, r0 = rr() * 0.42;
-        m.position.set(Math.cos(a) * r0, crustTop + h / 2, Math.sin(a) * r0);
+        const a = rr() * Math.PI * 2, r0 = rr() * 0.22;
+        m.position.set(PASS_TOP[0] + Math.cos(a) * r0, crustTop + h / 2, PASS_TOP[2] + Math.sin(a) * r0);
         m.rotation.y = rr() * Math.PI;
         rubble.add(m);
     }
     above.add(rubble);
-    const hole = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R + 0.08, SHAFT_UP_R + 0.08, 0.02, 28), holeMat);
-    hole.position.set(0, crustTop + 0.012, 0);
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(PASS_R + 0.08, PASS_R + 0.1, 0.02, 12), holeMat);
+    hole.position.set(PASS_TOP[0], crustTop + 0.012, PASS_TOP[2]);
     hole.visible = false;
     above.add(hole);
-    // the ring stands over the hatch in the crust: a point straight above the pipe projects above
-    // it from every side the camera can orbit to, so the label never covers the opening
+    // the ring stands over the passage's mouth: a point straight above it projects above the
+    // opening from every side the camera can orbit to, so the label never covers it
     const crustHost = document.createElement('div');
     crustHost.className = 'deep-crust-label';
     const crustLabel = new CSS2DObject(crustHost);
-    crustLabel.position.set(0, crustTop + 1.1, 0);
+    crustLabel.position.set(PASS_TOP[0], crustTop + 1.1, PASS_TOP[2]);
     above.add(crustLabel);
     let shaftOpen = false;
     function openShaft(open) {
@@ -344,6 +383,7 @@ export function createScene(container, opts = {}) {
     let world = new THREE.Group();
     scene.add(world);
     let solids = [];        // what a label can hide behind
+    let occluders = [];     // and the machine's room on top too (deep-machine): labels only, never a click on the base
     let plates = [];        // every chamber's slab, with its slot and sector (v1.52.0)
     let labels = [];        // { obj, inner, kind, key }
     let nodes = [];         // the walk graph
@@ -355,9 +395,7 @@ export function createScene(container, opts = {}) {
     let lastPlan = null;                    // what the home view was last fitted to
     let dead = false;                       // disposed: a late timer must not touch the buffers
     let march = null;                       // everyone walking somewhere at once: cryo, or the way up
-    let machine = null;                     // the rock, paper, scissors machine on the lid
-    let machineRate = 0;                    // its throws a second
-    let machinePhase = 0, machineThrow = 0, machineWin = 0;
+    let machineTempo = { throws: 0, drive: 0, quiet: 1 };     // deep-machine: machine.js machineTempo
     const cryoAt = new THREE.Vector3(0, 0, 0);
     const rnd = mulberry32(20260921);
     // the body: one group per sealed sector, so a sector breathes as one; `into` is where a cell
@@ -380,7 +418,7 @@ export function createScene(container, opts = {}) {
         world.removeFromParent();
         world = new THREE.Group();
         scene.add(world);
-        solids = []; nodes = []; floors = []; folk = []; digLabel = null; machine = null; plates = [];
+        solids = []; nodes = []; floors = []; folk = []; digLabel = null; plates = [];
         bodyGroups = []; into = null;
         march = null;
         lampKey = '';
@@ -641,10 +679,7 @@ export function createScene(container, opts = {}) {
                     bar.scale.set(1.34, 0.14, 0.24);
                     bar.position.set(0, y + PLATE_H / 2 + 0.14, 0);
                     world.add(bar); solids.push(bar);
-                    // the star machine from chapter I came down the hole with them: it sits on
-                    // the lid and plays rock, paper, scissors with the colony's surplus
-                    machine = makeLabel(MACHINE_HTML, 0.9, y + 0.55, -0.9, 'machine');
-                    machine.glyphs = [...machine.inner.querySelectorAll('.rps')];
+                    // deep-machine: the star machine stands in its own room on top (above), not on the lid
                 } else if (c.room) {
                     // a dormitory the Watcher took holds no one: its glyph is the Watcher's, not a bed
                     let html = `<i data-lucide="${c.taken ? 'cpu' : (ROOM_ICON[c.room] || 'square')}" class="w-7 h-7"></i>`;
@@ -750,6 +785,7 @@ export function createScene(container, opts = {}) {
             nodes.forEach((n, i) => { if (n.floor === fi && n.adj.length) floor.nodes.push(i); });
         });
 
+        occluders = solids.concat([neck, machine.plate]);
         paintCandidates();
         framing(plan);
         opts.onLabels?.();
@@ -830,6 +866,9 @@ export function createScene(container, opts = {}) {
         // the crust and its ring are part of the colony's picture: the goal is over their heads
         box.expandByPoint(new THREE.Vector3(-CRUST_W / 2, crustTop + 1.5, -CRUST_W / 2));
         box.expandByPoint(new THREE.Vector3(CRUST_W / 2, crustTop + 1.5, CRUST_W / 2));
+        // and the machine in its room on top, its plate and its tube (deep-machine)
+        box.expandByPoint(new THREE.Vector3(-PLATE_W / 2, MACH_Y - PLATE_H, -PLATE_W / 2));
+        box.expandByPoint(new THREE.Vector3(PLATE_W / 2, MACH_Y + 1.7, PLATE_W / 2));
         const tgt = box.getCenter(new THREE.Vector3());
         const dir = new THREE.Vector3(0.498, 0.485, 0.723).normalize();
         // The exact fit, not a bounding sphere: a sphere around a wide flat colony is mostly
@@ -945,23 +984,6 @@ export function createScene(container, opts = {}) {
         }
     }
 
-    /** One frame of the machine: a throw every 1/rate seconds, and every third throw a win. */
-    function stepMachine(dt) {
-        if (!machine?.glyphs?.length) return;
-        if (machineWin > 0) {
-            machineWin -= dt;
-            if (machineWin <= 0) machine.inner.classList.remove('is-win');
-        }
-        if (!(machineRate > 0)) return;
-        machinePhase += dt * machineRate;
-        if (machinePhase < 1) return;
-        machinePhase %= 1;
-        machine.glyphs[machineThrow % 3].classList.remove('is-on');
-        machineThrow++;
-        machine.glyphs[machineThrow % 3].classList.add('is-on');
-        if (machineThrow % 3 === 0) { machine.inner.classList.add('is-win'); machineWin = 0.35; }
-    }
-
     function chooseNext(p) {
         const adj = nodes[p.at].adj;
         if (!adj.length) return;
@@ -1040,7 +1062,7 @@ export function createScene(container, opts = {}) {
             const s = Math.min(1.2, Math.max(0.4, 20 / dist));
             l.inner.style.transform = `scale(${s.toFixed(3)})`;
             ray.set(camera.position, tmp.clone().sub(camera.position).normalize());
-            const hit = ray.intersectObjects(solids, false)[0];
+            const hit = ray.intersectObjects(occluders, false)[0];
             l.inner.style.opacity = (hit && hit.distance < dist - 0.5) ? '0' : '1';
         }
     }
@@ -1135,25 +1157,23 @@ export function createScene(container, opts = {}) {
         if (route[0] !== from) route.unshift(from);
         return route.map((i) => nodes[i].p.clone());
     }
-    /** Round the outside of the pipe, a turn and a half, from the lid to the underside of the crust. */
-    function stair(fromAngle) {
-        const pts = [];
-        const r = SHAFT_UP_R + 0.07;
-        const turns = 1.5, steps = 24;
-        for (let i = 0; i <= steps; i++) {
-            const k = i / steps;
-            const a = fromAngle + k * turns * Math.PI * 2;
-            pts.push(new THREE.Vector3(Math.cos(a) * r, LID_TOP + k * (CRUST_Y - 0.08 - LID_TOP), Math.sin(a) * r));
-        }
-        pts.push(new THREE.Vector3(0, CRUST_Y + CRUST_T / 2, 0));    // into the crust, and out of sight
-        return pts;
+    /** From the hatch on the lid up the neck, across the machine's plate to its east edge and up the
+     *  passage into the crust (deep-machine): the one way out. */
+    const PASS_WALK = passCurve.getSpacedPoints(16).map((p) => p.setY(p.y + 0.02));
+    function wayUp() {
+        return [
+            new THREE.Vector3(0, LID_TOP, 0),
+            new THREE.Vector3(0, MACH_TOP - 0.1, 0),                // up the neck, under the plate
+            new THREE.Vector3(0.62, MACH_TOP - 0.1, 0.02),          // and out from under it, at the lane
+            new THREE.Vector3(0.9, MACH_TOP + WALK_Y, 0),
+            ...PASS_WALK.map((p) => p.clone()),
+            new THREE.Vector3(PASS_TOP[0], crustTop + 0.05, PASS_TOP[2]),   // out of the mouth, and gone
+        ];
     }
     function scoutRoute() {
         const start = floors[0]?.nodes?.length ? floors[0].nodes[Math.floor(rnd() * floors[0].nodes.length)] : null;
         const walk = routeToHatch(start);
-        const door = walk.length ? walk[walk.length - 1] : new THREE.Vector3(0.7, WALK_Y, 0);
-        const angle = Math.atan2(door.z, door.x);
-        return [...walk, new THREE.Vector3(Math.cos(angle) * 0.42, LID_TOP, Math.sin(angle) * 0.42), ...stair(angle)];
+        return [...walk, ...wayUp()];
     }
     /**
      * A party leaves (`up`) or comes home (`down`): `n` people, drawn as at most MAX_SCOUT_DOTS.
@@ -1204,15 +1224,14 @@ export function createScene(container, opts = {}) {
         }
         const cryo = cryoPoint();
         const cryoShaft = new THREE.Vector3(0, cryo.y - WALK_Y - 0.2, 0);
-        const hatch = new THREE.Vector3(0, LID_TOP, 0);
-        const sky = new THREE.Vector3(0, CRUST_Y + CRUST_T / 2, 0);     // up the pipe, into the crust
+        const up = wayUp();                     // the neck, the machine's room, the passage, the crust
         for (const p of folk) {
             const mine = shaftPoint(p.floor);
             if (mode === 'release') {
                 p.path = [cryo.clone(), cryoShaft.clone(), mine, nodes[p.at] ? nodes[p.at].p.clone() : cryo.clone()];
             } else if (mode === 'ascend') {
                 personPosition(p, here3);
-                p.path = [here3.clone(), mine, hatch.clone(), sky.clone()];
+                p.path = [here3.clone(), mine, ...up.map((v) => v.clone())];
             } else {
                 personPosition(p, here3);
                 p.path = [here3.clone(), mine, cryoShaft.clone(), cryo.clone()];
@@ -1288,7 +1307,7 @@ export function createScene(container, opts = {}) {
                 controls.target.lerpVectors(tween.t, defTgt, k);
                 if (tween.k >= 1) tween = null;
             }
-            stepMachine(dt);
+            machine.step(dt);
             stepOutings(dt);
             stepSoft(dt);
             stepBreath(dt);
@@ -1309,12 +1328,38 @@ export function createScene(container, opts = {}) {
             framing(lastPlan);              // a narrower window needs a longer lens
         },
         /**
-         * How fast the machine on the lid plays: in proportion to the stars a day, on a log
-         * scale (the rate climbs ten orders of magnitude over the chapter), and still at none.
+         * How the machine on top runs (deep-machine): machine.js machineTempo, read off the day's
+         * report. Its tempo is the stars a day.
+         * @param {{throws:number, drive:number, quiet:number}} tempo
+         * @param {boolean} [asleep]
          */
-        setMachine(starsPerDay) {
-            const v = Math.max(0, starsPerDay || 0);
-            machineRate = v > 0 ? Math.min(8, 0.4 + 0.8 * Math.log10(1 + v)) : 0;
+        setMachine(tempo, asleep = false) {
+            machineTempo = { throws: 0, drive: 0, quiet: 1, ...(tempo || {}) };
+            machine.setTempo(machineTempo, asleep);
+        },
+        /**
+         * Is the machine under this point of the screen (the hover)?
+         * @param {number} clientX
+         * @param {number} clientY
+         * @returns {boolean}
+         */
+        machineAt(clientX, clientY) {
+            const r = renderer.domElement.getBoundingClientRect();
+            if (!(r.width > 0 && r.height > 0)) return false;
+            pick.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+            ray.setFromCamera(pick, camera);
+            return machine.hits(ray);
+        },
+        /** Test hook (deep-machine): the machine on or off, to weigh what it costs a frame. */
+        showMachine(on) { machine.group.visible = !!on; },
+        /** Where the machine's top tube is on the screen, for the tests, or null off the window. */
+        screenOfMachine() {
+            const r = renderer.domElement.getBoundingClientRect();
+            tmp.set(0, 0.9, 0);
+            machine.group.localToWorld(tmp);
+            const ndc = tmp.clone().project(camera);
+            if (Math.abs(ndc.x) > 0.98 || Math.abs(ndc.y) > 0.98 || ndc.z > 1) return null;
+            return { x: r.left + (ndc.x + 1) / 2 * r.width, y: r.top + (1 - ndc.y) / 2 * r.height };
         },
         /** Everyone walks to the cryo hall and is gone. Resolves when the last one is in. */
         gather(seconds = 1.5) { return startMarch('gather', seconds); },
@@ -1349,7 +1394,7 @@ export function createScene(container, opts = {}) {
             if (!(r.width > 0 && r.height > 0)) return false;
             pick.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
             ray.setFromCamera(pick, camera);
-            return ray.intersectObjects(solids, false).length > 0 || ray.intersectObject(shaftUp, false).length > 0;
+            return ray.intersectObjects(solids, false).length > 0 || ray.intersectObject(neck, false).length > 0;
         },
         /**
          * Which chamber a point on the screen lands on (v1.51.0, the lamps): the plate hit first,
@@ -1463,8 +1508,10 @@ export function createScene(container, opts = {}) {
             dots.dispose();
             peopleMesh.material.dispose();
             unitBox.dispose(); plateGeo.dispose(); bridgeGeo.dispose();
+            machine.dispose();
             above.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
             above.removeFromParent();
+            roomMat.dispose(); passMat.dispose();
             scoutGeo.dispose(); scoutMesh.material.dispose();
             outings = [];
             plateMat.dispose(); bodyMat.dispose(); rockMat.dispose(); laneMat.dispose();
@@ -1478,7 +1525,8 @@ export function createScene(container, opts = {}) {
         get stats() {
             return {
                 floors: floors.length, labels: labels.length, people: folk.length, nodes: nodes.length, marching: !!march,
-                throws: machineThrow, machineRate, shaftOpen,
+                machine: { ...machine.stats, y: MACH_Y, onTop: MACH_Y > LID_TOP }, shaftOpen,
+                draws: renderer.info.render.calls, triangles: renderer.info.render.triangles,
                 soft: softNow, softTarget, softAmp: softU.uSoft.value, snapping: !!snapping || snapHold > 0, flash,
                 body: bodyGroups.filter(Boolean).length, bodyPlates: bodyGroups.reduce((a, g) => a + (g ? g.children.filter((o) => o.isMesh && o.material === bodyMat && o.geometry === plateGeo).length : 0), 0),
                 whole, breath: bodyGroups.map((g) => (g ? +g.position.y.toFixed(4) : null)),

@@ -239,7 +239,8 @@ Decisions taken here, for Ola to overrule:
   board is Beds, Creche, Hands, with Quiet hands above Hands.
 - **Teasers with no rule yet**, locked with "Not open yet.": Deep seam, Hydroponics, Hands and
   **The machine: feed**. The machine's star rule (10 × the weakest column) has no neutral
-  mapping to "more energy, more games"; it waits for step 3 (B174).
+  mapping to "more energy, more games"; it waits for step 3 (B174). (Step 3 gave The machine:
+  feed its rule; the other three are still teasers.)
 - **WATCHER is all eight steps**, not six: Deep read and Second core are kept (old saves own
   them and the ladder is bought in order). SYSTEM runs along the lower row, HARDWARE back along
   the upper. The branch shows once the first sleep is over.
@@ -371,3 +372,78 @@ button is marked; a wake takes the line off the screen; the tree's night log has
 fourth tied to Quiet hands with its thread; Quiet hands' ring is filled, it can be bought, its
 info box quotes the line, Long count's says "Not ours to open."; a click buys it and the
 generators burn 77.5 to 15.3 ore a day, the rooms draw 457 to 93 energy.
+
+## Built: step 3, the machine (deep-machine branch)
+
+Opus, 2026-10-02. The machine in 3D on top of the colony, and the stars as its wins.
+
+**The rule** (`deep.js`, `machine.test.js`). Stars come from the machine and from nothing else:
+
+| step | rule | constant |
+|---|---|---|
+| fed | the spare energy (the E column) × the share the machine may draw | `FEED_SHARE0` 0.06, × `FEED_STEP` 1.42 a level, 99 % at level 8 |
+| games | `GAMES_K` × fed ^ `GAMES_EXP`: concave | 240, 0.9 |
+| wins | games × one in three, an average (random only in the picture) | `WIN_ODDS` 1/3 |
+| stars | wins: each win is a star | |
+| feed | "The machine: feed", 8 levels in `state.feed`, stars, awake or asleep, paid at once | `FEED_COST0` 3e3 × `FEED_GROWTH` 26 a level |
+
+The weakest column is still worked out (the alarms, the wake-up strip and the scripted player read
+it) but no longer sets the stars; the bars' dot keeps its days-of-cover meaning. Feeding the machine
+changes no column. The Watcher's capacity still reads the spare energy before the machine (B193).
+The "limits the stars" wording is gone ("ore is the smallest surplus"), and a purchase's goal line
+says "No change to the stars: the machine plays on spare energy." when it adds none.
+
+**Calibration** (`scripts/sim-phase4.mjs`; the scripted player buys the next level of feed the moment
+it can be paid and pays for itself within 90 real seconds, awake or asleep; `FEED_PAYBACK`):
+
+| run | before | after |
+|---|---|---|
+| plain, to year 802 701 | 24m44s (seeds 2 to 5: 24m38s to 24m55s) | **24m47s** (seeds 2 to 5: 24m44s to 24m56s) |
+| --watcher, biological ending | 28m19s (the ring 25m46s) | **27m40s** (the ring 27m09s; seeds 2 to 5: 27m15s to 29m09s) |
+| longest stall at zero stars a day | 76 s | 0 s |
+| stars a day on day 1 | 40 | 81 |
+
+The plain run's stars a day first reach 10^k at (before / after): 10^3 6m49s / 6m28s, 10^4 9m59s /
+10m26s, 10^5 10m43s / 11m18s, 10^6 12m20s / 12m34s, 10^7 14m20s / 14m10s, 10^8 14m54s / 15m08s,
+10^9 15m06s / 15m08s, 10^10 17m52s / 17m10s, 10^11 19m32s / 19m22s, 10^12 23m42s / 24m02s
+(`stars/day curve` in the sim's output). Feed is bought at 1m04s, 7m56s, 9m13s, 11m00s, 12m12s,
+13m42s, 16m12s, 16m13s: about two levels a cryo tier up to Cryo IV. The --watcher run is sensitive
+(B194): a 1 % change of the unfed share makes seed 2 end at 21m14s with the body whole before the
+ring; the constants above were chosen for the steadiest of the candidates searched.
+
+**Save**: schema 8. An old save is given the feed its tier implies in the simulated run (`impliedFeed`:
+Cryo I 1, II 3, III 5, IV and up 8), so its stars a day do not fall away. The checkpoints carry the
+same feed.
+
+**What the player sees** (`machine.js`, pure). The tempo is the stars a day: throws a second follow
+the logarithm of the games a day (about one a second at the start, up to 14), and the drive (0 to 1:
+arms hanging to standing, thin to thick smoke, dim to bright tubes and cables) is half the share it
+may draw and half the decades of games. Fed past nine throws a second the cable pulses become a steady
+glow and the arms leave after-images. A win (one in three on screen, random) throws sparks from the
+arm's tube and the top tube and a small star rises over the top tube. Asleep it keeps running at 45 %
+of its pace unfed, all of it fed to the top, smoke and sparks thinned by as much, its lamp on the
+junction box in the automated rooms' 1.4 s rhythm. The hover: "The machine plays. N energy a day.
+Each win is a star." with N live (one decimal under ten). The stars-a-day readout is the machine's
+rate; its tooltip says "one game in three is a win, each win a star".
+
+**The model** (`machine-model.js`, ported from `docs/mockups/deep-machine-12.html` at the scene's own
+scale). On its own plate at y 1.75, over a short neck in plate colour from the hatch on the lid; the
+room above the lid has no walls and stays rigid when the Watcher lets the base go soft. Four armoured
+cables climb from the lid beside the neck, up through the plate and the deck, into the junction box
+and the three shoulders. What does not move is merged into one mesh per material (3); the chain's
+links walk a table of 512 precomputed matrices; no array, vector or gradient is made per frame. The
+hover is one ray against an invisible drum round the machine. The plate and the neck hide the room
+labels behind them. At a hundred chambers the machine is about 170 of some 2 380 draw calls (60 of
+them the after-images while it blurs); in SwiftShader it costs about a fifth of a frame either way.
+
+**The way up**. The straight pipe to the crust is gone. Scouts and the ascent go from the hatch up the
+neck, out across the machine's plate to its east lane and up the passage: a lumpy tube, every vertex
+pushed by hand, from the plate's edge out through the crust to the side. The rubble and the opening
+are at its mouth on the crust, and the survival ring stands over the mouth.
+
+**Acceptance** (`scripts/accept-iv-cut.mjs`, section M): from "IV · the deep" the machine stands on top
+(y 1.75) and in the window at the home view, the old glyph is gone, the stars a day are a third of the
+games, the hover reads "The machine plays. 1 energy a day. Each win is a star.", and
+`debug_deep('feed', 6)` takes it from 1.0 to 8.4 energy a day, 81 to 541 stars a day and 1.10 to 1.46
+throws a second, the hover following; back to 0, back to 81.
+

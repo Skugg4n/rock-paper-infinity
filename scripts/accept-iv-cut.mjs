@@ -35,6 +35,11 @@
 //    from the screen; in the tree's night log it is the fourth line, with its dotted thread to
 //    Quiet hands, whose ring is filled and which can be bought; buying it changes the rule's
 //    output (the generators burn less ore, the rooms draw less power).
+// deep-machine (step 3 of the tree): the machine.
+// M. From "IV · the deep" (awake): the machine stands on top (its own plate over the lid), in the
+//    window at the home view; the old floating glyph on the lid is gone; under the cursor it says
+//    "The machine plays. N energy a day. Each win is a star." with the live N; and the stars a day
+//    (and the machine's tempo) change when the feed changes (debug_deep('feed', n)).
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -203,6 +208,38 @@ try {
     check(col0 === col1, `no button in the column moved${col0 === col1 ? '' : `: ${col0} / ${col1}`}`);
     for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.level.mine')) < 1; i++) await sleepMs(250);
     check((await evaluate('rpiDeep.state.level.mine')) === 1, 'the order lands: the mines are at level 1, Seam reads 1');
+
+    // ================= M. IV · the deep: the machine on top ==================
+    await jump('iv-start', { asleep: false });
+    const m0 = await evaluate(`(() => { const d = rpiDeep, m = d.scene.stats.machine;
+        return { m, at: d.scene.screenOfMachine(), oldGlyph: document.querySelectorAll('#deep-labels .deep-machine').length,
+            feed: d.state.feed, fed: d.report.fed, perDay: d.report.stars, games: d.report.games,
+            shown: document.getElementById('deep-stars-day').textContent }; })()`);
+    check(!!m0.m && m0.m.onTop && m0.m.y > 1 && m0.m.merged > 0, `the machine stands on its own plate on top of the colony (y ${m0.m?.y}, ${m0.m?.meshes} meshes, ${m0.m?.merged} merged)`);
+    check(!!m0.at && m0.at.x > 0 && m0.at.x < 1440 && m0.at.y > 0 && m0.at.y < 900, `the home view frames it: at ${m0.at ? `${Math.round(m0.at.x)}, ${Math.round(m0.at.y)}` : 'off the window'}`);
+    check(m0.oldGlyph === 0, `the old floating glyph on the lid is gone (${m0.oldGlyph})`);
+    check(m0.feed === 0 && m0.fed > 0 && Math.abs(m0.perDay - m0.games / 3) < 1e-6 * m0.perDay, `fed ${m0.fed.toFixed(2)} energy a day: ${Math.round(m0.games)} games, ${m0.perDay.toFixed(1)} stars a day (one in three)`);
+    await mouse('mouseMoved', m0.at.x, m0.at.y);
+    await sleepMs(400);
+    const m1 = await evaluate(`({ tip: rpiDeep.machineTip, el: document.getElementById('deep-machine-tip').textContent,
+        on: !document.getElementById('deep-machine-tip').hidden, hit: rpiDeep.scene.machineAt(${m0.at.x}, ${m0.at.y}) })`);
+    const n0 = m0.fed < 9.95 ? String(Math.round(m0.fed * 10) / 10) : null;
+    check(m1.on && m1.hit && /^The machine plays\. .+ energy a day\. Each win is a star\.$/.test(m1.el) && (!n0 || m1.el.includes(` ${n0} energy`)),
+        `the hover over the machine: "${m1.el}" (${m1.on ? 'shown' : 'hidden'})`);
+    await shot('M-1-the-machine-on-top');
+    const t0m = await evaluate('rpiDeep.scene.stats.machine.throws');
+    await evaluate('debug_deep("feed", 6)');
+    await sleepMs(300);
+    const m2 = await evaluate(`({ feed: rpiDeep.state.feed, fed: rpiDeep.report.fed, perDay: rpiDeep.report.stars,
+        throws: rpiDeep.scene.stats.machine.throws, drive: rpiDeep.scene.stats.machine.drive, tip: rpiDeep.machineTip.text })`);
+    check(m2.feed === 6 && m2.fed > m0.fed * 3 && m2.perDay > m0.perDay * 2, `fed more (level ${m2.feed}): ${m0.fed.toFixed(1)} to ${m2.fed.toFixed(1)} energy a day, ${m0.perDay.toFixed(1)} to ${m2.perDay.toFixed(1)} stars a day`);
+    check(m2.throws > t0m && m2.tip !== m1.el, `and it plays faster (${t0m.toFixed(2)} to ${m2.throws.toFixed(2)} throws a second); the hover follows: "${m2.tip}"`);
+    await shot('M-2-the-machine-fed');
+    await evaluate('debug_deep("feed", 0)');
+    await sleepMs(200);
+    const m3 = await evaluate('({ feed: rpiDeep.state.feed, perDay: rpiDeep.report.stars })');
+    check(m3.feed === 0 && m3.perDay < m2.perDay, `starved again (level ${m3.feed}): ${m3.perDay.toFixed(1)} stars a day`);
+    await mouse('mouseMoved', 5, 5);
 
     // ================= V. IV · Surface: the voice in the night, the gift in the tree ==================
     await jump('iv-surface');

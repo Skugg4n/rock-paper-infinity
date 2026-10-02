@@ -15,8 +15,11 @@
  *      and so add people; dormitory LEVELS add some beds and make every pair of hands worth more.
  *      Asleep there is nobody on duty, so the column is the sleepers the machines carry, and the
  *      machines are only half as good at it (SLEEP_HANDS).
- * Stars per day = 10 × the smallest of the four. The dot marks the smallest;
- * upgrading it is always the best move, and then another becomes the smallest.
+ * Since deep-machine (step 3 of the tree) the stars come from ONE place: the rock, paper,
+ * scissors machine on top of the colony. It is fed a share of the E column (the spare energy,
+ * `machineFed`), the energy fed buys games (`gamesFor`, a concave curve), one game in three is a
+ * win and every win is a star. The four columns still decide everything else (what the colony
+ * can afford to run, and so how much energy is spare); the smallest is no longer the star rule.
  *
  * What a room costs to run grows with every upgrade too, only slower than what it makes
  * (roomMultiplier vs upkeepMultiplier): a deeper mine draws more power and needs more hands,
@@ -66,7 +69,6 @@ export const BIRTH_SHARE = 0.02;            // at most this much of the larder g
 export const GROWTH_PER_YEAR = 6.0;         // toward the beds while the larder holds: a bed left empty
                                             // for long is the colony's own fault, not the calendar's
 export const SLEEP_GROWTH = 0.3;            // the creches run slower while the colony sleeps
-export const STARS_PER_UNIT = 10;           // stars/day = 10 × the smallest surplus
 export const DAYS_PER_YEAR = 365;
 export const HUNGER_PER_DAY = 0.002;        // people lost per day with an empty larder
 /** The ice is not kind: this share of the sleepers is lost per sleeping year, and every
@@ -141,6 +143,44 @@ export function upkeepFor(s, t, level = s.level[t] || 0, auto = s.auto[t] || 0) 
 }
 /** The share of a ration a sleeper eats: none with Cold storage. */
 export const sleepFood = (s) => (gift(s, 'cold') ? 0 : SLEEP_FOOD);
+/* ---------------------------------------------------------------------------
+ * THE MACHINE (deep-machine, step 3 of docs/superpowers/specs/2026-10-02-chapter-iv-tree-and-bio.md).
+ * Stars come from the machine on top of the colony and from nothing else. A day:
+ *   fed    = the spare energy (the E column) × the share the machine may draw (`feedShare`, the
+ *            POWER branch's "The machine: feed", FEED_MAX levels kept in `state.feed`)
+ *   games  = GAMES_K × fed ^ GAMES_EXP: concave, so twice the energy is less than twice the games
+ *   wins   = games × WIN_ODDS (one in three, as the rule of the ring; an average, never a dice roll)
+ *   stars  = wins: each win is a star
+ * The Watcher's capacity still reads the spare energy before the machine (B191-B195 note).
+ * ------------------------------------------------------------------------ */
+export const FEED_MAX = 8;
+/* Calibrated with scripts/sim-phase4.mjs so the run keeps its length (deep-machine): plain 24m47s to
+   year 802 701 (was 24m44s), --watcher's biological ending 27m40s (was 28m19s). Unfed the machine
+   draws 6 % of the spare energy, every level of feed ×1.42, 99 % at the top. */
+export const FEED_SHARE0 = 0.06;
+export const FEED_STEP = 1.42;
+export const FEED_COST0 = 3e3;              // the first level of feed, in stars
+export const FEED_GROWTH = 26;              // and every level after it costs this much more
+export const GAMES_K = 240;                 // games a day for one unit of energy fed
+export const GAMES_EXP = 0.9;               // below 1: the curve is concave
+export const WIN_ODDS = 1 / 3;
+const feedLevel = (s) => Math.max(0, Math.min(FEED_MAX, Math.floor((s && s.feed) || 0)));
+/** The share of the spare energy the machine may draw at this feed level. */
+export const feedShare = (level) => Math.min(1, FEED_SHARE0 * Math.pow(FEED_STEP, Math.max(0, Math.min(FEED_MAX, level))));
+/** The price of the next level of feed, in stars (Infinity at the top). */
+export const feedCost = (level) => (level < FEED_MAX ? Math.round(FEED_COST0 * Math.pow(FEED_GROWTH, level)) : Infinity);
+/** The energy the machine is fed in a day, out of `spare`. */
+export const machineFed = (s, spare) => Math.max(0, spare || 0) * feedShare(feedLevel(s));
+/** Games a day for this much energy fed. */
+export const gamesFor = (fed) => (fed > 0 ? GAMES_K * Math.pow(fed, GAMES_EXP) : 0);
+/** Stars a day for this much energy fed: the wins. */
+export const starsFor = (fed) => gamesFor(fed) * WIN_ODDS;
+/** The feed a colony on this cryo tier holds in the simulated run (Cryo I 1, II 3, III 5, IV on 8):
+ *  what a save from before the machine (schema 7) and the checkpoints start with, so their stars a
+ *  day stay whole. */
+export const FEED_AT_TIER = [1, 3, 5, 8, 8, 8, 8, 8];
+export const impliedFeed = (cryo) => ((cryo ?? -1) < 0 ? 0 : FEED_AT_TIER[Math.min(cryo, FEED_AT_TIER.length - 1)]);
+
 /** Thousands are grouped with a space, never a comma: the counter reads the same in every locale. */
 export const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 /**
@@ -817,6 +857,7 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         mournUntil: null,                   // no one is born until this day (a year after deaths)
         shaftOpen: false,                   // the rubble at the top of the shaft up, cleared by the first party
         cryo: -1, doom0,
+        feed: 0,                            // deep-machine: levels of "The machine: feed" bought
         // deep-voice: the tree's memory (tree.js normalizeTree): Surface's nodes opened and bought
         tree: { opened: [], bought: [], unseen: false },
     };
@@ -893,16 +934,20 @@ export function tickDay(s, asleep = false) {
         s.food = 0; starving = true;
         s.humans = Math.max(2, s.humans * (1 - HUNGER_PER_DAY));
     }
-    // Stars: the balance of the four surpluses. Asleep nobody stands at a post, so the H
-    // column counts the sleepers the machines carry instead of the hands on duty.
+    // The four surpluses. Asleep nobody stands at a post, so the H column counts the sleepers the
+    // machines carry instead of the hands on duty.
     const parts = {
         M: mined - fuel,
         F: grown - eat,
         E: energySpare,
         H: WORK_PER_HAND * Math.pow(mult('dorm'), 1 - BED_SHARE) * (asleep ? s.humans * SLEEP_HANDS : hands),
     };
+    // the smallest surplus: what the screen and the alarms still read; it no longer sets the stars
     const weakest = COLUMN.reduce((a, k) => (parts[k] < parts[a] ? k : a), 'M');
-    const stars = STARS_PER_UNIT * Math.max(0, parts[weakest]);
+    // deep-machine: the stars are the machine's wins, on the spare energy it is fed
+    const fed = machineFed(s, energySpare);
+    const games = gamesFor(fed);
+    const stars = starsFor(fed);
     s.stars += stars; s.day += 1;
     // What each room actually drew and who actually stood in it. The bars are hovered and have
     // to say where their number came from (Ola: "I buy electricity and BOOM all humans drop"),
@@ -913,7 +958,7 @@ export function tickDay(s, asleep = false) {
         crew[t] = s.auto[t] > 0 ? 0 : live(t) * ROOM[t].crew * upkeep(t) * staff[t];
         rooms[t] = live(t);
     }
-    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, hands, born, died, starving, stars, weakest, parts, capacity, staff, power, draw, crew, eaten: eat, awake, live: rooms };
+    return { minerals: mined, food: grown, fuel, fuelWanted, energyMade, energyNeed, energySpare, fed, games, hands, born, died, starving, stars, weakest, parts, capacity, staff, power, draw, crew, eaten: eat, awake, live: rooms };
 }
 
 /* ---------------------------------------------------------------------------
