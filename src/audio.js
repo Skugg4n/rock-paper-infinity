@@ -438,6 +438,23 @@ function finale() {
 /** A chapter begins (again): the machine may play. */
 function begin() { M.ended = false; }
 
+/**
+ * The graph, for another act's sound (src/audio-city.js and the like) to hang
+ * its own layers on the same buses, the same on/off and the same unlocking.
+ * Null until the first gesture has made the context. The buses carry the
+ * saved choices (sfx, music) in their gain; a finale fades the music bus out,
+ * so an act that starts its music after one calls wake() first.
+ *
+ * @returns {{ ctx: AudioContext, master: GainNode, sfxBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, noiseBuf: AudioBuffer } | null}
+ */
+function graph() {
+    if (!ensureIfUnlocked()) return null;
+    return { ctx, master, sfxBus, musicBus, reverb, noiseBuf };
+}
+
+/** Puts the buses back at the saved levels (after a finale, before another act's music). */
+function wake() { if (ctx) applyPrefs(); }
+
 // ---------------------------------------------------------------- choices and unlocking
 
 function getPrefs() { return { ...prefs }; }
@@ -456,4 +473,4 @@ if (typeof window !== 'undefined') {
     window.addEventListener('keydown', unlock, { capture: true });
 }
 
-export const audio = { click, pling, thunk, rise, lucky, knock, boom, swell, machine, stopMachine, finale, begin, getPrefs, setPref };
+export const audio = { click, pling, thunk, rise, lucky, knock, boom, swell, machine, stopMachine, finale, begin, graph, wake, getPrefs, setPref };

@@ -80,6 +80,8 @@ describe('sound: the rules', () => {
             audio.stopMachine();
             expect(audio.finale()).toBe(false);
             audio.begin();
+            expect(audio.graph()).toBeNull();
+            audio.wake();
         }).not.toThrow();
     });
 });
