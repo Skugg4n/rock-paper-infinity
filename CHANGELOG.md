@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.59.0 - 2026-10-02 (sound, chapter I)
+
+### The game has sound
+
+The sounds Ola approved on the sound board (`docs/mockups/sound-board.html`), now in chapter I, to be judged over a whole playthrough (B162). Everything is synthesised in the browser; there are no sound files.
+
+- **Words.** A click on the hand buttons, auto and recharge; a pling on a win (wins within a few seconds of each other climb the scale); a thunk on a purchase; three rising notes when something new appears, when the factory is built and when the foam collapses; two quick notes on the clover; two knocks when the energy runs out; a swell on every chapter card (lower and longer on the dark ones).
+- **The machine.** While auto runs the music follows the game: a heartbeat from 3 games a second, a bass from 10, and a shimmer instead of single plings when wins come closer than five a second. The tempo goes from 58 to 128 beats a minute with the speed. The heart weakens when less than five seconds of energy is left and is nearly silent when it is gone. The generator hums, every board adds a voice.
+- **It stops** when the game is paused, when the tab is hidden and when the chapter ends.
+- **☰ menu**: Sound on/off and Music on/off, saved (`rpi-audio`). Both are on from the start; the browser allows no sound before the first click.
+- New `src/audio.js` (`audio.*`, and the tested rules `bpmFor`, `layersFor`, `pentaNote`, `readPrefs`). Chapters II to IV have no sounds of their own yet, only the chapter cards.
+
 ## v1.58.0 - 2026-10-02 (chapter I's end, and the factory in the city)
 
 ### The factory: boards all the way down

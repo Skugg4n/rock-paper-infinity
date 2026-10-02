@@ -316,6 +316,7 @@ export function resetCounterIconState() {
  * @param {boolean} opts.firstDone         - whether first upgrade update has already run
  * @param {AbortSignal} opts.signal        - for animationend listener cleanup
  * @param {HTMLElement} opts.quantumFoamContainer
+ * @param {function} [opts.onReveal]       - called with the key of an upgrade that appears in play
  * @returns {boolean} true on the very first call (caller should set firstDone = true)
  */
 export function renderUpgrades({
@@ -331,6 +332,7 @@ export function renderUpgrades({
     firstDone,
     signal,
     quantumFoamContainer,
+    onReveal,
 }) {
     const factoryReady = upgrades.mergeGameBoard.unlockCondition &&
         upgrades.mergeGameBoard.unlockCondition() &&
@@ -383,6 +385,7 @@ export function renderUpgrades({
                 if (wasHidden && !revealedUpgrades.has(key)) {
                     revealedUpgrades.add(key);
                     if (firstDone) {
+                        if (typeof onReveal === 'function') onReveal(key);
                         upgrade.element.classList.add('materialize');
                         upgrade.element.addEventListener('animationend', () => {
                             upgrade.element.classList.remove('materialize');

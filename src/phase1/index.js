@@ -11,6 +11,7 @@ import { runCountdownAnimation } from "./countdown.js";
 import { serializeGameState, saveToStorage, loadFromStorage, sanitizeNumber, helperCounters } from "./persistence.js";
 import { createUpgrades } from "./upgrades-config.js";
 import { createFactoryView, FACTORY_TILES } from "./factory-view.js";
+import { audio, PLING_LIMIT } from "../audio.js";
 import { setupDashes, updateDashes, updateProgressDashes, PROGRESS_DASHES } from "./upgrade-dashes.js";
 import { mountSaveButtons } from "../save-export.js";
 import {
@@ -167,7 +168,7 @@ function scheduleUIUpdate() {
                 if (!choice && !upgrade) return;
                 btn.addEventListener('pointerup', (e) => {
                     e.preventDefault();
-                    if (choice) playGame(choice);
+                    if (choice) { audio.click(); playGame(choice); }
                     else handleUpgradeClick(upgrade);
                 }, { signal });
                 btn.addEventListener('mouseenter', () => {
@@ -245,7 +246,7 @@ function scheduleUIUpdate() {
             gameBoardContainer.classList.add('pointer-events-none', 'is-factory');
             factoryView?.destroy();
             factoryView = createFactoryView(gameBoards.map(board => board.element));
-            if (!fromLoad) factoryView.arrive();
+            if (!fromLoad) { factoryView.arrive(); setTimeout(() => audio.rise(), 300); }
 
             quantumFoamContainer.classList.remove('hidden');
         }
@@ -286,6 +287,7 @@ function scheduleUIUpdate() {
         function clickClover() {
             if (!upgrades.autoPlay.purchased || upgrades.luck.purchased) return;
             cloverUntil = performance.now() + CLOVER_MS;
+            audio.lucky();
             cloverBtn.classList.remove('lucky');
             void cloverBtn.offsetWidth;
             cloverBtn.classList.add('lucky');
@@ -351,7 +353,7 @@ function scheduleUIUpdate() {
 
         function passiveTick() {
             // Paused (window.__rpiPaused, main.js): time stands still, the save does not.
-            if (window.__rpiPaused) { saveGame(); return; }
+            if (window.__rpiPaused) { audio.stopMachine(); saveGame(); return; }
             timed('p1:logicTick', () => {
                 const energyGen = upgrades.energyGenerator.level * ENERGY_PER_GENERATOR_LEVEL;
                 if (energyGen > 0) {
@@ -374,6 +376,7 @@ function scheduleUIUpdate() {
 
         function handleVisibilityChange() {
             if (document.hidden) {
+                audio.stopMachine();
                 if (passiveInterval) {
                     clearInterval(passiveInterval);
                     passiveInterval = null;
@@ -435,7 +438,9 @@ function scheduleUIUpdate() {
         }
 
         function updateUpgrades() {
+            let revealed = false;
             renderUpgrades({
+                onReveal: () => { revealed = true; },
                 upgrades,
                 starBalance,
                 totalStarsEarned,
@@ -449,6 +454,7 @@ function scheduleUIUpdate() {
                 signal: listenerController.signal,
                 quantumFoamContainer,
             });
+            if (revealed) audio.rise();   // something new appeared
             if (!firstUpgradeUpdateDone) firstUpgradeUpdateDone = true;
         }
 
@@ -472,10 +478,36 @@ const uiState = {
     showReserve: null,
     cloverVisible: null,
     cloverEvergreen: null,
-    handsRest: null
+    handsRest: null,
+    outOfEnergy: null
 };
 
+        /**
+         * What the machine (the music, audio.js) is told. It plays while auto
+         * is on; with no energy left it is nearly silent. The battery is how
+         * long the energy lasts: under five seconds the heart is weak.
+         */
+        function machineState() {
+            const gps = getGamesPerSecond(gameSpeed, isMetaBoardActive, gameBoards.length);
+            const drain = getEPS(gameSpeed, isMetaBoardActive, gameBoards.length) - upgrades.energyGenerator.level * ENERGY_PER_GENERATOR_LEVEL;
+            const stock = energy + reserveEnergy;
+            const battery = isMetaBoardActive ? 1 : stock <= 0 ? 0 : drain <= 0 ? 1 : Math.min(1, stock / drain / 20);
+            return {
+                running: autoPlayWantsToRun && !window.__rpiPaused && !document.hidden,
+                gps,
+                wins: gps * winRate(),
+                battery,
+                gen: isMetaBoardActive ? 1 : upgrades.energyGenerator.level / upgrades.energyGenerator.maxLevel,
+                boards: isMetaBoardActive ? FACTORY_TILES : gameBoards.length,
+                plings: gameSpeed >= HYPER_SPEED_THRESHOLD || isMetaBoardActive,
+            };
+        }
+
         function updateUI() {
+            audio.machine(machineState());
+            const outOfEnergy = autoPlayWantsToRun && !isMetaBoardActive && !hasEnergy();
+            if (outOfEnergy && uiState.outOfEnergy === false) audio.knock();
+            uiState.outOfEnergy = outOfEnergy;
             const games = Math.floor(totalGamesPlayed);
             // Energy only matters once machines play; hands are free. The
             // factory has its own reactor, so its bars go away (foam stays).
@@ -754,6 +786,8 @@ const uiState = {
             renderRound(board, playerChoice, computerChoice, result, { instant, celebrate });
 
             if (result === 'win') {
+                // Single wins ring; when they come too close the machine's shimmer takes over.
+                if (!autoPlayInterval || machineState().wins < PLING_LIMIT) audio.pling();
                 totalWins++;
                 const starGain = 1 * starMultiplier;
                 starBalance += starGain;
@@ -780,6 +814,7 @@ const uiState = {
 
             const upgrade = upgrades[key];
             if (key === 'autoPlay' && upgrade.purchased) {
+                audio.click();
                 toggleAutoPlayState();
                 return;
             }
@@ -790,6 +825,8 @@ const uiState = {
                 if(upgrade.level !== undefined && upgrade.level >= upgrade.maxLevel) return;
 
                 starBalance -= currentCost;
+                // The recharge button is clicked all the time: a click. Everything else is a purchase.
+                if (key === 'manualRecharge') audio.click(); else audio.thunk();
                 if (upgrade.level === undefined && !upgrade.consumable) {
                     upgrade.purchased = true;
                 }
@@ -851,6 +888,7 @@ const uiState = {
             
             // The collapse shows as a wave of wins from the middle of the factory.
             factoryView?.wave(4, 4);
+            audio.rise();
             scheduleUIUpdate();
         }
 
@@ -955,6 +993,7 @@ const uiState = {
         }
 
         export function teardown() {
+            audio.stopMachine();
             stopAutoPlayInterval();
             stopClover();
             clearTimeout(heroTimer);

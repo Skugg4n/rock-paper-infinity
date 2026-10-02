@@ -1544,12 +1544,15 @@ items:
       music with a steady rhythm, humming, a bass line, a heartbeat in time
       with the engine that charges the battery. Controls for sound and music
       on/off in the ☰ menu.
-    status: open
+    status: done
+    resolved_in: v1.59.0
     notes: |
       Design dialogue first. Earlier proposal: docs/superpowers/specs/2026-09-27-sound-design.md
       (it said no music; Ola's idea of the machine's rhythm as music replaces that for chapter I).
       2026-10-02: sound board built, docs/mockups/sound-board.html (single sounds, the machine with
-      speed/battery/generator/boards, chapter I in 75 seconds). Ola judges it; nothing in the game yet.
+      speed/battery/generator/boards, chapter I in 75 seconds). Ola: wonderful, unsure how tiring over a whole
+      game, worth testing. In the game from v1.59.0 (chapter I). Open: his verdict after a real playthrough;
+      chapters II to IV have no sound of their own yet.
 
   - id: B163
     added: 2026-10-02

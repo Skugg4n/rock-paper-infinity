@@ -67,6 +67,7 @@ rock-paper-infinity/
 │   ├── version.js          # VERSION constant
 │   ├── gamePhase.js        # Phase state machine: show/hide containers, persist to localStorage
 │   ├── icons.js            # SVG icon preloading and caching (Phase 1 only)
+│   ├── audio.js            # Sound: synthesised words (click, pling, thunk…) and the machine (chapter I's music); prefs in rpi-audio
 │   ├── chapterCard.js      # Chapter card transition animations (I·TRIVIAL, II·CAPITAL …)
 │   ├── save-export.js      # exportSave / importSave + mountSaveButtons (debug menus)
 │   ├── perf.js             # Perf instrumentation helpers — active only with ?debug&perf URL

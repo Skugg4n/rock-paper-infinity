@@ -1,3 +1,5 @@
+import { audio } from './audio.js';
+
 const REDUCED_MOTION = typeof window !== 'undefined'
     && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -32,6 +34,7 @@ function delay(ms) {
  */
 export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false, pause = 0 } = {}) {
     if (_cardActive) return Promise.resolve();
+    audio.swell(dark);
 
     const card = el('#chapter-card');
     if (!card) {

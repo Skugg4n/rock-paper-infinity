@@ -6,6 +6,7 @@ import { playChapterCard } from './src/chapterCard.js';
 import { initPerf } from './src/perf.js';
 import { CHECKPOINTS, jumpTo, snapshot, restore, slotInfo } from './src/checkpoints.js';
 import { MODULE_PATHS } from './src/modules.js';
+import { audio } from './src/audio.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -45,12 +46,22 @@ pauseBtn.className = 'btn';
 pauseBtn.setAttribute('aria-label', 'Pause');
 function setPaused(on) {
   window.__rpiPaused = on;
+  if (on) audio.stopMachine();
   document.body.classList.toggle('paused', on);
   pauseBtn.setAttribute('aria-label', on ? 'Play' : 'Pause');
   pauseBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
   pauseBtn.replaceChildren(iconSvg(on ? 'Play' : 'Pause') || document.createTextNode(on ? '▶' : 'II'));
 }
 pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); setPaused(!window.__rpiPaused); pauseBtn.blur(); });
+
+// Sound and music on/off in the ☰ menu (src/audio.js keeps and saves the choice).
+for (const [id, pref, label] of [['sound-toggle', 'sfx', 'Sound'], ['music-toggle', 'music', 'Music']]) {
+  const btn = document.getElementById(id);
+  if (!btn) continue;
+  const paint = () => { btn.textContent = `${label} · ${audio.getPrefs()[pref] ? 'on' : 'off'}`; };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); audio.setPref(pref, !audio.getPrefs()[pref]); paint(); });
+  paint();
+}
 document.getElementById('menu-wrapper')?.appendChild(pauseBtn);
 setPaused(false);
 document.addEventListener('keydown', (e) => {
