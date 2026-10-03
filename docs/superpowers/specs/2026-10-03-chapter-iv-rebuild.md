@@ -384,3 +384,21 @@ swap-tend, swap-sleep-first, swap-sleep-deep, swap-grow, swap-hands, swap-rise, 
 **Not done here.** A playtest of the act in the strata view; whether to zoom closer with sideways scrolling or
 retune GROW's length in the row (B319). In the strata view the scouts' calls are empty (they were cut), and
 `sealAnim` is a flash only (an older save's sector choice).
+
+### GROW, something to do and time that moves (Ola, 2026-10-03)
+
+Ola: "Maybe turn it around so the Body falls asleep? That way we can speed things up. Now
+you have to sit and wait and watch and can't do anything. OR add something so you can do
+something. Or both." Both:
+- **The body dreams.** In GROW the lever returns as DREAM. Before pulling it the player
+  MARKS chambers the body should grow toward (click reachable or distant chambers: a faint
+  red thread from the body to each mark). Pulling it dives time like SLEEP; the body grows
+  by itself along the marks (as SPREAD does, but only toward marks), and wakes on hunger
+  (FEED empty), when every mark is reached, or by hand. The wake lamp shows one word:
+  HUNGER, REACHED, AWAKE. This is the "programmed sleep" idea from the first critique,
+  finally in its right place. The calendar no longer runs fast while awake in GROW.
+- **The heart.** Awake, clicking the heart (the lid organ) PUMPS: each beat pushes FEED
+  to the edge: it revives a necrotic room a little, speeds the take in progress, and
+  nudges MASS. On the beat (the heartbeat sound and a visible pulse) a pump counts double;
+  off the beat it counts half. A pump has a short cooldown so it is a rhythm, not a
+  spam-click. Same family as the snap in SLEEP and the clicks of chapter I.
