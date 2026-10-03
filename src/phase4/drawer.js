@@ -101,6 +101,11 @@ export function createDrawer(host, { onBuy, onWholeTree, onClose }) {
             for (const x of rows) { const f = fresh.get(x.r.id); if (f) x.r = f; }
             draw(groups);
         },
+        /** deep-grow: the drawer becomes tissue (style-deep.css .deep-drawer.is-flesh); same behaviour. */
+        setFlesh(on) {
+            host.classList.toggle('is-flesh', !!on);
+            host.querySelector('.deep-drawer-tree').hidden = !!on;
+        },
         /** What the drawer shows now, for the tests: [{ id, status }]. */
         get rows() { return rows.map(({ r }) => ({ id: r.id, status: r.status, price: r.price, need: r.need })); },
     };

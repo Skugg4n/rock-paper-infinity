@@ -930,7 +930,11 @@ export function tickDay(s, asleep = false) {
         staff[t] = got / need; crewLeft -= got;
     }
     const hands = crewLeft;
-    const running = (t) => live(t) * staff[t] * mult(t);
+    // deep-grow (movement III): what the body makes. `s.organs` (grow.js organsOf) adds to a type's
+    // rooms the extra a living organ makes (x20 and more), takes away what a dead one does not, and
+    // the beds of a dormitory that became a vat. Without a body it is not there and nothing changes.
+    const outN = (t) => Math.max(0, live(t) + ((s.organs && Number.isFinite(s.organs[t])) ? s.organs[t] : 0));
+    const running = (t) => outN(t) * staff[t] * mult(t);
     // Energy: the generators burn minerals, every room draws power, a shortfall scales output.
     const drawing = (t) => live(t) * staff[t] * upkeep(t);      // upkeep side of a running room
     const fuelWanted = drawing('generator') * ROOM.generator.fuel * (asleep ? SLEEP_FUEL : 1);
@@ -954,7 +958,7 @@ export function tickDay(s, asleep = false) {
     s.minerals += mined; s.food += grown;
     // People eat, and grow toward the beds as long as the larder holds. Asleep nobody eats,
     // but the creches keep running, slower, on the food the automated farms bring in.
-    const beds = live('dorm') * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
+    const beds = outN('dorm') * power.dorm * ROOM.dorm.out * Math.pow(mult('dorm'), BED_SHARE);   // an unlit bed is not a bed
     // deep-fix: the beds the body took with its people stay the body's (bodyTakes below)
     const capacity = beds * bodyKeep(s);
     // the ice takes its share first, and the creches then fill the beds it emptied
@@ -973,7 +977,9 @@ export function tickDay(s, asleep = false) {
         const rate = (asleep ? VAT_GROWTH[vatsLevel(s)] : 1) * GROWTH_PER_YEAR / DAYS_PER_YEAR;
         const mouthsToSpare = grown / FOOD_MARGIN - demand;
         const room = capacity - s.humans;
-        if (rate > 0 && mouthsToSpare > 0 && !mourning(s)) {
+        // deep-grow: once the body grows, nobody is born the old way: the vats grow the body's people
+        const bred = !(s.organs && s.organs.births === 0);
+        if (rate > 0 && mouthsToSpare > 0 && !mourning(s) && bred) {
             born = Math.max(0, Math.min(s.humans * rate, room * BED_FILL, mouthsToSpare, s.food * BIRTH_SHARE / BIRTH_FOOD));
         }
         s.food -= born * BIRTH_FOOD; s.humans += born;
@@ -993,8 +999,10 @@ export function tickDay(s, asleep = false) {
     const weakest = COLUMN.reduce((a, k) => (parts[k] < parts[a] ? k : a), 'M');
     // deep-machine: the stars are the machine's wins, on the spare energy it is fed
     const fed = machineFed(s, energySpare);
-    const games = gamesFor(fed);
-    const stars = starsFor(fed);
+    // deep-grow: the machine house taken by the body plays with hands, more games for the same energy
+    const handsK = s.organs && Number.isFinite(s.organs.games) ? Math.max(0, s.organs.games) : 1;
+    const games = gamesFor(fed) * handsK;
+    const stars = starsFor(fed) * handsK;
     s.stars += stars; s.day += 1;
     // What each room actually drew and who actually stood in it. The bars are hovered and have
     // to say where their number came from (Ola: "I buy electricity and BOOM all humans drop"),

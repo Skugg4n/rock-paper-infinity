@@ -221,22 +221,29 @@ export function distances(graph, state) {
     return d;
 }
 
-/** What one organ eats a year (0 when necrotic, or a vat). */
-export function eatOf(graph, state, id, levels = {}) {
+/** What one organ eats a year (0 when necrotic, or a vat). `k` scales it (deep-grow: the body's
+ *  APPETITE, bought in the drawer). */
+export function eatOf(graph, state, id, levels = {}, k = 1) {
     const n = look(graph).byId.get(id);
     if (!n || !isBody(state, id) || isNecrotic(state, id) || isVat(n)) return 0;
-    if (n.kind === 'machine') return EAT_MACHINE;
+    if (n.kind === 'machine') return EAT_MACHINE * k;
     const lvl = n.type ? (levels[n.type] || 0) : 0;
-    return EAT_PER_ORGAN * (1 + EAT_PER_LEVEL * lvl) * Math.pow(HUNGER_FLOOR_GROWTH, Math.max(0, n.floor));
+    return k * EAT_PER_ORGAN * (1 + EAT_PER_LEVEL * lvl) * Math.pow(HUNGER_FLOOR_GROWTH, Math.max(0, n.floor));
 }
-/** What the whole body eats a year, and what its vats grow. */
-export function hunger(graph, state, levels = {}) {
-    let eat = 0, grow = 0;
+/**
+ * What the whole body eats a year, and what its vats grow. deep-grow: `opts.eat` and `opts.grow`
+ * scale the two (the drawer's APPETITE and VATS), `opts.extra` people a year grown outside the
+ * chambers (the culture vats the body took over). Without them it is what it was.
+ */
+export function hunger(graph, state, levels = {}, opts = {}) {
+    let eat = 0, grow = Math.max(0, opts.extra || 0);
+    const ek = Number.isFinite(opts.eat) ? opts.eat : 1;
+    const gk = Number.isFinite(opts.grow) ? opts.grow : 1;
     const { byId } = look(graph);
     for (const id of state.body) {
-        eat += eatOf(graph, state, id, levels);
+        eat += eatOf(graph, state, id, levels, ek);
         const n = byId.get(id);
-        if (isVat(n) && !isNecrotic(state, id)) grow += VAT_GROWTH * (1 + VAT_PER_LEVEL * (levels.dorm || 0));
+        if (isVat(n) && !isNecrotic(state, id)) grow += gk * VAT_GROWTH * (1 + VAT_PER_LEVEL * (levels.dorm || 0));
     }
     return { eat, grow, net: grow - eat };
 }
@@ -247,12 +254,13 @@ export function hunger(graph, state, levels = {}) {
  * @param {object} graph
  * @param {object} state
  * @param {number} people - the colony's people (awake or not, they are food)
- * @param {object} [opts] - { levels: {type: level} } the rooms' levels
+ * @param {object} [opts] - { levels: {type: level} } the rooms' levels; deep-grow: { eat, grow,
+ *        extra } scale the hunger and the vats (see hunger())
  * @returns {{state:object, people:number, eaten:number, grown:number, died:string[], revived:string[]}}
  */
 export function tick(graph, state, people, opts = {}) {
     const levels = opts.levels || {};
-    const { eat, grow } = hunger(graph, state, levels);
+    const { eat, grow } = hunger(graph, state, levels, opts);
     let p = Math.max(0, people || 0) + grow;
     const died = [], revived = [];
     let necrotic = state.necrotic.slice();
@@ -265,7 +273,7 @@ export function tick(graph, state, people, opts = {}) {
             const order = necrotic.slice().sort((a, b) => (d.get(a) ?? 1e9) - (d.get(b) ?? 1e9));
             for (const id of order) {
                 if (revived.length >= REVIVE_PER_YEAR) break;
-                const cost = eatOf(graph, { ...state, necrotic: [] }, id, levels);
+                const cost = eatOf(graph, { ...state, necrotic: [] }, id, levels, Number.isFinite(opts.eat) ? opts.eat : 1);
                 if (p < cost * REVIVE_COVER) break;
                 revived.push(id);
             }
@@ -298,7 +306,7 @@ export function advance(graph, state, people, years, opts = {}) {
     const died = [], revived = [];
     let stepped = 0;
     while (left > 0) {
-        const { net } = hunger(graph, s, opts.levels || {});
+        const { net } = hunger(graph, s, opts.levels || {}, opts);
         if (!s.necrotic.length && net >= 0) {
             // nothing can die and nothing is dead: the rest is a straight line
             p += net * left;

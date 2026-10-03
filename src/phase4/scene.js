@@ -164,7 +164,8 @@ function structureKey(state, layout) {
         (layout.slots || []).map((s) => s || '.').join(''),
         Object.keys(state.auto).sort().map((t) => `${t}${state.auto[t]}`).join(''),
         (state.takenSlots || []).join(','),
-        ((state.watcher && state.watcher.sealed) || []).join(','),
+        // deep-grow: once the body grows, the old sealed sectors are not drawn
+        state.grow ? 'grow' : ((state.watcher && state.watcher.sealed) || []).join(','),
     ].join('|');
 }
 
@@ -443,6 +444,14 @@ export function createScene(container, opts = {}) {
     // being built puts its meshes (null: the world)
     let bodyGroups = [];
     let into = null;
+    // deep-grow: what the flesh (view-hooks.js) needs of the model, by node id (growth.js ids:
+    // 'h0' the lid, 'h1' the landing below, 's12' chamber 12); rebuilt with the world
+    let buildNo = 0;
+    let fleshCells = new Set();         // the cells the body holds: nobody walks there
+    let growMode = false;
+    let partPlates = new Map(), partCuts = new Map(), partBridges = new Map(), partExtras = new Map();
+    let shaftMesh = null;
+    let curCuts = null;                 // where cut() files the lanes and houses of the cell being built
     let breath = 0;
     let whole = false;              // the last wake-up has come: the base breathes as one
     let lampKey = '';               // the lamps as last drawn (v1.51.0)
@@ -461,6 +470,8 @@ export function createScene(container, opts = {}) {
         scene.add(world);
         solids = []; nodes = []; floors = []; folk = []; digLabel = null; plates = [];
         bodyGroups = []; into = null;
+        partPlates = new Map(); partCuts = new Map(); partBridges = new Map(); partExtras = new Map();
+        shaftMesh = null; curCuts = null;
         march = null;
         lampKey = '';
         labelHost.classList.remove('is-lamp-game');
@@ -481,6 +492,7 @@ export function createScene(container, opts = {}) {
         m.position.set((ax + bx) / 2 * PITCH, y, (az + bz) / 2 * PITCH);
         if (az !== bz) m.rotation.y = Math.PI / 2;
         world.add(m); solids.push(m);
+        return m;
     }
     /** Lanes are cut in a mid grey, houses in rock: the same rock as the background,
      *  seen through the slab. */
@@ -489,6 +501,8 @@ export function createScene(container, opts = {}) {
         m.scale.set(w, 0.02, d);
         m.position.set(cx, y + LANE_Y, cz);
         put(m);
+        if (curCuts) curCuts.push(m);
+        return m;
     }
     function addCylinder(r, h, x, y, z, mat) {
         const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 32, Math.max(1, Math.ceil(h / 0.5))), mat);
@@ -546,10 +560,10 @@ export function createScene(container, opts = {}) {
     function planFloors(state, layout) {
         const slots = layout.slots || [];
         const taken = new Set(state.takenSlots || []);
-        const sealed = new Set((state.watcher && state.watcher.sealed) || []);
+        const sealed = new Set(state.grow ? [] : ((state.watcher && state.watcher.sealed) || []));
         const deepest = Math.max(floorCount(slots.length) - 1, placeChamber(slots.length).floor);
         const plan = [];
-        for (let f = 0; f <= deepest; f++) plan.push({ y: -f * FLOOR_GAP, cells: [{ x: 0, z: 0, hub: true, lid: f === 0 }], doors: [], people: 0 });
+        for (let f = 0; f <= deepest; f++) plan.push({ y: -f * FLOOR_GAP, cells: [{ x: 0, z: 0, hub: true, lid: f === 0, flesh: fleshCells.has(`h${f}`) }], doors: [], people: 0 });
         slots.forEach((type, i) => {
             const p = placeChamber(i);
             plan[p.floor].cells.push({
@@ -558,6 +572,7 @@ export function createScene(container, opts = {}) {
                 auto: type ? (state.auto[type] || 0) > 0 : false,
                 taken: taken.has(i),        // v1.49.0: a dormitory the Watcher took for its hardware
                 body: sealed.has(sectorOf(i)),      // v1.50.0: part of the body; nobody walks here
+                flesh: fleshCells.has(`s${i}`),     // deep-grow: the body took it; nobody walks here either
                 sector: sectorOf(i),
             });
         });
@@ -572,7 +587,8 @@ export function createScene(container, opts = {}) {
 
         // ---- the shaft: plate colour, and it is also the stairs ----
         const shaftH = -0.05 - bottom;
-        addCylinder(SHAFT_R, shaftH, 0, bottom + shaftH / 2, 0, plateMat);
+        shaftMesh = addCylinder(SHAFT_R, shaftH, 0, bottom + shaftH / 2, 0, plateMat);
+        buildNo++;
 
         plan.forEach((floor, fi) => {
             const taken = new Map();
@@ -591,6 +607,12 @@ export function createScene(container, opts = {}) {
                 plate.userData.sector = Number.isInteger(c.slot) ? c.sector : -1;
                 plate.userData.body = !!c.body;
                 if (!isHub) plates.push(plate);
+                // deep-grow: the plate by its node id, and what is cut into it
+                const nodeId = isHub ? `h${fi}` : `s${c.slot}`;
+                plate.userData.nodeId = nodeId;
+                partPlates.set(nodeId, plate);
+                curCuts = [];
+                partCuts.set(nodeId, curCuts);
 
                 // the ring
                 const span = 2 * r + LANE_W;
@@ -723,12 +745,13 @@ export function createScene(container, opts = {}) {
                 if (c.lid) {
                     // the way in from chapter III, closed: a raised rim in plate, a
                     // well of rock sunk inside it, and the bar laid across
-                    addCylinder(0.62, 0.18, 0, y + PLATE_H / 2 + 0.04, 0, plateMat);
+                    const rim = addCylinder(0.62, 0.18, 0, y + PLATE_H / 2 + 0.04, 0, plateMat);
                     addCylinder(0.47, 0.2, 0, y + PLATE_H / 2 + 0.02, 0, rockMat);
                     const bar = new THREE.Mesh(unitBox, plateMat);
                     bar.scale.set(1.34, 0.14, 0.24);
                     bar.position.set(0, y + PLATE_H / 2 + 0.14, 0);
                     world.add(bar); solids.push(bar);
+                    partExtras.set(nodeId, [rim, bar]);
                     // deep-machine: the star machine stands in its own room on top (above), not on the lid
                 } else if (c.room) {
                     // a dormitory the Watcher took holds no one: its glyph is the Watcher's, not a bed
@@ -742,6 +765,7 @@ export function createScene(container, opts = {}) {
                     html += '<span class="building"></span>';
                     const rec = makeLabel(html, cx, y + 0.45, cz, 'room');
                     rec.obj.element.dataset.slot = String(c.slot);      // v1.51.0: which chamber, for the tests
+                    if (c.flesh) rec.obj.visible = false;               // deep-grow: the flesh has it
                     if (c.auto) rec.inner.classList.add('is-auto');
                     rec.cell = c;
                     rec.lvlEl = rec.inner.querySelector('.lvl');
@@ -756,6 +780,7 @@ export function createScene(container, opts = {}) {
                     const rec = makeLabel('<span class="plus"></span><span class="claim"></span><span class="building"></span><span class="ghost-lamp"></span>', cx, y + 0.45, cz, 'empty');
                     rec.obj.element.dataset.slot = String(c.slot);
                     rec.inner.classList.add('is-empty');
+                    if (c.flesh || growMode) rec.obj.visible = false;
                     rec.cell = c;
                     rec.buildEl = rec.inner.querySelector('.building');
                     rec.claimEl = rec.inner.querySelector('.claim');
@@ -796,6 +821,7 @@ export function createScene(container, opts = {}) {
             });
 
             into = null;
+            curCuts = null;
             // bridges, and the lane that runs over them
             floor.cells.forEach((c) => {
                 const r = c.hub ? R_HUB : R_ROOM;
@@ -803,18 +829,25 @@ export function createScene(container, opts = {}) {
                     const n = taken.get(`${c.x + d[0]},${c.z + d[1]}`);
                     if (!n) return;
                     const nr = n.hub ? R_HUB : R_ROOM;
-                    addBridge(c.x, c.z, n.x, n.z, floor.y);
+                    const bridge = addBridge(c.x, c.z, n.x, n.z, floor.y);
                     const s1 = DIR_SIDE[`${d[0]},${d[1]}`], s2 = DIR_SIDE[`${-d[0]},${-d[1]}`];
                     const m1 = (r + 1.0) / 2, l1 = 1.0 - r;
-                    cut(c.x * PITCH + d[0] * m1, floor.y, c.z * PITCH + d[1] * m1,
+                    const idOf = (cell) => (cell.hub ? `h${fi}` : `s${cell.slot}`);
+                    const laneA = cut(c.x * PITCH + d[0] * m1, floor.y, c.z * PITCH + d[1] * m1,
                         d[0] ? l1 : LANE_W, d[0] ? LANE_W : l1);
                     const m2 = (nr + 1.0) / 2, l2 = 1.0 - nr;
-                    cut(n.x * PITCH - d[0] * m2, floor.y, n.z * PITCH - d[1] * m2,
+                    const laneB = cut(n.x * PITCH - d[0] * m2, floor.y, n.z * PITCH - d[1] * m2,
                         d[0] ? l2 : LANE_W, d[0] ? LANE_W : l2);
-                    cut((c.x + n.x) / 2 * PITCH, floor.y, (c.z + n.z) / 2 * PITCH,
+                    const lane = cut((c.x + n.x) / 2 * PITCH, floor.y, (c.z + n.z) / 2 * PITCH,
                         d[0] ? PITCH - PLATE_W + 0.04 : LANE_W,
                         d[0] ? LANE_W : PITCH - PLATE_W + 0.04);
-                    if (c.auto || n.auto || c.body || n.body) return;
+                    // deep-grow: the bridge by its two node ids, and the lanes that run over it
+                    bridge.userData.lane = lane;
+                    bridge.userData.ends = [idOf(c), idOf(n)];
+                    partBridges.set([idOf(c), idOf(n)].sort().join('|'), bridge);
+                    partCuts.get(idOf(c))?.push(laneA);
+                    partCuts.get(idOf(n))?.push(laneB);
+                    if (c.auto || n.auto || c.body || n.body || c.flesh || n.flesh) return;
                     const b = addNode((c.x + n.x) / 2 * PITCH, floor.y + WALK_Y, (c.z + n.z) / 2 * PITCH, 'lane', fi);
                     link(b, c.mid[s1]);
                     link(b, n.mid[s2]);
@@ -826,7 +859,7 @@ export function createScene(container, opts = {}) {
         // v1.50.0 a room that is part of the body, whatever it is
         plan.forEach((floor, fi) => {
             floor.cells.forEach((c) => {
-                if (!c.auto && !c.body) return;
+                if (!c.auto && !c.body && !c.flesh) return;
                 const near = (o) => o.floor === fi
                     && Math.abs(o.p.x - c.x * PITCH) < 1.02 && Math.abs(o.p.z - c.z * PITCH) < 1.02;
                 nodes.forEach((nd) => { if (near(nd)) nd.adj.length = 0; });
@@ -852,17 +885,70 @@ export function createScene(container, opts = {}) {
             }
         });
         paintDigOffer();
+        if (growMode) digLabel.obj.visible = false;
 
         // where the people may stand, floor by floor
-        plan.forEach((floor, fi) => {
-            floor.nodes = [];
-            nodes.forEach((n, i) => { if (n.floor === fi && n.adj.length) floor.nodes.push(i); });
-        });
+        standable();
 
         occluders = solids.concat([neck, machine.plate]);
         paintCandidates();
         framing(plan);
         opts.onLabels?.();
+    }
+
+    /** Where the people may stand, floor by floor, and the doors to the stairs still open. */
+    function standable() {
+        floors.forEach((floor, fi) => {
+            floor.nodes = [];
+            nodes.forEach((n, i) => { if (n.floor === fi && n.adj.length) floor.nodes.push(i); });
+            floor.doors = (floor.doors || []).filter((i) => nodes[i].adj.length);
+        });
+    }
+    /**
+     * deep-grow: the body has taken this cell. Nobody walks there any more: its lanes are cut off the
+     * walking graph, and whoever stood on it walks into its middle and is gone.
+     * @param {string} id - a growth.js node id ('s12', 'h1')
+     * @returns {number} how many walked in
+     */
+    function closeCell(id) {
+        const plate = partPlates.get(id);
+        if (!plate) return 0;
+        const fi = floors.findIndex((f) => Math.abs(f.y - plate.position.y) < 0.01);
+        const cx = plate.position.x, cz = plate.position.z;
+        const near = (o) => o.floor === fi && Math.abs(o.p.x - cx) < 1.02 && Math.abs(o.p.z - cz) < 1.02;
+        const cut = new Set();
+        nodes.forEach((nd, i) => { if (near(nd)) cut.add(i); });
+        // who stands on it walks in and is gone
+        const walkers = [];
+        for (let i = folk.length - 1; i >= 0; i--) {
+            const p = folk[i];
+            if (p.floor !== fi || !(cut.has(p.at) || cut.has(p.to))) continue;
+            personPosition(p, p3);
+            walkers.push(p3.clone());
+            folk.splice(i, 1);
+        }
+        for (const i of cut) nodes[i].adj.length = 0;
+        nodes.forEach((nd) => { nd.adj = nd.adj.filter((i) => !cut.has(i)); });
+        // anyone left standing on a node that has gone nowhere walks on from the nearest open one
+        standable();
+        for (const p of folk) {
+            if (nodes[p.at].adj.length && nodes[p.to].adj.length) continue;
+            const f = floors[p.floor];
+            if (!f || !f.nodes.length) continue;
+            p.at = p.prev = p.to = f.nodes[Math.floor(rnd() * f.nodes.length)];
+            p.state = 'walk'; p.t = 1; p.len = 1;
+        }
+        dots.setDrawRange(0, folk.length);
+        // and they walk in: the leaving dots of v1.52.0, toward the middle of the plate
+        const top = plate.position.y + WALK_Y;
+        const n = Math.min(MAX_LEAVERS, Math.max(6, walkers.length + 4));
+        const list = [];
+        for (let i = 0; i < n; i++) {
+            const from = walkers[i] || new THREE.Vector3(cx + (rnd() - 0.5) * PLATE_W * 0.8, top, cz + (rnd() - 0.5) * PLATE_W * 0.8);
+            list.push({ from, to: new THREE.Vector3(cx + (rnd() - 0.5) * 0.2, top - 0.05, cz + (rnd() - 0.5) * 0.2), delay: rnd() * 0.3 });
+        }
+        leaving = { k: -1, t: 0, dots: list };
+        return walkers.length;
     }
 
     /** The plates of the sectors on offer glow; the rest are what they were (v1.52.0). */
@@ -1399,6 +1485,111 @@ export function createScene(container, opts = {}) {
             const r = el.getBoundingClientRect();
             return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
         },
+        /* ---- deep-grow: what the flesh needs (view-hooks.js) ------------------------------- */
+        /**
+         * The model's parts by growth.js node id, for the flesh to grow over. `build` changes every
+         * time the world is rebuilt (then the meshes are new and the flesh must be laid on again).
+         */
+        fleshParts() {
+            return {
+                build: buildNo, plates: partPlates, cuts: partCuts, bridges: partBridges, extras: partExtras,
+                shaft: shaftMesh, neck, machinePlate: machine.plate, armHeads: machine.armHeads,
+                machineGc: () => machine.gc, world, above, crust: crustSlab, crustTop, lidTop: LID_TOP,
+                machY: MACH_Y, floorY: (f) => -f * FLOOR_GAP, pitch: PITCH, plateW: PLATE_W, plateH: PLATE_H, shaftR: SHAFT_R,
+                renderer, scene,
+            };
+        },
+        /**
+         * The cells the body holds (growth.js ids). New ones are closed to the walkers at once, and
+         * whoever stood there walks in; their labels go. Kept across rebuilds.
+         * @param {string[]} ids
+         * @returns {string[]} the ids that were new
+         */
+        setFleshCells(ids) {
+            const next = new Set(ids || []);
+            const fresh = [...next].filter((id) => !fleshCells.has(id));
+            fleshCells = next;
+            for (const id of fresh) closeCell(id);
+            for (const l of labels) {
+                if (!l.cell || !Number.isInteger(l.cell.slot)) continue;
+                if (fleshCells.has(`s${l.cell.slot}`)) l.obj.visible = false;
+            }
+            return fresh;
+        },
+        /** Movement III: no digging, no rooms; the "+" and the next chamber's ring go. */
+        setGrowMode(on) {
+            growMode = !!on;
+            if (digLabel) digLabel.obj.visible = !growMode;
+            for (const l of labels) if (l.kind === 'empty') l.obj.visible = !growMode && !fleshCells.has(`s${l.cell.slot}`);
+        },
+        /**
+         * The chamber under a point of the screen as a growth.js node id: a plate ('s12'), a landing
+         * ('h1') or the machine house ('machine'); '' over a bridge, the shaft or the dark.
+         */
+        chamberAt(clientX, clientY) {
+            const r = renderer.domElement.getBoundingClientRect();
+            if (!(r.width > 0 && r.height > 0)) return '';
+            pick.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+            ray.setFromCamera(pick, camera);
+            const hit = ray.intersectObjects(solids, false)[0];
+            const mHit = ray.intersectObject(machine.plate, false)[0];
+            if (mHit && (!hit || mHit.distance < hit.distance)) return 'machine';
+            if (machine.hits(ray) && !hit) return 'machine';
+            const id = hit && hit.object.userData ? hit.object.userData.nodeId : '';
+            return id || '';
+        },
+        /** Where a node's plate is on the screen, or null (tests, the price over a chamber). */
+        screenOfNode(id) {
+            const m = id === 'machine' ? machine.plate : partPlates.get(id);
+            if (!m) return null;
+            const rr = renderer.domElement.getBoundingClientRect();
+            m.getWorldPosition(tmp);
+            tmp.y += PLATE_H / 2;
+            const ndc = tmp.clone().project(camera);
+            if (Math.abs(ndc.x) > 0.98 || Math.abs(ndc.y) > 0.98 || ndc.z > 1) return null;
+            return { x: rr.left + (ndc.x + 1) / 2 * rr.width, y: rr.top + (1 - ndc.y) / 2 * rr.height };
+        },
+        /**
+         * deep-grow: the camera eases in to the floor the body's front is on (the lid's floor and the
+         * machine house when it is 0), unless the player has taken hold of the camera.
+         * @param {number} floor
+         * @param {number} [seconds]
+         */
+        focusFloor(floor, seconds = 1.8) {
+            if (touched) return false;
+            const y = -Math.max(0, floor) * FLOOR_GAP;
+            const tgt = new THREE.Vector3(0.3, y + (floor <= 0 ? 0.6 : 0), 0);
+            const dir = new THREE.Vector3(0.52, 0.62, 0.72).normalize();
+            const dist = Math.max(12, Math.min(22, defPos.distanceTo(defTgt) * 0.62));
+            tween = { p: camera.position.clone(), t: controls.target.clone(), k: 0, to: { p: tgt.clone().addScaledVector(dir, dist), t: tgt }, dur: seconds };
+            controls.autoRotate = false;
+            return true;
+        },
+        /**
+         * deep-grow: the camera eases in to the machine house (the hands), unless the player holds it.
+         * @param {number} [seconds]
+         */
+        focusMachine(seconds = 2.2) {
+            if (touched) return false;
+            const tgt = new THREE.Vector3(0, MACH_Y + 0.55, 0);
+            const pos = tgt.clone().add(new THREE.Vector3(3.1, 1.5, 4.2));
+            controls.minDistance = Math.min(controls.minDistance, 4);
+            tween = { p: camera.position.clone(), t: controls.target.clone(), k: 0, to: { p: pos, t: tgt }, dur: seconds };
+            controls.autoRotate = false;
+            return true;
+        },
+        /**
+         * The rise: the camera eases to look at the crust from below its edge, the body under it.
+         * @param {number} [seconds]
+         */
+        focusRise(seconds = 2.5) {
+            const tgt = new THREE.Vector3(0, crustTop - 0.6, 0);
+            const pos = tgt.clone().add(new THREE.Vector3(7.5, 2.2, 10.5));
+            controls.minDistance = Math.min(controls.minDistance, 6);
+            touched = true;
+            controls.autoRotate = false;
+            tween = { p: camera.position.clone(), t: controls.target.clone(), k: 0, to: { p: pos, t: tgt }, dur: seconds };
+        },
         /** Draws this state. Rebuilds only when the colony's shape changed. */
         setState(state, layout) {
             const key = structureKey(state, layout);
@@ -1418,10 +1609,10 @@ export function createScene(container, opts = {}) {
                 dots.attributes.position.needsUpdate = true;
             }
             if (tween) {
-                tween.k = Math.min(1, tween.k + dt / 1.2);
+                tween.k = Math.min(1, tween.k + dt / (tween.dur || 1.2));
                 const k = ease(tween.k);
-                camera.position.lerpVectors(tween.p, defPos, k);
-                controls.target.lerpVectors(tween.t, defTgt, k);
+                camera.position.lerpVectors(tween.p, tween.to ? tween.to.p : defPos, k);
+                controls.target.lerpVectors(tween.t, tween.to ? tween.to.t : defTgt, k);
                 if (tween.k >= 1) tween = null;
             }
             machine.step(dt);

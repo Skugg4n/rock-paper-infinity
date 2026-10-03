@@ -17,6 +17,13 @@
  *   hallucinates (instruments.js); a click on the base snaps it back. Surface is the hallucination:
  *   it comes only to a low mind, and from night 4 it speaks in the Watcher's own letters.
  *
+ * deep-grow: III · GROW. The question answered, the colony does not sleep any more. The panel
+ *   overgrows (panel.js overgrow), the drawer becomes tissue with the body's four items (grow.js),
+ *   and the body spreads over the chambers as the player clicks them (view-hooks.js setBody,
+ *   onChamberClick): it eats people every year of its own, starved its edge dies back, its organs
+ *   make twenty times what the rooms did. The machine house taken, the tubes become hands. When the
+ *   deepest floor is full the lever comes back, overgrown: RISE.
+ *
  * Asleep, a 10 Hz sleep timer runs the colony; the frame loop only rolls the numbers between those
  * ticks. `window.__rpiPaused` (the shell's pause button) stops the chapter's clocks.
  */
@@ -56,6 +63,12 @@ import {
 import { createPanel } from './panel.js';
 import { createDrawer } from './drawer.js';
 import { createViewHooks } from './view-hooks.js';
+import {
+    growOn, risen, normalizeGrow, organsOf, stepGrow, takeChamber, takeWords, viewOf, graphOf,
+    growGauges, adviseGrow, riseLamps, riseReady, bodyGroups, buyBody, fleshShare, rise as riseBody,
+    GROW_GAUGES, GROW_DAYS_PER_SECOND, GROW_END, RISE_LINES,
+} from './grow.js';
+import { HANDS_SECONDS } from './view-hooks.js';
 import { playChapterCard } from '../chapterCard.js';
 import { audio } from '../audio.js';
 import { createDeepSound } from './sound.js';
@@ -193,6 +206,7 @@ export function init() {
         rpsBtns: [...document.querySelectorAll('#deep-surface .deep-rps-btn')],
         snapRing: $('deep-snap-ring'), snapArc: document.querySelector('#deep-snap-ring .arc'),
         drawer: $('deep-drawer'), ring: $('deep-ring'),
+        takeTip: $('deep-take-tip'), riseLines: $('deep-rise-lines'),
     };
     $('deep-crust').hidden = true;
 
@@ -213,8 +227,9 @@ export function init() {
         }
     }
     if (!scene) ui.fallback.classList.add('is-on');
-    const isEmpty = (slot) => emptyChambers(state, layout).includes(slot);
-    const hooks = createViewHooks(scene, { ringHost: ui.ring, isEmpty, onIcons: scheduleIconRefresh });
+    // deep-grow: once the body grows nothing is built into an empty chamber any more
+    const isEmpty = (slot) => !growOn(state) && emptyChambers(state, layout).includes(slot);
+    const hooks = createViewHooks(scene, { ringHost: ui.ring, isEmpty, onIcons: scheduleIconRefresh, graph: () => graphOf(layout) });
     const panel = createPanel({
         root: ui.panel, gauges: $('deep-gauges'), advice: $('deep-advice'), empty: $('deep-empty'),
         lamps: $('deep-lamps'), alarm: $('deep-alarm'), alarmWord: $('deep-alarm-word'),
@@ -232,9 +247,15 @@ export function init() {
     let diveOffset = 0;             // the years slept, as days, less the calendar day: constant within a sleep
     let alarmUntil = 0;             // the wake's lamp goes out then (0: it is out)
     let inst = { advice: '', lamps: null, lever: false };   // what the instruments say, kept once a colony day
+    let lastTempo = { throws: 0 };   // the machine's tempo as last read (the hands throw on it)
 
     const dryRun = () => tickDay(JSON.parse(JSON.stringify(state)), state.asleep);
     let report = dryRun();
+    // deep-grow: a save that answered The question (or owns the old biological steps) has its body
+    if (normalizeGrow(state, layout, report)) {
+        state.organs = organsOf(state, layout);
+        report = dryRun();
+    }
 
     function saveGame() {
         if (!savingEnabled || window.__rpiSkipSave) return;
@@ -371,6 +392,10 @@ export function init() {
     const treeCtx = () => ({ need: needNow, road: roadNow, starsPerDay: report.stars, orePerDay: report.parts.M, asleep: !!state.asleep });
     function recomputeGates() {
         if (state.asleep) return;
+        if (growOn(state)) {
+            inst = { lever: riseReady(state, layout).ready, lamps: riseLamps(state, layout), advice: adviseGrow(state, layout) };
+            return;
+        }
         const want = state.cryo + 1;
         const days = nextCryo(state)?.days;
         roadNow = CRYO[want] && want <= CRYO_TOP ? cryoRoad(want, state) : null;
@@ -395,21 +420,25 @@ export function init() {
         if (ui.starsRate.textContent !== starDay) ui.starsRate.textContent = starDay;
         // the machine's tempo IS the stars a day
         const tempo = machineTempo(report, { asleep: !!state.asleep, feed: state.feed });
+        lastTempo = tempo;
         scene?.setMachine(tempo, !!state.asleep);
         sound?.setState({
             asleep: !!state.asleep, tempo, games: report.games, humans: state.humans, cryo: state.cryo,
             stability: state.watcher.stability, gone: !!state.watcher.gone, lamps: lampsNow().length, bought: state.watcher.bought,
+            // deep-grow: the blood and the heartbeat follow the body's share of the colony
+            flesh: growOn(state) ? fleshShare(state, layout) : null,
         });
         machineText = machineSays(report);
 
         // the panel: the gauges every pass, the word and the lamps as the day reads them
         const gone = !!state.watcher.gone;
         const asleep = !!state.asleep || gone;
+        const growing = growOn(state);
         panel.update({
-            gauges: readGauges(state, report),
-            advice: asleep ? '' : inst.advice,
-            empty: asleep ? 0 : emptyChambers(state, layout).length,
-            lamps: !asleep && state.cryo < 0 ? inst.lamps : null,
+            gauges: growing ? growGauges(state, report, layout) : readGauges(state, report),
+            advice: asleep || risen(state) ? '' : inst.advice,
+            empty: asleep || growing ? 0 : emptyChambers(state, layout).length,
+            lamps: growing ? (risen(state) ? null : inst.lamps) : (!asleep && state.cryo < 0 ? inst.lamps : null),
         });
         if (alarmUntil && performance.now() > alarmUntil) { alarmUntil = 0; panel.alarm(''); }
 
@@ -421,12 +450,12 @@ export function init() {
         // deep-fix2: ore always with its pickaxe, here, on the "+" of the next chamber, in the ring
         const dp = `${ORE_SIGN} ${formatCount(digPrice)}`;
         if (ui.digPrice.dataset.text !== dp) { ui.digPrice.dataset.text = dp; ui.digPrice.innerHTML = signHtml(dp); }
-        scene?.setDigOffer({ html: signHtml(dp), ok: !digLocked, on: !asleep && !busy });
+        scene?.setDigOffer({ html: signHtml(dp), ok: !digLocked, on: !asleep && !busy && !growing });
         showBuild(ui.digBtn, 'dig', null);
         drawQueue();
 
         // the drawer: its badge counts what can be bought now; open, it is drawn again
-        const groups = gone ? [] : drawerGroups(state, treeCtx());
+        const groups = gone ? [] : drawerRows();
         const badge = drawerCount(groups) > 0 ? String(drawerCount(groups)) : '';
         if (ui.treeBadge.textContent !== badge) ui.treeBadge.textContent = badge;
         ui.treeBadge.classList.toggle('hidden', !badge);
@@ -434,9 +463,10 @@ export function init() {
         if (drawer.isOpen()) drawer.refresh(groups, wallet());
         treeView?.refresh();
 
-        // THE LEVER: before the hall it is there once the lamps are lit and Cryo I can be paid
+        // THE LEVER: before the hall it is there once the lamps are lit and Cryo I can be paid.
+        // deep-grow: in the body it is gone, and comes back overgrown when the body can rise
         const owns = state.cryo >= 0;
-        const leverOn = !gone && (owns || inst.lever);
+        const leverOn = growing ? (inst.lever && !risen(state)) : (!gone && (owns || inst.lever));
         if (leverWas === false && leverOn) {
             ui.leverWrap.classList.remove('is-arriving');
             void ui.leverWrap.offsetWidth;
@@ -446,13 +476,14 @@ export function init() {
         ui.leverWrap.hidden = !leverOn;
         ui.root.classList.toggle('has-lever', leverOn);
         ui.leverWrap.classList.toggle('is-down', !!state.asleep);
-        ui.leverWrap.classList.toggle('is-ready', !state.asleep && inst.advice === 'SLEEP');
-        const few = !state.asleep && state.humans < MIN_SLEEPERS;
+        ui.leverWrap.classList.toggle('is-ready', !state.asleep && (inst.advice === 'SLEEP' || inst.advice === 'RISE'));
+        ui.leverWrap.classList.toggle('is-flesh', growing);
+        const few = !growing && !state.asleep && state.humans < MIN_SLEEPERS;
         ui.leverWrap.classList.toggle('is-locked', busy || few);
         // deep-fix2: the price is the fourth lamp on the panel; it is not said again under the lever
         if (ui.leverPrice.textContent !== '') ui.leverPrice.textContent = '';
-        ui.lever.setAttribute('aria-label', state.asleep ? 'Wake' : 'Sleep');
-        const tape = state.asleep ? 'WAKE' : 'SLEEP';
+        ui.lever.setAttribute('aria-label', growing ? 'Rise' : state.asleep ? 'Wake' : 'Sleep');
+        const tape = growing ? 'RISE' : state.asleep ? 'WAKE' : 'SLEEP';
         if (ui.leverTape.textContent !== tape) ui.leverTape.textContent = tape;
         // the Watcher alone, at the old ending: the one thing left to press
         ui.ascendBtn.classList.toggle('hidden', !gone);
@@ -488,8 +519,10 @@ export function init() {
     }
 
     /* ---- THE DRAWER, and the whole tree behind it ---------------------------------------------- */
+    /** What the drawer lists: the tree's rows, or in the body its four items (grow.js). */
+    const drawerRows = () => (growOn(state) ? bodyGroups(state) : drawerGroups(state, treeCtx()));
     const drawer = createDrawer(ui.drawer, {
-        onBuy: (id) => buyNode(id),
+        onBuy: (id) => (id.startsWith('body:') ? buyBodyItem(id.slice(5)) : buyNode(id)),
         onWholeTree: () => { closeDrawer(); openTree(); },
         onClose: () => ui.root.classList.remove('is-drawer-open'),
     });
@@ -499,7 +532,7 @@ export function init() {
         if (state.tree) state.tree.unseen = false;
         drawer.open();
         ui.root.classList.add('is-drawer-open');
-        drawer.refresh(state.watcher.gone ? [] : drawerGroups(state, treeCtx()), wallet());
+        drawer.refresh(state.watcher.gone ? [] : drawerRows(), wallet());
         updateChrome();
     }
     function closeDrawer() { drawer.close(); }
@@ -549,6 +582,8 @@ export function init() {
         const done = many ? treeBuyMany(state, id, treeCtx()) : [treeBuy(state, id, treeCtx())].filter(Boolean);
         if (!done.length) return false;
         for (const r of done) {
+            // deep-grow: The question answered: movement III begins
+            if (r.kind === 'gift' && r.gift === 'question') setTimeout(() => beginGrow().catch((e) => console.error('the deep: the body broke', e)), 0);
             if (r.kind === 'level' || r.kind === 'auto') mendType(r.type);
             // the hall is dug with its own chamber (v1.48.0)
             if (r.kind === 'cryo' && r.tier === 0) { layout.slots.push('cryo'); layout = normalizeLayout(state, layout); }
@@ -933,6 +968,7 @@ export function init() {
 
     function afterChange() {
         claimChambers(state, layout);
+        if (growOn(state)) state.organs = organsOf(state, layout);
         report = dryRun();
         recomputeGates();
         scene?.setState(state, layout);
@@ -1070,9 +1106,168 @@ export function init() {
     }
     const landBuilds = () => placeBuilt(completeBuilds(state));
 
+    /* ---- III · GROW (deep-grow) -------------------------------------------------------------
+       The question answered: the colony does not sleep any more; the body spreads where it is
+       clicked, eats people every year of its own, dies back at its edge when they run out. */
+    const GROW_LABELS = Object.fromEntries(GROW_GAUGES.map((x) => [x.c, x.label]));
+    /** Catch-up after a stall (a hidden tab): at most this many real seconds of the body at once. */
+    const GROW_CATCHUP_S = 20;
+    const growLog = { taken: 0, died: 0, revived: 0 };
+    let frontFloor = -1;
+    function drawBody() {
+        const v = viewOf(state, layout);
+        hooks.setBody(v.body, v.necrotic, v.reachable);
+        // the camera follows the front down, a floor at a time (never once the player holds it)
+        const floorOf = (id) => Math.max(0, graphOf(layout).nodes.find((n) => n.id === id)?.floor ?? 0);
+        const handsNow = v.body.includes('machine') && !handsShown;
+        if (handsNow) {
+            handsShown = true;
+            hooks.setHands(true, { instant: loadingBody });
+            // the machine becomes hands: the camera goes to look, and back to the front after
+            if (!loadingBody && scene?.focusMachine()) holdFocusUntil = performance.now() + 7000;
+        }
+        if (v.reachable.length) {
+            const front = Math.min(...v.reachable.map(floorOf));
+            if (front !== frontFloor && !risen(state) && performance.now() >= holdFocusUntil) { frontFloor = front; scene?.focusFloor(front); }
+        }
+    }
+    let handsShown = false;
+    let holdFocusUntil = 0;             // the camera stays on the hands this long
+    let loadingBody = false;            // the first drawing after a load: the hands are hands already
+    /** The panel, the drawer and the view go over to the body. */
+    function enterGrowUi({ instant = false } = {}) {
+        ui.root.classList.add('is-grow');
+        scene?.setGrowMode(true);
+        drawer.setFlesh(true);
+        hooks.closeRoomRing();
+        panel.overgrow(GROW_LABELS, { instant }).then(() => {
+            if (state.grow && !state.grow.overgrown) { state.grow.overgrown = true; saveGame(); }
+        });
+        state.organs = organsOf(state, layout);
+        loadingBody = instant;
+        drawBody();
+        loadingBody = false;
+    }
+    /** The question is answered: wake the colony if it sleeps, then the body begins. */
+    async function beginGrow() {
+        if (state.asleep) await wake({ kind: 'manual' });
+        if (!normalizeGrow(state, layout, dryRun())) return;
+        state.organs = organsOf(state, layout);
+        report = dryRun();
+        recomputeGates();
+        enterGrowUi({ instant: false });
+        sound?.event('take');
+        updateChrome();
+        saveGame();
+    }
+    let lastGrowAt = performance.now();
+    function growTick(now) {
+        const secs = Math.max(0, Math.min(GROW_CATCHUP_S, (now - lastGrowAt) / 1000));
+        lastGrowAt = now;
+        if (risen(state)) return;
+        const days = Math.max(1, Math.round(secs * GROW_DAYS_PER_SECOND));
+        const died = [], revived = [], spread = [];
+        for (let i = 0; i < days; i++) {
+            landBuilds();
+            state.organs = organsOf(state, layout);
+            report = tickDay(state, false);
+            const y = stepGrow(state, layout, 1);
+            died.push(...y.died); revived.push(...y.revived); spread.push(...y.spread);
+        }
+        recoverAwake(state.watcher, days);
+        if (died.length) { sound?.event('necrosis'); growLog.died += died.length; }
+        if (revived.length) growLog.revived += revived.length;
+        if (spread.length) { sound?.event('take'); growLog.taken += spread.length; }
+        afterChange();
+        drawBody();
+    }
+    /** A click on a chamber: the body takes it if it touches it and the price can be paid. */
+    function takeAt(id) {
+        if (!growOn(state) || risen(state) || busy || paused() || state.asleep) return false;
+        const r = takeChamber(state, layout, id);
+        if (!r) {
+            if (takeWords(state, layout, id)) nudgeTip();
+            return false;
+        }
+        growLog.taken++;
+        sound?.event('take');
+        afterChange();
+        drawBody();
+        if (id === 'machine') setTimeout(() => sound?.event('hands'), HANDS_SECONDS * 1000);
+        showTip(id, tipAt.x, tipAt.y);
+        return true;
+    }
+    /** The price over the chamber under the cursor, in plain words. */
+    let tipAt = { x: 0, y: 0 };
+    function showTip(id, x, y) {
+        tipAt = { x, y };
+        const words = id ? takeWords(state, layout, id) : '';
+        const el = ui.takeTip;
+        if (!el) return;
+        if (el.dataset.text !== words) { el.dataset.text = words; el.innerHTML = signHtml(words); }
+        el.hidden = !words;
+        ui.sceneHost.classList.toggle('is-over-take', !!words);
+        if (words) el.style.transform = `translate(${x + 16}px, ${y + 14}px)`;
+    }
+    function nudgeTip() {
+        const el = ui.takeTip;
+        if (!el) return;
+        el.classList.remove('is-no');
+        void el.offsetWidth;
+        el.classList.add('is-no');
+    }
+    hooks.onChamberClick((id) => takeAt(id));
+    hooks.onChamberHover((id, x, y) => showTip(growOn(state) && !busy ? id : '', x, y));
+    /** A body item from the drawer. */
+    function buyBodyItem(id) {
+        if (paused() || busy) return false;
+        if (!buyBody(state, id, report.stars)) return false;
+        bought();
+        afterChange();
+        return true;
+    }
+    /**
+     * RISE: the body pushes up through the shaft and the crust; two lines in the Watcher's own hand;
+     * then V · UNITY. The end is saved first, so a reload shows the wall.
+     */
+    async function riseUp() {
+        if (busy || !growOn(state) || risen(state) || !riseReady(state, layout).ready) return;
+        setBusy(true);
+        stopClock();
+        closeDrawer();
+        showTip('', 0, 0);
+        ui.root.classList.add('is-rising');
+        riseBody(state, layout);
+        saveGame();
+        sound?.event('rise');
+        await new Promise((resolve) => hooks.rise(resolve));
+        await typeLines(RISE_LINES);
+        await new Promise((r) => setTimeout(r, 900));
+        playChapterCard({ roman: GROW_END.roman, title: GROW_END.title, mode: 'to-come', dark: true });
+    }
+    /** The last lines, typed in the Watcher's tape, one after the other with a pause between. */
+    async function typeLines(lines) {
+        const host = ui.riseLines;
+        if (!host) return;
+        host.hidden = false;
+        host.textContent = '';
+        for (const [i, line] of lines.entries()) {
+            const row = document.createElement('div');
+            row.className = 'deep-rise-line';
+            host.appendChild(row);
+            sound?.event('type', { text: line, letterS: TYPE_MS / 1000 });
+            for (let k = 1; k <= line.length; k++) {
+                row.innerHTML = line.slice(0, k).split(' ').map((w) => (w ? `<span class="tape">${w}</span>` : '')).join(' ');
+                await new Promise((r) => setTimeout(r, TYPE_MS));
+            }
+            if (i < lines.length - 1) await new Promise((r) => setTimeout(r, 1600));
+        }
+    }
+
     /* ---- THE LEVER --------------------------------------------------------------------------- */
     async function pullLever() {
         if (busy || paused() || state.watcher.gone) return;
+        if (growOn(state)) { await riseUp(); return; }
         if (state.asleep) { await wake({ kind: 'manual' }); return; }
         if (state.cryo < 0) {
             if (!canBuy(state, 'cryo-i', treeCtx()).ok) return;
@@ -1198,7 +1393,7 @@ export function init() {
             openSurface(w, state);
             surfaceKey = '';
             rpsDoneAt = 0;
-            if ((state.tree.opened || []).length > opened) sound?.event('rise');
+            if ((state.tree.opened || []).length > opened) sound?.event('gift');
         }
         const open = w.puzzle;
         const held = w.stability;
@@ -1380,7 +1575,8 @@ export function init() {
             if (ui.bodyTip.hidden === body) ui.bodyTip.hidden = !body;
             if (body) ui.bodyTip.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 12}px)`;
         }
-        const onMachine = !!pointer && !!scene && !choosing && !body && hooks.ringSlot < 0 && scene.machineAt(pointer.x, pointer.y);
+        const onMachine = !!pointer && !!scene && !choosing && !body && hooks.ringSlot < 0 && scene.machineAt(pointer.x, pointer.y)
+            && !(ui.takeTip && !ui.takeTip.hidden);
         if (ui.machineTip) {
             if (ui.machineTip.hidden === onMachine) ui.machineTip.hidden = !onMachine;
             if (onMachine) {
@@ -1449,6 +1645,7 @@ export function init() {
         if (busy || state.asleep) return;
         const now = performance.now();
         if (paused()) { lastDayAt = now; return; }
+        if (growOn(state)) { growTick(now); return; }
         const elapsed = Math.round((now - lastDayAt) / 1000);
         const days = Math.max(1, Math.min(MAX_CATCHUP_DAYS, elapsed));
         lastDayAt = now;
@@ -1469,13 +1666,15 @@ export function init() {
     function startClock() {
         stopClock();
         lastDayAt = performance.now();
+        lastGrowAt = lastDayAt;
         dayInterval = setInterval(dayTick, 1000);
     }
 
     // --- frames: the people walk, the needles swing, the numbers roll; no game time here ---
     let lastFrame = performance.now();
     function frame(now) {
-        const dt = Math.min(0.05, (now - lastFrame) / 1000);
+        // a rAF timestamp can be earlier than the clock read at init: never a negative step
+        const dt = Math.max(0, Math.min(0.05, (now - lastFrame) / 1000));
         lastFrame = now;
         if (roll) drawCounters(rollingValue(now));
         else if (state.asleep && falseNow.twitch) drawDive(state.day);
@@ -1487,6 +1686,7 @@ export function init() {
         if (state.asleep && ui.surface && !ui.surface.hidden && surfaceGone(state.watcher.surface.visit)) drawSurface();
         else if (state.asleep && voice && voice.merge) drawSurface();
         panel.step(paused() ? 0 : dt);
+        hooks.step(paused() ? 0 : dt, lastTempo.throws || 0);
         scene?.step(paused() ? 0 : dt);
         rafId = requestAnimationFrame(frame);
     }
@@ -1494,6 +1694,7 @@ export function init() {
 
     recomputeGates();
     scene?.setState(state, layout);
+    if (growOn(state)) enterGrowUi({ instant: !!state.grow.overgrown || risen(state) });
     updateChrome();
     panel.settle();
     saveGame();
@@ -1514,7 +1715,9 @@ export function init() {
     }
     if (state.ascended) {
         scene?.lighten();
-        playChapterCard({ roman: CHAPTER_V.roman, title: CHAPTER_V.title, mode: 'to-come', dark: true });
+        // deep-grow: the body's end is V · UNITY
+        const end = state.ending === 'body' ? GROW_END : CHAPTER_V;
+        playChapterCard({ roman: end.roman, title: end.title, mode: 'to-come', dark: true });
     }
 
     // --- hooks, for the tests ---
@@ -1549,6 +1752,18 @@ export function init() {
         openRing: (slot) => { const p = scene?.screenOfSlot(slot); openRing(slot, p ? p.x : innerWidth / 2, p ? p.y : innerHeight / 2); },
         openDrawer: () => openDrawer(),
         pull: () => pullLever(),
+        // deep-grow
+        get grow() { return state.grow ? JSON.parse(JSON.stringify(state.grow)) : null; },
+        get gaugeLabels() { return panel.labels; },
+        get overgrown() { return panel.overgrown; },
+        get bodyView() { return viewOf(state, layout); },
+        get bodyStats() { return hooks.bodyStats; },
+        get growLog() { return { ...growLog }; },
+        get riseReady() { return riseReady(state, layout); },
+        take: (id) => takeAt(id),
+        takeWords: (id) => takeWords(state, layout, id),
+        screenOfNode: (id) => scene?.screenOfNode(id) || null,
+        chamberAt: (x, y) => scene?.chamberAt(x, y) || '',
     };
     let debugOn = false;
     try { debugOn = window.location.search.includes('debug') || localStorage.getItem(DEBUG_KEY) === '1'; } catch { /* ignore */ }
@@ -1590,6 +1805,15 @@ export function init() {
             else if (what === 'feed') state.feed = Math.max(0, Math.min(FEED_MAX, Math.floor(Number(n) || 0)));
             else if (what === 'day100') { for (let i = 0; i < 100; i++) report = tickDay(state, state.asleep); }
             else if (what === 'sleep') { pullLever(); return; }
+            else if (what === 'grow') {
+                // deep-grow: answer The question now
+                state.tree = state.tree || { opened: [], bought: [], unseen: false };
+                if (!state.tree.opened.includes('question')) state.tree.opened.push('question');
+                if (!state.tree.bought.includes('question')) state.tree.bought.push('question');
+                beginGrow();
+                return;
+            } else if (what === 'people') state.humans += Number(n) || 1e6;
+            else if (what === 'starve') state.humans = MIN_SLEEPERS;
             else if (what === 'alarm') {
                 // a test alarm; n names its kind ('food', 'energy', 'stall', 'reboot', ...)
                 if (state.asleep) wake(n ? { kind: n, type: 'mine', days: 3, pct: 60 } : { kind: 'debug' });

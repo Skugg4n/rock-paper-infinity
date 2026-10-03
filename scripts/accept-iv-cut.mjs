@@ -30,6 +30,15 @@
 //  4. opening and closing the drawer moves nothing: DIG, the drawer button and the lever stay put;
 //  7. the price is the fourth lamp ("★ 15 k"), dim without the stars, and then there is no lever;
 //  8. the night's line is typed once, through the throw and the result.
+// deep-grow (movement III · GROW, the body):
+// G. From "IV · the question answered": the panel overgrows; after ten seconds its labels read MASS,
+//    FEED, PULSE, FLESH (the tapes peeled) and the advice INSTRUMENTS: SPREAD. A chamber the body
+//    touches glows; hovered it says what it costs in plain words; a click takes it: it is body.
+// N. From "IV · the body": starved (the people gone), an edge goes necrotic within a body year; fed
+//    (people back), it revives.
+// R. From "IV · ready to rise": the hands are on the machine, the lever is back and reads RISE;
+//    pulling it, the body breaks the crust, the two lines type, and the V card reads UNITY. A reload
+//    shows the wall again.
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -385,6 +394,90 @@ try {
     check(m1.text === 'WATCHER' && m1.merging && m1.typed === '' && m2.text === 'SURFACE' && m2.tape && m2.typed.length > 0,
         `night 6: the label reads ${m1.text} before the question, then ${m2.text} on the tape as "${m2.typed}" types`);
     await shot('9-night-six');
+
+    // ================= G. GROW: the question answered, the panel overgrows, a chamber is taken =====
+    await jump('iv-grow', { asleep: false });
+    await sleepMs(5600);
+    await shot('grow-1-overgrowing');
+    const og0 = await D('overgrown');
+    await sleepMs(5200);
+    const og1 = await evaluate(`(() => ({ og: rpiDeep.overgrown, labels: rpiDeep.gaugeLabels,
+        dom: [...document.querySelectorAll('#deep-gauges .flesh-tape')].filter((e) => getComputedStyle(e).opacity > 0.5).map((e) => e.textContent),
+        advice: document.getElementById('deep-advice').textContent, drawerFlesh: document.getElementById('deep-drawer').classList.contains('is-flesh') }))()`);
+    check(og0 === 'growing' && og1.og === 'done' && og1.labels.join() === 'MASS,FEED,PULSE,FLESH' && og1.dom.join() === 'MASS,FEED,PULSE,FLESH',
+        `G. the panel overgrows (${og0} then ${og1.og}): its labels read ${og1.dom.join(', ')}`);
+    check(og1.advice === 'INSTRUMENTS: SPREAD' && og1.drawerFlesh, `G. the advice reads "${og1.advice}", the drawer is tissue (${og1.drawerFlesh})`);
+    const reach0 = await evaluate(`(() => { const v = rpiDeep.bodyView; for (const id of v.reachable) { const p = rpiDeep.screenOfNode(id);
+        if (p && rpiDeep.chamberAt(p.x, p.y) === id) return { id, x: p.x, y: p.y, n: v.body.length }; } return null; })()`);
+    let took = null, tip = '';
+    if (reach0) {
+        await mouse('mouseMoved', reach0.x, reach0.y);
+        await sleepMs(400);
+        tip = await evaluate(`(() => { const e = document.getElementById('deep-take-tip'); return e.hidden ? '' : e.textContent; })()`);
+        const h0 = await D('state.humans');
+        await click(reach0.x, reach0.y);
+        await sleepMs(120);
+        const h1 = await D('state.humans');
+        await sleepMs(2300);
+        took = await evaluate(`({ body: rpiDeep.bodyView.body, humans: rpiDeep.state.humans, stats: rpiDeep.bodyStats })`);
+        took.h0 = h0;
+        took.humans = h1;
+    }
+    check(!!reach0 && /^Costs [\d.]+( k| M| B)? people and [\d.]+( k| M| B| T|e\d+)?\.$/.test(tip.replace(/\s+/g, ' ').trim()), `G. hovering a reachable chamber (${reach0 && reach0.id}) says its price: "${tip}"`);
+    check(!!took && took.body.includes(reach0.id) && took.humans < took.h0 && took.stats.body === took.body.length,
+        `G. a click takes it: ${reach0 && reach0.id} is body (${took && took.body.join(',')}), its people walked in (${took && Math.round(took.h0)} to ${took && Math.round(took.humans)})`);
+
+    // ================= N. HUNGER: starved, an edge dies back; fed, it revives =====================
+    await jump('iv-body', { asleep: false });
+    await sleepMs(1200);
+    await shot('grow-2-body');
+    const n0 = await evaluate('rpiDeep.bodyView.necrotic.length');
+    // more mouths than its one vat feeds: two more chambers, then nobody left to eat
+    await evaluate(`(() => { const v = rpiDeep.bodyView; debug_deep('people', 1e7);
+        const fed = v.reachable.filter((id) => rpiDeep.layout.slots[Number(id.slice(1))] !== 'dorm').slice(0, 2);
+        for (const id of fed) rpiDeep.take(id); debug_deep('starve'); })()`);
+    let n1 = n0;
+    for (let i = 0; i < 30 && n1 <= n0; i++) { await sleepMs(250); await evaluate('debug_deep("starve")'); n1 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
+    check(n1 > n0, `N. starved, another edge dies back (${n0} to ${n1} necrotic)`);
+    await shot('grow-2b-starving');
+    await evaluate('debug_deep("people", 1e9)');
+    let n2 = n1;
+    for (let i = 0; i < 40 && n2 >= n1; i++) { await sleepMs(250); n2 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
+    check(n2 < n1, `N. fed, it revives (${n1} to ${n2} necrotic)`);
+
+    // ================= R. THE HANDS, AND THE RISE ================================================
+    await jump('iv-rise', { asleep: false });
+    await sleepMs(1500);
+    await evaluate('rpiDeep.scene.focusMachine(0.6)');
+    await sleepMs(2400);
+    await shot('grow-3-hands');
+    const r0 = await evaluate(`(() => ({ hands: rpiDeep.bodyStats.hands, lever: !document.getElementById('deep-lever-wrap').hidden,
+        tape: document.getElementById('deep-lever-tape').textContent, flesh: document.getElementById('deep-lever-wrap').classList.contains('is-flesh'),
+        ready: rpiDeep.riseReady.ready, advice: rpiDeep.instruments.advice }))()`);
+    check(r0.hands && r0.ready && r0.lever && r0.tape === 'RISE' && r0.flesh, `R. the hands are on the machine (${r0.hands}); the lever is back, overgrown, and reads ${r0.tape}`);
+    const lever = await centre('#deep-lever');
+    await click(lever.x, lever.y);
+    await sleepMs(3400);
+    await shot('grow-4-rise');
+    const riseMid = await evaluate('({ risen: rpiDeep.state.grow.risen, rising: rpiDeep.bodyStats.rising, broke: rpiDeep.bodyStats.broke })');
+    let lines = '';
+    for (let i = 0; i < 40 && !/So fragile\./i.test(lines); i++) { await sleepMs(250); lines = await evaluate(`document.getElementById('deep-rise-lines').textContent`); }
+    await shot('grow-5-lines');
+    let card = null;
+    for (let i = 0; i < 40; i++) {
+        await sleepMs(250);
+        card = await evaluate(`({ on: document.getElementById('chapter-card').classList.contains('is-active'), roman: document.querySelector('.chapter-card__roman').textContent, title: document.querySelector('.chapter-card__title').textContent })`);
+        if (card.on && card.title === 'UNITY') break;
+    }
+    check(riseMid.risen && riseMid.rising > 0 && riseMid.broke, `R. pulling it, the body rises and breaks the crust (${JSON.stringify(riseMid)})`);
+    check(/HUMANS ARE SO SMALL\.\s*SO FRAGILE\./i.test(lines.replace(/\s+/g, ' ')), `R. the last lines type: "${lines.replace(/\s+/g, ' ').trim()}"`);
+    check(card && card.on && card.roman === 'V' && card.title === 'UNITY', `R. the card: ${card && card.roman} · ${card && card.title}`);
+    await sleepMs(1500);
+    await shot('grow-6-unity');
+    await send('Page.reload');
+    await sleepMs(4500);
+    const wall = await evaluate(`({ on: document.getElementById('chapter-card').classList.contains('is-active'), title: document.querySelector('.chapter-card__title').textContent })`);
+    check(wall.on && wall.title === 'UNITY', `R. a reload shows the wall: ${wall.title}`);
 
     check(errors.length === 0, `no errors in the console${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
     ws.close();

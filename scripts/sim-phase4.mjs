@@ -10,6 +10,7 @@
 //   --quiet  only the summary line   --all  every purchase, not the first 30
 //   --gifts  (deep-voice) what a minute of play earns at each of Surface's nights, for the gifts' prices
 //   --table  a row a minute          --why  where the colony stood when the run ended (for tuning)
+//   (deep-grow) both runs end at the rise; GROW_DEBUG=1 prints the body every ten seconds
 //   --watcher  (v1.49.0) the same player, who also buys the Watcher's ladder as the capacity comes
 //              in (asleep, the next step the moment it can be paid), and does not wake by hand
 //              while the next step waits only on capacity or on the body growing (up to
@@ -42,6 +43,11 @@ import { THROWS, beats, counter, visitDue, TYPE_MS, NIGHTS } from '../src/phase4
 // the way the game's panel buys it. The greedy player still decides what to buy, as before; the
 // tree only does the buying. The sim never kept the queue's cap of eight (it orders one per lane).
 import { buy as treeBuy, canBuy as treeCanBuy, LEVEL_NODE, AUTO_NODE, cryoNode, nextWatcherNode, initialTree, GIFT_PRICE, LEVEL_MAX } from '../src/phase4/tree.js';
+// deep-grow: MOVEMENT III. The question answered, the body grows awake: the policy (src/phase4/policy.js
+// decideGrow) buys the drawer's body items, takes reachable chambers it can afford without starving,
+// and pulls RISE when the deepest floor is full and the machine is body. The act ends at the rise.
+import { normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, GROW_DAYS_PER_SECOND } from '../src/phase4/grow.js';
+import { decideGrow, pressGrow } from '../src/phase4/policy.js';
 const SIM = { queueMax: Infinity };
 /** Buy a node; the sim has already checked the price, so a refusal is a bug in the sim. */
 function onTree(id, ctx = SIM) {
@@ -256,8 +262,67 @@ let summaryWeakest = null;   // what the wake-up summary said stalled while the 
 // the --watcher player does not go up at the ring: it grows the body, and its run ends at the
 // last wake-up (v1.50.0; the sensor wakes the colony once at the ring, and it sleeps on after)
 let ringAt = null;
-while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
+// deep-grow: the body's run. The layout is frozen the day it begins (the sim builds no rooms after it)
+const answered = () => (s.tree.bought || []).includes('question');
+let growLayout = null, growAt = null, handsAt = null, floorsAt = [];
+const grown = { hand: 0, spread: 0, died: 0, revived: 0, items: [], lowFeed: Infinity };
+/** The sim keeps counts, not places: a layout where the types are spread over the floors the way a
+ *  colony built as it went would have them (every type on every floor), the hall where it was dug. */
+function mixedLayout() {
+  const left = { ...Object.fromEntries(ROOMS.map((t) => [t, s.rooms[t] || 0])) };
+  const total = ROOMS.reduce((a, t) => a + left[t], 0);
+  const slots = [];
+  const done = Object.fromEntries(ROOMS.map((t) => [t, 0]));
+  for (let i = 0; i < total; i++) {
+    // the type furthest behind its share
+    const t = ROOMS.filter((x) => left[x] > done[x]).sort((a, b) => (done[a] / left[a]) - (done[b] / left[b]))[0];
+    slots.push(t); done[t]++;
+  }
+  slots.splice(Math.min(slots.length, 7), 0, ...new Array(s.rooms.cryo || 0).fill('cryo'));
+  while (slots.length < s.chambers) slots.push(null);
+  return { slots: slots.slice(0, Math.max(s.chambers, slots.length)) };
+}
+function beginGrow() {
+  if (growLayout) return;
+  growLayout = mixedLayout();
+  normalizeGrow(s, growLayout, tickDay(JSON.parse(JSON.stringify(s)), false));
+  growAt = real;
+  if (process.env.GROW_DEBUG) console.log('grow start', JSON.stringify({ humans: s.humans, stars: s.stars, minerals: s.minerals, unit: s.grow.unit, starsDay: s.grow.starsDay, oreDay: s.grow.oreDay, vats: s.vats, rooms: s.rooms }));
+  events.push({ real, day: s.day, e: `THE QUESTION: the body begins (${growLayout.slots.length} chambers, ${graphOf(growLayout).nodes.length} nodes)` });
+}
+function growSecond() {
+  // a real second of the body: GROW_DAYS_PER_SECOND colony days awake, the body's years among them
+  let r = null, starsSec = 0;
+  const y = { died: [], revived: [], spread: [] };
+  for (let d = 0; d < GROW_DAYS_PER_SECOND; d++) {
+    completeBuilds(s);
+    s.organs = organsOf(s, growLayout);
+    r = tickDay(s, false);
+    starsSec += r.stars;
+    const yd = stepGrow(s, growLayout, 1);
+    y.died.push(...yd.died); y.revived.push(...yd.revived); y.spread.push(...yd.spread);
+  }
+  real += 1;
+  earned += starsSec; earnedAt.push([real, earned]);
+  grown.died += y.died.length; grown.revived += y.revived.length; grown.spread += y.spread.length;
+  for (const a of decideGrow(s, growLayout)) {
+    if (!pressGrow(s, growLayout, a, r.stars)) continue;
+    if (a.kind === 'take') grown.hand++;
+    if (a.kind === 'body') { grown.items.push(`${a.id} ${s.grow.lv[a.id]} ${fmt(real)}`); events.push({ real, day: s.day, e: `body ${a.id} ${s.grow.lv[a.id]}` }); }
+    if (a.kind === 'rise') events.push({ real, day: s.day, e: 'RISE' });
+  }
+  if (handsAt === null && s.grow.body.includes('machine')) handsAt = real;
+  const deepest = riseReady(s, growLayout).deepest;
+  for (let f = 0; f <= deepest; f++) {
+    if (floorsAt[f] === undefined && graphOf(growLayout).nodes.filter((n) => n.floor === f).every((n) => s.grow.body.includes(n.id))) floorsAt[f] = real;
+  }
+  grown.lowFeed = Math.min(grown.lowFeed, s.humans);
+  if (process.env.GROW_DEBUG && real % 10 < 1) { const h = hungerNow(s, growLayout); console.log(`${fmt(real)} humans ${Math.round(s.humans)} eat ${h.eat.toFixed(0)} grow ${h.grow.toFixed(0)} body ${s.grow.body.length} nec ${s.grow.necrotic.length} stars ${s.stars.toPrecision(3)} /day ${r.stars.toPrecision(3)} ore ${s.minerals.toPrecision(3)} lv ${JSON.stringify(s.grow.lv)}`); }
+  if (real % 60 < 1) log.push({ min: Math.round(real / 60), year: +yr(s.day), humans: Math.round(s.humans), starsDay: +r.stars.toPrecision(3), flesh: +fleshShare(s, growLayout).toFixed(2), necrotic: s.grow.necrotic.length, stars: +s.stars.toPrecision(3) });
+}
+while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
   if (ringAt === null && canAscend(s)) ringAt = real;
+  if (answered()) { beginGrow(); growSecond(); continue; }
   completeBuilds(s);                    // nothing is instant: orders land on their day
   const r = tickDay(s, false);
   for (const l of resolveDueProbes(s, slots(), rng)) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
@@ -321,6 +386,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
         voiceLeft = GAME_SECONDS + (v.night ? (v.line.length * TYPE_MS) / 1000 + LINE_READ : 0);
       } else if (voiceLeft > 0) voiceLeft -= spent;
       buyGifts(true);
+      if (answered()) { alarm = 'question'; break; }     // deep-grow: the body begins awake
       buyFeed(true);
       if (WATCHER) {
         // the ladder: the next step the moment it can be paid
@@ -382,7 +448,7 @@ if (WATCHER) {
   console.log(`ladder (--watcher)  ${LADDER.map((u) => `${u.id} ${at(u.id)}`).join('  ')}  dormitories taken ${s.taken?.dorm || 0}  sectors sealed ${(w.sealed || []).length}  surface games ${surfaceGames} (words ${w.surface.words}/${9})`);
   console.log(bodyEnd
     ? `biological ending (--watcher)  the last wake-up at ${fmt(bodyEnd.real)}, year ${Math.round(bodyEnd.year)}: nobody came out (${Math.round(bodyEnd.were)} under the ice)`
-    : 'biological ending (--watcher)  never');
+    : 'biological ending (--watcher)  retired in deep-grow: the ladder stops after HARDWARE and the body rises instead (GROW below)');
   console.log(`the ring (--watcher)  ${ringAt === null ? 'not reached' : `reached at ${fmt(ringAt)}, the player stayed down`}`);
 }
 /*
@@ -429,6 +495,11 @@ console.log(`culture vats (deep-fix2)  ${vatsAt.map((x) => `${x.level} ${fmt(x.r
 console.log(`surface (both runs: wins 1 in 3)  games ${surfaceGames}  nights ${nightAt.map((x) => `${x.n} ${fmt(x.real)}`).join('  ') || 'none'}  |  gifts bought: ${Object.keys(GIFT_PRICE).map((id) => `${id} ${gat(id)}`).join('  ')}  (of ${NIGHTS.length} nights)`);
 console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (night 1)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}  |  ${REF_SLEEP} s sleeps from full, first reboot in sleep: ${absent}`);
 console.log(`watcher (attentive: snap every ${SNAP_EVERY} s)  stability ${Math.round(w2.stability)} at the end, lowest ${Math.round(lowest2)}, ${w2.reboots} reboots  |  ${REF_SLEEP} s sleeps, held (low-high from the third sleep): ${held}`);
+if (growAt !== null) {
+  const total = real;
+  console.log(`GROW (deep-grow)  the question at ${fmt(growAt)}, ${risen(s) ? `the rise at ${fmt(real)}` : 'no rise'}: ${fmt(total - growAt)} of ${fmt(total)} (${Math.round(100 * (total - growAt) / total)} %)  floors full ${floorsAt.map((t, f) => `${f + 1}:${fmt(t)}`).join(' ')}  the hands ${handsAt === null ? 'never' : fmt(handsAt)}  taken by hand ${grown.hand}, by the flesh itself ${grown.spread}  necrosis ${grown.died} (revived ${grown.revived})  people low ${Math.round(grown.lowFeed)}`);
+  console.log(`  body items  ${grown.items.join('  ') || 'none'}`);
+} else console.log('GROW (deep-grow)  the question never answered');
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

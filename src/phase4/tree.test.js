@@ -201,7 +201,7 @@ describe('the Watcher\'s branch', () => {
         expect(priceText(priceOf(a, 'scheduler'))).toBe('30 cap + ★ 200 k');
     });
 
-    test('a biological step waits for its sector, and its node says so', () => {
+    test('deep-grow: a biological step is retired: never bought, and the ladder stops before it', () => {
         const s = start();
         s.asleep = true;
         s.watcher.sleeps = 9;
@@ -210,13 +210,11 @@ describe('the Watcher\'s branch', () => {
         s.watcher.grown = 100;
         s.humans = 400;
         s.stars = 1e30;
-        s.tree = { opened: ['question'], bought: ['question'] };       // deep-voice: BIOLOGICAL grows out of The question
-        const r = buy(s, 'brain', { slots: ['mine', 'farm', 'generator', 'dorm'], choose: true });
-        expect(r.step.pending).toBe(true);
-        expect(s.watcher.sealing).toBe('brain');
-        const st = nodeStatus(s, 'brain');
-        expect(st).toMatchObject({ status: 'buyable', kind: 'choose', reason: 'Paid. Choose a sector to seal.' });
-        expect(buy(s, 'brain')).toMatchObject({ choose: true });
+        s.tree = { opened: ['question'], bought: ['question'] };
+        expect(buy(s, 'brain', { slots: ['mine', 'farm', 'generator', 'dorm'], choose: true })).toBe(null);
+        expect(s.watcher.sealing || null).toBe(null);
+        expect(nodeStatus(s, 'brain').status).toBe('locked');
+        expect(nextWatcherNode(s)).toBe(null);
         expect(nextStep(s.watcher).id).toBe('brain');
     });
 });

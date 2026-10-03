@@ -1849,3 +1849,258 @@ body.in-deep #version-info { z-index: 1400; }
 /* the counters top right stay where they are under the open drawer; its own wallet says the same */
 #phase-deep #deep-hold { transition: opacity 200ms ease; }
 #phase-deep.is-drawer-open #deep-hold { opacity: 0; }
+
+/* =============================================================================================
+   deep-grow: MOVEMENT III, THE BODY. docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md
+   The locked look (mockup deep-tree-12, "biological"): mycelium, sinew, vessels, one arterial red
+   pulse; cold, dark, wet. No mushrooms, no sacs, no eyes, no symmetry, no beige.
+   ============================================================================================= */
+#phase-deep {
+    --bone: #d9dad3;
+    --bone-mid: #9a9d98;
+    --bone-low: #5d625f;
+    --artery: #2c1219;
+    --artery-core: #7d1f2e;
+    --pulse: #a8132c;
+    --hyphae: #b9c4ca;
+    --muscle-dk: #170d11;
+    --wet: #0c1013;
+}
+/* in the body there is nothing to dig and no empty chamber to count */
+#phase-deep.is-grow #deep-act .deep-act-col:first-child,
+#phase-deep.is-grow #deep-empty { display: none; }
+#deep-scene.is-over-take canvas { cursor: pointer; }
+
+/* ---- THE PANEL OVERGROWS (panel.js overgrow: og-1 veins, og-2 the tapes peel, og-3 the organ
+   names, og-4 the needles sink into fluid; is-flesh at the end, at once on a reload) ---- */
+#deep-panel { isolation: isolate; }
+#deep-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 9s ease-in;
+    background:
+        radial-gradient(45% 30% at 16% 10%, rgba(125, 31, 46, 0.16), transparent 70%),
+        radial-gradient(50% 35% at 82% 60%, rgba(42, 20, 38, 0.7), transparent 72%),
+        radial-gradient(70% 50% at 40% 95%, rgba(29, 35, 40, 0.9), transparent 75%),
+        radial-gradient(40% 25% at 70% 20%, rgba(27, 33, 38, 0.8), transparent 70%),
+        repeating-linear-gradient(103deg, rgba(185, 196, 202, 0.035) 0 1px, transparent 1px 7px),
+        repeating-linear-gradient(71deg, rgba(185, 196, 202, 0.025) 0 1px, transparent 1px 11px),
+        linear-gradient(180deg, #120a0e 0%, #0a0709 100%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.8), inset 0 12px 30px rgba(168, 19, 44, 0.06), inset 0 -18px 40px rgba(0, 0, 0, 0.6);
+}
+#deep-panel.og-1::before { opacity: 1; }
+#deep-panel.is-flesh::before { opacity: 1; transition: none; }
+#deep-panel .deep-screw { transition: opacity 3s ease 2s, filter 3s ease 2s; }
+#deep-panel.og-2 .deep-screw { filter: sepia(0.6) hue-rotate(-30deg) brightness(0.6); opacity: 0.5; }
+
+/* the veins cross the glass */
+.deep-gauge-svg .veins { pointer-events: none; }
+.deep-gauge-svg .vein { fill: none; stroke: var(--artery); stroke-linecap: round; stroke-dasharray: 260; stroke-dashoffset: 260; opacity: 0; }
+.deep-gauge-svg .vein.is-d0 { stroke: var(--artery-core); }
+#deep-panel.og-1 .vein { opacity: 0.95; stroke-dashoffset: 0; transition: stroke-dashoffset 3.2s cubic-bezier(.4, .1, .2, 1), opacity 0.6s ease; }
+#deep-panel.og-1 .deep-gauge:nth-child(2) .vein { transition-delay: 0.45s; }
+#deep-panel.og-1 .deep-gauge:nth-child(3) .vein { transition-delay: 0.9s; }
+#deep-panel.og-1 .deep-gauge:nth-child(4) .vein { transition-delay: 1.3s; }
+#deep-panel.is-flesh .vein { opacity: 0.95; stroke-dashoffset: 0; transition: none; }
+#deep-panel.is-flesh .vein.is-d0 { animation: deep-vein-beat 1.7s ease-out infinite; }
+@keyframes deep-vein-beat {
+    0% { stroke: #c0183a; }
+    12% { stroke: var(--artery-core); }
+    20% { stroke: #a8132c; }
+    40%, 100% { stroke: var(--artery-core); }
+}
+
+/* the bezel turns from metal to sinew */
+.deep-gauge-svg .bezel, .deep-gauge-svg .bezel-in, .deep-gauge-svg .tk, .deep-gauge-svg .arc-red, .deep-gauge-svg .arc-green, .deep-gauge-svg .cap {
+    transition: fill 4s ease, stroke 4s ease, opacity 2s ease;
+}
+#deep-panel.og-2 .deep-gauge-svg .bezel { fill: #2a1420; stroke: #050304; }
+#deep-panel.og-2 .deep-gauge-svg .bezel-in { fill: #0a0507; }
+#deep-panel.og-2 .deep-gauge-svg .cap { fill: #3a1d26; }
+#deep-panel.og-4 .deep-gauge-svg .tk { stroke: #4a3a3f; }
+#deep-panel.og-4 .deep-gauge-svg .tk-major { stroke: var(--bone-mid); }
+#deep-panel.og-4 .deep-gauge-svg .arc-green { opacity: 0.15; }
+#deep-panel.og-4 .deep-gauge-svg .arc-red { opacity: 0.45; stroke: var(--pulse); }
+
+/* the dymo tapes peel, one after the other */
+.deep-gauge-tapes { position: relative; display: inline-flex; justify-content: center; align-items: center; min-height: 26px; }
+#phase-deep .deep-gauge-tapes .dymo.is-gauge, #phase-deep .deep-gauge-tapes .deep-gauge-label { transform-origin: 8% 50%; }
+#deep-panel.og-2 .deep-gauge-tapes .dymo.is-gauge,
+#deep-panel.og-2 .deep-gauge-tapes .deep-gauge-label {
+    opacity: 0;
+    transform: translate(10px, 16px) rotate(-16deg) skewX(-8deg);
+    transition: opacity 1.4s ease 0.4s, transform 1.6s cubic-bezier(.5, 0, .8, .4);
+}
+#deep-panel.og-2 .deep-gauge:nth-child(2) .deep-gauge-tapes > * { transition-delay: 0.4s, 0.3s; }
+#deep-panel.og-2 .deep-gauge:nth-child(3) .deep-gauge-tapes > * { transition-delay: 0.7s, 0.6s; }
+#deep-panel.og-2 .deep-gauge:nth-child(4) .deep-gauge-tapes > * { transition-delay: 1s, 0.9s; }
+#deep-panel.og-2 .deep-gauge-tapes .deep-gauge-label .dymo.is-gauge { transform: none; }
+#deep-panel.is-flesh .deep-gauge-tapes .dymo.is-gauge, #deep-panel.is-flesh .deep-gauge-tapes .deep-gauge-label { display: none; }
+
+/* ... and the organ's name comes in a warmer hand: bone-pale, inked, a little uneven */
+.flesh-tape {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -40%) rotate(-2deg) scale(0.92);
+    opacity: 0;
+    white-space: nowrap;
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-style: italic;
+    font-size: 17px;
+    letter-spacing: 0.16em;
+    color: var(--bone);
+    padding: 1px 10px 2px;
+    border-radius: 9px 4px 11px 5px;
+    background:
+        radial-gradient(80% 120% at 30% 40%, rgba(125, 31, 46, 0.35), transparent 70%),
+        linear-gradient(180deg, #24111a, #12080c);
+    box-shadow: inset 0 1px 0 rgba(255, 220, 220, 0.06), 0 2px 6px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 0 6px rgba(168, 19, 44, 0.35);
+    pointer-events: none;
+}
+.deep-gauge:nth-child(2) .flesh-tape { transform: translate(-50%, -40%) rotate(1.5deg) scale(0.92); }
+.deep-gauge:nth-child(3) .flesh-tape { transform: translate(-50%, -40%) rotate(-0.6deg) scale(0.92); }
+.deep-gauge:nth-child(4) .flesh-tape { transform: translate(-50%, -40%) rotate(2.2deg) scale(0.92); }
+#deep-panel.og-3 .flesh-tape { opacity: 1; transform: translate(-50%, -50%) rotate(-2deg); transition: opacity 1.6s ease, transform 2s ease; }
+#deep-panel.og-3 .deep-gauge:nth-child(2) .flesh-tape { transform: translate(-50%, -50%) rotate(1.5deg); transition-delay: 0.35s; }
+#deep-panel.og-3 .deep-gauge:nth-child(3) .flesh-tape { transform: translate(-50%, -50%) rotate(-0.6deg); transition-delay: 0.7s; }
+#deep-panel.og-3 .deep-gauge:nth-child(4) .flesh-tape { transform: translate(-50%, -50%) rotate(2.2deg); transition-delay: 1s; }
+#deep-panel.is-flesh .flesh-tape { transition: none; }
+
+/* the needles sink, and the reading is a fluid level in the glass */
+.deep-gauge-svg .fluid { opacity: 0; transition: opacity 2.4s ease; }
+.deep-gauge-svg .fluid-body { fill: #1c070c; }
+.deep-gauge-svg .fluid-top { fill: none; stroke: #a8132c; stroke-width: 1.4; opacity: 0.9; }
+#deep-panel.og-4 .fluid { opacity: 0.96; }
+.deep-gauge-svg .needle, .deep-gauge-svg .cap, .deep-gauge-svg .cap-dot { transition: opacity 2s ease; }
+#deep-panel.og-4 .deep-gauge-svg .needle, #deep-panel.og-4 .deep-gauge-svg .cap-dot { opacity: 0; }
+#deep-panel.og-4 .deep-gauge-svg .cap { opacity: 0.35; }
+#deep-panel.is-flesh .deep-gauge.is-red .fluid-top { animation: deep-fluid-red 1.4s ease-in-out infinite; }
+@keyframes deep-fluid-red { 50% { stroke: #ff3b5c; stroke-width: 2; } }
+#deep-panel.og-4 .deep-gauge-svg .glass { opacity: 0.5; }
+
+/* the lamps of the rise: two, their light the arterial red */
+#deep-panel.is-grow .deep-cryo-lamps, #phase-deep.is-grow .deep-cryo-lamps { grid-template-columns: repeat(2, 1fr); }
+#phase-deep.is-grow .deep-cryo-lamp .deep-bulb { background: radial-gradient(circle at 35% 30%, #3a1a22, #12070a 70%); box-shadow: 0 0 0 2px #2a1420, 0 0 0 3px #0a0507, inset 0 -2px 3px rgba(0, 0, 0, 0.6); }
+#phase-deep.is-grow .deep-cryo-lamp.is-lit .deep-bulb {
+    background: radial-gradient(circle at 35% 30%, #ffc9d2, #c0183a 45%, #4a0612 100%);
+    box-shadow: 0 0 0 2px #2a1420, 0 0 0 3px #0a0507, 0 0 12px 3px rgba(192, 24, 58, 0.6), 0 0 30px 8px rgba(168, 19, 44, 0.2);
+    animation: deep-heart-beat 1.7s ease-out infinite;
+}
+#phase-deep.is-grow .deep-cryo-lamp .dymo.is-small { max-width: 120px; }
+@keyframes deep-heart-beat { 0% { filter: brightness(1.25); } 14% { filter: brightness(0.85); } 22% { filter: brightness(1.15); } 45%, 100% { filter: brightness(0.9); } }
+
+/* ---- THE DRAWER BECOMES TISSUE ---- */
+.deep-drawer.is-flesh {
+    background:
+        radial-gradient(70% 30% at 85% 8%, rgba(125, 31, 46, 0.28), transparent 70%),
+        radial-gradient(60% 40% at 10% 60%, rgba(42, 20, 38, 0.55), transparent 72%),
+        radial-gradient(80% 30% at 60% 100%, rgba(29, 35, 40, 0.7), transparent 75%),
+        repeating-linear-gradient(97deg, rgba(185, 196, 202, 0.03) 0 1px, transparent 1px 9px),
+        repeating-linear-gradient(64deg, rgba(185, 196, 202, 0.02) 0 1px, transparent 1px 13px),
+        linear-gradient(180deg, rgba(20, 9, 13, 0.98), rgba(11, 6, 8, 0.98));
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.6), inset 1px 0 0 rgba(125, 31, 46, 0.35), inset 3px 0 12px rgba(168, 19, 44, 0.08);
+    color: var(--bone-mid);
+}
+.deep-drawer.is-flesh .deep-dr-tag { color: var(--bone-low); letter-spacing: 0.32em; }
+.deep-drawer.is-flesh .deep-dr-row.is-buy {
+    background: linear-gradient(100deg, rgba(125, 31, 46, 0.22), rgba(42, 20, 38, 0.28) 60%, rgba(23, 13, 17, 0.4));
+    box-shadow: inset 0 1px 0 rgba(217, 218, 211, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+    border-radius: 9px 4px 10px 5px;
+}
+.deep-drawer.is-flesh .deep-dr-row.is-buy:hover { background: linear-gradient(100deg, rgba(168, 19, 44, 0.32), rgba(42, 20, 38, 0.4) 60%, rgba(23, 13, 17, 0.5)); }
+.deep-drawer.is-flesh .deep-dr-name { color: var(--bone); font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; font-style: italic; font-size: 14px; letter-spacing: 0.12em; }
+.deep-drawer.is-flesh .deep-dr-price { color: #e8b4bd; }
+.deep-drawer.is-flesh .deep-dr-sub { color: var(--bone-mid); }
+.deep-drawer.is-flesh .deep-dr-row.is-next .deep-dr-name, .deep-drawer.is-flesh .deep-dr-row.is-next .deep-dr-sub { color: var(--bone-low); }
+.deep-drawer.is-flesh .deep-dr-row.is-bought { animation: deep-dr-flesh 700ms ease-out; }
+@keyframes deep-dr-flesh { 0% { background: rgba(192, 24, 58, 0.55); } }
+.deep-drawer.is-flesh .deep-drawer-wallet { color: var(--bone); }
+.deep-drawer.is-flesh .deep-drawer-tree[hidden] { display: none; }
+
+/* ---- THE LEVER COMES BACK OVERGROWN: RISE ---- */
+.deep-lever-wrap.is-flesh .deep-lever {
+    background:
+        radial-gradient(70% 40% at 30% 20%, rgba(125, 31, 46, 0.4), transparent 70%),
+        repeating-linear-gradient(80deg, rgba(185, 196, 202, 0.04) 0 1px, transparent 1px 6px),
+        linear-gradient(180deg, #24111a, #0d0709);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.8), inset 0 0 18px rgba(168, 19, 44, 0.12);
+    border-radius: 14px 8px 16px 9px;
+}
+.deep-lever-wrap.is-flesh .deep-lever-slot { background: #070304; box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(125, 31, 46, 0.4); }
+.deep-lever-wrap.is-flesh .deep-lever-arm {
+    background: repeating-linear-gradient(170deg, #4a2a36 0 3px, #2c1219 3px 5px, #8a8c86 5px 6px, #2c1219 6px 9px);
+    width: 10px;
+    margin-left: -5px;
+}
+.deep-lever-wrap.is-flesh .deep-lever-knob {
+    background: radial-gradient(circle at 34% 28%, #ff8fa3, #a8132c 48%, #2c050c 100%);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.7), inset 0 -3px 6px rgba(0, 0, 0, 0.45), 0 0 16px 3px rgba(168, 19, 44, 0.45);
+    animation: deep-heart-knob 1.7s ease-out infinite;
+    border-radius: 48% 52% 50% 46%;
+}
+@keyframes deep-heart-knob { 0% { transform: scale(1.08); } 14% { transform: scale(0.97); } 22% { transform: scale(1.05); } 45%, 100% { transform: scale(1); } }
+#phase-deep .deep-lever-wrap.is-flesh .deep-lever-tape { animation: deep-tape-in 600ms ease-out both; }
+
+/* ---- the price over a chamber the body can take ---- */
+#deep-take-tip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 60;
+    padding: 6px 12px;
+    border-radius: 9px 4px 10px 5px;
+    background: linear-gradient(100deg, rgba(36, 17, 26, 0.96), rgba(18, 8, 12, 0.96));
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(125, 31, 46, 0.45);
+    color: var(--bone);
+    font-size: 13px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+#deep-take-tip[hidden] { display: none; }
+#deep-take-tip.is-no { animation: deep-shake 320ms ease; }
+
+/* ---- THE RISE: the chrome goes, the lines come in the Watcher's tape ---- */
+#phase-deep.is-rising #deep-panel, #phase-deep.is-rising #deep-act, #phase-deep.is-rising #deep-hold,
+#phase-deep.is-rising #deep-time, #phase-deep.is-rising #deep-queue, #phase-deep.is-rising #deep-reset-view,
+#phase-deep.is-rising #deep-mark, #phase-deep.is-rising #deep-labels {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1600ms ease;
+}
+.deep-rise-lines {
+    left: 50%;
+    top: 30%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    pointer-events: none;
+    text-align: center;
+}
+.deep-rise-lines[hidden] { display: none; }
+#phase-deep .deep-rise-line .tape {
+    display: inline-block;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(0, 0, 0, .3)), #0b0c0e;
+    color: #f1efe8;
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 40px;
+    line-height: 40px;
+    letter-spacing: 0.12em;
+    padding: 4px 9px 1px;
+    margin: 0 2px;
+    text-transform: uppercase;
+    text-shadow: 0 -1px 0 #000, 0 1px 0 rgba(255, 255, 255, 0.28);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+    transform: rotate(-0.8deg);
+}
+#phase-deep .deep-rise-line:nth-child(2) .tape { transform: rotate(0.6deg); }
+@media (max-width: 600px) { #phase-deep .deep-rise-line .tape { font-size: 26px; line-height: 26px; } }

@@ -782,6 +782,10 @@ export function createMachine(opts = {}) {
     return {
         group,
         plate,
+        /** deep-grow: the three arm heads (the tubes), in arm order, for the hands (hands.js). */
+        armHeads: arms.map((a) => a.head),
+        /** deep-grow: the game clock, so the hands throw on the machine's own rhythm. */
+        get gc() { return gc; },
         /** Where the star flash rises from, in the group's frame. */
         topAt: new THREE.Vector3(0, CRT_Y + 0.3, 0),
         /**
