@@ -61,6 +61,7 @@ import {
     playSurface, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, BODY_GROW_SECONDS, sealLine,
     lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, rungOpenLine,
+    mindWarning, lampHint, taughtLamps,
     sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, lookDue, sleepDaysAt, sleepPace,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS, NIGHTS } from './surface.js';
@@ -70,13 +71,13 @@ import { createTreeView } from './tree-view.js';
 import {
     gauges as readGauges, advise, cryoLamps, wakeWord, hallucinationsAt, SNAP_CLEAR_MS, healing,
     drawerGroups, drawerCount, surfaceTape, MERGE_MS, RPS_FADE_MS, cardGone,
-    adviseAsleep, adviceNote, RECALL_MS, levelsReady, LEVELS_ROW, rowName,
+    adviseAsleep, adviceNote, RECALL_MS, levelsReady, LEVELS_ROW, rowName, wakeWhy, roomStarsLine, calledRow, PRICES_FOOT,
 } from './instruments.js';
 import { createPanel } from './panel.js';
 import { createDrawer } from './drawer.js';
 import { createViewHooks } from './view-hooks.js';
 import {
-    growOn, risen, normalizeGrow, organsOf, stepGrow, viewOf, graphOf,
+    growOn, risen, normalizeGrow, organsOf, stepGrow, viewOf, graphOf, growTarget,
     growGauges, adviseGrow, riseLamps, riseReady, bodyGroups, buyBody, fleshShare, rise as riseBody,
     GROW_GAUGES, GROW_DAYS_PER_SECOND, GROW_END, RISE_LINES, setChamberPlace,
     takeTip, toggleMark, markThreads, dreamStart, dreamWake, dreamEnd, dreaming, dreamDaysAt,
@@ -251,7 +252,7 @@ export function init() {
         stabFill: $('deep-stab-fill'), stabVal: $('deep-stab-val'),
         pulse: document.querySelector('#deep-watcher .deep-watcher-pulse'),
         bodyTip: $('deep-body-tip'), machineTip: $('deep-machine-tip'),
-        card: { el: $('deep-puzzle'), q: $('deep-puzzle-q'), said: $('deep-puzzle-said') },
+        card: { el: $('deep-puzzle'), q: $('deep-puzzle-q'), said: $('deep-puzzle-said'), hint: $('deep-puzzle-hint') },
         queue: $('deep-queue'),
         ask: $('deep-watcher-ask'),
         duel: $('deep-rps-duel'), fistYou: $('deep-fist-you'), fistIt: $('deep-fist-it'), fistItFront: $('deep-fist-it-front'),
@@ -492,7 +493,8 @@ export function init() {
     let needNow = null;             // its one reason, for the tree (readout.js cryoNeed)
     const treeCtx = () => ({ need: needNow, road: roadNow, starsPerDay: report.stars, orePerDay: report.parts.M, asleep: !!state.asleep });
     function recomputeGates() {
-        if (state.asleep) return;
+        // deep-pass3 (B404): a save opened asleep still knows the road to the next tier (the tape wakes for it)
+        if (state.asleep) { if (!roadNow && CRYO[state.cryo + 1] && state.cryo + 1 <= CRYO_TOP) roadNow = cryoRoad(state.cryo + 1, state); return; }
         if (growOn(state)) {
             inst = { lever: riseReady(state, layout).ready, lamps: riseLamps(state, layout), advice: adviseGrow(state, layout) };
             return;
@@ -554,6 +556,10 @@ export function init() {
         const gone = !!state.watcher.gone;
         const asleep = !!state.asleep || gone;
         const growing = growOn(state);
+        // deep-pass3 (B400): the mind warns before it restarts (the tape and the Watcher's label say so)
+        mindWarning(state.watcher, !!state.asleep);
+        // one thing asked at a time: the mind first (the lamps waited for an answer while it fell to 14)
+        if (state.watcher.warn && state.watcher.puzzle) { dismissPuzzle(state.watcher, state.cryo); lamp = null; }
         // deep-econ (B332): asleep the tape still names the goal, or says WAKE when it can be paid
         const word = risen(state) || gone ? '' : state.asleep ? adviseAsleep(state, { road: roadNow }) : inst.advice;
         panel.update({
@@ -562,11 +568,13 @@ export function init() {
             note: growing ? growNote(state, layout) : adviceNote(state, word, { road: roadNow }),
             empty: asleep || growing ? 0 : emptyChambers(state, layout).length,
             lamps: growing ? (risen(state) ? null : inst.lamps) : (!asleep && state.cryo < 0 ? inst.lamps : null),
+            mode: growing ? 'grow' : asleep ? 'sleep' : 'tend',
         });
         if (alarmUntil && performance.now() > alarmUntil) { alarmUntil = 0; panel.alarm(''); }
         // deep-tension: the chamber the tape points at glows slowly, the drawer open or not
         const empties = !asleep && !growing && /^BUILD /.test(word) ? emptyChambers(state, layout) : [];
-        hooks.callChamber?.(empties.length ? `s${empties[0]}` : null);
+        // deep-pass3 (B402): in GROW the tape's word has a place too (TAKE A CHAMBER, GROW A HEART): ringed
+        hooks.callChamber?.(growing ? growTarget(state, layout, panel.advice || word) : empties.length ? `s${empties[0]}` : null);
 
         // DIG: one button, its price under it
         const full = (state.builds || []).length >= QUEUE_MAX;
@@ -589,6 +597,8 @@ export function init() {
         ui.treeBadge.classList.toggle('hidden', !badge);
         ui.treeBtn.classList.toggle('has-night', !!(state.tree && state.tree.unseen));
         if (drawer.isOpen()) drawer.refresh(groups, wallet());
+        // deep-pass3 (B404): the prices move on the wake, and the drawer says so (they read as following the purse)
+        drawer.setFoot(state.cryo >= 0 && !growing ? PRICES_FOOT : '');
         treeView?.refresh();
 
         // THE LEVER: before the hall it is there once the lamps are lit and Cryo I can be paid.
@@ -642,6 +652,7 @@ export function init() {
                 if (ui.stabVal.textContent !== v) ui.stabVal.textContent = v;
                 ui.stabFill.style.width = `${(100 * w.stability / STABILITY_MAX).toFixed(1)}%`;
                 ui.watcher.classList.toggle('is-low', w.stability < 35);
+                ui.watcher.classList.toggle('is-warn', !!w.warn);
                 const shape = bodyGlyph(w);
                 const cls = `deep-watcher-pulse${shape ? ` is-body is-${shape}` : ''}`;
                 if (ui.pulse && ui.pulse.className !== cls) ui.pulse.className = cls;
@@ -655,7 +666,8 @@ export function init() {
 
     /* ---- THE DRAWER, and the whole tree behind it ---------------------------------------------- */
     /** What the drawer lists: the tree's rows, or in the body its four items (grow.js). */
-    const drawerRows = () => (growOn(state) ? bodyGroups(state) : drawerGroups(state, treeCtx()));
+    // deep-pass3 (B406): the row the tape names is always listed, ringed and scrolled to
+    const drawerRows = () => (growOn(state) ? bodyGroups(state) : drawerGroups(state, { ...treeCtx(), called: calledRow(state, panel.advice) }));
     const drawer = createDrawer(ui.drawer, {
         onBuy: (id) => (id.startsWith('body:') ? buyBodyItem(id.slice(5)) : id === LEVELS_ROW ? buyLevels() : buyNode(id)),
         onWholeTree: () => { closeDrawer(); openTree(); },
@@ -663,7 +675,7 @@ export function init() {
     });
     /** deep-tension: every level ready, in one click ("BUY 4 LEVELS"), cheapest first. */
     function buyLevels() {
-        if (paused() || busy || state.asleep) return false;
+        if (paused() || busy) return false;
         const { ids } = levelsReady(state);
         let n = 0;
         for (const id of ids) {
@@ -1017,7 +1029,8 @@ export function init() {
 
     /* ---- THE LAMPS (v1.51.0): now and then in the sleep the lamps on the automated rooms ask for
        something, and the Watcher answers by clicking the rooms. Rules in watcher.js. ---- */
-    const LAMP_T = { lead: 900, on: 460, gap: 220, darkLead: 1300 };
+    // deep-pass3 (B400): bigger and slower ("one lamp I barely saw"): each lamp burns 0.75 s
+    const LAMP_T = { lead: 1400, on: 750, gap: 380, darkLead: 1800 };
     let lamp = null;
     let lampFx = null;
     let cardSaid = null;
@@ -1075,14 +1088,20 @@ export function init() {
     function drawLampCard() {
         const card = ui.card;
         if (!card.el) return;
-        let q = '', said = '', cls = '';
+        let q = '', said = '', cls = '', hint = '';
         const now = performance.now();
         if (cardSaid && now < cardSaid.until) ({ q, said, cls } = cardSaid);
         else if (lamp && state.asleep) {
             cardSaid = null;
             const p = lamp.p;
-            if (p.kind === 'dark') q = lamp.phase === 'out' ? `ONE WENT OUT · ${Math.max(0, (DARK_MS - (lamp.t - lamp.outAt)) / 1000).toFixed(1)} s` : 'LAMPS · ALL LIT';
-            else q = lamp.phase === 'input' ? `LAMPS · YOUR TURN${p.at ? ` · ${p.at}` : ''}` : 'LAMPS · WATCH';
+            // deep-pass3 (B400): plain words, and how far along as lamps ("LAMPS · YOUR TURN" never said what)
+            if (p.kind === 'dark') q = lamp.phase === 'out' ? `WHICH WENT OUT? ${Math.max(0, (DARK_MS - (lamp.t - lamp.outAt)) / 1000).toFixed(1)} s` : 'WATCH THE LAMPS';
+            else q = lamp.phase === 'input' ? `YOUR TURN ${'●'.repeat(p.at)}${'○'.repeat(Math.max(0, p.answer.length - p.at))}` : 'WATCH THE LAMPS';
+            hint = lampHint(state.watcher, p);
+        }
+        if (card.hint) {
+            if (card.hint.textContent !== hint) card.hint.textContent = hint;
+            card.hint.hidden = !hint;
         }
         const on = !!q;
         if (card.el.classList.contains('is-on') !== on) card.el.classList.toggle('is-on', on);
@@ -1109,20 +1128,29 @@ export function init() {
     function endLamps(out, lamps, slot, p) {
         const w = state.watcher;
         lamp = null;
+        taughtLamps(w, p.kind);
         if (out.ok) {
             const gain = puzzleStars(report.stars) * lampFactor(w);
             state.stars += gain;
             lampFlash({ flash: lamps }, 520);
-            cardSaid = { q: 'LAMPS', said: `+${Math.round(out.gained)}`, cls: 'is-right', until: performance.now() + 1200 };
+            cardSaid = { q: 'RIGHT', said: `+${Math.round(out.gained)}`, cls: 'is-right', until: performance.now() + 1400 };
         } else {
             lampFlash({ wrong: slot >= 0 ? [slot] : [], ...(p.kind === 'dark' ? { off: [p.out] } : {}) }, 700);
-            cardSaid = { q: 'LAMPS', said: `${Math.round(out.gained)}`, cls: 'is-wrong', until: performance.now() + 1200 };
+            cardSaid = { q: 'WRONG', said: out.gained < 0 ? `${Math.round(out.gained)}` : '', cls: 'is-wrong', until: performance.now() + 1400 };
         }
         updateChrome();
         saveGame();
         if (out.rebooted) wake({ kind: 'reboot' }).catch((e) => console.error('the deep: the wake broke', e));
     }
 
+    /** deep-pass3 (B407): a tip by the cursor, kept on screen (the machine's ran off the right edge). */
+    function placeTip(el, x, y) {
+        const w = el.offsetWidth || 0, h = el.offsetHeight || 0;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const px = x + w > vw - 8 ? Math.max(8, x - 32 - w) : x;
+        const py = Math.max(8, Math.min(vh - h - 8, y));
+        el.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px)`;
+    }
     function afterChange({ save = true } = {}) {
         claimChambers(state, layout);
         state.organs = organsOf(state, layout);
@@ -1179,17 +1207,23 @@ export function init() {
     function roomOffer() {
         const out = {};
         const full = queueFull();
+        // deep-pass3 (B403, B406): the room the tape names is ringed; each says what it does to the stars
+        const called = (/^BUILD (\w+)$/.exec(panel.advice || '') || [])[1];
         for (const t of ROOMS) {
             const price = nextPrice(state, 'room', t);
             const miss = Math.ceil(price - state.minerals);
+            const eff = roomStarsLine(state, t);
             out[t] = {
                 price: `${ORE_SIGN} ${formatCount(price)}`,
                 ok: !full && miss <= 0,
                 need: full ? 'THE QUEUE IS FULL' : `${ORE_SIGN} ${formatCount(miss)} MORE`,
+                stars: eff.line, why: eff.why,
+                called: !!called && ROOM_TAPE[t] === called,
             };
         }
         return out;
     }
+    const ROOM_TAPE = { mine: 'MINE', farm: 'FARM', generator: 'GENERATOR', dorm: 'DORMITORY' };
     function openRing(slot, x, y) {
         hooks.openRoomRing(slot, x, y, {
             rooms: roomOffer(),
@@ -1325,7 +1359,12 @@ export function init() {
             if (!loadingBody && scene?.focusMachine()) holdFocusUntil = performance.now() + 7000;
         }
         if (v.reachable.length) {
-            const front = Math.min(...v.reachable.map(floorOf));
+            // deep-pass3 (B402): the camera goes where the tape points; else to the front's floor, the machine
+            // house left out unless it is all there is (it counted as floor 0 and held the camera there while
+            // the chambers in reach lay a floor below: "TAKE A CHAMBER, but nothing glows")
+            const tgt = growTarget(state, layout);
+            const rooms = v.reachable.filter((id) => id !== 'machine');
+            const front = tgt && tgt !== 'machine' ? floorOf(tgt) : Math.min(...(rooms.length ? rooms : v.reachable).map(floorOf));
             if (front !== frontFloor && !risen(state) && performance.now() >= holdFocusUntil) { frontFloor = front; scene?.focusFloor(front); }
         }
     }
@@ -1762,7 +1801,7 @@ export function init() {
         t.days += sum.days; t.minerals += sum.minerals; t.food += sum.food; t.stars += sum.stars;
         t.born += sum.born; t.died += sum.died;
         for (const r of ROOMS) t.ranDays[r] = (t.ranDays[r] || 0) + (sum.ran[r] || 0) * sum.days;
-        sum.watch = watchSleep(state.watcher, { days: sum.days, tier: state.cryo, spare: sum.spare, hold: choosing });
+        sum.watch = watchSleep(state.watcher, { days: sum.days, tier: state.cryo, spare: sum.spare, hold: choosing, pace: sleepPace(sleepClock) });
         trackStrata();
         report = dryRun();
         scene?.setState(state, layout);
@@ -1878,6 +1917,7 @@ export function init() {
         const w = state.watcher;
         closeSurface(w);
         // deep-econ: the prices follow the income from this wake on; the cap counts again next sleep
+        // (deep-pass3, B404: the drawer says so, and the tape wakes only for what the new prices still pay)
         endSleepYield(state);
         setIncome(state);
         // deep-econ (B335): a night that came in this sleep is said again, low, once the panel is back
@@ -1915,6 +1955,11 @@ export function init() {
         panel.alarm(wakeWord(rebooted && alarm.kind !== 'reboot' ? { kind: 'reboot' } : alarm));
         alarmUntil = performance.now() + ALARM_LAMP_MS;
         if (missed) recallNight(missed);
+        else {
+            // deep-pass3 (B400): a restart, the first sleep's end, a look: said once, low, with the lamp
+            const why = wakeWhy(alarm, rebooted || (alarm.kind === 'reboot' && !alarm.voice));
+            if (why) recallLine(why);
+        }
         await Promise.all([panel.lights(true, LIGHTS_MS), scene ? scene.release(SLEEP_TIMING.release) : Promise.resolve()]);
         sleepSum = null;
         setBusy(false);
@@ -1930,12 +1975,16 @@ export function init() {
     function recallNight(n) {
         const line = NIGHTS[n - 1]?.line;
         if (!line || !ui.recall) return;
+        recallLine(`“${line}”`);
+        recallShown = { n, at: performance.now() };
+    }
+    function recallLine(text) {
+        if (!ui.recall) return;
         for (const t of recallTimers) clearTimeout(t);
-        ui.recall.textContent = `“${line}”`;
+        ui.recall.textContent = text;
         ui.recall.hidden = false;
         void ui.recall.offsetWidth;
         ui.recall.classList.add('is-in');
-        recallShown = { n, at: performance.now() };
         recallTimers = [
             setTimeout(() => ui.recall.classList.remove('is-in'), RECALL_MS),
             setTimeout(() => { ui.recall.hidden = true; }, RECALL_MS + 750),
@@ -2058,7 +2107,7 @@ export function init() {
         const body = slot >= 0 && inBody(state.watcher, slot);
         if (ui.bodyTip) {
             if (ui.bodyTip.hidden === body) ui.bodyTip.hidden = !body;
-            if (body) ui.bodyTip.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 12}px)`;
+            if (body) placeTip(ui.bodyTip, pointer.x + 14, pointer.y + 12);
         }
         const onMachine = !!pointer && !!scene && !choosing && !body && hooks.ringSlot < 0 && scene.machineAt(pointer.x, pointer.y)
             && !(ui.takeTip && !ui.takeTip.hidden);
@@ -2066,7 +2115,7 @@ export function init() {
             if (ui.machineTip.hidden === onMachine) ui.machineTip.hidden = !onMachine;
             if (onMachine) {
                 if (ui.machineTip.textContent !== machineText) ui.machineTip.textContent = machineText;
-                ui.machineTip.style.transform = `translate(${pointer.x + 16}px, ${pointer.y + 14}px)`;
+                placeTip(ui.machineTip, pointer.x + 16, pointer.y + 14);
             }
         }
         if (!ui.snapRing) return;
@@ -2196,7 +2245,11 @@ export function init() {
         centreAt = key;
         ui.root.style.setProperty('--deep-cx', `${Math.round(c.x)}px`);
         ui.root.style.setProperty('--deep-cy', `${Math.round(c.y)}px`);
+        // deep-pass3 (B407): Surface's stage holds still through a sleep (its buttons drifted with the camera
+        // and a click aimed at rock missed): it takes the middle awake and keeps it until the wake
+        if (!state.asleep || !nightX) { nightX = Math.round(c.x); ui.root.style.setProperty('--deep-night-x', `${nightX}px`); }
     }
+    let nightX = 0;
 
     recomputeGates();
     scene?.setState(state, layout);

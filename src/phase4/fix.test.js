@@ -33,7 +33,7 @@ describe('Cryo I shows its whole road', () => {
     test('at the descent every part at once, none ticked', () => {
         const s = initialDeepState();
         const r = cryoRoad(0, s);
-        expect(r.text).toBe('needs generators automated, farms automated, mines automated and ★ 15 k');
+        expect(r.text).toBe('needs generators automated, farms automated, mines automated and ★ 7.5 k');
         expect(r.done).toBe(0);
         expect(r.total).toBe(4);
         expect(r.open).toBe(false);
@@ -46,7 +46,7 @@ describe('Cryo I shows its whole road', () => {
         s.auto = { ...s.auto, generator: 1 };
         s.builds = [{ kind: 'auto', type: 'farm', slot: -1, startDay: 0, doneDay: 12 }];
         const r = cryoRoad(0, s);
-        expect(r.text).toBe('needs generators automated ✓, farms automated (on order), mines automated and ★ 15 k ✓');
+        expect(r.text).toBe('needs generators automated ✓, farms automated (on order), mines automated and ★ 7.5 k ✓');
         expect(r.done).toBe(2);
     });
     test('everything in: the road is open, and the node can be bought', () => {

@@ -38,7 +38,7 @@ import {
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, recoverAwake,
   LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake, snap,
-  lookDue, sleepDaysAt,
+  lookDue, sleepDaysAt, mindWarning, WARN_BELOW, sleepPace,
 } from '../src/phase4/watcher.js';
 import { THROWS, beats, counter, visitDue, TYPE_MS, NIGHTS } from '../src/phase4/surface.js';
 // deep-tree (step 1): every level, automation, cryo tier and Watcher step is bought ON THE TREE,
@@ -48,13 +48,13 @@ import { buy as treeBuy, canBuy as treeCanBuy, priceOf as treePriceOf, LEVEL_NOD
 // deep-grow: MOVEMENT III. The question answered, the body grows awake: the policy (src/phase4/policy.js
 // decideGrow) buys the drawer's body items, takes reachable chambers it can afford without starving,
 // and pulls RISE when the deepest floor is full and the machine is body. The act ends at the rise.
-import { normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, setChamberPlace, dreamDaysAt, dreamWake, dreamEnd, pump, bodyRatios } from '../src/phase4/grow.js';
+import { adviseGrow, growDoable, normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, setChamberPlace, dreamDaysAt, dreamWake, dreamEnd, pump, bodyRatios } from '../src/phase4/grow.js';
 import { decideGrow, pressGrow, TAKES_PER_SECOND, PUMP_EVERY_S, onBeatTurn } from '../src/phase4/policy.js';
 import { GAUGE_ORGAN } from '../src/phase4/organs.js';
 // deep-tension: --naive, the GROW player who always takes the cheapest (green) organ and never reads a gauge
 const STYLE = process.argv.includes('--naive') ? 'naive' : 'balanced';
 // deep-econ: after the hall the player follows the instruments' named goal (SAVE FOR ..., BUY ...)
-import { goalOf } from '../src/phase4/instruments.js';
+import { goalOf, adviseAsleep, levelsReady, calledRow, tierDue } from '../src/phase4/instruments.js';
 import { cryoRoad } from '../src/phase4/readout.js';
 // deep-grow2: Surface's nights 4 and 5 give a graft; the player places it at the next wake, in a room of
 // the weakest column. GROW is awake at a day a second; when nothing can be taken the player marks the
@@ -99,6 +99,12 @@ let lowest = 100, capFullAt = null;
 const SNAP_EVERY = 12;
 const w2 = initialWatcher();
 let lowest2 = 100, snapClock = 0;
+// deep-pass3 (B400): the Watcher kept by a player who only answers THE WARNING: when the tape says STEADY
+// THE MIND (under WARN_BELOW) it clicks the colony REACT_S later and again at every cooldown until the
+// warning goes. Reported only, like the other two; its reboots per act are the brief's measure.
+const REACT_S = 2;
+const w3 = initialWatcher();
+let lowest3 = 100, warnFor = 0, warnings3 = 0;
 // v1.49.0: the Watcher's ladder, bought by the --watcher player only
 const WATCHER = process.argv.includes('--watcher');
 const WATCHER_HOLD = 20;           // real seconds a sleep the player stays under for the next step's capacity
@@ -183,7 +189,11 @@ function buyGoal() {
   if (process.env.GOAL_DEBUG && real % 20 < 1) { const g = simGoal(); console.log(fmt(real), goalRoad && goalRoad.text, JSON.stringify(g), "stars", s.stars.toPrecision(3), "income", JSON.stringify(s.income), "sleepGot", JSON.stringify(s.sleepGot)); }
   reserve = 0;
   for (let k = 0; k < 12; k++) {
-    const g = simGoal();
+    // deep-pass3: as the tape awake: something NEW that can be paid (the tier it woke for) comes first
+    simGoal();                         // the road to the next tier, fresh
+    const due = s.cryo >= 0 && nextCryo(s) ? tierDue(s, goalRoad) : null;
+    const g0 = due && s.stars >= due.price && treeCanBuy(s, due.id, { ...SIM, asleep: false, need: null }).ok ? { ...due, gap: 0 } : simGoal({ onlyNew: true });
+    const g = g0 && g0.gap <= 0 && treeCanBuy(s, g0.id, { ...SIM, asleep: false, need: null }).ok ? g0 : simGoal();
     if (!g) return;
     if (g.gap > 0 || !treeCanBuy(s, g.id, { ...SIM, asleep: false, need: null }).ok) { reserve = g.gap > 0 ? g.price : 0; return; }
     onTree(g.id, { ...SIM, need: null });
@@ -218,6 +228,8 @@ function placeGrafts(r) {
     events.push({ real, day: s.day, e: `graft: a ${t} turns to flesh` });
   }
 }
+let tapeChecks = 0, tapeDead = 0;
+const tapeDeadAt = [];
 let bodyEnd = null;                // v1.50.0: the last wake-up, { real, year, were }
 let real = 0, wakeUps = 0, buysThisWake = 0;
 const alarmsSeen = {};
@@ -335,18 +347,42 @@ function waitDays(report) {
   return Math.max(0, Math.min(mineralWait, starWait));
 }
 
-/** Would the player wake now? When the next thing it wants is paid for. */
-function wantsToWake() {
-  // deep-econ: after the hall the player wakes when the tape says WAKE: the goal can be paid
-  // (the store full is checked by the caller). Ore waits for the wake.
-  // deep-tension: the tape says WAKE only for something new (a tier, a gift, a first level)
-  const g = simGoal({ onlyNew: true });
-  if (g) return g.gap <= 0;
-  const r = tickDay(JSON.parse(JSON.stringify(s)), false);
-  if (waitDays(r) <= 0) return true;
-  const next = nextCryo(s);
-  return !!next && s.stars >= cryoPrice(s, s.cryo + 1) && !sleepTrouble(s, next.days);
+/** deep-pass3 (B404): the tape asleep, as the game reads it (adviseAsleep), for the sim's colony. */
+function tapeAsleep() {
+  const had = s.watcher, was = s.asleep;
+  s.watcher = had || w;
+  s.asleep = true;
+  try { return adviseAsleep(s, { road: nextCryo(s) ? goalRoad : null }); } finally { s.watcher = had; s.asleep = was; }
 }
+/** Would the player wake now? deep-pass3 (B404): when the tape says WAKE, and only then (a deeper sleep can
+ *  be paid; the store full is checked by the caller). Everything else is ordered in the night. */
+function wantsToWake() {
+  return tapeAsleep() === 'WAKE' && !sleepFull(s);
+}
+/** deep-pass3 (B404): NIGHT ORDERS. Asleep the player buys what the tape names (BUY X, BUY N LEVELS). */
+function buyAtNight() {
+  for (let k = 0; k < 8; k++) {
+    const word = tapeAsleep();
+    if (/^BUY \d+ LEVELS$/.test(word)) {
+      const { ids } = levelsReady(s);
+      let n = 0;
+      for (const id of ids) { if (!treeBuy(s, id, { ...SIM, asleep: true })) break; n++; events.push({ real, day: s.day, e: `night ${id}` }); }
+      nightBuys += n;
+      if (!n) return;
+      continue;
+    }
+    if (!word.startsWith('BUY ')) return;
+    const id = calledRow(s, word);
+    if (!id || !treeBuy(s, id, { ...SIM, asleep: true, need: null })) return;
+    if (GIFT_PRICE[id]) giftAt[id] = { real, year: s.day / DAYS_PER_YEAR };
+    if (id === 'vats') vatsAt.push({ level: s.vats, real, year: s.day / DAYS_PER_YEAR });
+    nightBuys++;
+    events.push({ real, day: s.day, e: `night ${id}` });
+    if (answered()) return;
+  }
+}
+let nightBuys = 0;
+const handWakeAt = [];
 
 /** A party when it is cheap: the ring is the goal, and every reading narrows it. */
 function maybeScout(r) {
@@ -488,6 +524,9 @@ function growSecond() {
     if (p.done) afterTake(p.done);
     if (p.revived) progressed();
   }
+  // deep-pass3 (B402): the tape's word must be doable at every moment of GROW
+  tapeChecks++;
+  { const word = adviseGrow(s, growLayout); if (!growDoable(s, growLayout, word)) { tapeDead++; if (tapeDeadAt.length < 5) tapeDeadAt.push(`${fmt(real)} ${word}`); } }
   let takes = 0, boughtNow = false;
   for (let round = 0; round < TAKES_PER_SECOND + 4 && !s.grow.dreaming && !risen(s); round++) {
     let did = false;
@@ -531,6 +570,7 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
   earned += r.stars; earnedAt.push([real, earned]);
   recoverAwake(w, 1);                   // v1.49.0: awake, the Watcher rests
   recoverAwake(w2, 1);
+  recoverAwake(w3, 1);
   onCurve(r.stars);
   if (!starsDay0 && r.stars > 0) starsDay0 = r.stars;   // the first day the colony makes stars at all
   starsDayEnd = r.stars;
@@ -561,6 +601,7 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
     let alarm = null, slept = 0, died = 0, held = 0, lookClock = 0;
     beginSleep(w, s.cryo);
     beginSleep(w2, s.cryo);
+    beginSleep(w3, s.cryo);
     // deep-voice: is Surface due in this sleep? Then the player stays under for it
     const visitThisSleep = !firstSleep(w) && visitDue(w.surface, w.sleeps);
     let voiceLeft = 0;                 // real seconds still to give the visit once it has come
@@ -576,14 +617,24 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
       real += spent; sleepReal += spent; lookClock += spent;
       earned += sum.stars; earnedAt.push([real, earned]);
       if (sum.days > 0) onCurve(sum.stars / sum.days);
-      watchSleep(w, { days: sum.days, tier: s.cryo, spare: sum.spare });
+      watchSleep(w, { days: sum.days, tier: s.cryo, spare: sum.spare, pace: sleepPace(into) });
       if (sum.alarm) alarmHit(w, sum.alarm.kind);
       w2.bought = w.bought.slice();                       // the --watcher player's ladder counts for both
-      watchSleep(w2, { days: sum.days, tier: s.cryo, spare: sum.spare });
+      watchSleep(w2, { days: sum.days, tier: s.cryo, spare: sum.spare, pace: sleepPace(into) });
       snapClock += spent;
       while (snapClock >= SNAP_EVERY) { snapClock -= SNAP_EVERY; snap(w2, sleepReal * 1000, s.cryo); }
       if (sum.alarm) alarmHit(w2, sum.alarm.kind);
       lowest2 = Math.min(lowest2, w2.stability);
+      w3.bought = w.bought.slice();
+      watchSleep(w3, { days: sum.days, tier: s.cryo, spare: sum.spare, pace: sleepPace(into) });
+      const warnedBefore = w3.warned || 0;
+      if (mindWarning(w3, true)) {
+        if ((w3.warned || 0) > warnedBefore) { warnFor = 0; warnings3++; }
+        warnFor += spent;
+        if (warnFor >= REACT_S) snap(w3, sleepReal * 1000, s.cryo);
+      }
+      if (sum.alarm) alarmHit(w3, sum.alarm.kind);
+      lowest3 = Math.min(lowest3, w3.stability);
       // Surface, when it comes, in both runs (deep-voice); a night holds the player under
       if (surfaceDue(w, slept + sum.days, rate)) {
         const v = surfaceComes();
@@ -592,6 +643,8 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
       buyGifts(true);
       if (answered()) { alarm = 'question'; break; }     // deep-grow: the body begins awake
       buyFeed(true);
+      buyAtNight();
+      if (answered()) { alarm = 'question'; break; }
       if (WATCHER) {
         // the ladder: the next step the moment it can be paid
         let id, got;
@@ -615,7 +668,7 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
       // deep-voice: a line is due in this sleep and has not come or not finished typing yet
       const waitsOnVoice = visitThisSleep && (w.surface.visit ? voiceLeft > 0 : true);
       if (waitsOnVoice && wantsToWake()) continue;
-      if (wantsToWake()) { alarm = 'hand'; handWakes++; decided(); break; }
+      if (wantsToWake()) { alarm = 'hand'; handWakes++; handWakeAt.push(`${fmt(real)} ${(s.cryo >= 0 && tierDue(s, goalRoad)?.id) || simGoal({ onlyNew: true })?.id}`); decided(); break; }
       // deep-econ: the store is full and nothing more comes in this sleep: the instruments say WAKE
       if (sleepFull(s) && !waitsOnVoice && !waitsOnCapacity) { alarm = 'full'; decided(); break; }
     }
@@ -676,7 +729,7 @@ function refTier(tier, every) {
     beginSleep(r, tier);
     for (let k = 0; k < REF_SLEEP * 10; k++) {
       clock += 0.1; since += 0.1;
-      watchSleep(r, { days: sleepDaysAt(k * 0.1, 0.1, CRYO[tier].days), tier });     // deep-rebuild: the dive
+      watchSleep(r, { days: sleepDaysAt(k * 0.1, 0.1, CRYO[tier].days), tier, pace: sleepPace(k * 0.1) });     // deep-rebuild: the dive
       if (every && since >= every - 1e-9) { since = 0; snap(r, clock * 1000, tier); }
       if (n >= 3) { low = Math.min(low, r.stability); high = Math.max(high, r.stability); }
     }
@@ -704,6 +757,9 @@ console.log(`culture vats (deep-fix2)  ${vatsAt.map((x) => `${x.level} ${fmt(x.r
 console.log(`grafts (deep-grow2)  ${graftAt.map((g) => `${g.type} ${fmt(g.real)}`).join('  ') || 'none'}`);
 console.log(`surface (both runs: wins 1 in 3)  games ${surfaceGames}  nights ${nightAt.map((x) => `${x.n} ${fmt(x.real)}`).join('  ') || 'none'}  |  gifts bought: ${Object.keys(GIFT_PRICE).map((id) => `${id} ${gat(id)}`).join('  ')}  (of ${NIGHTS.length} nights)`);
 console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (night 1)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}  |  ${REF_SLEEP} s sleeps from full, first reboot in sleep: ${absent}`);
+console.log(`SLEEP's wakes only for buying (deep-pass3)  ${handWakes} (${handWakeAt.join(', ')})  night orders ${nightBuys}`);
+console.log(`GROW's tape (deep-pass3)  ${tapeChecks} seconds read, the word not doable ${tapeDead}${tapeDeadAt.length ? ` (${tapeDeadAt.join(', ')})` : ''}`);
+console.log(`watcher (follows the warning: clicks ${REACT_S} s after STEADY THE MIND, at each cooldown until it goes)  ${w3.reboots} reboots in the act  warnings ${warnings3}  lowest ${Math.round(lowest3)}  |  unattended ${w.reboots} reboots in the act`);
 console.log(`watcher (attentive: snap every ${SNAP_EVERY} s)  stability ${Math.round(w2.stability)} at the end, lowest ${Math.round(lowest2)}, ${w2.reboots} reboots  |  ${REF_SLEEP} s sleeps, held (low-high from the third sleep): ${held}`);
 if (growAt !== null) {
   const total = real;

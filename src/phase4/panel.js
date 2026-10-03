@@ -10,7 +10,7 @@
  * one by one when the colony lies down and come back the same way.
  */
 
-import { GAUGES, RED_K, GREEN_FROM, GREEN_SPAN, ADVICE_PREFIX, ADVICE_HOLD_MS } from './instruments.js';
+import { GAUGES, RED_K, GREEN_FROM, GREEN_SPAN, ADVICE_PREFIX, ADVICE_HOLD_MS, URGENT_ADVICE } from './instruments.js';
 import { ORE_GLYPH, signHtml } from './readout.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -76,7 +76,9 @@ function gaugeSvg(id) {
         <circle cx="${CX}" cy="${CY}" r="${R + 4}" class="bezel-in"/>
         <circle cx="${CX}" cy="${CY}" r="${R + 2}" fill="url(#face-${id})" class="face"/>
         <clipPath id="glass-clip-${id}"><circle cx="${CX}" cy="${CY}" r="${R + 1.5}"/></clipPath>
+        <clipPath id="vein-clip-${id}"><circle cx="${CX}" cy="${CY}" r="${VEIN_R}"/></clipPath>
         <g class="fluid" clip-path="url(#glass-clip-${id})"><path class="fluid-body" d=""/><path class="fluid-top" d=""/></g>
+        <g class="veins" clip-path="url(#vein-clip-${id})">${veinPaths(id)}</g>
         <path d="${arc(0, RED_K, R - 4)}" class="arc-red"/>
         <path d="${arc(GREEN_FROM, GREEN_FROM + GREEN_SPAN + 0.02, R - 4)}" class="arc-green"/>
         ${ticks}
@@ -84,12 +86,16 @@ function gaugeSvg(id) {
         <circle cx="${CX}" cy="${CY}" r="5" class="cap"/>
         <circle cx="${CX}" cy="${CY}" r="1.6" class="cap-dot"/>
         <ellipse cx="${CX}" cy="${CY - 16}" rx="${R - 6}" ry="${R - 22}" fill="url(#glass-${id})" class="glass"/>
-        <g class="veins" clip-path="url(#glass-clip-${id})">${veinPaths(id)}</g>`;
+        <circle cx="${CX}" cy="${CY}" r="${R + 10.5}" class="weak-ring"/>`;
     return svg;
 }
 
 /* deep-grow: THE PANEL OVERGROWS. A vein crosses each gauge's glass (drawn once, hidden until the
-   question is answered), branching, never mirrored: a seeded walk from the bezel inward. */
+   question is answered), branching, never mirrored: a seeded walk from the bezel inward.
+   deep-pass3 (B401): the veins lie UNDER the scale and the needle, inside the ticks (VEIN_R), and at
+   half their old width: they covered the needles ("the gauges cannot be read"). */
+const VEIN_R = R - 11;
+const VEIN_W = 0.5;
 function veinPaths(id) {
     let seed = [...String(id)].reduce((a, c) => a * 31 + c.charCodeAt(0), 11) >>> 0;
     const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -105,7 +111,7 @@ function veinPaths(id) {
             d += ` Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`;
             if (depth < 2 && r() < 0.35) walk(x, y, a + (r() < 0.5 ? 0.9 : -0.9), len * 0.45, w * 0.55, depth + 1);
         }
-        out.push(`<path class="vein is-d${depth}" d="${d}" style="stroke-width:${w.toFixed(2)}"/>`);
+        out.push(`<path class="vein is-d${depth}" d="${d}" style="stroke-width:${(w * VEIN_W).toFixed(2)}"/>`);
     };
     const a0 = r() * Math.PI * 2;
     walk(CX + Math.cos(a0) * (R + 6), CY + Math.sin(a0) * (R + 6), a0 + Math.PI + (r() - 0.5) * 0.7, R * 2.1, 2.6, 0);
@@ -184,7 +190,7 @@ export function createPanel(els) {
             return { key: L.key, label: L.label, cell };
         });
     }
-    const advice = { word: '', at: 0, want: '' };
+    const advice = { word: '', at: 0, want: '', mode: '' };
     let alarmOn = false;
     let fleshK = 0;                 // deep-grow: 0 needles, 1 fluid (the gauges overgrown)
     let clock = 0;
@@ -200,7 +206,7 @@ export function createPanel(els) {
          * @param {number} view.empty - chambers dug and empty
          * @param {{key:string,label:string,lit:boolean,ordered:boolean}[]|null} view.lamps - null: none
          */
-        update({ gauges, advice: want = '', note = '', empty = 0, lamps = null }) {
+        update({ gauges, advice: want = '', note = '', empty = 0, lamps = null, mode = '' }) {
             for (const { c } of GAUGES) {
                 const x = gauges && gauges[c];
                 if (!x) continue;
@@ -215,7 +221,11 @@ export function createPanel(els) {
             // the stamped word changes rarely: it holds ADVICE_HOLD_MS before the next may replace it
             const now = performance.now();
             advice.want = want;
-            if (want !== advice.word && (!advice.word || now - advice.at >= ADVICE_HOLD_MS)) {
+            // deep-pass3 (B406): the hold never keeps a word across a change of mode (asleep it held BUILD
+            // FARM), nor in front of an urgent one (STEADY THE MIND), nor an urgent one once it is over
+            const urgent = URGENT_ADVICE.includes(want) || URGENT_ADVICE.includes(advice.word);
+            if (mode !== advice.mode) { advice.mode = mode; if (want !== advice.word) advice.at = -Infinity; }
+            if (want !== advice.word && (!advice.word || urgent || now - advice.at >= ADVICE_HOLD_MS)) {
                 advice.word = want;
                 advice.at = now;
                 const text = want ? `${ADVICE_PREFIX}${want}` : '';

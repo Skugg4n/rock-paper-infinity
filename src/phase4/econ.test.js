@@ -116,8 +116,13 @@ describe('the tape always names the next goal (B332)', () => {
         // for the wake; something new is (the tape says WAKE, and why)
         s.stars = goal.price;
         const fresh = goalOf(s, { onlyNew: true });
-        if (!fresh) expect(adviseAsleep(s)).toMatch(/^(A LEVEL|\d+ LEVELS) READY$/);
-        else { s.stars = Math.max(s.stars, fresh.price); expect(adviseAsleep(s)).toBe('WAKE'); expect(adviceNote(s, 'WAKE')).toMatch(/can be bought\.$/); }
+        // deep-pass3 (B404): what the night can order is bought in the night (BUY ...); only a deeper sleep wakes it
+        if (!fresh) expect(adviseAsleep(s)).toMatch(/^BUY /);
+        else {
+            s.stars = Math.max(s.stars, fresh.price);
+            const w = adviseAsleep(s);
+            if (NODE_BY_ID[fresh.id].kind === 'cryo') { expect(w).toBe('WAKE'); expect(adviceNote(s, 'WAKE')).toMatch(/can be bought\.$/); } else expect(w).toBe(`BUY ${fresh.name}`);
+        }
     });
     test('an opened gift is the goal before the levels; The question before everything', () => {
         const s = olas();

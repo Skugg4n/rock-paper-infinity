@@ -2132,7 +2132,7 @@ body.in-deep #version-info { z-index: 1400; }
    of years stands in the years over YEAR 0, Surface and the last lines over the shaft. index.js sets
    --deep-cx and --deep-cy from the view each frame they move. */
 #phase-deep[data-view="strata"] .deep-dive { left: var(--deep-cx, 50%); top: var(--deep-cy, 46%); }
-#phase-deep[data-view="strata"] .deep-night-stage,
+#phase-deep[data-view="strata"] .deep-night-stage { left: var(--deep-night-x, 50%); }
 #phase-deep[data-view="strata"] .deep-rise-lines { left: var(--deep-cx, 50%); }
 /* the "+" where the next chamber is dug sits in the same label layer as the 3D view's */
 #phase-deep[data-view="strata"] .strata-dig .deep-lbl-in { width: 48px; height: 48px; }
@@ -2309,7 +2309,9 @@ body.in-deep #version-info { z-index: 1400; }
     transform: scale(0.4);
     transition: opacity 400ms ease, transform 400ms ease;
 }
-.deep-gauge.is-weakest::after { opacity: 1; transform: scale(1); }
+/* deep-pass3 (B401): the dot is gone (6 px, between two gauges); a red ring round the whole gauge and its
+   label in red say which one is short */
+.deep-gauge::after { display: none; }
 /* the ring of organs: the same ring as the rooms', warmer; the room's own organ marked cheap */
 .deep-ring.is-organs .deep-ring-room { background: rgba(38, 18, 24, 0.97); color: #e8c8c0; }
 .deep-ring.is-organs .deep-ring-room.is-ok { background: rgba(70, 24, 34, 0.98); color: #ffe6e0; box-shadow: 0 0 0 1px rgba(240, 96, 110, 0.45); }
@@ -2356,3 +2358,50 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-float.is-fill { color: #ff9aa4; }
 .deep-float.is-mass { color: #f3b4bb; }
 .deep-float.is-dead { color: #9a9ea2; text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9); }
+
+/* ---- deep-pass3 (B400): THE MIND WARNS. Under 30 the Watcher's label flickers and its meter burns red;
+   the tape says STEADY THE MIND. The lamps say what to do the first time, in one plain line. ---- */
+#phase-deep #deep-watcher.is-warn .deep-watcher-name { animation: deep-warn-flicker 1.1s steps(1, end) infinite; color: #ffb3a8; }
+#phase-deep #deep-watcher.is-warn .deep-watcher-fill { background: #e0473f; }
+@keyframes deep-warn-flicker {
+    0%, 100% { opacity: 1; }
+    12% { opacity: 0.25; }
+    18% { opacity: 1; }
+    52% { opacity: 0.55; }
+    58% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { #phase-deep #deep-watcher.is-warn .deep-watcher-name { animation: none; } }
+#phase-deep .deep-puzzle { flex-wrap: wrap; justify-content: center; max-width: 320px; }
+#phase-deep .deep-puzzle-hint { flex-basis: 100%; text-align: center; font-size: 12px; line-height: 16px; color: #d8d2c4; letter-spacing: 0.02em; white-space: normal; }
+#phase-deep .deep-puzzle-hint[hidden] { display: none; }
+
+/* deep-pass3 (B401): THE WEAKEST GAUGE, a red ring round the whole dial and its name in red */
+.deep-gauge-svg .weak-ring { fill: none; stroke: #e0473f; stroke-width: 2.6; opacity: 0; transition: opacity 400ms ease; }
+.deep-gauge.is-weakest .deep-gauge-svg .weak-ring { opacity: 1; filter: drop-shadow(0 0 3px rgba(224, 71, 63, 0.8)); }
+#phase-deep .deep-gauge.is-weakest .flesh-tape, #phase-deep .deep-gauge.is-weakest .dymo.is-gauge { color: #ff6b5e; }
+.deep-gauge-svg .vein { opacity: 0; }
+#deep-panel.og-1 .deep-gauge-svg .vein, #deep-panel.is-flesh .deep-gauge-svg .vein { opacity: 0.7; }
+
+/* ---- deep-pass3 (B403, B406): the room ring says what a room does to the stars, and rings the room the tape names ---- */
+.deep-ring-effect {
+    position: absolute; left: 0; top: 92px; transform: translateX(-50%);
+    white-space: nowrap; text-align: center; font-size: 12px; line-height: 16px;
+    padding: 4px 9px; border-radius: 8px; background: rgba(10, 13, 18, 0.92); color: #eef2f6; pointer-events: none;
+}
+.deep-ring-effect[hidden] { display: none; }
+.deep-ring-effect.is-down { color: #f2c8a0; }
+.deep-ring-room.is-called { box-shadow: 0 0 0 2px rgba(240, 217, 138, 0.95), 0 0 14px rgba(240, 217, 138, 0.55); }
+
+/* ---- deep-pass3 (B406): the drawer row the tape names, ringed in the tape's gold; the foot line ---- */
+.deep-dr-row.is-called { box-shadow: inset 0 0 0 2px rgba(240, 217, 138, 0.9); border-radius: 8px; }
+.deep-dr-row.is-called .deep-dr-name { color: #f2d98a; }
+.deep-drawer-foot { font-size: 11px; line-height: 15px; color: #8d96a3; padding: 8px 2px 0; }
+.deep-drawer-foot[hidden] { display: none; }
+
+/* deep-pass3 (B407): the machine's tip wraps and stays on screen (index.js placeTip) */
+#deep-machine-tip { white-space: normal; max-width: min(340px, calc(100vw - 16px)); line-height: 18px; }
+/* deep-pass3 (B401): the reading stands out from the veins: the fluid's surface bright and thicker, the veins
+   dark and quiet under it (both were the same red, and a diagonal vein read like a needle) */
+.deep-gauge-svg .fluid-top { stroke: #ff6f7f; stroke-width: 2.2; opacity: 1; }
+#deep-panel.og-1 .deep-gauge-svg .vein, #deep-panel.is-flesh .deep-gauge-svg .vein { opacity: 0.38; }
+#deep-panel.is-flesh .deep-gauge-svg .vein.is-d0 { animation: none; }

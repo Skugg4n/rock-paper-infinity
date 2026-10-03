@@ -75,8 +75,36 @@ export const ALARM_DROP_BAD = 6;
 export const ALARM_DROP = 2;
 const NO_DROP = ['manual', 'debug', 'reboot', 'first', 'look'];
 
-/** At zero the system reboots: the colony wakes, and the meter comes back at this. */
-export const REBOOT_TO = 40;
+/** At zero the system reboots: the colony wakes, and the meter comes back at this. deep-pass3: 60 (it was
+ *  40, and an unwatched mind restarted again forty seconds later: three FAULT wakes in six minutes). */
+export const REBOOT_TO = 60;
+
+/* ---- THE WARNING (deep-pass3, B400) -----------------------------------------------------------
+   The human pass of v1.83.0: "FAULT: THE MIND RESTARTED" three times in six minutes, and nothing on
+   screen ever said how to stop it. Now the mind warns first: under WARN_BELOW the Watcher's label
+   flickers and the tape says STEADY THE MIND (the first time with "Click the colony to steady it."
+   under it), until a few snaps have brought it back over STEADY_AT. At about a point a second that
+   is half a minute to act. A lamp event never comes while the warning is up, and a lost one never
+   takes the mind under the warning on its own: only the drift does, and the drift is what the tape
+   warns of. */
+export const WARN_BELOW = 30;
+export const STEADY_AT = 70;
+/**
+ * Is the mind warning now? With hysteresis: on under WARN_BELOW, off again at STEADY_AT. Asleep only,
+ * never in the first sleep (it does not drift) nor once the Watcher is alone.
+ * @param {object} w - mutated (`warn`, and `warned`, how many warnings it has given)
+ * @param {boolean} asleep
+ * @returns {boolean}
+ */
+export function mindWarning(w, asleep = true) {
+    if (!w || !asleep || w.gone || firstSleep(w)) { if (w) w.warn = false; return false; }
+    if (!w.warn && w.stability < WARN_BELOW) { w.warn = true; w.warned = (w.warned || 0) + 1; }
+    else if (w.warn && w.stability >= STEADY_AT) w.warn = false;
+    return !!w.warn;
+}
+/** The hint under the tape, only during the first warning a Watcher ever gives. */
+export const STEADY_HINT = 'Click the colony to steady it.';
+export const steadyHint = (w) => (w && w.warn && (w.warned || 0) <= 1 ? STEADY_HINT : '');
 
 /**
  * THE SNAP. A click on the base: the structure snaps back, and stability with it, at most once in
@@ -148,6 +176,9 @@ export function initialWatcher() {
         sealing: null,          // a biological step paid for, waiting for the player to choose its sector (v1.52.0)
         grown: 0,               // real seconds of sleep since the body last grew
         gone: false,            // the last wake-up has come: nobody came out
+        warn: false,            // deep-pass3: the mind is warning (STEADY THE MIND)
+        warned: 0,              // deep-pass3: warnings given, so the hint comes only with the first
+        taught: [],             // deep-pass3: the lamp kinds whose one plain line has been shown
     };
 }
 
@@ -180,6 +211,9 @@ export function normalizeWatcher(w) {
     out.puzzle = okPuzzle(out.puzzle) ? { ...out.puzzle, ...(out.puzzle.kind === 'lamps' ? { at: 0 } : {}) } : null;
     out.puzzle2 = null;
     if (!Number.isFinite(out.lampSleep)) out.lampSleep = null;
+    out.warn = !!had.warn;
+    out.warned = Number.isFinite(had.warned) ? Math.max(0, had.warned | 0) : 0;
+    out.taught = Array.isArray(had.taught) ? had.taught.filter((k) => PUZZLE_KINDS.includes(k)) : [];
     return out;
 }
 
@@ -241,13 +275,16 @@ export function sleepDaysAt(t0, seconds, tierDays, paused = false) {
  *          REBOOT_TO (the phase wakes the colony); named: always false since deep-voice (the label
  *          changes on Surface's first night, openSurface)
  */
-export function watchSleep(w, { days, tier, spare = 0, hold = false }) {
+export function watchSleep(w, { days, tier, spare = 0, hold = false, pace = 1 }) {
     const d = Math.max(0, days || 0);
     const years = d / DAYS_PER_YEAR;
     w.sleptYears += years;
     // deep-fix: `hold`, while a sector is being chosen, the meter holds (a click there seals, it
     // does not snap: the playtest fell from 51 to 6 and rebooted right after the seal)
-    if (!firstSleep(w) && !hold) w.stability = Math.max(0, w.stability - years * driftFactor(w) / driftYears(tier));
+    // deep-pass3 (B400): `pace`, the dive's (sleepPace): the mind drifts with real time, never faster than
+    // DRIFT_PER_SECOND a second. At the dive's top (three times the pace) it fell three points a second, and
+    // the warning gave ten seconds; now it gives half a minute
+    if (!firstSleep(w) && !hold) w.stability = Math.max(0, w.stability - years / Math.max(1, pace || 1) * driftFactor(w) / driftYears(tier));
     const k = capacityGain(w);
     const cap = k * CAPACITY_PER_SECOND * d / CRYO[tierOf(tier)].days;
     w.grown = (w.grown || 0) + d / CRYO[tierOf(tier)].days;       // the body grows only in the dark
@@ -381,6 +418,19 @@ function mulberry32(a) {
 const rngFor = (seed, salt) => mulberry32((((seed | 0) * 2654435761) + salt * 40503) >>> 0);
 
 export const PUZZLE_KINDS = ['lamps', 'dark'];
+/** deep-pass3 (B400): the one plain line under the lamps the first time each kind comes. */
+export const LAMP_HINT = {
+    lamps: 'Repeat the lamps. Click the rooms in the order they lit.',
+    dark: 'One lamp goes out. Click that room before the time runs out.',
+};
+/** The line to show under this event, or '' once its kind has been taught. */
+export const lampHint = (w, p) => (p && LAMP_HINT[p.kind] && !((w && w.taught) || []).includes(p.kind) ? LAMP_HINT[p.kind] : '');
+/** The event of this kind has been seen through: its line is not shown again. */
+export function taughtLamps(w, kind) {
+    if (!w || !LAMP_HINT[kind]) return;
+    if (!Array.isArray(w.taught)) w.taught = [];
+    if (!w.taught.includes(kind)) w.taught.push(kind);
+}
 /** Of the lamp events, this share is "which lamp went out". */
 export const DARK_SHARE = 0.4;
 /** At most one lamp event in this many sleeps. */
@@ -492,6 +542,8 @@ export function demand(w) {
  */
 export function puzzleDue(w, { asleep, alarmPending = false }) {
     if (!asleep || alarmPending || firstSleep(w) || demand(w)) return false;
+    // deep-pass3: never while the mind is warning (one thing asked at a time: steady it first)
+    if (w.warn || w.stability < WARN_BELOW) return false;
     if (w.lampSleep != null && (w.sleeps || 0) - w.lampSleep < LAMP_EVERY_SLEEPS) return false;
     if (w.capacity < PUZZLE_COST) return false;
     return w.nextPuzzleYears != null && w.sleptYears >= w.nextPuzzleYears;
@@ -549,11 +601,13 @@ export function solvePuzzle(w, tier) {
     dismissPuzzle(w, tier);
     return { ok: true, gained: w.stability - before, rebooted: false };
 }
-/** The event lost: a wrong click, or the lamp not found in time. It ends, and it costs. */
+/** The event lost: a wrong click, or the lamp not found in time. It ends, and it costs. deep-pass3:
+ *  never more than down to the warning (WARN_BELOW), so a lost sequence never restarts the mind by itself. */
 function failLamps(w, tier) {
-    w.stability = Math.max(0, w.stability - PUZZLE_WRONG);
+    const before = w.stability;
+    w.stability = Math.max(Math.min(before, WARN_BELOW), before - PUZZLE_WRONG);
     dismissPuzzle(w, tier);
-    return { ok: false, gained: -PUZZLE_WRONG, rebooted: rebootIfSpent(w) };
+    return { ok: false, gained: w.stability - before, rebooted: false };
 }
 
 /**

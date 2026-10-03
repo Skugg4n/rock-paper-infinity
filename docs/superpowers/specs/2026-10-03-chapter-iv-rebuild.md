@@ -662,3 +662,66 @@ against "never pulse on a loop", but the brief asked for it while the drawer is 
 **Not done here.** accept-iv-cut.mjs was updated (FLOORS, `--mute-audio`) but not run: the machine was slow and the brief
 asked to keep it light. The big numbers (1e17) the human pass named are untouched. The machine's hover in SLEEP runs off
 the right edge.
+
+## Built: pass 3 (deep-pass3)
+
+The second human pass of v1.83.0 (docs/playtests/2026-10-03-chapter-iv-human-pass-2.md): GROW alone worth ten minutes,
+the chapter not yet. Built on the branch `deep-pass3` (B400 to B409); the play log docs/playtests/2026-10-03-pass3-play.md.
+
+**The Watcher explains itself** (watcher.js, instruments.js, index.js). `WARN_BELOW` 30: the label flickers red, the
+meter red, the tape STEADY THE MIND (urgent: no hold), the first warning a Watcher gives with "Click the colony to steady
+it." under it; it stays until `STEADY_AT` 70 (one snap is not enough). The drift is divided by the dive's pace above 1:
+the mind falls about a point a real second at every tier (at the dive's top it fell three). A lost lamp sequence takes
+`PUZZLE_WRONG` but never below the warning and never restarts the mind; `puzzleDue` is false under the warning and a
+waiting event is dismissed when the warning starts. `LAMP_HINT` per kind, shown until that kind has been played
+(`w.taught`, saved). The card: WATCH THE LAMPS, YOUR TURN ●●○○○, WHICH WENT OUT? 1.2 s, RIGHT +15, WRONG -5; lamps
+1.4 s lead, 0.75 s on, 0.38 s gap, and a sequence lamp lights a whole chamber. `REBOOT_TO` 60. `WAKE_WHY`: the wake after
+a restart, after the first sleep and after a look says why, low, as a missed night is said.
+
+**GROW** (grow.js, organs.js, panel.js). `growTarget` is where the tape points (TAKE A CHAMBER: the cheapest chamber in
+reach it can pay, the machine house last; GROW A X: the chamber in reach, or the spare organ, that gives X cheapest); the
+view rings it and the camera goes to its floor (the machine house counted as floor 0 and held the camera there).
+`growDoable` holds the tape: PUMP always does something, DREAM unless dreaming, RISE when ready, TAKE and GROW only with
+a target. When the short organ is more than `DREAM_ADVISE_S` of mass away the tape says DREAM. Decisions where the brief
+left room, from the sim: `massRate` never under `LID_MASS` (the vats eat the guts' mass, not the lid's: a body with more
+vats than guts read PUMP for half an hour); a colony over `TAKE_REF` 48 chambers spreads the price step and the work of a
+take and scales its guts' (and vats') mass by its size; a floor below the fourth costs what the fourth does
+(`FLOOR_TOP`). Without these a colony of 60 chambers, which the new SLEEP sometimes builds, rose after half an hour.
+The gauges: veins clipped inside the ticks (`VEIN_R`), half width, dark; the fluid's surface bright; the weakest is a
+red ring (`weak-ring`) and a red name, set only on the gauge whose organ the tape names (`wantOrgan`).
+
+**TEND** (instruments.js `roomStarsLine`). Rooms keep drawing the machine's power; the ring's hover says what a room does
+to the stars a second, and why when it falls. Chosen over a rebalance: it is the one trade-off TEND has (a farm costs
+games, a generator buys them) and every later tier's stars are tuned on the spare energy. Cryo I ★ 7.5 k. The tape says
+SAVE FOR CRYO I while the last automation is on order.
+
+**SLEEP** (tree.js, deep.js, instruments.js). After the hall levels, automations and the culture vats are bought asleep
+(`job.night`; asleep without the Scheduler only night orders start). `tierDue`: the next tier, once its road is done and
+the first vats are bought, is the goal asleep and awake; asleep it is priced as the wake will price it (`wakePrice`,
+`payableOnWake`), saved for (no night levels meanwhile: they ate its price and the colony sat six minutes at Cryo II),
+and WAKE names it. Prices stay set on the wake; the drawer's foot says so (`PRICES_FOOT`).
+
+**The drawer** (instruments.js `calledRow`, drawer.js). The tape's word names its row; `drawerGroups` always lists it
+(asleep a called tier too, "Bought awake."), rings it, and the drawer scrolls to it on opening and when it changes. The
+rows are rebuilt only when their shape changes: a price or gap that moves is written in place (rebuilt every frame in
+the night, a click was lost between press and release). The tape uses the drawer's names (`AUTO_NAME`). The panel's hold
+is released on a change of mode and for urgent words.
+
+**Numbers** (sim, the strata view; the 3D view runs the same, 28m53s)
+
+| | before (v1.83.0) | after |
+|---|---|---|
+| act | 30m18s | 30m38s |
+| TEND / SLEEP / GROW | 4m45s / 12m37s / 12m56s | 4m22s / 13m13s / 13m03s |
+| --watcher | 35m57s (SLEEP 14m20s, GROW 16m52s) | 30m36s (14m17s, 11m57s) |
+| longest without a decision | TEND 34, SLEEP 41 (55 --watcher), GROW 40 s | TEND 34, SLEEP 48 (51), GROW 34 s |
+| wakes only for buying in SLEEP | 10 (and 1 store full) | 5, one a tier (and 2 store full) |
+| reboots per act | unattended 15, a click every 12 s 0 | unattended 5, a click every 12 s 0, answering the warning 0 |
+| GROW's tape not doable | not measured | 0 of 628 seconds |
+| naive GROW (cheapest organ always) | no rise in 42 min | no rise in 60 min (it never reads a gauge) |
+
+Seeds 2 to 5: 31m49s to 35m36s (one colony of 61 chambers, SLEEP 16 min).
+
+**Not done here.** Wakes only for buying are 2.3 per six minutes of SLEEP (one a tier; the target was 2). The saves for
+the next tier in SLEEP have nothing to buy (the mind, the lamps and Surface fill them). accept-iv-cut.mjs not run. The
+big numbers (1e17) and "It gives 8 capacity and a word." untouched.

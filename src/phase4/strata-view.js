@@ -1427,8 +1427,13 @@ export function createStrataView(container, opts = {}) {
         for (const r of avoidRects) if (sy > r.top - 10 && sy < r.bottom + 10) return true;
         return false;
     }
+    let labelYear = -1;
     function updateLabels(dt) {
         labelClock -= dt;
+        // deep-pass3 (B407): the top of the ruler is the clock's year, so it moves with the clock ("YEAR 0" stood
+        // still at the right while the clock said 682), and every boundary reads as a year ("8", "50", "82")
+        const yearNow = Math.floor(Math.max(0, (lastState && lastState.day) || 0) / 365);
+        if (yearNow !== labelYear) { labelYear = yearNow; labelsDirty = true; }
         if (labelsDirty && labelClock <= 0) {
             labels = S.strataLabels(layers, Math.max(0.4, 22 / ppu));
             labelClock = 0.1;
@@ -1437,13 +1442,14 @@ export function createStrataView(container, opts = {}) {
                 const L = labels[i];
                 const rec = labelEls[i];
                 if (!L) { rec.y = NaN; continue; }
-                const txt = L.kind === 'zero' ? 'YEAR 0' : L.kind === 'surface' ? (L.years > 0 ? `SURFACE  ${S.formatYears(L.years)}` : 'SURFACE') : S.formatYears(L.years);
+                const top0 = labels[0];
+                const offset = Math.max(0, yearNow - ((top0 && top0.years) || 0));
+                const txt = i === 0 ? `YEAR ${S.formatYears(yearNow)}` : L.kind === 'zero' ? 'YEAR 0' : `YEAR ${S.formatYears(L.years + offset)}`;
                 if (rec.text !== txt) { rec.el.textContent = txt; rec.text = txt; }
                 rec.el.classList.toggle('is-zero', L.kind !== 'year');
                 rec.y = L.y;
             }
-            const top = labels[0];
-            const upText = top && top.years > 0 ? `SURFACE ↑  ${S.formatYears(top.years)}` : 'SURFACE ↑';
+            const upText = 'SURFACE ↑';
             if (upTag.textContent !== upText) upTag.textContent = upText;
         }
         const viewTop = camY + viewH() / 2;
@@ -1595,16 +1601,18 @@ export function createStrataView(container, opts = {}) {
     function paintLamps() {
         let n = 0;
         if (lampSpec) {
-            const add = (list, color, hot) => {
+            // deep-pass3 (B400): a lamp in the sequence lights the whole chamber, big ("one lamp I barely saw")
+            const add = (list, color, hot, big = false) => {
                 for (const slot of list || []) {
                     const c = chambers[slot];
                     if (!c || n >= 32) continue;
-                    placeGlow(lamps, n++, c.x, c.y + S.CH_H - 0.12, 0.9, 0.9, color, hot);
+                    if (big) placeGlow(lamps, n++, c.x, c.y + S.CH_H - 0.12, 1.8, 1.8, color, hot);
+                    else placeGlow(lamps, n++, c.x, c.y + S.CH_H - 0.12, 0.9, 0.9, color, hot);
                 }
             };
             add(lampSpec.lit, 0xe8f0f8, 0);
-            add(lampSpec.flash, 0xffffff, 0.5);
-            add(lampSpec.wrong, 0xe0a24f, 0.25);
+            add(lampSpec.flash, 0xffffff, 0.5, true);
+            add(lampSpec.wrong, 0xe0a24f, 0.25, true);
         }
         glowsDone(lamps, n);
     }

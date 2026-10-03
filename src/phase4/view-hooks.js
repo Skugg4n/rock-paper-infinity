@@ -117,21 +117,31 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
             const my = Math.max(RING_R + 40, Math.min(window.innerHeight - RING_R - 50, y));
             ringHost.style.left = `${mx}px`;
             ringHost.style.top = `${my}px`;
-            ringHost.innerHTML = '<span class="deep-ring-hub"><span class="dymo is-small deep-ring-say"></span></span>';
+            ringHost.innerHTML = '<span class="deep-ring-hub"><span class="dymo is-small deep-ring-say"></span></span>'
+                + '<span class="deep-ring-effect deep-mono" hidden></span>';
             const say = ringHost.querySelector('.deep-ring-say');
+            const eff = ringHost.querySelector('.deep-ring-effect');
             say.hidden = true;
             ROOM_ORDER.forEach((t, i) => {
                 const r = rooms[t];
                 const a = -Math.PI / 2 + i * Math.PI / 2 - Math.PI / 4;
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = `deep-ring-room${r.ok ? ' is-ok' : ''}`;
+                b.className = `deep-ring-room${r.ok ? ' is-ok' : ''}${r.called ? ' is-called' : ''}`;
                 b.dataset.room = t;
                 b.style.left = `${(RING_R * Math.cos(a)).toFixed(1)}px`;
                 b.style.top = `${(RING_R * Math.sin(a)).toFixed(1)}px`;
                 b.innerHTML = `<i data-lucide="${ROOM_ICON[t]}" class="w-6 h-6"></i><span class="deep-ring-price deep-mono">${signHtml(r.price)}</span>`;
-                b.addEventListener('pointerenter', () => { say.innerHTML = signHtml(r.ok ? ROOM_NAME[t] : r.need); say.hidden = false; });
-                b.addEventListener('pointerleave', () => { say.hidden = true; });
+                b.addEventListener('pointerenter', () => {
+                    say.innerHTML = signHtml(r.ok ? ROOM_NAME[t] : r.need);
+                    say.hidden = false;
+                    // deep-pass3 (B403): what the room does to the stars, under the ring
+                    const text = r.stars ? `${r.stars}${r.why ? `<br>${r.why}` : ''}` : '';
+                    eff.innerHTML = text;
+                    eff.hidden = !text;
+                    eff.classList.toggle('is-down', !!r.why);
+                });
+                b.addEventListener('pointerleave', () => { say.hidden = true; eff.hidden = true; });
                 b.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (!r.ok) {

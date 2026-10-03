@@ -55,12 +55,12 @@ describe('the info box: four plain lines', () => {
         expect(infoLines(s, 'seam', {}).lvl).toBe('0 / 20');
     });
     test('locked for a reason: the mode, the node before it, the hall\'s road', () => {
-        const s = start({ stars: 1e4 });
+        const s = start({ stars: 5e3 });
         s.asleep = true;
         expect(stateLine(s, 'seam', {}).text).toBe('Only while the colony is awake.');
         s.asleep = false;
         expect(stateLine(s, 'cryo-iii', {}).text).toBe('Opens after Cryo II.');
-        expect(stateLine(s, 'cryo-i', {}).text).toMatch(/^Needs generators automated, .+ and ★ 15 k\.$/);
+        expect(stateLine(s, 'cryo-i', {}).text).toMatch(/^Needs generators automated, .+ and ★ 7.5 k\.$/);       // deep-pass3: Cryo I ★ 7.5 k
     });
     test('the first time capacity shows, its node says what capacity is; once a step is bought, no more', () => {
         const s = sleeping();
