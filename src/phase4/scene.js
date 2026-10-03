@@ -120,6 +120,12 @@ vec3 deepSoft(vec3 p) {
 }
 `;
 
+/**
+ * deep-swap: where chamber number i sits in THIS view, for the body's graph (grow.js
+ * setChamberPlace): a ring of twelve round the landing, layout.js's placement.
+ */
+export const chamberPlace = placeChamber;
+
 /** Which glyph stands for which room. */
 export const ROOM_ICON = { mine: 'pickaxe', farm: 'sprout', generator: 'zap', dorm: 'bed', cryo: 'snowflake' };
 
@@ -1478,6 +1484,10 @@ export function createScene(container, opts = {}) {
          * @param {{html:string, ok:boolean, on:boolean}} offer
          */
         setDigOffer(offer) { digOffer = { ...digOffer, ...offer }; paintDigOffer(); },
+        /** deep-swap: the chambers that show an order's ring now (tests; the strata view answers the same). */
+        buildingSlots() {
+            return labels.filter((l) => l.buildEl && l.buildEl.classList.contains('is-on') && Number.isInteger(l.cell?.slot)).map((l) => l.cell.slot);
+        },
         /** Where the "+" on the next chamber is on the screen, or null (tests). */
         digPlusAt() {
             const el = digLabel && digLabel.plusEl;

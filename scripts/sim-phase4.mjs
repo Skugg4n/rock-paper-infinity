@@ -11,6 +11,8 @@
 //   --gifts  (deep-voice) what a minute of play earns at each of Surface's nights, for the gifts' prices
 //   --table  a row a minute          --why  where the colony stood when the run ended (for tuning)
 //   (deep-grow) both runs end at the rise; GROW_DEBUG=1 prints the body every ten seconds
+//   --view 3d  (deep-swap) the body's neighbours as the 3D view has them (a ring of twelve round the
+//              landing); without it as the strata view, the default, has them (a row outward from the shaft)
 //   --watcher  (v1.49.0) the same player, who also buys the Watcher's ladder as the capacity comes
 //              in (asleep, the next step the moment it can be paid), and does not wake by hand
 //              while the next step waits only on capacity or on the body growing (up to
@@ -46,8 +48,13 @@ import { buy as treeBuy, canBuy as treeCanBuy, LEVEL_NODE, AUTO_NODE, cryoNode, 
 // deep-grow: MOVEMENT III. The question answered, the body grows awake: the policy (src/phase4/policy.js
 // decideGrow) buys the drawer's body items, takes reachable chambers it can afford without starving,
 // and pulls RISE when the deepest floor is full and the machine is body. The act ends at the rise.
-import { normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, GROW_DAYS_PER_SECOND } from '../src/phase4/grow.js';
+import { normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, GROW_DAYS_PER_SECOND, setChamberPlace } from '../src/phase4/grow.js';
 import { decideGrow, pressGrow } from '../src/phase4/policy.js';
+// deep-swap: the body's graph follows the view the player sees (src/phase4/views.js)
+import { chosenView, placeFor } from '../src/phase4/views.js';
+const viewArg = process.argv.indexOf('--view');
+const VIEW = chosenView(viewArg > 0 ? `?view=${process.argv[viewArg + 1]}` : '');
+setChamberPlace(placeFor(VIEW));
 const SIM = { queueMax: Infinity };
 /** Buy a node; the sim has already checked the price, so a refusal is a bug in the sim. */
 function onTree(id, ctx = SIM) {
@@ -497,7 +504,7 @@ console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  st
 console.log(`watcher (attentive: snap every ${SNAP_EVERY} s)  stability ${Math.round(w2.stability)} at the end, lowest ${Math.round(lowest2)}, ${w2.reboots} reboots  |  ${REF_SLEEP} s sleeps, held (low-high from the third sleep): ${held}`);
 if (growAt !== null) {
   const total = real;
-  console.log(`GROW (deep-grow)  the question at ${fmt(growAt)}, ${risen(s) ? `the rise at ${fmt(real)}` : 'no rise'}: ${fmt(total - growAt)} of ${fmt(total)} (${Math.round(100 * (total - growAt) / total)} %)  floors full ${floorsAt.map((t, f) => `${f + 1}:${fmt(t)}`).join(' ')}  the hands ${handsAt === null ? 'never' : fmt(handsAt)}  taken by hand ${grown.hand}, by the flesh itself ${grown.spread}  necrosis ${grown.died} (revived ${grown.revived})  people low ${Math.round(grown.lowFeed)}`);
+  console.log(`GROW (deep-grow, the ${VIEW} view's neighbours)  the question at ${fmt(growAt)}, ${risen(s) ? `the rise at ${fmt(real)}` : 'no rise'}: ${fmt(total - growAt)} of ${fmt(total)} (${Math.round(100 * (total - growAt) / total)} %)  floors full ${floorsAt.map((t, f) => `${f + 1}:${fmt(t)}`).join(' ')}  the hands ${handsAt === null ? 'never' : fmt(handsAt)}  taken by hand ${grown.hand}, by the flesh itself ${grown.spread}  necrosis ${grown.died} (revived ${grown.revived})  people low ${Math.round(grown.lowFeed)}`);
   console.log(`  body items  ${grown.items.join('  ') || 'none'}`);
 } else console.log('GROW (deep-grow)  the question never answered');
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);

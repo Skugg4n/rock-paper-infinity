@@ -2104,3 +2104,15 @@ body.in-deep #version-info { z-index: 1400; }
 }
 #phase-deep .deep-rise-line:nth-child(2) .tape { transform: rotate(0.6deg); }
 @media (max-width: 600px) { #phase-deep .deep-rise-line .tape { font-size: 26px; line-height: 26px; } }
+
+/* ---- deep-swap: THE STRATA VIEW is the default (src/phase4/strata-view.js) ----------------------
+   The middle of the screen is the colony's middle, the shaft (the panel takes the left): the counter
+   of years stands in the years over YEAR 0, Surface and the last lines over the shaft. index.js sets
+   --deep-cx and --deep-cy from the view each frame they move. */
+#phase-deep[data-view="strata"] .deep-dive { left: var(--deep-cx, 50%); top: var(--deep-cy, 46%); }
+#phase-deep[data-view="strata"] .deep-night-stage,
+#phase-deep[data-view="strata"] .deep-rise-lines { left: var(--deep-cx, 50%); }
+/* the "+" where the next chamber is dug sits in the same label layer as the 3D view's */
+#phase-deep[data-view="strata"] .strata-dig .deep-lbl-in { width: 48px; height: 48px; }
+/* the last lines over the hands, not on them: the strata camera looks up at the body through the crust */
+#phase-deep[data-view="strata"] .deep-rise-lines { top: 11%; }

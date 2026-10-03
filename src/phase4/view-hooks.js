@@ -28,6 +28,10 @@
  *
  * The room ring itself is drawn here, in the DOM, over whatever view is below it. The 3D
  * implementation calls into scene.js, flesh.js and hands.js.
+ *
+ * deep-swap: the strata view (strata-view.js) is the default; index.js wraps these hooks with its
+ * extendHooks there, which answers every call above from the strata view itself. This 3D body is used
+ * with `?view=3d` or "View · 3D" in the ☰ menu.
  */
 
 import * as THREE from 'three';

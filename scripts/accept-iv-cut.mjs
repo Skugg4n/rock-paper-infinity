@@ -39,6 +39,16 @@
 // R. From "IV · ready to rise": the hands are on the machine, the lever is back and reads RISE;
 //    pulling it, the body breaks the crust, the two lines type, and the V card reads UNITY. A reload
 //    shows the wall again.
+// deep-swap (the strata view is the default; the 3D view stays selectable):
+//   --view strata | --view 3d   run against one view; without --view the script runs itself once for
+//   each and fails if either fails. In the strata run the shots are named swap-*.
+// V. With no view in the URL the strata view is made (and the ☰ menu offers the other); with
+//    ?view=3d the 3D one.
+// A. From "IV · the body": every chamber that glows as reachable lies beside a body chamber ON THE
+//    SCREEN (no farther from one than 1.3 times the lid's first chamber is from the lid; 1.6 in the
+//    3D view's perspective).
+// K. From "IV · the Watcher" (asleep, an old save without layers): the layers are rebuilt from the
+//    years slept and the sleeps (one per sleep); after a reload the same layers are laid again.
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -53,6 +63,22 @@ const arg = (name, dflt) => { const i = process.argv.indexOf(name); return i > 0
 const shotsAt = process.argv.indexOf('--shots');
 const SHOTS = shotsAt > 0 ? path.resolve(process.argv[shotsAt + 1]) : null;     // screenshots at the key moments
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+const viewAt = process.argv.indexOf('--view');
+const VIEW = viewAt > 0 ? (process.argv[viewAt + 1] === '3d' ? '3d' : 'strata') : null;
+if (!VIEW) {
+    // both views, one after the other: the strata (the default) and the 3D one
+    let bad = 0;
+    for (const v of ['strata', '3d']) {
+        console.log(`==== the ${v} view`);
+        const code = await new Promise((resolve) => {
+            const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...process.argv.slice(2), '--view', v], { stdio: 'inherit' });
+            child.on('exit', (c) => resolve(c ?? 1));
+        });
+        if (code) bad++;
+    }
+    console.log(bad ? `${bad} view(s) failed` : 'both views hold');
+    process.exit(bad ? 1 : 0);
+}
 
 // ---- a static server for the repo ----
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -119,15 +145,15 @@ try {
         if (!SHOTS) return;
         fs.mkdirSync(SHOTS, { recursive: true });
         const out = await send('Page.captureScreenshot', { format: 'png' });
-        fs.writeFileSync(path.join(SHOTS, `${name}.png`), Buffer.from(out.result.data, 'base64'));
+        fs.writeFileSync(path.join(SHOTS, `${VIEW === 'strata' ? 'swap-' : ''}${name}.png`), Buffer.from(out.result.data, 'base64'));
     };
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: 27 }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: 27 }); };
     await send('Runtime.enable');
     await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 
-    async function jump(idOf, { asleep = true } = {}) {
-        await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug` });
+    async function jump(idOf, { asleep = true, view = VIEW } = {}) {
+        await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug${view ? `&view=${view}` : ''}` });
         await sleepMs(1500);
         await evaluate(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(idOf)}); return true; })`);
         await sleepMs(2500);
@@ -155,9 +181,18 @@ try {
         const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) return false;
         const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()`);
     const D = (expr) => evaluate(`window.rpiDeep.${expr}`);
-    // ================= T. TEND: the panel, the empty chamber and its ring, the drawer ================
-    await jump('iv-start', { asleep: false });
+    // a lamp where nothing is: a chamber's slot, or 'rock' in the strata view (a room never dug); -1 is none
+    const lampOn = (l) => l !== -1 && l !== undefined && l !== null;
+    // ================= V. WHICH VIEW =============================================================
+    // the strata run comes in by the plain URL (no view named): the strata view is the default
+    await jump('iv-start', { asleep: false, view: VIEW === 'strata' ? null : VIEW });
     await sleepMs(1500);
+    const vw = await evaluate(`({ view: rpiDeep.view, dom: document.getElementById('phase-deep').dataset.view,
+        item: (document.getElementById('deep-view-toggle') || {}).textContent || '' })`);
+    check(vw.view === VIEW && vw.dom === VIEW && vw.item === `View · ${VIEW === '3d' ? '3D' : 'strata'}`,
+        `V. ${VIEW === 'strata' ? 'with no view in the URL' : 'with ?view=3d'} the ${vw.view} view draws the colony; the menu reads "${vw.item}"`);
+
+    // ================= T. TEND: the panel, the empty chamber and its ring, the drawer ================
     await shot('0-iv-start');
     const p0 = await evaluate(`(() => ({
         gauges: [...document.querySelectorAll('#deep-gauges .deep-gauge')].map((g) => g.querySelector('.dymo').textContent),
@@ -204,7 +239,8 @@ try {
     check(ordered.ore < before.ore && ordered.job && ordered.job.type === 'farm' && ordered.job.slot === empties[0] && ordered.ring === -1,
         `the farm is ordered into that chamber (slot ${ordered.job?.slot}, ore ${Math.round(before.ore)} to ${Math.round(ordered.ore)}), the ring closed`);
     await sleepMs(300);
-    const ringSlots = await evaluate(`[...document.querySelectorAll('#deep-labels .deep-lbl')].filter((w) => w.querySelector('.building.is-on')).map((w) => Number(w.dataset.slot))`);
+    // deep-swap: each view says which chambers show an order's ring (the 3D view: a ring label; the strata view: the bar in the chamber)
+    const ringSlots = await evaluate('rpiDeep.scene.buildingSlots()');
     check(ringSlots.length === 1 && ringSlots[0] === empties[0], `1. the ring spins on the one plate the farm is built into (${ringSlots.join(',') || 'none'}), not on the other farm`);
     let landed = false;
     for (let i = 0; i < 40 && !landed; i++) { await sleepMs(250); landed = await evaluate(`rpiDeep.layout.slots[${empties[0]}] === 'farm'`); }
@@ -243,7 +279,7 @@ try {
     await sleepMs(400);
     check((await D('state.stars')) < stars0, `a bright row buys (${bright[0].id})`);
     await sleepMs(300);
-    const lvRings = await evaluate(`({ plates: [...document.querySelectorAll('#deep-labels .deep-lbl')].filter((w) => w.querySelector('.building.is-on')).length,
+    const lvRings = await evaluate(`({ plates: rpiDeep.scene.buildingSlots().length,
         jobs: (rpiDeep.state.builds || []).map((j) => j.kind), row: !!document.querySelector('#deep-drawer .deep-dr-row.has-ring') })`);
     const perPlate = lvRings.jobs.filter((k) => k === 'room').length;
     check(lvRings.jobs.some((k) => k === 'level' || k === 'auto') && lvRings.plates === perPlate && lvRings.row,
@@ -340,14 +376,28 @@ try {
 
     // ================= H. THE MIND GOES, and the snap ==============================================
     await jump('iv-watcher');
+    // K. the layers: this save never kept them, so they are rebuilt from the years slept and the sleeps;
+    // the strata view lays one per sleep. After a reload the same layers come back
+    const k0 = await evaluate(`({ strata: rpiDeep.strata, sleeps: rpiDeep.state.watcher.sleeps, layers: rpiDeep.scene.stats.layers ?? null })`);
+    check(k0.strata.length === k0.sleeps && k0.strata.every((y) => y >= 0) && (VIEW === '3d' || k0.layers === k0.strata.length),
+        `K. an old save is given its layers: ${k0.strata.length} for ${k0.sleeps} sleeps${VIEW === '3d' ? '' : `, ${k0.layers} drawn`}`);
+    await sleepMs(1200);
+    const k1 = await D('strata');
+    await send('Page.reload');
+    for (let i = 0; i < 60; i++) { await sleepMs(250); if (await evaluate('!!(window.rpiDeep && window.rpiDeep.scene)')) break; }
+    await sleepMs(1500);
+    const k2 = await evaluate(`({ strata: rpiDeep.strata, layers: rpiDeep.scene.stats.layers ?? null })`);
+    const sameBelow = k1.length === k2.strata.length && k1.slice(0, -1).every((y, i) => Math.abs(y - k2.strata[i]) < 1e-6) && k2.strata[k2.strata.length - 1] >= k1[k1.length - 1] - 1e-6;
+    check(sameBelow && (VIEW === '3d' || k2.layers === k2.strata.length),
+        `K. after a reload the same ${k2.strata.length} layers (the top one still thickening: ${Math.round(k1[k1.length - 1])} to ${Math.round(k2.strata[k2.strata.length - 1])} years)`);
     await evaluate('debug_deep("stability", 20)');
     let hal = null;
     for (let i = 0; i < 50; i++) {
         await sleepMs(250);
         hal = await D('hallucinating');
-        if (hal.scene && (hal.scene.figure || hal.scene.lamp >= 0) && hal.twitch) break;
+        if (hal.scene && (hal.scene.figure || lampOn(hal.scene.lamp)) && hal.twitch) break;
     }
-    check(!!hal && !!hal.scene && (hal.scene.figure || hal.scene.lamp >= 0), `with the mind at 20 the screen hallucinates (${JSON.stringify(hal && hal.scene)}, twitch ${hal && hal.twitch})`);
+    check(!!hal && !!hal.scene && (hal.scene.figure || lampOn(hal.scene.lamp)), `with the mind at 20 the screen hallucinates (${JSON.stringify(hal && hal.scene)}, twitch ${hal && hal.twitch})`);
     await sleepMs(1500);
     await shot('7-deep-sleep-hallucination');
     const base = await evaluate(`(${PLATE_AT})(rpiDeep.layout.slots.map((_, i) => i).filter((i) => !rpiDeep.state.watcher.puzzle || !rpiDeep.state.watcher.puzzle.lamps.includes(i)))`);
@@ -355,7 +405,7 @@ try {
     if (base) await click(base.x, base.y);
     await sleepMs(700);
     const hal2 = await D('hallucinating');
-    check(!!base && !hal2.lamp && !hal2.figure && !hal2.breathe && !hal2.twitch && hal2.scene && !hal2.scene.figure && hal2.scene.lamp < 0,
+    check(!!base && !hal2.lamp && !hal2.figure && !hal2.breathe && !hal2.twitch && hal2.scene && !hal2.scene.figure && !lampOn(hal2.scene.lamp),
         `a click on the base snaps them away (${JSON.stringify(hal2)})`);
 
     // ================= S. SURFACE: the line, the game, and the card fades =========================
@@ -431,6 +481,19 @@ try {
     await jump('iv-body', { asleep: false });
     await sleepMs(1200);
     await shot('grow-2-body');
+    // A. the front lies beside the body ON THE SCREEN: each glowing chamber is no farther from a body
+    // chamber than the lid's first chamber is from the lid (its neighbour in both views)
+    const adj = await evaluate(`(() => { const v = rpiDeep.bodyView, at = (id) => rpiDeep.screenOfNode(id);
+        const h0 = at('h0'), s0 = at('s0'); if (!h0 || !s0) return null;
+        const pitch = Math.hypot(h0.x - s0.x, h0.y - s0.y);
+        const rows = v.reachable.map((id) => { const p = at(id); if (!p) return { id, d: null };
+            let d = Infinity; for (const b of v.body) { const q = at(b); if (q) d = Math.min(d, Math.hypot(p.x - q.x, p.y - q.y)); }
+            return { id, d: Math.round(d) }; });
+        return { pitch: Math.round(pitch), rows }; })()`);
+    // the 3D camera looks in perspective: a near neighbour is drawn larger than the lid's far arm
+    const slack = VIEW === '3d' ? 1.6 : 1.3;
+    check(!!adj && adj.rows.length > 0 && adj.rows.every((r) => r.d !== null && r.d <= adj.pitch * slack),
+        `A. every glowing chamber lies beside the body on the screen (pitch ${adj && adj.pitch} px): ${adj ? adj.rows.map((r) => `${r.id} ${r.d} px`).join(', ') : 'nothing on screen'}`);
     const n0 = await evaluate('rpiDeep.bodyView.necrotic.length');
     // more mouths than its one vat feeds: two more chambers, then nobody left to eat
     await evaluate(`(() => { const v = rpiDeep.bodyView; debug_deep('people', 1e7);
@@ -448,7 +511,7 @@ try {
     // ================= R. THE HANDS, AND THE RISE ================================================
     await jump('iv-rise', { asleep: false });
     await sleepMs(1500);
-    await evaluate('rpiDeep.scene.focusMachine(0.6)');
+    await evaluate(`rpiDeep.scene.focusMachine(${VIEW === '3d' ? 0.6 : 8})`);
     await sleepMs(2400);
     await shot('grow-3-hands');
     const r0 = await evaluate(`(() => ({ hands: rpiDeep.bodyStats.hands, lever: !document.getElementById('deep-lever-wrap').hidden,
@@ -457,11 +520,18 @@ try {
     check(r0.hands && r0.ready && r0.lever && r0.tape === 'RISE' && r0.flesh, `R. the hands are on the machine (${r0.hands}); the lever is back, overgrown, and reads ${r0.tape}`);
     const lever = await centre('#deep-lever');
     await click(lever.x, lever.y);
-    await sleepMs(3400);
+    // the 3D body breaks the crust in under three seconds; the strata body pushes up through every year first
+    let riseMid = null;
+    for (let i = 0; i < 70; i++) {
+        await sleepMs(i ? 250 : 2400);
+        riseMid = await evaluate('({ risen: rpiDeep.state.grow.risen, rising: rpiDeep.bodyStats.rising, broke: rpiDeep.bodyStats.broke })');
+        if (VIEW === 'strata' && i === 8) await shot('grow-4a-rising');
+        if (riseMid.broke) break;
+    }
+    await sleepMs(VIEW === '3d' ? 600 : 300);
     await shot('grow-4-rise');
-    const riseMid = await evaluate('({ risen: rpiDeep.state.grow.risen, rising: rpiDeep.bodyStats.rising, broke: rpiDeep.bodyStats.broke })');
     let lines = '';
-    for (let i = 0; i < 40 && !/So fragile\./i.test(lines); i++) { await sleepMs(250); lines = await evaluate(`document.getElementById('deep-rise-lines').textContent`); }
+    for (let i = 0; i < 80 && !/So fragile\./i.test(lines); i++) { await sleepMs(250); lines = await evaluate(`document.getElementById('deep-rise-lines').textContent`); }
     await shot('grow-5-lines');
     let card = null;
     for (let i = 0; i < 40; i++) {

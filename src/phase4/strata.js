@@ -42,6 +42,13 @@ export const LAYER_PER_DECADE = 0.3;
 /** Pixels per unit at most (the mockup's scale), and the room kept for the year ruler on the right. */
 export const MAX_PPU = 46;
 export const RULER_PX = 118;
+/**
+ * deep-swap: the scale the camera zooms in to when it goes to look at something (the machine as it
+ * becomes hands). At rest the colony always fits between the panel and the ruler (fitScale), so
+ * nothing of it is ever under the HUD; zoomed in, it is wider than the screen and the camera pans
+ * sideways (panLimit) to keep what it looks at in view, the colony fading out at the sides.
+ */
+export const FOCUS_PPU = 44;
 
 /** The column of chamber number `index` on its floor: -1, +1, -2, +2, ... (never 0: the shaft). */
 export function sectionColumn(index) {
@@ -152,13 +159,19 @@ export function strataLabels(layers, minGap = 0.42) {
     const out = [];
     if (!layers || !layers.length) return [{ y: 0, years: 0, kind: 'surface' }];
     const top = layers[layers.length - 1];
+    // deep-swap: the first sleep's layer is thinner than a label: YEAR 0 alone until the years show
+    if (top.y1 < minGap || top.cum < 1) return [{ y: 0, years: 0, kind: 'zero' }];
     out.push({ y: top.y1, years: top.cum, kind: 'surface' });
-    let last = top.y1;
+    let last = top.y1, lastText = formatYears(top.cum);
     for (let i = layers.length - 2; i >= 0; i--) {
         const L = layers[i];
         if (last - L.y1 < minGap || L.y1 < minGap) continue;
+        // deep-swap: a boundary that reads the same as the one above it, or as YEAR 0, says nothing
+        const text = formatYears(L.cum);
+        if (text === lastText || text === '0') continue;
         out.push({ y: L.y1, years: L.cum, kind: 'year' });
         last = L.y1;
+        lastText = text;
     }
     out.push({ y: 0, years: 0, kind: 'zero' });
     return out;
@@ -188,6 +201,42 @@ export function fitScale(width, insetLeft, maxCol) {
     const half = maxCol * PITCH + CH_W / 2 + 0.7;
     const ppu = Math.min(MAX_PPU, avail / (2 * half));
     return { ppu, shaftPx: insetLeft + 16 + avail / 2 };
+}
+
+/** The colony's half width in units: its widest column's outer wall, and a margin. */
+export function colonyHalf(maxCol) {
+    return maxCol * PITCH + CH_W / 2 + 0.4;
+}
+
+/**
+ * deep-swap: how far (units) the camera may pan sideways from the shaft at this scale: 0 when the
+ * colony fits between the panel and the ruler.
+ */
+export function panLimit(width, insetLeft, maxCol, ppu) {
+    const avail = Math.max(200, width - insetLeft - RULER_PX - 32);
+    return Math.max(0, colonyHalf(maxCol) - avail / 2 / Math.max(1e-6, ppu));
+}
+
+/**
+ * deep-swap: the pan that keeps `x` in view with `margin` units to spare, moving as little as it can
+ * from `pan`, inside +-limit.
+ */
+export function panToShow(x, pan, halfView, limit, margin = 1.6) {
+    const room = Math.max(0, halfView - margin);
+    let p = pan;
+    if (x > p + room) p = x - room;
+    else if (x < p - room) p = x + room;
+    return Math.max(-limit, Math.min(limit, p));
+}
+
+/**
+ * deep-swap: the camera while they sleep: YEAR 0 a little under the middle, so the counter of years
+ * stands in the years, but never so high that the first floor leaves the screen.
+ * @param {number} viewH - the view's height in units
+ * @param {number} ppu - pixels per unit
+ */
+export function sleepHomeY(viewH, ppu) {
+    return Math.min(0.03 * viewH, FLOOR0 + viewH / 2 - 56 / Math.max(1e-6, ppu));
 }
 
 /**
