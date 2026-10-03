@@ -61,6 +61,8 @@ import {
 import { machineTempo, machineSays } from './machine.js';
 import { createTreeView } from './tree-view.js';
 import { playChapterCard } from '../chapterCard.js';
+import { audio } from '../audio.js';
+import { createDeepSound } from './sound.js';
 import { doomsday } from '../phase3/war.js';
 
 const { SAVE_KEY, MAX_CATCHUP_DAYS } = PHASE4_CONSTANTS;
@@ -98,6 +100,7 @@ let dayInterval = null;
 let sleepInterval = null;
 let rafId = 0;
 let scene = null;
+let sound = null;
 let crust = null;
 let replay = null;
 let savingEnabled = true;
@@ -171,6 +174,15 @@ export function init() {
     layout = normalizeLayout(state, layout);
     state.watcher = normalizeWatcher(state.watcher);
     state.tree = normalizeTree(state.tree);
+
+    // deep-sound: the chapter's sound. Begins with only the low D of the cable hum (the war's drone
+    // has just fallen to it); the rest opens once the chapter card has gone. A colony that already
+    // climbed is finished and makes no sound. A descent that is new (no save) blows the shaft once.
+    sound = createDeepSound(audio, { isHeld: () => !!document.querySelector('#chapter-card.is-active') });
+    if (!state.ascended) {
+        sound.start();
+        if (!saved) sound.event('descent');
+    }
 
     const ui = {
         sceneHost: document.getElementById('deep-scene'),
@@ -469,7 +481,12 @@ export function init() {
         ui.starsRate.textContent = perDayText(report.stars);
         ui.starsDay.textContent = formatCount(report.stars);
         // deep-machine: the machine's tempo IS the stars a day; its hover says what it plays on
-        scene?.setMachine(machineTempo(report, { asleep: !!state.asleep, feed: state.feed }), !!state.asleep);
+        const tempo = machineTempo(report, { asleep: !!state.asleep, feed: state.feed });
+        scene?.setMachine(tempo, !!state.asleep);
+        sound?.setState({
+            asleep: !!state.asleep, tempo, games: report.games, humans: state.humans, cryo: state.cryo,
+            stability: state.watcher.stability, gone: !!state.watcher.gone, lamps: lampsNow().length, bought: state.watcher.bought,
+        });
         machineText = machineSays(report);
 
         // THE BARS ARE STORES (B056): each on its own scale, the weakest FLOW marked with the dot.
@@ -753,6 +770,7 @@ export function init() {
         if (n.kind === 'watcher' || n.kind === 'bio') {
             const out = treeBuy(state, id, { ...treeCtx(), slots: layout.slots, choose: true });
             if (!out) return false;
+            sound?.event('buy');
             // a biological step paid for and waiting for its sector: the tree closes, the arms light
             if (out.choose || (out.step && out.step.pending)) {
                 if (out.step?.firstSpace) feed = pushFeed(feed, [SPACE_LINE]);
@@ -845,6 +863,7 @@ export function init() {
         const out = sealSector(w, state, layout.slots, k);
         if (!out) return false;
         leaveChoice();
+        sound?.event('seal');           // the body takes the sector: the thunk, wet
         // the advisor calls it maintenance, and the wake strip shows it
         feed = pushFeed(feed, [sealLine(out.sector, w.sealed.length - 1)]);
         sealedThisSleep.push(out.sector);
@@ -976,6 +995,7 @@ export function init() {
         const key = `${state.watcher.surface.visits}|${line}`;
         if (!voice || voice.key !== key) {
             voice = { key, text: line, t0: performance.now(), doneAt: 0 };
+            sound?.event('type', { text: line, letterS: TYPE_MS / 1000 });
             ui.voiceText.textContent = '';
             ui.voiceRest.textContent = line;        // held in place, unseen, so the line never moves as it types
             ui.voice.classList.add('is-typing');
@@ -1016,6 +1036,7 @@ export function init() {
             rps.stage = stage;
             rps.log.push([stage, performance.now()]);
             updateWatcher();
+            if (stage === 'settle' && (r.outcome === 'win' || r.outcome === 'lose')) sound?.event(r.outcome === 'win' ? 'win' : 'lose');
             if (stage === 'line') {
                 rpsLast = rps.log;
                 rpsTimers.push(setTimeout(() => { rps = null; }, 600));
@@ -1218,7 +1239,7 @@ export function init() {
     }
 
     // --- buying: the price now, the thing itself in a few days ---------------
-    function bought() { advisorLine = ''; advisorUntil = 0; nextLine = ''; said.key = ''; }
+    function bought() { advisorLine = ''; advisorUntil = 0; nextLine = ''; said.key = ''; sound?.event('buy'); }
     /* Since v1.49.0 every order goes through the queue (deep.js `orderBuild`): paid now, at the
        price after the orders already on the books, started when its lane and its chamber are free.
        A room takes whichever chamber is empty the day it starts. */
@@ -1387,6 +1408,7 @@ export function init() {
         ui.root.classList.add('is-night');
         await (scene ? scene.gather(SLEEP_TIMING.gather) : Promise.resolve());
         state.asleep = true;
+        sound?.event('sleep');
         ui.root.classList.add('is-sleeping');
         updateChrome();                 // the sleep world at once: the Watcher, and its one line
         sleepSum = freshSum();
@@ -1456,7 +1478,12 @@ export function init() {
         // an event whose lamp went away (a dormitory taken, a chamber gone dark) goes quietly
         if (w.puzzle && w.puzzle.lamps.some((sl) => !lampsNow().includes(sl))) { dismissPuzzle(w, state.cryo); lamp = null; }
         if (puzzleDue(w, { asleep: true, alarmPending: busy })) openPuzzle(w, lampsInView(), state.cryo);
-        if (sleepSum && surfaceDue(w, sleepSum.days, CRYO[state.cryo].days)) { openSurface(w, state); surfaceKey = ''; }
+        if (sleepSum && surfaceDue(w, sleepSum.days, CRYO[state.cryo].days)) {
+            const opened = (state.tree.opened || []).length;
+            openSurface(w, state);
+            surfaceKey = '';
+            if ((state.tree.opened || []).length > opened) sound?.event('rise');     // Surface opened a node
+        }
         // the body at work (v1.50.0): the lamps answer themselves now and then, the snap comes by itself
         const open = w.puzzle;
         const held = w.stability;
@@ -1464,7 +1491,7 @@ export function init() {
             endLamps({ ok: true, done: true, gained: w.stability - held, rebooted: false }, open.lamps.slice(), -1, open);
         }
         stepLamps();
-        if (autoSnapDue(state.watcher, Date.now())) { scene?.snap(); snapWatcher(state.watcher, Date.now(), state.cryo); }
+        if (autoSnapDue(state.watcher, Date.now())) { scene?.snap(); sound?.event('snap'); snapWatcher(state.watcher, Date.now(), state.cryo); }
         updateChrome();
         if (sleepTicks % 10 === 0) saveGame();
     }
@@ -1479,6 +1506,7 @@ export function init() {
         stopSleep();
         setBusy(true);
         state.asleep = false;
+        sound?.event('wake');            // the night is heard fading back over a second and a half
         // the alarm is a jolt to the Watcher; a low one says it slightly wrong, never the reboot
         const w = state.watcher;
         closeSurface(w);                // Surface, and everything it said, is gone the moment they wake
@@ -1489,6 +1517,7 @@ export function init() {
         lamp = null;
         scene?.setLamps(null);
         if (bodyWhole(w) && !w.gone) { await lastWakeUp(); return; }
+        if (!['manual', 'debug', 'first', 'look'].includes(alarm.kind)) sound?.event('knock');     // an alarm, a reboot included
         const rebooted = alarm.kind !== 'reboot' && (alarmHit(w, alarm.kind) || !!alarm.rebooted);
         const said = alarm.kind === 'reboot' ? [alarmLine(alarm)]
             : watcherLines(w, [alarmLine(alarm), ...(alarm.kind === 'scouts' ? (alarm.landed || []).slice(1).map(scoutLine) : [])]);
@@ -1546,6 +1575,7 @@ export function init() {
      */
     async function lastWakeUp() {
         const w = state.watcher;
+        sound?.event('unity');          // every voice on the same low D, the heart under it
         const t = sleepSum || freshSum();
         const were = lastWake(w, state);
         feed = pushFeed(feed, [NOBODY_LINE]);
@@ -1618,6 +1648,7 @@ export function init() {
             return;
         }
         replay.hide();
+        sound?.event('goUp');           // the murmur climbs the shaft and leaves the low D alone
         await (scene ? scene.ascend(2.0) : Promise.resolve());
         crust.lighten();
         scene?.lighten();
@@ -1633,6 +1664,7 @@ export function init() {
         ascendAlone(state);
         saveGame();
         replay.hide();
+        sound?.event('fade');           // nobody to climb: only the low D, alone
         await (scene ? scene.climbAlone(4.5) : Promise.resolve());
         crust.lighten();
         scene?.lighten();
@@ -1673,6 +1705,7 @@ export function init() {
         scene?.snap();
         if (paused()) return;            // the base snaps; nothing is earned while time holds
         if (snapWatcher(state.watcher, Date.now(), state.cryo) > 0) {
+            sound?.event('snap');
             ui.watcher?.classList.remove('is-held');
             void ui.watcher?.offsetWidth;          // restart the one-shot
             ui.watcher?.classList.add('is-held');
@@ -2010,6 +2043,8 @@ export function teardown() {
     beforeUnloadHandler = null;
     try { scene?.dispose(); } catch (e) { console.warn('the deep: dispose', e); }
     scene = null;
+    try { sound?.stop(); } catch (e) { console.warn('the deep: sound stop', e); }
+    sound = null;
     try { replay?.destroy(); crust?.destroy(); } catch (e) { console.warn('the deep: chrome dispose', e); }
     replay = null;
     crust = null;

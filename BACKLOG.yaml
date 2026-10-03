@@ -2190,4 +2190,64 @@ items:
       2.8 s strokes; (3) a landing is heard at the impact, which comes 10 to 20 s after the drum's
       downbeat (the departure); (4) the ◆ reveal calls arrive() once per plate: the war plays one rise,
       the city's own rise word would still stack outside the war.
+
+  - id: B238
+    added: 2026-10-03
+    source: "coordinator brief (deep-sound)"
+    request: |
+      Put chapter IV's sound into the game from the approved sound board
+      (docs/mockups/sound-board-deep.html): awake machine, the night under water,
+      Surface in metal, the blood, the words, the two endings.
+    status: done
+    resolved_in: "deep-sound branch (unreleased)"
+    notes: "src/phase4/sound.js, hooks in src/phase4/index.js, src/phase4/sound.test.js. Spec: 'Built: sound' in the chapter IV tree-and-bio spec."
+
+  - id: B239
+    added: 2026-10-03
+    source: "coordinator message (deep-sound)"
+    request: |
+      The IV card must play no swell (the war's drone owns that moment). goDeep in
+      src/phase2/index.js calls playChapterCard without silent, so chapter I's dark swell
+      still plays over the card.
+    status: open
+    notes: "One word: add silent: true to the IV card in goDeep (src/phase2/index.js). Not done in deep-sound, the file is outside its scope. The V card's swell stays."
+
+  - id: B240
+    added: 2026-10-03
+    source: "deep-sound (for Ola's ear)"
+    request: |
+      Decisions taken in deep-sound, to overrule: (1) the board's 110 ms pause at each space is
+      silence in the ticks only (the three letters after a space make no tick), so the sound never
+      falls behind the text; (2) the boom plays once, when the chapter card has gone, and only for a
+      descent with no save; (3) the layers sit at 1.875 times the music bus, which is the board's 0.75
+      on the game's 0.4 and measures the same as the board; (4) the Watcher's snap holds the tone true
+      for 0.45 s and then sinks back to where stability stands.
+    status: open
+
+  - id: B241
+    added: 2026-10-03
+    source: "deep-sound"
+    request: |
+      The Unity ending (every voice on the same low D, the heart under it) has no event of its own in
+      the game: the biological ending is "Woke: nobody came out", then Go up alone. The sound plays
+      Unity at that last wake-up (lastWakeUp) and a plain fade of the low D when the Watcher goes up alone.
+    status: open
+    notes: "If a real Unity ending is built, call sound.event('unity') at it."
+
+  - id: B242
+    added: 2026-10-03
+    source: "deep-sound"
+    request: |
+      The board's swell word (the dark swell and the war's E-flat falling two octaves to D) is built in
+      sound.js (event 'swell') but not wired: the IV card belongs to the war and the V card keeps chapter
+      I's swell. Wire it, or remove it.
+    status: open
+
+  - id: B243
+    added: 2026-10-03
+    source: "deep-sound"
+    request: |
+      Listen to the live deep on headphones and judge by ear what the board could not: the hold-over of
+      the low D during the card, the awake level against chapter III, the pause and resume (the layers
+      start over, they do not resume mid-phrase), and the wake fade of about 1.5 s.
     status: open
