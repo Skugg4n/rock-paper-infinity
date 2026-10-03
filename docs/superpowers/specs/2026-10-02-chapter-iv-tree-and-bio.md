@@ -563,3 +563,35 @@ node and the caption), M (the new hover), V (Quiet hands' arrow), F (TREE 0.5 s 
 drift and the base soft at 20), 1 (capacity on the balances asleep; the feed does not repeat the advisor),
 D (Surface visiting, a step bought: no second demand while choosing, the meter holds), 2 (people and beds
 still lower 10 s after the seal). All checks hold, no console errors.
+
+## Built: sound (deep-sound branch)
+
+`src/phase4/sound.js`, `createDeepSound(audio)` returning `{ start, stop, setState, event }`, ported from the approved board
+(`docs/mockups/sound-board-deep.html`, its node graphs, numbers and layer logic) onto the shared graph of `src/audio.js`
+(`audio.graph()`): our layers go through one gain onto the music bus (so Music on/off governs them), the words through
+another onto the sfx bus (Sound on/off governs them). `src/audio.js` is untouched.
+
+**What index.js tells it** (no new game logic): `setState` from `updateChrome` (asleep, the machine's drive, games a day, people,
+cryo tier, the Watcher's meter, whether it is gone, the number of lamps, the steps bought) and events at the moments the phase
+already has: `sleep`/`wake` (startSleep, wake), `buy` (every purchase, and a biological step paid), `seal` (a sector chosen),
+`rise` (Surface's visit opened a node), `knock` (every alarm but the hand, the first sleep's year, the look and the test),
+`snap` (a click or the body's own), `type` (Surface's line begins), `win`/`lose` (Surface's game settles; a win plays chapter I's
+`lucky`), `goUp` (the ascent succeeds), `unity` (the last wake-up, the body whole), `fade` (the Watcher goes up alone), `descent`
+(a new descent, no save: the boom, once, when the card has gone). Teardown calls `stop()`.
+
+**The map from game to sound:** the tempo is the drive of `machine.js` (the decades of games a day and the feed), through the
+board's `bpmFor` (46 to 132 throws a minute); the roll is `cryo + 1` (1 to 8) one pentatonic step each; the Watcher's cents are
+`-85 * (1 - stability)^1.15`; The question answered is the biological steps bought out of four, which tunes the Surface's metal
+(50 cents out at 0, in tune at 1), brings the blood (`0.27 * a^1.3`) and takes the clack and pound away (`1 - a`) until the heart
+is the pulse. The murmur follows the people on a log scale (0.3 of its level for ten people, full at a million).
+
+**Hand-over from III:** the module starts at phase init with only the low D of the cable hum at 45 % (the A waits in its own
+gain), and opens everything else when `#chapter-card` has lost `is-active` (`opts.isHeld`). The IV card plays no swell of ours; chapter
+I's swell from `playChapterCard` still plays and has to be silenced in `goDeep` (B239).
+
+**Checked:** `npm test` and `npx eslint .` green (`sound.test.js`: the pure rules with no Web Audio, and the module on a stubbed
+AudioContext, for the prefs, the pause, the card hold and the teardown). The board's own 90 s act driven through the module
+offline: peak -2.9 dBFS and RMS -22.9 (board -3.7, -22.8), the per-five-seconds trace within one dB; the unity ending peaks -3.5.
+In a browser: no console errors, the context running after one click, live sound sources 15 to 23 over 60 s awake and 16 to 23
+over 30 s asleep (about 16 are the continuous voices), Music off silences the layers, Sound off the words, both off everything,
+pause silences and resume brings it back.

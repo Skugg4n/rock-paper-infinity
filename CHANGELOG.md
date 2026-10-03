@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased (deep-sound)
+
+### Chapter IV has its sound (B238)
+
+Lifted from the sound board Ola approved (docs/mockups/sound-board-deep.html) into `src/phase4/sound.js`, hung on the shared graph of src/audio.js (its buses, the Sound and Music choices in the menu, the first-click unlocking). No game rule changed: index.js only tells the sound what it already knew.
+
+- **Awake:** the machine is the tempo (a clack a throw from the drive that stands the arms, a pling on a win, pitch drooping and limping when starved, a whirr when fed), the cable hum on low D and A, drips, a thin murmur that grows with the people.
+- **Asleep:** the same world under water (one low-pass, one slow compressor), the pulse gone. The roll of the years rises a pentatonic step per cryo tier, the lamps are sparse tones (one per automated room), the Watcher is a held D that sinks up to 85 cents flat with the meter and beats against a true pilot; a snap is the thunk and the tone jumping true. Waking fades it back over about a second and a half.
+- **Surface:** every typed letter a struck-metal tick a quarter tone outside the scale, metallic breaks at the spaces. As the biological steps are bought the metal comes into tune and the blood comes in, a low rush with a heartbeat on the machine's two pounds a bar, until it is the pulse and the clack has gone.
+- **Words:** thunk on a purchase (wet when the tissue is whole), rise when Surface opens a node, knock on an alarm and on a reboot, lucky on a win against Surface, boom once at a new descent, the two endings (go up: the murmur climbs and leaves the low D alone; the body whole: every voice on the same low D, the heart under it).
+- **Hand-over from III:** the chapter starts with only the low D of the hum; the rest opens when the chapter card has gone.
+- Silent when paused or hidden; Sound and Music behave as in the other chapters. Measured with the board's own act offline: peak -2.9 dBFS, RMS -22.9 (the board: -3.7 and -22.8), within a dB in every five seconds.
+- Open for the coordinator: the IV card still plays chapter I's swell from `goDeep` in src/phase2/index.js; it needs `silent: true` there (B239).
+
 ## v1.67.1 - 2026-10-03 (chapter II, the raid when played through)
 
 Ola played chapter II through (not from a checkpoint): the raid came with no boat and no pier, the watchmen stood on the shore and then crossed the water on foot, the pier reached our island, and their defence looked like a line.
