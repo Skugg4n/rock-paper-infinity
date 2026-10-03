@@ -13,13 +13,14 @@
 import {
     ROOM_FOR_COLUMN, MIN_SLEEPERS, freeChambers, buildPending, nextPrice, CRYO, CRYO_TOP,
     sleepTrouble, FEED_MAX, buildProgress, isQueued, RESURFACE_AT, surface, vatsLevel, feedPrice, vatsPrice,
-    sleepFull, cryoName,
+    sleepFull, cryoName, tickDay, setIncome,
 } from './deep.js';
 import { foodDaysLeft } from './advisor.js';
+import { steadyHint } from './watcher.js';
 import { stocks, short, ORE_SIGN, cryoRoad, list } from './readout.js';
 import {
     NODES, NODE_BY_ID, canBuy, orderedOf, levelOf, nodeVisible, stateLine, priceOf, opened, cryoNode, displayName,
-    nightNext, buy as treeBuyFor,
+    nightNext, buy as treeBuyFor, AUTO_NODE,
 } from './tree.js';
 
 /* ---- THE GAUGES ---------------------------------------------------------------------------
@@ -105,10 +106,14 @@ export const ADVICE = {
     surfaceWaits: (tier) => `SURFACE WAITS FOR ${cryoName(tier).toUpperCase()}`,
     // deep-tension: the level-ups that queued in a sleep, bought in one click
     levels: (n) => `BUY ${n} LEVELS`,
+    // deep-pass3 (B400): the mind is going; a click on the colony steadies it
+    steady: 'STEADY THE MIND',
     ready: (n) => (n === 1 ? 'A LEVEL READY' : `${n} LEVELS READY`),
 };
 /** The label holds a word at least this long before it may change. */
 export const ADVICE_HOLD_MS = 4000;
+/** deep-pass3: words that come (and go) at once, whatever the hold. */
+export const URGENT_ADVICE = [ADVICE.steady, ADVICE.wake];
 
 /** A room of this type ordered or dug toward: BUILD it, or DIG for a chamber to put it in. deep-tension:
  *  only when the ore is there (the tape never names what cannot be done; it said DIG with no ore). */
@@ -117,7 +122,8 @@ function buildOrDig(state, t) {
     return buildPending(state, 'dig') || (state.minerals || 0) < nextPrice(state, 'dig') ? null : ADVICE.dig;
 }
 /** deep-tension: what an automation is called when the tape saves for it: "GENERATOR AUTOMATION". */
-const AUTO_NAME = { mine: 'MINE AUTOMATION', farm: 'FARM AUTOMATION', generator: 'GENERATOR AUTOMATION', dorm: 'DORMITORY AUTOMATION' };
+// deep-pass3 (B406): the drawer's own names ("SAVE FOR MINE AUTOMATION" while the drawer said DRILL AUTO)
+const AUTO_NAME = { mine: 'DRILL AUTO', farm: 'FARM AUTO', generator: 'GENERATOR AUTO', dorm: 'CRECHE' };
 
 /**
  * The instruments' word for now.
@@ -153,6 +159,9 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
     // deep-tension: after the hall, something NEW that can be paid (what the colony woke for) comes before
     // the ore's DIG and BUILD (it woke for the culture vats and the tape said DIG)
     if (state.cryo >= 0 && !state.grow) {
+        // deep-pass3 (B404): the deeper sleep first, once it can be paid (what the colony woke for)
+        const due = tierDue(state, road);
+        if (due && (state.stars || 0) >= due.price && canBuy(state, due.id, { road, asleep: false }).ok) return ADVICE.longer;
         const g0 = goalOf(state, { road, onlyNew: true });
         if (g0 && g0.gap <= 0 && canBuy(state, g0.id, { road, asleep: false }).ok) return g0.id === cryoNode(state.cryo + 1) ? ADVICE.longer : ADVICE.buy(g0.name);
     }
@@ -186,7 +195,8 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
     if ((state.feed || 0) < FEED_MAX && (state.stars || 0) >= feedPrice(state) && !saveFor) return ADVICE.feed;
     if (saveFor) return saveFor;
     // deep-tension: before the hall with every lamp lit but the price: SAVE FOR CRYO I, the gap under it
-    if (state.cryo < 0 && road && road.items.every((x) => x.done || x.key === 'stars')) return ADVICE.save('CRYO I');
+    // deep-pass3 (B403): an automation still being built counts (the tape said WAIT while the last one built)
+    if (state.cryo < 0 && road && road.items.every((x) => x.done || x.ordered || x.key === 'stars')) return ADVICE.save('CRYO I');
     if (state.cryo >= 0) {
         // deep-econ (B332): THE NEXT GOAL, always named. Bought when it can be; else saved for (the
         // lever glows: a sleep is how stars come in); a night that waits for a tier says so
@@ -204,6 +214,31 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
         if (lever && !sleepTrouble(state, CRYO[Math.min(CRYO.length - 1, state.cryo)].days, 1500)) return ADVICE.sleep;
     }
     return ADVICE.wait;
+}
+
+/* ---- WHAT A NEW ROOM DOES TO THE STARS (deep-pass3, B403) -----------------------------------
+   The human pass: "stars a second fell 186 to 164 after a build, no reason shown". Every room draws
+   power, and the machine plays on the power to spare; a generator makes more of it. That is a real
+   choice in TEND (a farm costs the machine's games, a generator buys them), so it stays, and is SAID
+   where the room is chosen: the ring's hover over a room reads "★ 186 → 164 a second." with "It draws
+   the machine's power." under it when the rate falls. Kept, not rebalanced: it is the one trade-off TEND
+   has, and the stars of every later tier are tuned on it. */
+/**
+ * The stars a second now, and with one more room of type `t` standing (built, crewed as the colony can).
+ * @returns {{before:number, after:number}}
+ */
+export function roomStars(state, t) {
+    const a = JSON.parse(JSON.stringify(state));
+    const b = JSON.parse(JSON.stringify(state));
+    a.asleep = false; b.asleep = false;
+    b.rooms[t] = (b.rooms[t] || 0) + 1;
+    return { before: Math.max(0, tickDay(a, false).stars), after: Math.max(0, tickDay(b, false).stars) };
+}
+/** The ring's line for a room: "★ 186 → 164 a second." ('' when the rate does not move). */
+export function roomStarsLine(state, t) {
+    const { before, after } = roomStars(state, t);
+    if (!(before > 0) || Math.abs(after - before) < Math.max(1, 0.01 * before)) return { line: '', why: '' };
+    return { line: `★ ${short(before)} → ${short(after)} a second.`, why: after < before ? 'It draws the machine\'s power.' : '' };
 }
 
 /* ---- THE NEXT GOAL (deep-econ, B332) ---------------------------------------------------------
@@ -279,16 +314,18 @@ export function goalOf(state, { road = null, cryoReady, onlyNew = false } = {}) 
  */
 export function adviceNote(state, word, ctx = {}) {
     if (!word) return '';
+    if (word === ADVICE.steady) return steadyHint(state.watcher);
     if (word.startsWith('SAVE FOR ')) {
         // deep-tension: before the hall, an automation or Cryo I's price
         const name = word.slice('SAVE FOR '.length);
         const t = Object.keys(AUTO_NAME).find((k) => AUTO_NAME[k] === name);
         const before = t ? nextPrice(state, 'auto', t) : name === 'CRYO I' && (state.cryo ?? -1) < 0 ? priceOf(state, cryoNode(0))?.stars : null;
         if (before) { const gap = before - (state.stars || 0); return gap > 0 ? `★ ${short(gap)} to go` : ''; }
+        // deep-pass3 (B404): the deeper sleep, at the price it will have on the wake
+        const due = tierDue(state, ctx.road);
+        if (due && name === due.name) { const gap = due.price - (state.stars || 0); return gap > 0 ? `★ ${short(gap)} to go` : ''; }
         const goal = [goalOf(state, ctx), goalOf(state, { ...ctx, onlyNew: true })].find((g) => g && word === ADVICE.save(g.name));
-        const ready = state.asleep ? levelsReady(state).n : 0;
-        const parts = [goal && goal.gap > 0 ? `★ ${short(goal.gap)} to go` : '', ready > 1 ? `${ready} levels ready` : ''].filter(Boolean);
-        return parts.join(' · ');
+        return goal && goal.gap > 0 ? `★ ${short(goal.gap)} to go` : '';
     }
     if (word.startsWith('SURFACE WAITS FOR ')) {
         const wait = nightNext(state, { asleep: !!state.asleep });
@@ -298,6 +335,9 @@ export function adviceNote(state, word, ctx = {}) {
     }
     if (word === ADVICE.wake) {
         if (sleepFull(state)) return 'The store is full.';
+        // deep-pass3 (B404): the deeper sleep the tape woke for (it said "Creche can be bought.")
+        const due = tierDue(state, ctx.road);
+        if (due && (state.stars || 0) >= due.price) return `${displayName(due.id)} can be bought.`;
         const goal = goalOf(state, { ...ctx, onlyNew: true });
         return goal ? `${displayName(goal.id)} can be bought.` : '';
     }
@@ -312,27 +352,71 @@ export function adviceNote(state, word, ctx = {}) {
  */
 export function adviseAsleep(state, ctx = {}) {
     if (!state.asleep || (state.watcher && state.watcher.gone) || state.grow) return '';
+    // deep-pass3 (B400): the mind warns before it restarts, and that comes before anything to buy
+    if (state.watcher && state.watcher.warn) return ADVICE.steady;
     // deep-tension: the feed's first level only; every level after it is a next level of the same, and
     // waits in the levels bundle (asleep the tape said FEED THE MACHINE every few seconds)
     if ((state.feed || 0) < FEED_MAX && canBuy(state, 'feed', { asleep: true }).ok && isNewKind(state, 'feed')) return ADVICE.feed;
     if (sleepFull(state)) return ADVICE.wake;
+    // deep-pass3 (B404): the next tier, once only its price stands in the way, comes before anything the night
+    // could order: its price is kept (night levels ate it, and the colony stayed six minutes at Cryo II)
+    const due = tierDue(state, ctx.road);
+    if (due) return (state.stars || 0) < due.price ? ADVICE.save(due.name) : ADVICE.wake;
     // deep-tension: WAKE only for something new (a tier, a gift, a first level); the next level of the
     // same waits for the wake, where it is bought with the others in one click
     const goal = goalOf(state, { ...ctx, onlyNew: true });
     if (goal && goal.gap <= 0) {
-        // a gift is bought in the night too
-        if (NODE_BY_ID[goal.id].kind === 'surface' && canBuy(state, goal.id, { asleep: true }).ok) return ADVICE.buy(goal.name);
-        return ADVICE.wake;
+        // a gift is bought in the night too; deep-pass3 (B404): and a first level, an automation, the vats.
+        // Only a deeper sleep (a cryo tier) wakes the colony to be bought
+        if (canBuy(state, goal.id, { asleep: true }).ok) return ADVICE.buy(goal.name);
+        // deep-pass3 (B404): the prices are set on the wake: WAKE only when the wake's price is paid too (it
+        // woke for Cryo II and Cryo II then cost more than the colony held)
+        if (payableOnWake(state, goal.id)) return ADVICE.wake;
     }
     const wait = nightNext(state, { asleep: true });
     if (wait && wait.kind === 'tier') return ADVICE.surfaceWaits(wait.tier);
-    if (goal) return ADVICE.save(goal.name);
-    // nothing new left: the next level of the same, saved for, or the levels the wake will buy
+    // the deeper sleep is the goal: saved for, the levels wait (bought in the night they ate its price)
     const any = goalOf(state, ctx);
-    if (any && any.gap > 0) return ADVICE.save(any.name);
+    if (any && NODE_BY_ID[any.id].kind === 'cryo' && any.gap > 0) return ADVICE.save(any.name);
+    // deep-pass3 (B404): the next levels of the same, ordered in the night in one click once there are
+    // LEVELS_AT_NIGHT of them (fewer is not worth a click in the dark)
     const ready = levelsReady(state).n;
-    return ready > 0 ? ADVICE.ready(ready) : '';
+    if (ready >= LEVELS_AT_NIGHT) return ADVICE.levels(ready);
+    if (goal) return ADVICE.save(goal.name);
+    // nothing new left: the next level of the same, saved for
+    if (any && any.gap > 0) return ADVICE.save(any.name);
+    return ready > 1 ? ADVICE.levels(ready) : ready === 1 ? ADVICE.buy(rowName(NODE_BY_ID[levelsReady(state).ids[0]])) : '';
 }
+/**
+ * deep-pass3 (B404): THE NEXT TIER, once nothing but its price stands in the way: { id, name, price }, or null.
+ * It is the goal before anything else after the hall, asleep and awake (the tape asleep woke for Cryo III,
+ * and awake it named a gift).
+ */
+export function tierDue(state, road) {
+    // the first culture vats before it: asleep nobody else is born, and a long sleep thinned the colony to nine
+    if (!((state.cryo ?? -1) >= 0) || state.grow || vatsLevel(state) < 1) return null;
+    const tier = state.cryo + 1;
+    if (tier > CRYO_TOP || !road || !road.items.every((x) => x.done || x.key === 'stars')) return null;
+    const id = cryoNode(tier);
+    // asleep, the price it will have on the wake (the prices are set then): what the tape saves for
+    const p = wakePrice(state, id);
+    return p > 0 ? { id, name: rowName(NODE_BY_ID[id]), price: p } : null;
+}
+/** deep-pass3 (B404): can this be paid at the prices the wake will set (deep.js setIncome on the wake)? */
+export function payableOnWake(state, id) {
+    const p = wakePrice(state, id);
+    return !(p > 0) || (state.stars || 0) >= p;
+}
+/** deep-pass3 (B404): the price in stars this will have once the colony wakes (asleep; awake, its price now). */
+export function wakePrice(state, id) {
+    if (!state.asleep) return priceOf(state, id)?.stars || 0;
+    const c = JSON.parse(JSON.stringify(state));
+    c.asleep = false;
+    setIncome(c);
+    return priceOf(c, id)?.stars || 0;
+}
+/** deep-pass3 (B404): asleep the tape asks for the levels ready once there are this many. */
+export const LEVELS_AT_NIGHT = 2;
 /** deep-tension: is this purchase a NEW kind of thing (worth waking for): a cryo tier, a gift, The
  *  question, or the first level of a level, an automation, the feed or the vats? */
 export function isNewKind(state, id) {
@@ -426,6 +510,15 @@ export function wakeWord(alarm) {
     default: return a.rebooted ? faultWord('THE MIND RESTARTED') : 'AWAKE';
     }
 }
+
+/** deep-pass3 (B400): the wakes that had no word on screen say why, once, low, on the wake (as a night
+ *  missed is told). The FAULT of a restart says what it cost. */
+export const WAKE_WHY = {
+    reboot: 'Nobody steadied the mind, so everyone woke.',
+    first: 'The first sleep is short. The next ones go deeper.',
+    look: 'Woke to look in on the colony.',
+};
+export const wakeWhy = (alarm, rebooted = false) => (rebooted ? WAKE_WHY.reboot : WAKE_WHY[(alarm && alarm.kind) || ''] || '');
 
 /* ---- THE MIND GOES ------------------------------------------------------------------------
    As the Watcher's stability falls in the sleep, the screen hallucinates. Each kind comes under
@@ -553,6 +646,7 @@ function orderProgress(state, n) {
  */
 export function drawerGroups(state, ctx = {}) {
     const asleep = ctx.asleep ?? !!state.asleep;
+    const called = ctx.called || null;
     const groups = [];
     for (const g of DRAWER_GROUPS) {
         if (g === 'WATCHER' && !asleep) continue;
@@ -562,30 +656,44 @@ export function drawerGroups(state, ctx = {}) {
             if (n.branch !== g || LEFT_OUT.has(n.id) || n.kind === 'teaser' || n.kind === 'bio' || n.kind === 'root') continue;
             if (!nodeVisible(state, n.id)) continue;
             if (n.kind === 'surface' && !opened(state, n.id)) continue;
-            // asleep only the night's things: the levels, automations and cryo tiers wait for the wake
-            if (asleep && (n.kind === 'level' || n.kind === 'auto' || n.kind === 'cryo' || n.kind === 'vats')) continue;
+            // asleep only the night's things. deep-pass3 (B404): the levels, automations and vats are ordered in
+            // the night too; only a cryo tier waits for the wake (listed, as the next, when the tape names it)
+            if (asleep && n.kind === 'cryo' && n.id !== called) continue;
             const can = canBuy(state, n.id, { ...ctx, asleep });
             const prog = (n.kind === 'level' || n.kind === 'auto') ? orderProgress(state, n) : -1;
             const row = {
                 id: n.id, name: rowName(n),
                 does: drawerDoes(state, n.id), price: drawerPrice(priceOf(state, n.id)), status: 'buy', need: '', progress: prog,
             };
+            // deep-pass3 (B404): asleep a cryo tier is bought on the wake, at the wake's price: it says both
+            if (asleep && n.kind === 'cryo') {
+                const wp = wakePrice(state, n.id);
+                row.price = drawerPrice({ stars: wp });
+                if (n.id === called) {
+                    const gap = wp - (state.stars || 0);
+                    rows.push({ ...row, called: true, status: 'next', need: gap > 0 ? `You need ★ ${short(gap)} more. Bought awake.` : 'Wake the colony to buy it.' });
+                    continue;
+                }
+            }
+            if (n.id === called) row.called = true;
             if (can.ok) { rows.push(row); continue; }
             if (prog >= 0) { rows.push({ ...row, status: 'building', price: '' }); continue; }
+            // deep-pass3 (B406): the row the tape names is always there, the branch's next or not
+            if (n.id === called && can.kind !== 'bought') { rows.push({ ...row, status: 'next', need: drawerNeed(state, n.id, { ...ctx, asleep }) }); continue; }
             if (['bought', 'surface', 'teaser', 'mode'].includes(can.kind)) continue;
             if (!next) next = { ...row, status: 'next', need: drawerNeed(state, n.id, { ...ctx, asleep }) };
         }
-        if (next) rows.push(next);
+        if (next && !rows.some((r) => r.id === next.id)) rows.push(next);
         if (rows.length) groups.push({ name: g, rows });
     }
-    // deep-tension: the levels the stars pay for, one row, one click, awake
-    if (!asleep) {
+    // deep-tension: the levels the stars pay for, one row, one click (deep-pass3: in the night too)
+    {
         const ready = levelsReady(state);
         if (ready.n > 1) {
             const names = {};
             for (const id of ready.ids) { const nm = rowName(NODE_BY_ID[id]); names[nm] = (names[nm] || 0) + 1; }
             groups.unshift({ name: 'READY', rows: [{
-                id: LEVELS_ROW, name: `${ready.n} LEVELS`, does: Object.entries(names).map(([k, v]) => (v > 1 ? `${k} ×${v}` : k)).join(', '),
+                id: LEVELS_ROW, called: called === LEVELS_ROW, name: `${ready.n} LEVELS`, does: Object.entries(names).map(([k, v]) => (v > 1 ? `${k} ×${v}` : k)).join(', '),
                 price: `★ ${short(ready.price)}`, status: 'buy', need: '', progress: -1,
             }] });
         }
@@ -595,13 +703,42 @@ export function drawerGroups(state, ctx = {}) {
     if (opened(state, 'question') && levelOf(state, 'question') < 1) {
         const can = canBuy(state, 'question', { ...ctx, asleep });
         const row = {
-            id: 'question', name: 'THE QUESTION', does: drawerDoes(state, 'question'),
+            id: 'question', called: called === 'question', name: 'THE QUESTION', does: drawerDoes(state, 'question'),
             price: drawerPrice(priceOf(state, 'question')), status: can.ok ? 'buy' : 'next', need: can.ok ? '' : drawerNeed(state, 'question', { ...ctx, asleep }), progress: -1,
         };
         groups.unshift({ name: 'THE QUESTION', rows: [row] });
     }
     return groups;
 }
+/* ---- THE DRAWER FINDS WHAT THE PANEL NAMES (deep-pass3, B406) -------------------------------
+   The human pass: the tape's item sat at the bottom of a twelve-row drawer, or was not in it at all
+   (SAVE FOR GENERATOR AUTOMATION, and the drawer showed the next power level instead). The tape's
+   word names a drawer row; the drawer always lists it, rings it and opens scrolled to it. */
+const AUTO_TYPE = { MINES: 'mine', FARMS: 'farm', GENERATORS: 'generator', DORMITORIES: 'dorm' };
+/**
+ * The drawer row the tape's word names, or null (DIG, BUILD, SLEEP, WAKE, STEADY THE MIND: not the drawer's).
+ * @param {object} state
+ * @param {string} word - the advice, without the prefix
+ */
+export function calledRow(state, word) {
+    if (!word) return null;
+    if (/^BUY \d+ LEVELS$/.test(word)) return LEVELS_ROW;
+    if (word === ADVICE.feed) return 'feed';
+    if (word === ADVICE.vats) return 'vats';
+    if (word === ADVICE.question) return 'question';
+    if (word === ADVICE.longer) return cryoNode((state.cryo ?? -1) + 1);
+    const auto = /^AUTOMATE (\w+)$/.exec(word);
+    if (auto && AUTO_TYPE[auto[1]]) return AUTO_NODE[AUTO_TYPE[auto[1]]];
+    const waits = /^SURFACE WAITS FOR (.+)$/.exec(word);
+    const name = waits ? waits[1].toUpperCase() : (/^(?:BUY|SAVE FOR) (.+)$/.exec(word) || [])[1];
+    if (!name) return null;
+    const t = Object.keys(AUTO_NAME).find((k) => AUTO_NAME[k] === name);
+    if (t) return AUTO_NODE[t];
+    const n = NODES.find((x) => rowName(x) === name);
+    return n ? n.id : null;
+}
+/** deep-pass3 (B404): the drawer's foot after the hall. */
+export const PRICES_FOOT = 'Prices follow what the colony earns. They are set when it wakes.';
 /** deep-tension: the drawer row that buys every level ready (index.js buys levelsReady's ids in turn). */
 export const LEVELS_ROW = 'levels-ready';
 /** How many rows of the drawer can be bought now: the badge on its button. */

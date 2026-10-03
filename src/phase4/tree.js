@@ -431,13 +431,16 @@ export function canBuy(state, id, ctx = {}) {
     // deep-fix2: the culture vats, bought awake once the hall stands, with stars, at once
     if (n.kind === 'vats') {
         if ((state.cryo ?? -1) < 0) return no('prereq', `Needs ${cryoName(0)} first.`);
-        if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
+        // deep-pass3 (B404): bought in the night too (the culture vats woke the colony only to be bought)
         const miss = affordText({ price: vatsPrice(state), have: state.stars || 0, perDay });
         return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
     }
 
     if (n.kind === 'level' || n.kind === 'auto') {
-        if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
+        // deep-pass3 (B404): NIGHT ORDERS. After the hall a level or an automation is ordered in the night
+        // too, and the Watcher builds it while they sleep (deep.js completeBuilds): the colony no longer
+        // wakes only to buy (four wake, buy, sleep rounds in six minutes). Only a deeper sleep wakes it.
+        if (asleep && (state.cryo ?? -1) < 0) return no('mode', 'The colony is asleep: wake it to buy.');
         if (!((state.rooms[n.type] || 0) > 0) && !buildPending(state, 'room', n.type)) {
             return no('room', `Build a ${ROOM_WORD[n.type]} first: there is none to improve.`);
         }
@@ -807,6 +810,7 @@ export function buy(state, id, ctx = {}) {
         const price = nextPrice(state, n.kind, n.type);
         state.stars -= price;
         const job = orderBuild(state, n.kind, { type: n.type });
+        if (ctx.asleep ?? !!state.asleep) job.night = true;
         return { id, kind: n.kind, type: n.type, price, job };
     }
     if (n.kind === 'feed') {

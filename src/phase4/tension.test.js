@@ -11,7 +11,7 @@ import { cryoRoad } from './readout.js';
 import { initialTree, buy as treeBuy, LEVEL_NODE } from './tree.js';
 import { initialWatcher } from './watcher.js';
 import { graphFromSlots, HEART } from './growth.js';
-import { bodySums, massRate, gutRate, pulseRatio, HEART_K, LID_REACH, VAT_MASS } from './organs.js';
+import { bodySums, massRate, gutRate, pulseRatio, HEART_K, LID_REACH, LID_MASS } from './organs.js';
 import { KEEP_KEYS } from '../checkpoints.js';
 
 const start = (o = {}) => ({ ...initialDeepState({ salvage: 1500, doom0: 85 }), tree: initialTree(), watcher: initialWatcher(), ...o });
@@ -50,7 +50,7 @@ describe('the tape never names what cannot be done (B355)', () => {
     test('an automation short of stars is saved for, with the gap under it', () => {
         const s = start({ minerals: 300, stars: 0 });
         const word = advise(s, dry(s), { road: cryoRoad(0, s), lever: false });
-        expect(word).toBe('SAVE FOR GENERATOR AUTOMATION');
+        expect(word).toBe('SAVE FOR GENERATOR AUTO');
         expect(adviceNote(s, word)).toMatch(/^★ \S+( \w)? to go$/);
     });
     test('the price lamp says what is left to go once the three are lit', () => {
@@ -123,8 +123,9 @@ describe('GROW pulls against itself (B350)', () => {
         const guts = bodySums(graph, st({ s0: 'gut' }));
         const vats = bodySums(graph, st({ s0: 'vat', s1: 'vat' }));
         expect(gutRate(guts)).toBeGreaterThan(gutRate(vats) * 2);
-        expect(massRate(vats)).toBeLessThan(0);
-        expect(massRate(vats)).toBeCloseTo(gutRate(vats) - 2 * VAT_MASS, 9);
+        // deep-pass3 (B402): they eat the guts' mass, never the lid's, so a body is slow, never stuck at nothing
+        expect(massRate(vats)).toBeCloseTo(LID_MASS, 9);
+        expect(massRate(vats)).toBeLessThan(massRate(guts));
     });
     test('a heart reaches two and a half: a body without hearts runs out of reach', () => {
         const ids = graph.nodes.filter((n) => n.floor === 0 && n.kind === 'room').map((n) => n.id).slice(0, 8);

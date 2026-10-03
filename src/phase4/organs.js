@@ -76,6 +76,21 @@ export const PACE_MIN = 0.2;
 export const TAKE_MASS = 12;
 /** ... times this for every chamber taken before it (the price grows with the body) ... */
 export const TAKE_STEP = 1.05;
+/** deep-pass3: the colony size TAKE_STEP is tuned on; a bigger one spreads the step over its chambers. */
+export const TAKE_REF = 48;
+/** deep-pass3 (B402): a floor below the fourth costs (in mass and in work) what the fourth does: a colony a
+ *  floor deeper than TAKE_REF's spent a third of GROW on its fifth floor alone. */
+export const FLOOR_TOP = 3;
+const floorK = (floor) => Math.max(0, Math.min(FLOOR_TOP, floor || 0));
+const roomCache = new WeakMap();
+function roomCount(graph) {
+    let n = roomCache.get(graph);
+    if (n === undefined) {
+        n = graph.nodes.filter((x) => x.kind === 'room').length;
+        roomCache.set(graph, n);
+    }
+    return n;
+}
 /** ... times this a floor down ... */
 export const TAKE_FLOOR = 1.6;
 /** ... and the machine house this many times. */
@@ -172,7 +187,10 @@ export function bodySums(graph, st) {
         if (ORGANS.includes(o)) { give[o] += supplyOf(n, full); count[o]++; }
         if (o === 'vat') vatAsk += demandOf(n);
     }
-    return { size, give, count, full, vatAsk };
+    // deep-pass3 (B402): a colony bigger than TAKE_REF's makes its mass in proportion, so GROW lasts about as
+    // long whatever the colony's size (a colony of 60 chambers rose after half an hour)
+    const scale = Math.max(1, roomCount(graph) / TAKE_REF);
+    return { size, give, count, full, vatAsk, scale };
 }
 /** PULSE: the hearts' reach over the body's size (1: every organ is fed to the edge). */
 export function pulseRatio(sums) { return reachOf(sums) / Math.max(1, sums.size); }
@@ -181,11 +199,13 @@ export const reachOf = (sums) => LID_REACH + HEART_K * sums.give.heart;
 /** FLESH: the nerves' speed over the body's size. */
 export function nerveRatio(sums) { return (LID_NERVE + NERVE_K * sums.give.nerve) / Math.max(1, sums.size); }
 /** The mass the guts make a second (times MUSCLE's `muscle`), before the vats eat theirs. */
-export function gutRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle; }
+export function gutRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle * (sums.scale || 1); }
 /** What the living vats eat of it a second. */
-export function vatMass(sums) { return VAT_MASS * (sums.vatAsk || 0); }
-/** The mass the body gains a second: the guts' less the vats' (it can be below zero). */
-export function massRate(sums, muscle = 1) { return gutRate(sums, muscle) - vatMass(sums); }
+export function vatMass(sums) { return VAT_MASS * (sums.vatAsk || 0) * (sums.scale || 1); }
+/** The mass the body gains a second: the guts' less the vats'. deep-pass3 (B402): the vats eat the guts'
+ *  mass, never the lid's, so it never falls under LID_MASS (below zero the mass sat at nothing for good: a
+ *  body with more vats than guts read PUMP for half an hour in the sim, and the pumped mass was eaten). */
+export function massRate(sums, muscle = 1) { return LID_MASS + Math.max(0, gutRate(sums, muscle) - LID_MASS - vatMass(sums)); }
 /** The pace of a take: the weakest of the four ratios, never under PACE_MIN, never over 1. */
 export const paceOf = (ratios) => Math.max(PACE_MIN, Math.min(1, ...Object.values(ratios)));
 /** Nerves to spare (FLESH over 1) make every take quicker still: up to NERVE_SPEED more at FLESH 2. */
@@ -231,7 +251,11 @@ export function fitsReach(graph, sums, id) {
 export function takeMass(graph, id, organ, taken = 0) {
     const n = nodeOf(graph, id);
     if (!n) return Infinity;
-    const k = Math.pow(TAKE_STEP, Math.max(0, taken)) * Math.pow(TAKE_FLOOR, Math.max(0, n.floor));
+    // deep-pass3 (B402): the step per take is spread over a bigger colony, so its last take costs what the
+    // last take of a TAKE_REF colony does (1.05 a take made a colony of 60 chambers cost 45 times as much at
+    // the end, and GROW ran half an hour)
+    const per = Math.max(0, taken) * TAKE_REF / Math.max(TAKE_REF, roomCount(graph));
+    const k = Math.pow(TAKE_STEP, per) * Math.pow(TAKE_FLOOR, floorK(n.floor));
     if (n.kind === 'machine') return Math.ceil(TAKE_MASS * TAKE_MACHINE * k);
     const cheap = cheapOrgans(n.type).includes(organ) ? CHEAP : 1;
     return Math.ceil(TAKE_MASS * k * cheap);
@@ -244,7 +268,9 @@ export function regrowMass(graph, id, organ, taken = 0) {
 export function takeWork(graph, id, { regrow = false } = {}) {
     const n = nodeOf(graph, id);
     if (!n) return Infinity;
-    const w = TAKE_WORK * Math.pow(WORK_FLOOR, Math.max(0, n.floor)) * (n.kind === 'machine' ? WORK_MACHINE : 1);
+    // deep-pass3 (B402): in a colony bigger than TAKE_REF's a take is that much less work (more of them)
+    const w = TAKE_WORK * Math.pow(WORK_FLOOR, floorK(n.floor)) * (n.kind === 'machine' ? WORK_MACHINE : 1)
+        * TAKE_REF / Math.max(TAKE_REF, roomCount(graph));
     return regrow ? w * REGROW_WORK : w;
 }
 /** What one pump fills: the beat, the hearts, the pace, the surge. */

@@ -3196,3 +3196,100 @@ items:
     status: done
     resolved_in: deep-tension (version at merge)
     notes: "docs/playtests/2026-10-03-tension-play.md, rebuild-shots/tension-*.png; accept-iv-cut.mjs runs Chrome with --mute-audio and reads FLOORS."
+
+  - id: B400
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass-2.md D1 (deep-pass3 brief)"
+    request: |
+      The Watcher's lamps: one plain line the first time; a failed sequence costs stability but never forces a wake;
+      FAULT: THE MIND RESTARTED preceded by a warning the player can act on (label flickers, tape STEADY THE MIND,
+      "Click the colony to steady it." the first time); at most one reboot per act for the attentive sim player.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "watcher.js WARN_BELOW 30 / STEADY_AT 70 mindWarning, LAMP_HINT, failLamps floors at the warning, drift on real time (pace), REBOOT_TO 60; instruments.js ADVICE.steady, WAKE_WHY; sim: 0 reboots answering the warning, 5 unattended (was 15)."
+
+  - id: B401
+    added: 2026-10-03
+    source: "human pass 2 D2 (deep-pass3 brief)"
+    request: |
+      GROW gauges readable: veins under the needle, thinner, away from the scale; the weakest mark a red ring round the
+      whole gauge and its label red.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "panel.js VEIN_R/VEIN_W, weak-ring; grow.js growGauges rings the tape's organ only; style-deep.css fluid surface bright."
+
+  - id: B402
+    added: 2026-10-03
+    source: "human pass 2 D3 (deep-pass3 brief)"
+    request: |
+      No dead end in GROW: the tape never says TAKE A CHAMBER when none is reachable; it names the real next action.
+      The tape's action must always be doable (sim and unit test).
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "grow.js growTarget, growDoable, DREAM when the short organ is far off; the camera follows the target; organs.js massRate never under LID_MASS, TAKE_REF scaling, FLOOR_TOP."
+
+  - id: B403
+    added: 2026-10-03
+    source: "human pass 2 D5 and C TEND (deep-pass3 brief)"
+    request: |
+      TEND: the star rate falling with each new room needs a cause the player sees; shorten the ~65 s wait for the
+      star lamp so TEND has no stretch over 40 s without a decision.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "Chose to show it, not rebalance (TEND's one trade-off): instruments.js roomStarsLine in the ring's hover. Cryo I 7.5 k; SAVE FOR CRYO I while the last automation builds."
+
+  - id: B404
+    added: 2026-10-03
+    source: "human pass 2 B4 and D4 (deep-pass3 brief)"
+    request: |
+      SLEEP: fewer wake-buy-sleep loops; at most two wakes only for buying in six minutes of SLEEP.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "Night orders (tree.js canBuy asleep after the hall; deep.js night jobs start asleep); instruments.js tierDue saves for the next tier first. Sim: 5 wakes only for buying in 13 min of SLEEP (one a tier, 2.3 per 6 min; was 10)."
+
+  - id: B405
+    added: 2026-10-03
+    source: "human pass 2 D4 (deep-pass3 brief)"
+    request: |
+      Drawer prices must not read as following what the player holds.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "Prices stay set on the wake and the drawer says so (PRICES_FOOT); asleep the tier is priced as the wake will price it (wakePrice), so the tape never wakes for what then costs more."
+
+  - id: B406
+    added: 2026-10-03
+    source: "human pass 2 D4, D6, F (deep-pass3 brief)"
+    request: |
+      The drawer shows what the panel names: opens scrolled to it, row highlighted; the panel never names an item the
+      drawer does not list, nor an awake action while asleep.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "instruments.js calledRow, drawerGroups ctx.called; drawer.js is-called + scroll; AUTO_NAME = drawer names; panel.js mode/urgent hold; the room ring rings the tape's room."
+
+  - id: B407
+    added: 2026-10-03
+    source: "human pass 2 F (deep-pass3 brief)"
+    request: |
+      Bugs: the machine's tooltip clamped; Surface's buttons fixed in screen space; YEAR 0 on the ruler moves with the
+      clock; anything else in section F.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "index.js placeTip, --deep-night-x frozen asleep, strata-view ruler years, drawer rows updated in place (clicks lost asleep), recomputeGates asleep road, the first sleep's wake line."
+
+  - id: B408
+    added: 2026-10-03
+    source: "deep-pass3 brief"
+    request: |
+      Sim before/after: act length, per movement, longest without a decision, reboots per act, sleep wakes only for buying.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "scripts/sim-phase4.mjs: the asleep tape, night orders, the warning-follower Watcher, GROW's tape check."
+
+  - id: B409
+    added: 2026-10-03
+    source: "deep-pass3 brief"
+    request: |
+      Human-eyed play pass, silent, one browser: TEND 5, SLEEP 6, GROW 4 minutes; a line every 30 s; fix and replay.
+    status: done
+    resolved_in: deep-pass3 (version at merge)
+    notes: "docs/playtests/2026-10-03-pass3-play.md, rebuild-shots/pass3-*.png."

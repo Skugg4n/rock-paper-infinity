@@ -117,7 +117,7 @@ export const automationCost = (type, auto) => (auto < MAX_AUTO ? AUTOMATION_COST
  * the only way the calendar ever gets there.
  */
 export const CRYO = [
-    { id: 'cryo-i',   days: 30,       cost: 1.5e4 },
+    { id: 'cryo-i',   days: 30,       cost: 7.5e3 },      // deep-pass3 (B403): 1.5e4, the last wait in TEND was a minute
     { id: 'cryo-ii',  days: 365,      cost: 5.0e5 },
     { id: 'cryo-iii', days: 3650,     cost: 1.2e8 },
     { id: 'cryo-iv',  days: 36500,    cost: 1.0e13 },
@@ -896,11 +896,12 @@ export function digSpare(s) {
     return s.chambers - used + ordered(s, 'dig') - 1 >= 0;
 }
 
-/** Start every waiting order that can start today, in the order they were placed. */
-function startQueued(s) {
+/** Start every waiting order that can start today, in the order they were placed. deep-pass3 (B404):
+ *  `nightOnly`, asleep without the Scheduler: only the orders placed in the night. */
+function startQueued(s, nightOnly = false) {
     let started = false;
     for (const job of s.builds || []) {
-        if (!isQueued(job) || !canStart(s, job)) continue;
+        if (!isQueued(job) || !canStart(s, job) || (nightOnly && !job.night)) continue;
         job.startDay = s.day;
         job.doneDay = s.day + BUILD_DAYS[job.kind];
         started = true;
@@ -965,6 +966,7 @@ export function completeBuilds(s, { asleep = false } = {}) {
     }
     // the next order in a lane that came free starts today (never due today: no build is 0 days)
     if (!asleep || queueRunsAsleep(s)) startQueued(s);
+    else startQueued(s, true);
     return done;
 }
 

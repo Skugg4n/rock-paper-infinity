@@ -642,7 +642,8 @@ export function takeTip(s, layout, id) {
         return { text: n.kind === 'machine' ? `The machine. Takes ${MASS_SIGN} ${short(cheapest)}.` : `Grow an organ here. From ${MASS_SIGN} ${short(cheapest)}.`, red: false };
     }
     const marked = (G.marks || []).includes(id);
-    return { text: marked ? 'Marked. Click to unmark.' : 'Mark it. The body grows here as it dreams.', red: false };
+    // deep-pass3: "Marked. Click to unmark." (marked for what?)
+    return { text: marked ? 'Marked. Pull DREAM and the body grows toward it.' : 'Mark it. The body grows here as it dreams.', red: false };
 }
 /** The tip's words only (tests, older callers). */
 export const takeWords = (s, layout, id) => takeTip(s, layout, id).text;
@@ -996,10 +997,13 @@ export function growGauges(s, report, layout) {
     const R = bodyRatios(s, layout);
     const G = s.grow;
     const dying = G.necrotic.length > 0;
+    // deep-pass3 (B401): the ring marks the gauge whose organ the tape names, and only then (the dot came at
+    // 1.25 and the tape at 1, so the two disagreed)
+    const want = wantOrgan(s, layout);
     const g = {};
     for (const c of ['M', 'F', 'E', 'H']) {
         const r = R.ratios[c];
-        g[c] = { k: ratioK(r), falling: r < 1, red: r < 1, days: Infinity, weakest: c === R.weakest && r < 1.25 };
+        g[c] = { k: ratioK(r), falling: r < 1, red: r < 1, days: Infinity, weakest: !!want && GAUGE_ORGAN[c] === want };
     }
     // FEED: a falling store reads its years left, as the food did
     if (Number.isFinite(R.years)) {
@@ -1037,11 +1041,60 @@ export function adviseGrow(s, layout) {
     const want = GAUGE_ORGAN[R.weakest];
     // deep-tension: the weakest short is THE answer: grow its organ, or pump the mass for it (the pump
     // sends the blood to the guts). The tape never names a take the mass cannot pay.
-    if (R.ratios[R.weakest] < 1) return canGrow(s, layout, want) ? growWord(want) : GROW_ADVICE.pump;
+    if (R.ratios[R.weakest] < 1) {
+        if (canGrow(s, layout, want)) return growWord(want);
+        // deep-pass3 (B402): the organ is far off in mass: DREAM (the guts make three times the mass while it
+        // dreams), not a minute of drumming (the human pass drummed a minute for a hand at ⧫ 65 of 28)
+        const far = (organPrice(s, layout, want) - G.mass) / Math.max(1e-9, R.massRate);
+        return far > DREAM_ADVISE_S ? GROW_ADVICE.dream : GROW_ADVICE.pump;
+    }
     if (inReach(s, layout).some((id) => canAfford(s, layout, id))) return GROW_ADVICE.take;
     if (G.necrotic.length && feedOf(s) > 0) return GROW_ADVICE.pump;
     const wait = Number.isFinite(R.price) ? (R.price - G.mass) / Math.max(1e-9, R.massRate) : Infinity;
     return wait > DREAM_ADVISE_S ? GROW_ADVICE.dream : GROW_ADVICE.pump;
+}
+/**
+ * deep-pass3 (B402): WHERE THE TAPE POINTS. The human pass read TAKE A CHAMBER with nothing glowing in
+ * view (the chamber it meant lay on a floor the camera had left for the machine house). Now the tape's
+ * word has a place: TAKE A CHAMBER, the cheapest chamber in reach it can pay (the machine house only
+ * when nothing else is in reach); GROW A <ORGAN>, the chamber in reach (or the spare organ) that gives
+ * it cheapest. The view rings it and the camera goes to its floor. Null for PUMP, DREAM and RISE (the
+ * heart and the lever are always in view).
+ * @returns {string|null} a chamber id
+ */
+export function growTarget(s, layout, word = adviseGrow(s, layout)) {
+    if (!growOn(s) || risen(s) || s.grow.dreaming || !word) return null;
+    const best = (ids, organ = null) => {
+        let pick = null;
+        for (const id of ids) {
+            const o = takeOffer(s, layout, id);
+            if (!o) continue;
+            for (const r of o.organs) {
+                if (!r.ok || (organ && r.organ !== organ)) continue;
+                const k = r.mass + (id === 'machine' ? 1e6 : 0);
+                if (!pick || k < pick.k) pick = { id, k };
+            }
+        }
+        return pick ? pick.id : null;
+    };
+    if (word === GROW_ADVICE.take) return best(inReach(s, layout));
+    const organ = Object.keys(ORGAN_NAME).find((o) => word === growWord(o));
+    if (!organ) return null;
+    return best(inReach(s, layout), organ) || best(spareOrgans(s, layout, organ), organ);
+}
+/**
+ * deep-pass3 (B402): CAN THE TAPE'S WORD BE DONE NOW? The tests and the sim hold the tape to it, every
+ * moment: PUMP always does something (it fills the take, brings the dead back or sends the blood to the
+ * guts); DREAM while not dreaming; RISE when the body can; TAKE and GROW only with a chamber to do it in.
+ */
+export function growDoable(s, layout, word = adviseGrow(s, layout)) {
+    if (!word) return true;
+    if (!growOn(s) || risen(s)) return false;
+    if (word === GROW_ADVICE.rise) return riseReady(s, layout).ready;
+    if (word === GROW_ADVICE.pump) return !s.grow.dreaming;
+    if (word === GROW_ADVICE.dream) return !s.grow.dreaming;
+    if (word === GROW_ADVICE.take || Object.keys(ORGAN_NAME).some((o) => word === growWord(o))) return !!growTarget(s, layout, word);
+    return false;
 }
 /** deep-tension: the organ the body is short of now (dead flesh's fix, else the red gauge's), or null. */
 export function wantOrgan(s, layout) {

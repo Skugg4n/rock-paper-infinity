@@ -9,7 +9,7 @@ import {
     lampLength, openPuzzle, puzzleDue, pressLamp, expireLamps, isLamp, demand, surfaceDue, openSurface,
     ladderLine, rungOpenLine, RUNG_OPEN_LINES, LADDER, RUNGS, selfSolve,
     LAMPS_MIN, LAMPS_MAX, LIE_BELOW, DARK_MS, DARK_SHARE, LAMP_EVERY_SLEEPS, PUZZLE_COST, PUZZLE_GAIN,
-    PUZZLE_WRONG, CAPACITY_MAX, REBOOT_TO, STABILITY_MAX, puzzleGapYears,
+    PUZZLE_WRONG, CAPACITY_MAX, WARN_BELOW, STABILITY_MAX, puzzleGapYears,
 } from './watcher.js';
 import {
     initialDeepState, orderBuild, cancelOrder, digSpare, nextPrice, isQueued, chambersAhead, digCost, levelCost,
@@ -87,11 +87,11 @@ describe('THE LAMPS: a sequence to repeat', () => {
         expect(w.puzzle).toBe(null);
         expect(w.stability).toBe(40 - PUZZLE_WRONG);
         expect(w.capacity).toBe(CAPACITY_MAX);
-        // and the one that takes the last of it reboots
-        const z = asleepWatcher({ stability: PUZZLE_WRONG });
+        // deep-pass3 (B400): a lost sequence never restarts the mind by itself: it stops at the warning
+        const z = asleepWatcher({ stability: WARN_BELOW + 2 });
         const q = openPuzzle(z, LAMPS, 2, { kind: 'lamps' });
-        expect(pressLamp(z, LAMPS.find((x) => x !== q.answer[0]), 2).rebooted).toBe(true);
-        expect(z.stability).toBe(REBOOT_TO);
+        expect(pressLamp(z, LAMPS.find((x) => x !== q.answer[0]), 2).rebooted).toBe(false);
+        expect(z.stability).toBe(WARN_BELOW);
     });
     test('a lie is not part of the answer: the player clicks the answer, not what blinked', () => {
         let p = null, seed = 1;

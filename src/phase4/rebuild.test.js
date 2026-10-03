@@ -106,7 +106,7 @@ describe('the one stamped word', () => {
         // ore to burn, but not enough for a chamber
         const s = start({ minerals: 300, stars: 0 });
         // deep-tension: the stars cannot pay it yet: the tape saves for it, never asks for what cannot be done
-        expect(advise(s, dry(s), { road: cryoRoad(0, s), lever: false })).toBe('SAVE FOR GENERATOR AUTOMATION');
+        expect(advise(s, dry(s), { road: cryoRoad(0, s), lever: false })).toBe('SAVE FOR GENERATOR AUTO');
         s.stars = 1e5;
         expect(advise(s, dry(s), { road: cryoRoad(0, s), lever: false })).toBe('AUTOMATE GENERATORS');
     });
@@ -128,7 +128,7 @@ describe('the three lamps are Cryo I\'s own road', () => {
         const lit = cryoLamps(cryoRoad(0, leverReady()));
         // deep-fix2: the fourth lamp is the price, its tape the stars
         expect(lit.map((l) => l.key)).toEqual(['food', 'power', 'ore', 'price']);
-        expect(lit[3]).toMatchObject({ label: '★ 15 k', price: true });
+        expect(lit[3]).toMatchObject({ label: '★ 7.5 k', price: true });
         expect(lit.every((l) => l.lit)).toBe(true);
     });
     test('an automation on order is not done: its lamp blinks', () => {
@@ -229,7 +229,7 @@ describe('the drawer: only what can be bought now, and the next thing', () => {
         }
         expect(groups.find((g) => g.name === 'CRYO').rows[0]).toMatchObject({ id: 'cryo-i', status: 'next', need: 'Needs all four lamps lit.' });
     });
-    test('asleep: only the night\'s things (no levels), the Watcher\'s steps once its branch is open', () => {
+    test('asleep: the night\'s things (deep-pass3: levels too, no cryo tier), the Watcher\'s steps once its branch is open', () => {
         const s = leverReady();
         s.cryo = 0;
         s.asleep = true;
@@ -238,7 +238,8 @@ describe('the drawer: only what can be bought now, and the next thing', () => {
         s.watcher.capacity = 100;
         const groups = drawerGroups(s, {});
         const rows = groups.flatMap((g) => g.rows);
-        expect(rows.some((r) => ['level', 'auto', 'cryo'].includes(NODE_BY_ID[r.id].kind))).toBe(false);
+        expect(rows.some((r) => NODE_BY_ID[r.id] && NODE_BY_ID[r.id].kind === 'cryo')).toBe(false);
+        expect(rows.some((r) => NODE_BY_ID[r.id] && NODE_BY_ID[r.id].kind === 'level' && r.status === 'buy')).toBe(true);
         expect(rows.find((r) => r.id === 'watchdog')?.status).toBe('buy');
     });
     test('an order under way shows its ring in its row', () => {
@@ -351,7 +352,7 @@ describe('deep-fix2: culture vats', () => {
         expect(canBuy(s, 'vats', {}).kind).toBe('prereq');           // no hall yet
         s.cryo = 0; s.stars = 1e12;
         expect(priceOf(s, 'vats').stars).toBe(VATS_COST[0]);
-        expect(canBuy(s, 'vats', { asleep: true }).ok).toBe(false);  // a day purchase
+        expect(canBuy(s, 'vats', { asleep: true }).ok).toBe(true);   // deep-pass3 (B404): ordered in the night too
         expect(treeBuy(s, 'vats', {})).toMatchObject({ kind: 'vats', level: 1 });
         expect(s.vats).toBe(1);
         expect(priceOf(s, 'vats').stars).toBe(VATS_COST[1]);
