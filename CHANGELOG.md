@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (deep-swap)
+
+### Chapter IV: the strata view is the default; 3D stays selectable (B310 to B319)
+
+Ola chose the strata (B). It now draws the whole act, TEND, SLEEP and GROW to the RISE; the 3D view stays in the code and is one click away. docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md, "Built: the swap".
+
+- **The strata view by default** (B310). src/phase4/index.js makes the strata view unless the URL says `?view=3d` or the ☰ menu's new "View · strata / 3D" item (chapter IV only, kept in localStorage `rpi-deep-view`) chose 3D; the URL wins. src/phase4/views.js holds the choice.
+- **The body's neighbours are the ones on the screen** (B311). Each view exports `chamberPlace` (a row outward from the shaft in the strata, the ring of twelve in 3D); grow.js `setChamberPlace` builds the body's graph with it. A glowing chamber always lies beside the body. growth.js untouched.
+- **Everything the orchestrator asks, in both views** (B312, B294). The strata view gained the "+" where the next chamber is dug (hover price, click digs), grow mode, `chamberAt`, `screenOfNode`, `focusFloor`, `focusMachine`, `onChamberHover`, the hands' rhythm, `setHands(false)` and an instant `setHands` for a reload, an older save's sector choice. People walk into organs and vats and step back out of the vats. The first throw by hand sounds whether the player or the flesh took the machine house.
+- **The layers are saved** (B313). `state.strata` (years per sleep) is kept with the deep save and laid again after a reload; an older save is given one layer per sleep from the years slept.
+- **Framing** (B314). The colony fits between the instrument panel and the year ruler; the ruler's labels keep out from under the counters, the buttons and the lever, and name a year once. Asleep the camera rests with the years in the middle and the counter stands in them over the shaft; Surface and the last lines stand over the shaft too. When the hands come, the camera looks closer for seven seconds and pans, the colony fading at the sides.
+- **The rise** (B315) runs on a wall clock (at most ten seconds of pushing), and the body stays risen while the lines type.
+- **Sims** (B316). `scripts/sim-phase4.mjs --view 3d` for the 3D graph, the strata row by default; the policy saves its people for the machine house once it is in reach. Strata: plain 31m56s (GROW 12m45s, 40 %), --watcher 27m43s (GROW 7m23s, 27 %); 3D: 30m16s (37 %) and 26m51s (24 %). Before (3D only): 30m02s (36 %), 26m29s (23 %).
+- **Acceptance in both views** (B317). `node scripts/accept-iv-cut.mjs` runs itself for the strata and the 3D view; new checks V (the strata view is the default), A (a glowing chamber lies beside the body on the screen), K (the layers are rebuilt for an old save and survive a reload). Shots: docs/playtests/rebuild-shots/swap-*.png.
+- **Tests** (B318). src/phase4/swap.test.js: the view choice, the body's graph per view, the pan, the sleep camera, the ruler's labels.
+
 ## v1.76.0 - 2026-10-03 (chapter IV, movement III: the body)
 
 ### Chapter IV, movement III · GROW: the body (B300 to B309)

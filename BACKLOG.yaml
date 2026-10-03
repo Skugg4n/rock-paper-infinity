@@ -2623,7 +2623,8 @@ items:
     source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
     request: |
       Wire the strata view into the game in place of scene.js: createStrataView(ui.sceneHost, {insetLeft: panel width, onInteract, onClearDark}); hooks = extendHooks(createViewHooks(view, ...), view); the HUD may call the new hallucination kinds afterimage and wrong; GROW calls setBody/onChamberClick/setHands/rise; save view.strata (years per sleep) with the game so the layers survive a reload exactly.
-    status: open
+    status: done
+    resolved_in: deep-swap (version at merge)
     notes: "Decide whether the body graph uses sectionPlace (the row on screen, recommended) or layout.js placement; the ids are the same either way, the sim must be rerun with the row (distances from the heart are longer)."
 
   - id: B294
@@ -2631,8 +2632,9 @@ items:
     source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
     request: |
       Strata view follow-ups: setHands(false) is a no-op; the people do not walk in and out of the vats; no sound for the roots, the hands or the rise; the 3D machine is small at 12 chambers a floor (about 28 px a unit at 1440 wide).
-    status: open
-    notes: "Found while building B290."
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "Found while building B290. deep-swap: setHands(false) takes the arms back; people walk into organs and vats and out of the vats; the take, hands and rise sounds come from index.js for either view (the hands now also when the flesh took the machine house); the machine is looked at closer (FOCUS_PPU 44) for seven seconds when the hands come. At rest the colony keeps the fit (about 27 px a unit at 1440 wide with twelve a floor) so nothing is under the HUD."
 
   - id: B300
     added: 2026-10-03
@@ -2723,3 +2725,92 @@ items:
     status: done
     resolved_in: deep-grow (version at merge)
     notes: "src/phase4/view-hooks.js; src/checkpoints.js growColony; scripts/accept-iv-cut.mjs."
+
+  - id: B310
+    added: 2026-10-03
+    source: "Ola chose the strata (2026-10-03), via the coordinator"
+    request: |
+      Make the strata view the default view of chapter IV; keep the 3D view selectable with ?view=3d and a choice in the ☰ menu (View: strata / 3D, saved in localStorage 'rpi-deep-view').
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "src/phase4/views.js (chosenView, urlForView); index.js makes the view and mounts the menu item (IV only, removed on teardown; main.js untouched)."
+
+  - id: B311
+    added: 2026-10-03
+    source: "coordinator, deep-swap"
+    request: |
+      The body's neighbours match what is on the screen: growth.js adjacency comes from the active view's geometry (strata.js sectionPlace in the strata view, layout.js placement in 3D) behind a function the view exports; growth.js stays pure. Re-run both sims, act 25 to 35 minutes, GROW about a third.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "Each view exports chamberPlace; grow.js setChamberPlace/graphOf. policy.js saves people for the machine house once it is reachable. Strata: plain 31m56s (GROW 40 %), --watcher 27m43s (27 %)."
+
+  - id: B312
+    added: 2026-10-03
+    source: "coordinator, deep-swap (B294 and the GROW agent's list)"
+    request: |
+      Both views support everything the orchestrator calls: in the strata view onChamberHover and step(dt, throws), setHands(false), people in and out of the vats, the dig '+', grow mode, chamberAt, screenOfNode, focusFloor, focusMachine, buildingSlots.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "strata-view.js (and extendHooks); scene.js buildingSlots. Left as no-ops in the strata view: scoutsUp/scoutsDown (the scouts were cut in deep-rebuild)."
+
+  - id: B313
+    added: 2026-10-03
+    source: "coordinator, deep-swap"
+    request: |
+      Save the strata layers (years per sleep) with the deep save so a reload rebuilds the same layers; migrate old saves from the total years slept and the sleep count.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "index.js trackStrata (state.strata, strata.js trackHistory); the view reads state.strata."
+
+  - id: B314
+    added: 2026-10-03
+    source: "coordinator, deep-swap"
+    request: |
+      Framing: the strata view composes with the instrument panel (insetLeft), the drawer, the lever and dig, the year counter top left awake and centre asleep; nothing overlaps at 1440x900 and 1280x800; chambers and the machine readable.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "strata.js panLimit/panToShow/sleepHomeY/FOCUS_PPU; ruler labels avoid the HUD (opts.avoid); --deep-cx/--deep-cy from view.centre(); style-deep.css deep-swap section."
+
+  - id: B315
+    added: 2026-10-03
+    source: "deep-swap, found while checking the rise"
+    request: |
+      The strata rise must end on time on a slow frame rate, and the body must stay risen while the last lines type (its front fell back once the rise was done).
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "strata-view.js stepRise on a wall clock; the front is held at its end after the rise."
+
+  - id: B316
+    added: 2026-10-03
+    source: "coordinator, deep-swap"
+    request: |
+      The sims follow the view: the strata row by default, --view 3d for the ring.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "scripts/sim-phase4.mjs --view; views.js placeFor."
+
+  - id: B317
+    added: 2026-10-03
+    source: "coordinator, deep-swap"
+    request: |
+      Acceptance against both views, with checks that the strata view is the default, that a glowing chamber is adjacent on screen to a body chamber, and that the layers survive a reload.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "scripts/accept-iv-cut.mjs runs both; checks V, A, K; shots docs/playtests/rebuild-shots/swap-*.png."
+
+  - id: B318
+    added: 2026-10-03
+    source: "deep-swap"
+    request: |
+      Unit tests for the view choice, the body's graph per view, the strata framing helpers and the ruler labels.
+    status: done
+    resolved_in: deep-swap (version at merge)
+    notes: "src/phase4/swap.test.js."
+
+  - id: B319
+    added: 2026-10-03
+    source: "deep-swap, open after the swap"
+    request: |
+      A playtest of the whole act in the strata view by Ola. Open questions from the swap: twelve chambers a floor keep a chamber about 55 px wide at 1440 (the fit; only the hands get a closer look); with the row the plain sim's GROW is 40 % of the act (the dormitories, which become vats, come late in a row). Decide whether to zoom closer with sideways scrolling, or retune GROW.
+    status: open
+    notes: "The zoom-and-pan machinery is in strata.js/strata-view.js (FOCUS_PPU, panLimit, panToShow, the side fade); it is only used for the hands' look now."

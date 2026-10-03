@@ -40,7 +40,10 @@ import {
 import { pushFeed, alarmLine } from './advisor.js';
 import { short, span, cryoRoad, cryoNeed, ORE_SIGN, signHtml } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout, sectorOf, claimChambers, emptyChambers } from './layout.js';
-import { createScene, supportsWebGL } from './scene.js';
+import { createScene, supportsWebGL, chamberPlace as sceneChamberPlace } from './scene.js';
+import { createStrataView, extendHooks, chamberPlace as strataChamberPlace } from './strata-view.js';
+import { trackHistory } from './strata.js';
+import { VIEW_KEY, VIEW_NAME, chosenView, otherView, urlForView } from './views.js';
 import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js';
 import {
     normalizeWatcher, watcherName, watchSleep, alarmHit, snap as snapWatcher, softness, watcherLines,
@@ -66,7 +69,7 @@ import { createViewHooks } from './view-hooks.js';
 import {
     growOn, risen, normalizeGrow, organsOf, stepGrow, takeChamber, takeWords, viewOf, graphOf,
     growGauges, adviseGrow, riseLamps, riseReady, bodyGroups, buyBody, fleshShare, rise as riseBody,
-    GROW_GAUGES, GROW_DAYS_PER_SECOND, GROW_END, RISE_LINES,
+    GROW_GAUGES, GROW_DAYS_PER_SECOND, GROW_END, RISE_LINES, setChamberPlace,
 } from './grow.js';
 import { HANDS_SECONDS } from './view-hooks.js';
 import { playChapterCard } from '../chapterCard.js';
@@ -102,6 +105,7 @@ let sound = null;
 let savingEnabled = true;
 let beforeUnloadHandler = null;
 let iconRefreshQueued = false;
+let viewItem = null;                // deep-swap: "View: strata / 3D" in the ☰ menu, while IV is open
 
 /** Debounced lucide pass: never called straight from a loop. */
 function scheduleIconRefresh() {
@@ -111,6 +115,33 @@ function scheduleIconRefresh() {
         iconRefreshQueued = false;
         try { lucide.createIcons(); } catch { /* the CDN is not there; the glyphs are not the game */ }
     });
+}
+
+/**
+ * deep-swap: "View · strata" or "View · 3D" in the ☰ menu while chapter IV is open. A click keeps the
+ * other view as the choice and loads the page again (the game is saved on the way out).
+ */
+function mountViewItem(kind) {
+    viewItem?.remove();
+    viewItem = null;
+    const menu = document.getElementById('menu-dropdown');
+    if (!menu) return;
+    const b = document.createElement('button');
+    b.id = 'deep-view-toggle';
+    b.type = 'button';
+    b.className = 'block w-full text-left px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap border-b border-slate-100';
+    b.textContent = `View · ${VIEW_NAME[kind]}`;
+    b.title = `Show the colony in the ${VIEW_NAME[otherView(kind)]} view`;
+    b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = otherView(kind);
+        try { localStorage.setItem(VIEW_KEY, next); } catch { /* the URL still carries it */ }
+        const url = urlForView(window.location.href, next);
+        if (url === window.location.href) window.location.reload();
+        else window.location.assign(url);
+    });
+    menu.insertBefore(b, document.getElementById('reset-btn'));
+    viewItem = b;
 }
 
 /** Every number in chapter IV: "313 k", "2.3 B", "9 M". See readout.js `short()`. */
@@ -168,6 +199,14 @@ export function init() {
     state.watcher = normalizeWatcher(state.watcher);
     state.tree = normalizeTree(state.tree);
     claimChambers(state, layout);
+    // deep-swap: the years per sleep, kept with the save so the strata view lays the same layers after
+    // a reload; a save from before is given them from the years slept and the number of sleeps
+    trackStrata();
+    function trackStrata() {
+        const w = state.watcher || {};
+        const next = trackHistory(state.strata, w.sleptYears || 0, w.sleeps || 0);
+        if (next !== state.strata) state.strata = next;
+    }
 
     // deep-sound: the chapter's sound. A colony that already climbed is finished and makes no sound.
     sound = createDeepSound(audio, { isHeld: () => !!document.querySelector('#chapter-card.is-active') });
@@ -211,25 +250,47 @@ export function init() {
     $('deep-crust').hidden = true;
 
     // --- the model, and the hooks the HUD talks to it through ---
+    // deep-swap: THE STRATA VIEW is the default (Ola's choice, 2026-10-03); `?view=3d` or the ☰
+    // menu's "View" makes the 3D one. Both answer the same calls (view-hooks.js, strata-view.js
+    // extendHooks), and each says where a chamber sits in it, so the body's neighbours are the ones
+    // on the screen (grow.js setChamberPlace)
+    let storedView = null;
+    try { storedView = localStorage.getItem(VIEW_KEY); } catch { /* ignore */ }
+    const viewKind = chosenView(window.location.search, storedView);
+    setChamberPlace(viewKind === '3d' ? sceneChamberPlace : strataChamberPlace);
     if (supportsWebGL()) {
         try {
-            scene = createScene(ui.sceneHost, {
+            const common = {
                 labelHost: ui.labelHost,
                 onInteract: () => ui.resetBtn.classList.add('is-on'),
                 onLabels: scheduleIconRefresh,
                 onClearDark: (slot) => clearDark(slot),
                 // deep-fix2: the "+" on the next chamber digs, as the DIG button does
                 onDig: () => (!busy && !state.asleep && !paused() && !state.watcher.gone ? dig() : false),
-            });
+            };
+            scene = viewKind === '3d' ? createScene(ui.sceneHost, common)
+                : createStrataView(ui.sceneHost, {
+                    ...common, insetLeft: panelInset(),
+                    // the year ruler's labels keep out from under what we hold, the buttons and the lever
+                    avoid: () => [$('deep-hold'), $('deep-act'), ui.resetBtn].filter(Boolean).map((e) => e.getBoundingClientRect()),
+                });
         } catch (e) {
             console.error('the deep: the model could not be built', e);
             scene = null;
         }
     }
+    /** The strata view centres the colony in what the instrument panel leaves free on the left. */
+    function panelInset() {
+        const r = ui.panel ? ui.panel.getBoundingClientRect() : null;
+        return Math.round(r && r.right > 0 ? r.right + 12 : 348);
+    }
     if (!scene) ui.fallback.classList.add('is-on');
+    ui.root.dataset.view = viewKind;
     // deep-grow: once the body grows nothing is built into an empty chamber any more
     const isEmpty = (slot) => !growOn(state) && emptyChambers(state, layout).includes(slot);
-    const hooks = createViewHooks(scene, { ringHost: ui.ring, isEmpty, onIcons: scheduleIconRefresh, graph: () => graphOf(layout) });
+    const baseHooks = createViewHooks(scene, { ringHost: ui.ring, isEmpty, onIcons: scheduleIconRefresh, graph: () => graphOf(layout) });
+    const hooks = scene && viewKind !== '3d' ? extendHooks(baseHooks, scene) : baseHooks;
+    mountViewItem(viewKind);
     const panel = createPanel({
         root: ui.panel, gauges: $('deep-gauges'), advice: $('deep-advice'), empty: $('deep-empty'),
         lamps: $('deep-lamps'), alarm: $('deep-alarm'), alarmWord: $('deep-alarm-word'),
@@ -1123,6 +1184,8 @@ export function init() {
         if (handsNow) {
             handsShown = true;
             hooks.setHands(true, { instant: loadingBody });
+            // the first throw by hand, whether the player took the machine house or the flesh did
+            if (!loadingBody) setTimeout(() => sound?.event('hands'), HANDS_SECONDS * 1000);
             // the machine becomes hands: the camera goes to look, and back to the front after
             if (!loadingBody && scene?.focusMachine()) holdFocusUntil = performance.now() + 7000;
         }
@@ -1193,7 +1256,6 @@ export function init() {
         sound?.event('take');
         afterChange();
         drawBody();
-        if (id === 'machine') setTimeout(() => sound?.event('hands'), HANDS_SECONDS * 1000);
         showTip(id, tipAt.x, tipAt.y);
         return true;
     }
@@ -1310,6 +1372,7 @@ export function init() {
         t.born += sum.born; t.died += sum.died;
         for (const r of ROOMS) t.ranDays[r] = (t.ranDays[r] || 0) + (sum.ran[r] || 0) * sum.days;
         sum.watch = watchSleep(state.watcher, { days: sum.days, tier: state.cryo, spare: sum.spare, hold: choosing });
+        trackStrata();
         report = dryRun();
         scene?.setState(state, layout);
         if (landed) hooks.reapply();
@@ -1332,6 +1395,7 @@ export function init() {
         sound?.event('sleep');
         ui.root.classList.add('is-sleeping');
         beginSleep(state.watcher, state.cryo);
+        trackStrata();
         setDiveOffset();
         ui.dive.hidden = false;
         updateChrome();
@@ -1688,9 +1752,21 @@ export function init() {
         panel.step(paused() ? 0 : dt);
         hooks.step(paused() ? 0 : dt, lastTempo.throws || 0);
         scene?.step(paused() ? 0 : dt);
+        placeCentre();
         rafId = requestAnimationFrame(frame);
     }
     rafId = requestAnimationFrame(frame);
+    /** deep-swap: the counter, Surface's stage and the last lines stand over the colony's middle (the strata view's shaft). */
+    let centreAt = '';
+    function placeCentre() {
+        if (!scene || typeof scene.centre !== 'function') return;
+        const c = scene.centre();
+        const key = `${Math.round(c.x)}|${Math.round(c.y)}`;
+        if (key === centreAt) return;
+        centreAt = key;
+        ui.root.style.setProperty('--deep-cx', `${Math.round(c.x)}px`);
+        ui.root.style.setProperty('--deep-cy', `${Math.round(c.y)}px`);
+    }
 
     recomputeGates();
     scene?.setState(state, layout);
@@ -1724,6 +1800,10 @@ export function init() {
     window.rpiDeep = {
         get state() { return state; }, get layout() { return layout; }, get report() { return report; },
         get feed() { return feed.slice(); }, scene,
+        // deep-swap: which view draws the colony, and the layers the strata view lays
+        view: viewKind,
+        get strata() { return Array.isArray(state.strata) ? state.strata.slice() : []; },
+        get graph() { return graphOf(layout); },
         get lamp() { return lamp ? { kind: lamp.p.kind, phase: lamp.phase, t: lamp.t, at: lamp.p.at || 0 } : null; },
         pressSlot: (slot) => pressSlot(slot),
         get rps() { return rps ? { stage: rps.stage, log: rps.log.slice() } : (rpsLast ? { stage: 'done', log: rpsLast.slice() } : null); },
@@ -1838,6 +1918,8 @@ export function teardown() {
     beforeUnloadHandler = null;
     try { scene?.dispose(); } catch (e) { console.warn('the deep: dispose', e); }
     scene = null;
+    viewItem?.remove();
+    viewItem = null;
     try { sound?.stop(); } catch (e) { console.warn('the deep: sound stop', e); }
     sound = null;
     document.body.classList.remove('in-deep');

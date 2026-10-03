@@ -47,6 +47,17 @@
  *                              in the shaft ('h<f>') or the machine house; returns an unsubscribe
  *   setHands(on)               three sinew arms rise out of the machine house, ending in hands
  *   rise(onDone) -> Promise    the body pushes up through every layer to the surface line
+ * deep-swap (the default view since then; index.js makes it unless ?view=3d or the ☰ menu says 3D):
+ *   chamberPlace               exported: where chamber i sits here (strata.js sectionPlace); index.js
+ *                              hands it to grow.js setChamberPlace, so the body's graph is this row
+ *   setDigOffer(o) digPlusAt() the "+" where the next chamber is dug (in opts.labelHost), opts.onDig
+ *   setGrowMode(on)  chamberAt(x, y)  screenOfNode(id)  buildingSlots()
+ *   focusFloor(f)  focusMachine(s)   the camera follows the front; on the hands it looks closer for s
+ *                              seconds (FOCUS_PPU), panning sideways, the colony fading at the sides
+ *   onChamberHover(cb)  setThrows(n)  bodyStats  centre()   (the counter stands at centre())
+ *   setHands(false) takes the arms back; setHands(true, {instant}) for a reload
+ *   setCandidates(sectors, hover)    an older save's sector choice glows; sealAnim() a flash
+ *   state.strata (years per sleep, kept in the save by index.js) wins over the view's own count
  * ---------------------------------------------------------------------------------------------
  *
  * Nothing is allocated per frame. The chambers are one instanced draw from a canvas atlas drawn at
@@ -55,15 +66,23 @@
  */
 
 import * as THREE from 'three';
-import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { createMachine } from './machine-model.js';
 import { createHands, OVERGROW_SECONDS } from './hands.js';
 import {
     makeFleshMaterial, fleshify, setNecrotic, stepFlesh, makeWetEnvironment, setFleshEnvironment, disposeFlesh,
 } from './flesh.js';
-import { emptyChambers } from './layout.js';
+import { emptyChambers, sectorOf } from './layout.js';
 import { slotOf, MACHINE } from './growth.js';
+import { digCost } from './deep.js';
 import * as S from './strata.js';
+
+/**
+ * deep-swap: where chamber number i sits in THIS view, for the body's graph (grow.js
+ * setChamberPlace): a row outward from the shaft, -1, +1, -2, +2, ... So a chamber that glows as
+ * reachable always lies beside the body on the screen.
+ */
+export const chamberPlace = S.sectionPlace;
 
 /* ------------------------------------------------------------------ the palette (scene.js, mockup B) */
 const ROCK = 0x0a0d12;
@@ -252,11 +271,15 @@ void main() {
 const LIGHT_FRAG = /* glsl */`
 uniform float uFocusY;
 uniform float uAsleep;
+uniform vec3 uSide;
 varying vec2 vW;
 void main() {
     float y = vW.y;
     float deep = smoothstep(0.35, 3.4, uFocusY - y) * 0.985;
     float night = uAsleep * 0.42 * smoothstep(0.2, -0.8, y);
+    // deep-swap: zoomed in past the fit, the colony fades out where the panel and the ruler are
+    float side = uSide.z * (1.0 - smoothstep(-0.6, 0.3, y)) * max(1.0 - smoothstep(uSide.x, uSide.x + 1.4, vW.x), smoothstep(uSide.y - 1.4, uSide.y, vW.x));
+    deep = max(deep, side * 0.96);
     float a = 1.0 - (1.0 - deep) * (1.0 - night);
     if (a < 0.002) discard;
     gl_FragColor = vec4(0.0, 0.0, 0.0, a);
@@ -617,6 +640,9 @@ function taperTube(points, radius, tip, radial = 7, segs = 48) {
  * @param {Function} [opts.onInteract] - the first time the player scrolls or drags the view
  * @param {Function} [opts.onClearDark] - (slot) a click on a chamber that stands dark
  * @param {Function} [opts.onLabels] - unused (scene.js draws lucide icons in labels; this view has none)
+ * @param {HTMLElement} [opts.labelHost] - deep-swap: where the DOM labels go (the "+" where the next
+ *        chamber is dug); defaults to a layer of its own over the canvas
+ * @param {Function} [opts.onDig] - deep-swap: a click on that "+"; returns whether it dug
  */
 export function createStrataView(container, opts = {}) {
     const insetLeft = opts.insetLeft || 0;
@@ -634,10 +660,14 @@ export function createStrataView(container, opts = {}) {
     renderer.domElement.classList.add('strata-canvas');
     container.appendChild(renderer.domElement);
 
-    const css2d = new CSS2DRenderer();
+    // deep-swap: the labels share the HUD's label layer (#deep-labels) when the game hands one over
+    const labelHost = opts.labelHost || null;
+    const css2d = labelHost ? new CSS2DRenderer({ element: labelHost }) : new CSS2DRenderer();
     css2d.setSize(W, H);
-    css2d.domElement.className = 'strata-stars';
-    container.appendChild(css2d.domElement);
+    if (!labelHost) {
+        css2d.domElement.className = 'strata-stars';
+        container.appendChild(css2d.domElement);
+    }
 
     const ui = document.createElement('div');
     ui.className = 'strata-ui';
@@ -691,7 +721,7 @@ export function createStrataView(container, opts = {}) {
     back.renderOrder = -10;
     scene.add(back);
 
-    const lightU = { uFocusY: { value: S.FLOOR0 }, uAsleep: { value: 0 } };
+    const lightU = { uFocusY: { value: S.FLOOR0 }, uAsleep: { value: 0 }, uSide: { value: new THREE.Vector3(-1e3, 1e3, 0) } };
     const lightMat = new THREE.ShaderMaterial({
         uniforms: lightU, vertexShader: BACK_VERT, fragmentShader: LIGHT_FRAG,
         transparent: true, depthTest: false, depthWrite: false,
@@ -810,7 +840,7 @@ export function createStrataView(container, opts = {}) {
     for (let i = 0; i < MAX_DOTS; i++) {
         folk.push({
             floor: 0, x: 0, y: 0, tx: 0, ty: 0, toFloor: 0, mode: 0, wait: 0, speed: 0.5, a: 0, aTo: 1, gone: 0, viaShaft: false,
-            path: new Float32Array(10), pn: 0, plen: 0, delay: 0,
+            path: new Float32Array(10), pn: 0, plen: 0, delay: 0, out: 0, into: false,
         });
     }
     let folkN = 0;
@@ -956,30 +986,73 @@ export function createStrataView(container, opts = {}) {
     let dead = false;
     let march = null;
     const clickers = new Set();
+    const hovers = new Set();
+    let growMode = false;
+    let handsThrows = 0.6;            // the machine's throws a second, for the hands (hooks.step)
+    let candSectors = null, candHover = -1;   // an older save's sector choice (v1.52.0)
+
+    /* ------------------------------------------------ deep-swap: the "+" where the next chamber is dug */
+    const DIG_RING = 113;
+    const digEl = document.createElement('div');
+    digEl.className = 'deep-lbl strata-dig';
+    digEl.innerHTML = '<div class="deep-lbl-in"><svg viewBox="0 0 40 40" style="width:34px;height:34px;">'
+        + '<circle class="ring-base" cx="20" cy="20" r="18" fill="none" stroke-width="2"></circle>'
+        + `<circle class="ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="3" stroke-dasharray="${DIG_RING}" stroke-dashoffset="${DIG_RING}" style="stroke:#4a5666;"></circle></svg>`
+        + '<button class="dig-plus" type="button" aria-label="Dig a chamber here"></button><span class="dig-price deep-mono"></span></div>';
+    const dig = {
+        obj: new CSS2DObject(digEl), inner: digEl.firstChild, ring: digEl.querySelector('.ring-fg'),
+        plus: digEl.querySelector('.dig-plus'), price: digEl.querySelector('.dig-price'), offer: { html: '', ok: false, on: true }, at: -1,
+    };
+    dig.obj.visible = false;
+    scene.add(dig.obj);
+    dig.plus.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ok = opts.onDig ? opts.onDig() : false;
+        if (!ok) { dig.inner.classList.remove('is-no'); void dig.inner.offsetWidth; dig.inner.classList.add('is-no'); }
+    });
+    function paintDig() {
+        if (dig.price.dataset.html !== dig.offer.html) { dig.price.dataset.html = dig.offer.html; dig.price.innerHTML = dig.offer.html; }
+        dig.inner.classList.toggle('is-dig-ok', !!dig.offer.ok);
+        dig.inner.classList.toggle('is-dig-off', !dig.offer.on);
+    }
 
     /* ------------------------------------------------ camera */
     let ppu = S.MAX_PPU, ppuTarget = S.MAX_PPU, shaftPx = W / 2;
     let camX = 0, camY = -6, camTarget = -6, homeMode = true, touched = false;
+    // deep-swap: sideways. 0 is the shaft in the middle of what the panel and the ruler leave free
+    let panX = 0, panTarget = 0, panMax = 0, activeX = null, digsAhead = 0;
+    let focusZoom = 0, focusUntil = 0;     // a short look closer (focusMachine), then back to the fit
     let focusY = S.floorLine(0);
     let shake = 0;
     const viewH = () => H / ppu;
     function deepestLine() { return S.floorLine(Math.max(0, floors - 1)); }
-    function home() { return S.homeY(viewH(), floors); }
+    function home() { return lastState && lastState.asleep && !rising ? S.sleepHomeY(viewH(), ppu) : S.homeY(viewH(), floors); }
+    const freeHalf = () => Math.max(100, W - insetLeft - S.RULER_PX - 32) / 2 / ppu;
     const lim = { min: 0, max: 0 };
     function limits() {
         S.cameraLimits(viewH(), floors, surface, lim);
+        // asleep the camera rests higher (the years over YEAR 0): that is always within reach
+        const h = home();
+        lim.max = Math.max(lim.max, h);
+        lim.min = Math.min(lim.min, h);
         if (rising) lim.max = Math.max(lim.max, surface + 2);
         return lim;
     }
     let zoomOverride = 0;
     function fit() {
-        const f = S.fitScale(W, insetLeft, S.widestColumn(Math.max(chambers.length, 4)));
-        ppuTarget = zoomOverride || f.ppu;
+        // the chambers, those being dug and the "+" for the next: all of them fit between the panel and the ruler
+        const maxCol = S.widestColumn(Math.max(chambers.length + (growMode ? 0 : digsAhead + 1), 4));
+        const f = S.fitScale(W, insetLeft, maxCol);
+        ppuTarget = zoomOverride || (focusZoom ? Math.max(f.ppu, focusZoom) : f.ppu);
         shaftPx = f.shaftPx;
+        panMax = S.panLimit(W, insetLeft, maxCol, ppuTarget);
+        labelsDirty = true;
     }
+    /** deep-swap: where things happen now (the "+" to dig, the body's front): the camera keeps it in view. */
+    function follow(x) { if (Number.isFinite(x) && !focusZoom) activeX = x; }
     function applyCamera() {
         const hw = W / 2 / ppu, hh = H / 2 / ppu;
-        camX = (W / 2 - shaftPx) / ppu;
+        camX = (W / 2 - shaftPx) / ppu + panX;
         const sx = shake ? (Math.sin(time.value * 61) * 0.05 * shake) : 0;
         const sy = shake ? (Math.sin(time.value * 47 + 1) * 0.05 * shake) : 0;
         camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh;
@@ -989,6 +1062,10 @@ export function createStrataView(container, opts = {}) {
         back.scale.set(hw * 2 + 2, hh * 2 + 2, 1);
         shade.position.set(camX, camY, 10);
         shade.scale.set(hw * 2 + 2, hh * 2 + 2, 1);
+        const sv = lightU.uSide.value;
+        sv.x = camX + (insetLeft - W / 2) / ppu;
+        sv.y = camX + (W - S.RULER_PX - 16 - W / 2) / ppu;
+        sv.z += ((panMax > 0.05 && !rising ? 1 : 0) - sv.z) * 0.08;
         backU.uPx.value = 1 / ppu;
         dotU.uSize.value = PERSON_H * ppu * dpr * 1.25;
         debrisMat.uniforms.uSize.value = Math.max(3, 0.12 * ppu * dpr);
@@ -1041,6 +1118,7 @@ export function createStrataView(container, opts = {}) {
             floorTargets[f] = row.filter((c) => c.type && c.type !== 'cryo' && !c.isBody).map((c) => c.x);
         }
         floorTargets.length = floors;
+        syncFolkTargets();
         rect(-0.32, -0.08, 0.32, 0.08, '#8b97a8');
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -1092,20 +1170,55 @@ export function createStrataView(container, opts = {}) {
         }
         tiles.count = n;
         tiles.instanceMatrix.needsUpdate = true;
+        // the "+" sits where the next chamber after those under way will be; its ring fills with the ore for it
+        const p = S.chamberPos(next);
+        if (next !== dig.at) { digsAhead = next - slots.length; dig.at = next; fit(); }
+        dig.obj.position.set(p.x, p.cy, 0);
+        dig.obj.visible = !growMode && !state.asleep;
+        if (!growMode) follow(p.x);
+        const cost = digCost(state.chambers || 0);
+        const frac = clamp01(cost > 0 ? (state.minerals || 0) / cost : 0);
+        dig.ring.setAttribute('stroke-dashoffset', (DIG_RING * (1 - frac)).toFixed(1));
     }
 
     /* ------------------------------------------------ people */
+    // deep-swap (B294): in the body they walk INTO its organs and the vats and do not come out of an
+    // organ; the vats (dormitories the body took) give people back: they step out of one and walk on
+    const floorVats = [];             // per floor: x of the living vats
+    const floorOrgans = [];           // per floor: x of the living organs that eat (not vats)
     function personY(f) { return S.floorLine(f) + 0.16 + PERSON_H / 2; }
-    function walkable(f) { return floorTargets[f] && floorTargets[f].length; }
+    function walkable(f) { return (floorTargets[f] && floorTargets[f].length) || (floorVats[f] && floorVats[f].length); }
+    function vatList() {
+        const out = [];
+        for (let f = 0; f < floors; f++) for (const x of floorVats[f] || []) out.push({ f, x });
+        return out;
+    }
     function pickTarget(p, rnd) {
-        const xs = floorTargets[p.floor];
-        if (!walkable(p.floor)) { p.gone = 1 + rnd() * 2; return; }
+        p.into = false;
+        if (!walkable(p.floor)) {
+            // nothing left here to walk to: down or up the shaft to a floor that has
+            const ok = [];
+            for (let f = 0; f < floors; f++) if (f !== p.floor && walkable(f)) ok.push(f);
+            if (!ok.length) { p.gone = 1 + rnd() * 2; return; }
+            p.toFloor = ok[Math.floor(rnd() * ok.length)]; p.viaShaft = true; p.tx = (rnd() - 0.5) * 0.12; p.mode = 1;
+            return;
+        }
         if (floors > 1 && rnd() < 0.16) {
             let to = p.floor + (rnd() < 0.5 ? -1 : 1);
             to = Math.max(0, Math.min(floors - 1, to));
             if (to !== p.floor && walkable(to)) { p.toFloor = to; p.viaShaft = true; p.tx = (rnd() - 0.5) * 0.12; p.mode = 1; return; }
         }
         p.viaShaft = false;
+        const org = floorOrgans[p.floor] || [], vat = floorVats[p.floor] || [];
+        if ((org.length || vat.length) && rnd() < 0.22) {
+            // the body calls: into an organ (eaten) or into a vat (taken back in)
+            const list = org.length && (!vat.length || rnd() < 0.7) ? org : vat;
+            p.tx = list[Math.floor(rnd() * list.length)] + (rnd() - 0.5) * 0.5;
+            p.into = true;
+            p.mode = 1;
+            return;
+        }
+        const xs = floorTargets[p.floor] && floorTargets[p.floor].length ? floorTargets[p.floor] : vat;
         p.tx = xs && xs.length ? xs[Math.floor(rnd() * xs.length)] + (rnd() - 0.5) * 1.4 : (rnd() - 0.5) * 2;
         p.mode = 1;
     }
@@ -1119,10 +1232,10 @@ export function createStrataView(container, opts = {}) {
         while (folkN < want) {
             const p = folk[folkN++];
             p.floor = living[Math.floor(rnd() * living.length)];
-            const xs = floorTargets[p.floor];
+            const xs = floorTargets[p.floor] && floorTargets[p.floor].length ? floorTargets[p.floor] : floorVats[p.floor];
             p.x = xs[Math.floor(rnd() * xs.length)] + (rnd() - 0.5) * 1.2;
             p.y = personY(p.floor);
-            p.mode = 0; p.wait = rnd() * 3; p.speed = 0.45 + rnd() * 0.4; p.a = 0; p.aTo = 1; p.gone = 0;
+            p.mode = 0; p.wait = rnd() * 3; p.speed = 0.45 + rnd() * 0.4; p.a = 0; p.aTo = 1; p.gone = 0; p.out = 0; p.into = false;
         }
         folkN = Math.min(folkN, want);
         dotGeo.setDrawRange(0, folkN);
@@ -1131,24 +1244,34 @@ export function createStrataView(container, opts = {}) {
         if (!body.size) return false;
         for (let i = 0; i < chambers.length; i++) {
             const c = chambers[i];
-            if (c.floor === p.floor && Math.abs(c.x - p.x) < S.CH_W / 2 && c.isBody) return true;
+            if (c.floor === p.floor && Math.abs(c.x - p.x) < S.CH_W / 2 - 0.15 && c.isBody) return true;
         }
         return false;
     }
+    /** The body lets one go: out of a vat if it has any, else down the shaft onto a living floor. */
+    function respawn(p) {
+        const vats = vatList();
+        if (vats.length && rnd() < 0.7) {
+            const v = vats[Math.floor(rnd() * vats.length)];
+            p.floor = v.f; p.x = v.x + (rnd() - 0.5) * 0.6; p.out = 2.2;
+        } else {
+            for (let k = 0; k < 6; k++) {
+                const f = Math.floor(rnd() * floors);
+                if (walkable(f)) { p.floor = f; break; }
+            }
+            const xs = floorTargets[p.floor] && floorTargets[p.floor].length ? floorTargets[p.floor] : floorVats[p.floor];
+            p.x = xs && xs.length ? xs[Math.floor(rnd() * xs.length)] + (rnd() - 0.5) * 1.2 : 0;
+            p.out = 0;
+        }
+        p.y = personY(p.floor); p.aTo = 1; p.into = false;
+        if (p.out > 0) pickTarget(p, rnd); else { p.mode = 0; p.wait = 0.5 + rnd() * 3; }
+    }
     function stepPerson(p, dt) {
+        if (p.out > 0) p.out -= dt;
         if (p.gone > 0) {
             p.gone -= dt;
             p.aTo = 0;
-            if (p.gone <= 0) {
-                // the body let one go elsewhere: they come down the shaft on a living floor
-                for (let k = 0; k < 6; k++) {
-                    const f = Math.floor(rnd() * floors);
-                    if (walkable(f)) { p.floor = f; break; }
-                }
-                const xs = floorTargets[p.floor];
-                p.x = xs && xs.length ? xs[Math.floor(rnd() * xs.length)] + (rnd() - 0.5) * 1.2 : 0;
-                p.y = personY(p.floor); p.mode = 0; p.wait = 0.5 + rnd() * 3; p.aTo = 1;
-            }
+            if (p.gone <= 0) respawn(p);
         } else if (p.mode === 0) {
             p.wait -= dt;
             if (p.wait <= 0) pickTarget(p, rnd);
@@ -1157,9 +1280,9 @@ export function createStrataView(container, opts = {}) {
             const s = p.speed * dt;
             if (Math.abs(d) <= s) {
                 p.x = p.tx;
-                if (p.viaShaft) { p.mode = 2; p.ty = personY(p.toFloor); } else { p.mode = 0; p.wait = 1 + rnd() * 4; }
+                if (p.into) { p.into = false; p.gone = 2 + rnd() * 4; } else if (p.viaShaft) { p.mode = 2; p.ty = personY(p.toFloor); } else { p.mode = 0; p.wait = 1 + rnd() * 4; }
             } else p.x += Math.sign(d) * s;
-            if (inBodyChamber(p)) { p.gone = 2 + rnd() * 4; }
+            if (!p.into && !(p.out > 0) && p.gone <= 0 && inBodyChamber(p)) { p.gone = 2 + rnd() * 4; }
         } else {
             const d = p.ty - p.y;
             const s = 1.1 * dt;
@@ -1255,29 +1378,48 @@ export function createStrataView(container, opts = {}) {
     }
 
     /* ------------------------------------------------ the strata: history, uniforms, labels */
-    function syncYears(force) {
-        const w = lastState && lastState.watcher;
-        const total = w ? (w.sleptYears || 0) : 0;
-        const sleeps = w ? (w.sleeps || 0) : 0;
-        if (!force && total === seenYears && sleeps === seenSleeps) return;
-        seenYears = total; seenSleeps = sleeps;
-        const next = S.trackHistory(history, total, sleeps);
-        if (next !== history || force) {
-            history = next;
-            layers = S.strataLayers(history);
-        } else return;
+    /** deep-swap: the layers the game keeps (state.strata, years per sleep) win over the view's own count. */
+    function applyLayers() {
+        layers = S.strataLayers(history);
         const arr = backU.uB.value;
         for (let i = 0; i < S.MAX_LAYERS; i++) arr[i] = i < layers.length ? layers[i].y1 : 0;
         backU.uN.value = layers.length;
         surface = S.surfaceY(layers);
         labelsDirty = true;
     }
+    function syncYears(force) {
+        const kept = lastState && Array.isArray(lastState.strata) ? lastState.strata : null;
+        if (kept) {
+            if (kept === keptRef && !force) return;
+            keptRef = kept;
+            history = S.compactHistory(kept.map(Number).filter((v) => v >= 0));
+            applyLayers();
+            return;
+        }
+        const w = lastState && lastState.watcher;
+        if (!w) { if (force) applyLayers(); return; }
+        const total = w.sleptYears || 0;
+        const sleeps = w.sleeps || 0;
+        if (!force && total === seenYears && sleeps === seenSleeps) return;
+        seenYears = total; seenSleeps = sleeps;
+        const next = S.trackHistory(history, total, sleeps);
+        if (next === history && !force) return;
+        history = next;
+        applyLayers();
+    }
+    let keptRef = null;
     let labelClock = 0;
     let rulerPos = -1;
+    // deep-swap: the HUD on the right (what we hold, the buttons and the lever): no year label under it
+    let avoidRects = [], avoidClock = 0;
+    function underHud(sy) {
+        for (const r of avoidRects) if (sy > r.top - 10 && sy < r.bottom + 10) return true;
+        return false;
+    }
     function updateLabels(dt) {
         labelClock -= dt;
         if (labelsDirty && labelClock <= 0) {
-            labels = S.strataLabels(layers, 0.4);
+            labels = S.strataLabels(layers, Math.max(0.4, 22 / ppu));
             labelClock = 0.1;
             labelsDirty = false;
             for (let i = 0; i < labelEls.length; i++) {
@@ -1294,10 +1436,17 @@ export function createStrataView(container, opts = {}) {
             if (upTag.textContent !== upText) upTag.textContent = upText;
         }
         const viewTop = camY + viewH() / 2;
+        avoidClock -= dt;
+        if (avoidClock <= 0 && opts.avoid) {
+            avoidClock = 0.25;
+            const cr = cv.getBoundingClientRect();
+            avoidRects = (opts.avoid() || []).filter((r) => r && r.width > 0 && r.right > cr.right - 230 && r.left < cr.right - 30)
+                .map((r) => ({ top: r.top - cr.top, bottom: r.bottom - cr.top }));
+        }
         for (let i = 0; i < labelEls.length; i++) {
             const rec = labelEls[i];
             const sy = Number.isFinite(rec.y) ? toScreenY(rec.y) : NaN;
-            const on = sy > 30 && sy < H - 8;
+            const on = sy > 30 && sy < H - 8 && !underHud(sy);
             if (on !== rec.shown) { rec.el.hidden = !on; rec.shown = on; }
             if (on && !(Math.abs(sy - rec.sy) <= 0.25)) { rec.el.style.transform = `translate3d(0, ${sy.toFixed(1)}px, 0)`; rec.sy = sy; }
             const gone = !!rising && rec.y < rising.frontY && Number.isFinite(rec.y);
@@ -1622,6 +1771,15 @@ export function createStrataView(container, opts = {}) {
             hyBatches.push({ from, to: hyN, root: roots.length - 3 });
         }
     }
+    function syncFolkTargets() {
+        for (let f = 0; f < floors; f++) {
+            const row = chambers.filter((c) => c.floor === f && c.isBody && !necrotic.has(`s${c.slot}`));
+            floorVats[f] = row.filter((c) => c.type === 'dorm').map((c) => c.x);
+            floorOrgans[f] = row.filter((c) => c.type !== 'dorm').map((c) => c.x);
+        }
+        floorVats.length = floors;
+        floorOrgans.length = floors;
+    }
     function setBody(bodyIds, necroticIds, reachableIds) {
         const next = new Set(bodyIds || []);
         const dead2 = new Set(necroticIds || []);
@@ -1642,7 +1800,16 @@ export function createStrataView(container, opts = {}) {
         necrotic = dead2;
         for (let i = 0; i < chambers.length; i++) chambers[i].isBody = body.has(`s${chambers[i].slot}`);
         for (let f = 0; f < floors; f++) floorTargets[f] = chambers.filter((c) => c.floor === f && c.type && c.type !== 'cryo' && !c.isBody).map((c) => c.x);
+        syncFolkTargets();
         reachSet = (reachableIds || []).slice();
+        // the camera keeps the front in view: the reachable chamber nearest the newest taken one
+        const newest = [...next].reverse().find((id) => slotOf(id) >= 0);
+        if (newest) {
+            const nc = chambers[slotOf(newest)];
+            const near = reachSet.map((id) => chambers[slotOf(id)]).filter((c) => c && nc && c.floor === nc.floor)
+                .sort((a, b) => Math.abs(a.x - nc.x) - Math.abs(b.x - nc.x))[0];
+            follow(near ? near.x : nc ? nc.x : 0);
+        }
         syncCorridors();
         syncVats();
         growRoots();
@@ -1659,8 +1826,19 @@ export function createStrataView(container, opts = {}) {
         }
         glowsDone(reach, n);
     }
-    function setHands(on) {
-        if (!on || handsArms.on) return;
+    /** The hands go back into the house: the arms, the hands and the cracks are taken away. */
+    function dropHands() {
+        if (!handsArms.on) return false;
+        for (const a of handsArms.arms) { scene.remove(a.mesh); a.mesh.geometry.dispose(); a.mesh.material.dispose?.(); }
+        for (const an of handsArms.anchors) scene.remove(an);
+        handsArms.hands?.dispose();
+        if (handsArms.cracks) { scene.remove(handsArms.cracks); handsArms.cracks.geometry.dispose(); handsArms.cracks.material.dispose(); }
+        handsArms.on = false; handsArms.arms = []; handsArms.anchors = []; handsArms.hands = null; handsArms.grow = -1; handsArms.cracks = null;
+        return false;
+    }
+    function setHands(on, { instant = false } = {}) {
+        if (!on) return dropHands();
+        if (handsArms.on) return true;
         handsArms.on = true;
         const paths = [
             [[-0.55, -5.7], [-0.75, -4.7], [-1.35, -3.6], [-2.2, -2.75]],
@@ -1690,8 +1868,8 @@ export function createStrataView(container, opts = {}) {
             handsArms.anchors.push(anchor);
         });
         handsArms.hands.attach(handsArms.anchors);
-        handsArms.hands.overgrow(OVERGROW_SECONDS);
-        handsArms.grow = 0;
+        handsArms.hands.overgrow(instant ? 0.05 : OVERGROW_SECONDS);
+        handsArms.grow = instant ? 0.999 : 0;
         // the rock cracks where the arms break out of the house
         const cp = [];
         const r = mulberry32(4411);
@@ -1712,6 +1890,7 @@ export function createStrataView(container, opts = {}) {
         handsArms.cracks.position.z = -12;
         handsArms.cracks.renderOrder = 6;
         scene.add(handsArms.cracks);
+        return true;
     }
     function stepGrow(dt) {
         for (let i = 0; i < roots.length; i++) {
@@ -1748,7 +1927,7 @@ export function createStrataView(container, opts = {}) {
                     an.position.set(an.userData.base.x, an.userData.base.y + rising.lift, an.userData.base.z);
                 }
             }
-            handsArms.hands.step(dt, machineTempo.throws || 0.6);
+            handsArms.hands.step(dt, handsThrows || machineTempo.throws || 0.6);
         }
     }
 
@@ -1783,14 +1962,16 @@ export function createStrataView(container, opts = {}) {
         mesh.position.z = 0.3;
         mesh.renderOrder = 25;
         fleshGroup.add(mesh);
-        const dur = Math.max(7, Math.min(16, h / 2.6));
+        const dur = Math.max(6, Math.min(10, h / 2.6));     // deep-swap: at most ten seconds of pushing
         const from = new THREE.Vector3(0, S.HOUSE.y0, fleshGroup.position.z + 0.3);
         sectionAlpha(fleshify(mesh, { from, duration: dur, sinew: 0.6, scale: 0.55, seed: 77, breathe: false, pulse: 1.5, tint: 2.5 }));
         for (const t of roots) t.dur = Math.min(t.dur, Math.max(0.1, t.t + 1.5));
         homeMode = false;
+        if (focusZoom) { focusZoom = 0; fit(); }
+        activeX = null;
         let resolveIt;
         const promise = new Promise((res) => { resolveIt = res; });
-        rising = { mesh, u: mesh.material.userData.flesh, top, frontY: S.HOUSE.y0, lift: 0, t: 0, dur, burst: -1, onDone, resolve: resolveIt, promise };
+        rising = { mesh, u: mesh.material.userData.flesh, top, frontY: S.HOUSE.y0, lift: 0, t: 0, t0: performance.now(), dur, burst: -1, burstAt: 0, onDone, resolve: resolveIt, promise };
         backU.uRise.value = 1;
         // a wall clock behind it, for a hidden tab
         setTimeout(() => { if (rising && !rising.done) finishRise(); }, (dur + 4) * 1000);
@@ -1803,9 +1984,16 @@ export function createStrataView(container, opts = {}) {
         try { onDone?.(); } finally { resolve(); }
     }
     function stepRise(dt) {
-        if (!rising || rising.done) return;
-        rising.t += dt;
-        const front = rising.u.uFront.value;
+        if (!rising) return;
+        // the body stays risen: flesh.js's own clock (slower on a slow frame) must not pull its front back
+        if (rising.done) { rising.u.uFront.value = rising.u.uFrontEnd.value; return; }
+        // deep-swap: on a wall clock, so a slow frame rate (or a hidden tab) still rises in its time
+        const wall = (performance.now() - rising.t0) / 1000;
+        rising.t = Math.max(rising.t + dt, wall);
+        const u = rising.u;
+        const want = u.uFrontEnd.value * ease(clamp01(rising.t / rising.dur));
+        if (want > u.uFront.value) u.uFront.value = want;
+        const front = u.uFront.value;
         rising.frontY = S.HOUSE.y0 + front;
         backU.uRiseY.value = rising.frontY;
         rising.lift = Math.max(0, rising.frontY - 1.1 - (-2.0));
@@ -1813,6 +2001,7 @@ export function createStrataView(container, opts = {}) {
         camTarget = Math.min(limits().max, rising.frontY - 0.12 * viewH());
         if (rising.burst < 0 && rising.frontY >= surface - 0.1) {
             rising.burst = 0;
+            rising.burstAt = wall;
             debris.visible = true;
             const r = mulberry32(31);
             for (let i = 0; i < MAX_DEBRIS; i++) {
@@ -1837,7 +2026,7 @@ export function createStrataView(container, opts = {}) {
             }
             debrisGeo.attributes.position.needsUpdate = true;
             debrisGeo.attributes.aA.needsUpdate = true;
-            if (rising.burst > 2.2) finishRise();
+            if (rising.burst > 2.2 || wall - rising.burstAt > 2.4) finishRise();
         }
     }
 
@@ -1855,25 +2044,43 @@ export function createStrataView(container, opts = {}) {
         e.preventDefault();
         tookHold();
         const l = limits();
+        // a sideways swipe (or shift and the wheel) pans along the floors when they are wider than the screen
+        const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+        if (Math.abs(dx) > Math.abs(e.deltaY) || e.shiftKey) {
+            panTarget = Math.max(-panMax, Math.min(panMax, panTarget + dx / ppu * 0.8));
+            return;
+        }
         camTarget = Math.max(l.min, Math.min(l.max, camTarget - e.deltaY / ppu * 0.8));
     }
     function onDown(e) {
         if (e.button !== 0) return;
-        press = { x: e.clientX, y: e.clientY, cam: camTarget, drag: false, t: performance.now() };
+        press = { x: e.clientX, y: e.clientY, cam: camTarget, pan: panTarget, drag: false, t: performance.now() };
     }
+    let hoverOut = '';
     function onMove(e) {
         toWorld(e.clientX, e.clientY, wp);
-        const id = reachSet.length ? idAtWorld(wp.x, wp.y) : '';
+        const onCanvas = e.target === cv;
+        const id = onCanvas ? idAtWorld(wp.x, wp.y) : '';
         const h = id && reachSet.includes(id) ? id : '';
         if (h !== hoverId) { hoverId = h; paintReach(); }
+        if (candSectors) {
+            const slot = slotOf(id);
+            const k = slot >= 0 ? sectorOf(slot) : -1;
+            if (k !== candHover) { candHover = k; paintCandidates(); }
+        }
         cv.style.cursor = h ? 'pointer' : '';
+        // deep-swap: what is under the cursor, for the price over a chamber (hooks.onChamberHover)
+        if (hovers.size && (id || hoverOut)) { hoverOut = id; for (const cb of hovers) cb(id, e.clientX, e.clientY); }
         if (!press || rising) return;
         const dy = e.clientY - press.y;
         if (!press.drag && Math.abs(dy) > CLICK_PX) { press.drag = true; tookHold(); }
+        if (!press.drag && Math.abs(e.clientX - press.x) > CLICK_PX && panMax > 0) { press.drag = true; tookHold(); }
         if (press.drag) {
             const l = limits();
             camTarget = Math.max(l.min, Math.min(l.max, press.cam + dy / ppu));
             camY = camTarget;
+            panTarget = Math.max(-panMax, Math.min(panMax, press.pan - (e.clientX - press.x) / ppu));
+            panX = panTarget;
         }
     }
     function onUp(e) {
@@ -1888,11 +2095,27 @@ export function createStrataView(container, opts = {}) {
         if (slot >= 0 && lastState && (lastState.darkSlots || []).includes(slot)) opts.onClearDark?.(slot);
         for (const cb of clickers) cb(id, { slot, x: e.clientX, y: e.clientY });
     }
+    function onLeave() { if (hoverId) { hoverId = ''; paintReach(); } if (hoverOut) { hoverOut = ''; for (const cb of hovers) cb('', 0, 0); } }
     cv.addEventListener('wheel', onWheel, { passive: false });
     cv.addEventListener('pointerdown', onDown);
+    cv.addEventListener('pointerleave', onLeave);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
 
+    /* an older save's sector choice (v1.52.0): the chambers of the sectors it may seal glow amber */
+    const cand = makeGlows(48, 0, 1, 31);
+    function paintCandidates() {
+        let n = 0;
+        if (candSectors) {
+            for (const c of chambers) {
+                if (n >= 48) break;
+                const k = sectorOf(c.slot);
+                if (!candSectors.includes(k)) continue;
+                placeGlow(cand, n++, c.x, c.y + S.CH_H * 0.45, 2.7, 2.0, k === candHover ? 0xe0a24f : 0x8a6a3a, k === candHover ? 1.6 : 0.5);
+            }
+        }
+        glowsDone(cand, n);
+    }
     function slotAtWorld(x, y) {
         for (const c of chambers) {
             if (Math.abs(x - c.x) <= S.CH_W / 2 + 0.04 && y >= c.y - 0.05 && y <= c.y + S.CH_H + 0.1) return c.slot;
@@ -1957,8 +2180,14 @@ export function createStrataView(container, opts = {}) {
         backU.uSleep.value = 1 - lit.value;
         backU.uDawn.value = dawn;
         // the camera
+        if (focusZoom && time.value > focusUntil) { focusZoom = 0; activeX = null; fit(); }
         ppu += (ppuTarget - ppu) * (1 - Math.exp(-dt * 3));
         if (homeMode && !rising) camTarget = home();
+        // sideways: back to the shaft when everything fits, else keep where things happen in view
+        if (rising) panTarget = 0;
+        else if (!touched) panTarget = activeX === null ? 0 : S.panToShow(activeX, panTarget, freeHalf(), panMax);
+        panTarget = Math.max(-panMax, Math.min(panMax, panTarget));
+        panX += (panTarget - panX) * (1 - Math.exp(-dt * 4));
         const l = limits();
         if (!rising) camTarget = Math.max(l.min, Math.min(l.max, camTarget));
         camY += (camTarget - camY) * (1 - Math.exp(-dt * (rising ? 3 : 7)));
@@ -2028,6 +2257,7 @@ export function createStrataView(container, opts = {}) {
             dead = true;
             cv.removeEventListener('wheel', onWheel);
             cv.removeEventListener('pointerdown', onDown);
+            cv.removeEventListener('pointerleave', onLeave);
             window.removeEventListener('pointermove', onMove);
             window.removeEventListener('pointerup', onUp);
             if (handsArms.hands) handsArms.hands.dispose();
@@ -2043,10 +2273,10 @@ export function createStrataView(container, opts = {}) {
             rtCur.dispose(); rtGhost.dispose();
             renderer.dispose();
             cv.remove();
-            css2d.domElement.remove();
+            if (labelHost) { scene.remove(dig.obj); digEl.remove(); } else css2d.domElement.remove();
             ui.remove();
         },
-        resetView() { homeMode = true; },
+        resetView() { homeMode = true; touched = false; },
         /** The machine's tempo (machine.js machineTempo) and whether the colony sleeps. */
         setMachine(tempo, asleep = false) {
             machineTempo = { throws: 0, drive: 0, quiet: 1, ...(tempo || {}) };
@@ -2068,10 +2298,81 @@ export function createStrataView(container, opts = {}) {
             startMarch('ascend', seconds);
             return new Promise((resolve) => setTimeout(resolve, Math.ceil(seconds * 1000) + 200));
         },
+        // the scouts were cut in deep-rebuild; an older save's party comes home without a picture
         scoutsUp() { return 0; },
         scoutsDown() { return 0; },
-        setCandidates() { },
-        sealAnim() { return 0; },
+        /** An older save's sector choice (v1.52.0): the sectors it may seal glow, the hovered one brighter. */
+        setCandidates(sectors, hover = -1) {
+            candSectors = Array.isArray(sectors) && sectors.length ? sectors.slice() : null;
+            candHover = hover;
+            paintCandidates();
+        },
+        /** A sector sealed (an older save): a short flash; the chambers go dark with the state. */
+        sealAnim() { flash = Math.max(flash, 0.4); return 0; },
+        /* --- deep-swap: what the orchestrator asks of the 3D view, answered here too --- */
+        /** The "+" where the next chamber is dug: its price on hover, whether it can be paid, whether it shows. */
+        setDigOffer(offer) { dig.offer = { ...dig.offer, ...(offer || {}) }; paintDig(); },
+        /** Where that "+" is on the screen, or null (tests). */
+        digPlusAt() {
+            if (!dig.obj.visible) return null;
+            const r = dig.plus.getBoundingClientRect();
+            return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+        },
+        /** The chambers that show an order under way (tests; the 3D view answers the same). */
+        buildingSlots() {
+            const slots = lastLayout.slots || [];
+            return (lastState?.builds || []).filter((j) => j.kind === 'room' && j.slot >= 0 && j.slot < slots.length).map((j) => j.slot);
+        },
+        /** Movement III: no digging, no rooms; the "+" goes. */
+        setGrowMode(on) { growMode = !!on; dig.obj.visible = !growMode && dig.at >= 0; fit(); if (lastState) paintTiles(lastState); },
+        /** The node under a point of the screen (growth.js id: 's12', 'h1', 'machine'), or ''. */
+        chamberAt(clientX, clientY) { toWorld(clientX, clientY, wp); return idAtWorld(wp.x, wp.y); },
+        /** Where a node is on the screen (client px), or null when it is off it. */
+        screenOfNode(id) {
+            idPos(id, wp);
+            const p = screenOf(wp.x, wp.y);
+            const r = cv.getBoundingClientRect();
+            if (p.x < r.left + 4 || p.x > r.right - 4 || p.y < r.top + 4 || p.y > r.bottom - 4) return null;
+            return p;
+        },
+        /** The camera eases to the floor of the body's front, unless the player holds it. */
+        focusFloor(floor) {
+            if (touched) return false;
+            homeMode = false;
+            if (focusZoom) { focusZoom = 0; fit(); }
+            const f = Math.max(0, Math.min(floors - 1, floor | 0));
+            camTarget = S.floorLine(f) + 0.18 * viewH();
+            return true;
+        },
+        /** The camera eases to the machine house (the hands), unless the player holds it. */
+        focusMachine(seconds = 7) {
+            if (touched) return false;
+            homeMode = false;
+            // closer, for as long as the game holds the look (index.js: seven seconds), then back to the fit
+            focusZoom = S.FOCUS_PPU;
+            focusUntil = time.value + Math.max(1, seconds);
+            fit();
+            activeX = 0;
+            panTarget = 0;
+            camTarget = (S.HOUSE.y0 + S.HOUSE.y1) / 2 + 0.08 * (H / ppuTarget);
+            return true;
+        },
+        /** The rise moves the camera by itself; this only lets go of the player's hold. */
+        focusRise() { homeMode = false; return true; },
+        /**
+         * deep-swap: where the HUD's middle things go (client px): x is the shaft (the colony's middle,
+         * not the window's), y the middle of the years over YEAR 0 for the counter while they sleep.
+         */
+        centre() {
+            const r = cv.getBoundingClientRect();
+            const y0 = toScreenY(0), top = Math.max(16, toScreenY(surface));
+            const y = Math.max(205, Math.min(H * 0.46, (top + y0) / 2, y0 - 205));
+            return { x: r.left + toScreenX(0), y: r.top + y };
+        },
+        /** cb(id, x, y) as the cursor moves over the view: the node under it, or '' (the price tip). */
+        onChamberHover(cb) { hovers.add(cb); return () => hovers.delete(cb); },
+        /** How fast the machine throws (hooks.step): the hands keep its rhythm. */
+        setThrows(n) { handsThrows = Number(n) > 0 ? Number(n) : 0.6; },
         hitsBase(clientX, clientY) { toWorld(clientX, clientY, wp); return hitsWorld(wp.x, wp.y); },
         slotAt(clientX, clientY) { toWorld(clientX, clientY, wp); return slotAtWorld(wp.x, wp.y); },
         machineAt(clientX, clientY) { toWorld(clientX, clientY, wp); return inHouse(wp.x, wp.y); },
@@ -2118,10 +2419,18 @@ export function createStrataView(container, opts = {}) {
         onChamberClick(cb) { clickers.add(cb); return () => clickers.delete(cb); },
         setHands,
         rise,
+        /** The body as the hooks report it (view-hooks.js bodyStats). */
+        get bodyStats() {
+            return {
+                body: body.size, necrotic: necrotic.size, reach: reachSet.length, hands: handsArms.on,
+                handsGrow: handsArms.on ? handsArms.grow : -1, rising: rising ? +rising.t.toFixed(2) : -1,
+                broke: !!(rising && rising.burst >= 0), meshes: organs.size, spine: [...body].some((id) => /^h[1-9]/.test(id)),
+            };
+        },
         /* --- the strata --- */
         /** The years per sleep the view draws (to save with the game, if wanted). */
         get strata() { return history.slice(); },
-        set strata(h) { if (Array.isArray(h)) { history = S.compactHistory(h.map(Number)); syncYears(true); } },
+        set strata(h) { if (Array.isArray(h)) { history = S.compactHistory(h.map(Number)); keptRef = null; applyLayers(); } },
         crustHost: null,
         /** Test hook: what the view believes it draws. */
         get stats() {
@@ -2164,8 +2473,13 @@ export function extendHooks(base, view) {
         screenOfSlot: (slot) => view.screenOfSlot(slot),
         setBody: (...a) => view.setBody(...a),
         onChamberClick: (cb) => view.onChamberClick(cb),
-        setHands: (on) => view.setHands(on),
+        // deep-swap (B294): the rest of the body's contract. The view steps its own flesh in its own
+        // step(); the hooks' step hands it the machine's throws, so the hands keep its rhythm
+        onChamberHover: (cb) => view.onChamberHover(cb),
+        step: (dt, throws) => view.setThrows(throws),
+        setHands: (on, o) => view.setHands(on, o),
         rise: (cb) => view.rise(cb),
+        get bodyStats() { return view.bodyStats; },
     };
 }
 

@@ -280,3 +280,54 @@ V · UNITY, the wall after a reload). Shots: docs/playtests/rebuild-shots/grow-*
 **Not done here.** The strata view (another agent, `strata-view.js`) implements the same hooks. A playtest
 of the whole act. The crust's pieces are plain boxes in the crust's colour; the machine's deck stays
 machinery under the hands.
+
+## Built: the swap (deep-swap)
+
+Built on the branch `deep-swap` (2026-10-03). Ola chose the strata; it is now the view of the whole act.
+The 3D view is kept whole and is one click away.
+
+**Which view.** `src/phase4/views.js`: the strata by default; `?view=3d` in the URL, or "View · strata / 3D"
+in the ☰ menu (added by index.js while chapter IV is open, kept in localStorage `rpi-deep-view`), makes the
+3D one. The URL wins over the menu; the menu's click reloads the page with the other view (the game is saved
+on the way out). Both views answer every call the orchestrator makes: the 3D one through view-hooks.js as
+before, the strata one through `extendHooks(createViewHooks(view, ...), view)`.
+
+**The body's neighbours are the ones on the screen.** Each view exports `chamberPlace` (strata: a row out from
+the shaft, `strata.js sectionPlace`; 3D: the ring of twelve, `layout.js placeChamber`), and index.js hands it
+to `grow.js setChamberPlace` when the view is made, so `graphOf` builds the body's graph with it. growth.js is
+unchanged. A body saved in one view keeps its chambers in the other (the ids are the same; only who touches
+whom changes). The sims take `--view 3d`; the strata row is their default.
+
+**Decisions taken where the brief left room.**
+- The colony always fits between the panel and the year ruler (about 27 px a unit, a chamber 55 px wide, at
+  1440 with twelve a floor; 22 at 1280). A floor is one row, so a fixed larger scale would put its ends under
+  the panel and the lever; only the hands get a closer look (`FOCUS_PPU` 44 for seven seconds, panning, the
+  colony fading at the sides). The zoom-and-pan is there if a playtest asks for it (B319).
+- Asleep the camera rests with YEAR 0 a little under the middle and the counter stands in the years, over the
+  shaft (`view.centre()`, CSS `--deep-cx`/`--deep-cy`); Surface's stage and the last lines are over the shaft
+  too. The ruler's labels keep out from under what we hold, the buttons and the lever, and a boundary that
+  reads the same as the one above it (or 0) is not labelled.
+- The layers: `state.strata` (years per sleep, at most 48, the oldest merged) is kept in the save by index.js
+  (`trackStrata` after each sleep chunk); the view lays them as given. An old save is given one layer per
+  sleep from the years slept (strata.js `reconstructHistory`).
+- People walk into living organs and into vats, and step back out of the vats (a body without vats lets them
+  come down the shaft elsewhere). The first throw by hand sounds when the machine house is taken by the player
+  or by the flesh itself.
+- The strata rise runs on a wall clock, six to ten seconds of pushing, and the body stays risen while the two
+  lines type (at the top, over the hands).
+- The policy saves its people for the machine house once it is in reach: in the row the dormitories (vats)
+  come late and the hands waited minutes behind floor 1.
+
+**Numbers.** Strata: plain 30m02s → 31m56s (the question at 19m11s, GROW 12m45s, 40 %, the hands at 20m12s);
+--watcher 26m29s → 27m43s (GROW 7m23s, 27 %). 3D with the new policy: 30m16s (37 %) and 26m51s (24 %).
+
+**Acceptance.** `node scripts/accept-iv-cut.mjs` runs itself for both views (or `--view strata|3d`); new
+checks V (no view in the URL makes the strata view, the menu reads "View · strata"), A (each glowing chamber is
+within 1.3 times the lid-to-first-chamber distance of a body chamber on the screen; 1.6 in the 3D perspective),
+K (an old save is given its layers; after a reload the same layers). Shots: docs/playtests/rebuild-shots/
+swap-tend, swap-sleep-first, swap-sleep-deep, swap-grow, swap-hands, swap-rise, swap-rise-lines and the
+1280x800 ones.
+
+**Not done here.** A playtest of the act in the strata view; whether to zoom closer with sideways scrolling or
+retune GROW's length in the row (B319). In the strata view the scouts' calls are empty (they were cut), and
+`sealAnim` is a flash only (an older save's sector choice).

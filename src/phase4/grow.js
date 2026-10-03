@@ -87,11 +87,28 @@ const ITEM = Object.fromEntries(BODY_ITEMS.map((x) => [x.id, x]));
 
 /* ------------------------------------------------------------------ the graph */
 let cached = { key: null, graph: null };
+/**
+ * deep-swap: WHERE A CHAMBER SITS, AS THE PLAYER SEES IT. The body's neighbours must be the
+ * neighbours on screen, so the active view says where chamber number i is: the strata view a row
+ * outward from the shaft (strata.js sectionPlace), the 3D view a ring round the landing (layout.js
+ * placeChamber, growth.js's default). Each view exports its `chamberPlace`; index.js hands it over
+ * here when the view is made, the sims pick one with --view. null: growth.js's default.
+ */
+let placeFn = null;
+/** @param {((index:number)=>{floor:number, x:number, z:number})|null} fn */
+export function setChamberPlace(fn) {
+    const next = typeof fn === 'function' ? fn : null;
+    if (next === placeFn) return;
+    placeFn = next;
+    cached = { key: null, graph: null };
+}
+/** The placement the body's graph is built with now (null: growth.js's default). */
+export const chamberPlace = () => placeFn;
 /** The colony's graph of chambers (growth.js graphFromSlots), kept while the layout is the same. */
 export function graphOf(layout) {
     const slots = (layout && layout.slots) || [];
     const key = slots.map((t) => t || '.').join(',');
-    if (cached.key !== key) cached = { key, graph: graphFromSlots(slots) };
+    if (cached.key !== key) cached = { key, graph: placeFn ? graphFromSlots(slots, placeFn) : graphFromSlots(slots) };
     return cached.graph;
 }
 const nodeOf = (graph, id) => graph.nodes.find((n) => n.id === id) || null;

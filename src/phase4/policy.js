@@ -156,6 +156,10 @@ export function decideGrow(state, layout) {
     const typeOf = (id) => graph.nodes.find((n) => n.id === id)?.type;
     // the machine the moment it can be had (the hands), then a dormitory (a vat), then the cheapest
     const rank = (id) => (id === 'machine' ? 0 : typeOf(id) === 'dorm' ? 1 : 2);
+    // deep-swap: with the machine house in reach, the player saves the people for it rather than
+    // spending them on cheaper chambers (in the strata row the dormitories come late and the machine
+    // waited minutes behind floor 1)
+    if (reach.includes('machine') && !canAfford(state, layout, 'machine')) return out;
     const pick = reach
         .filter((id) => canAfford(state, layout, id))
         .sort((a, b) => (rank(a) - rank(b)) || (takePrice(state, layout, a).people - takePrice(state, layout, b).people))[0];
