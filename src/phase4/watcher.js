@@ -194,6 +194,41 @@ export const watcherName = (w) => (w && w.gone ? SENTENCE[SENTENCE.length - 1]
  */
 export const sleepDays = (seconds, tierDays, paused = false) => (paused ? 0 : Math.max(0, seconds) * Math.max(0, tierDays));
 
+/* ---- THE DIVE (deep-rebuild, movement II) ---------------------------------------------------
+   Time ACCELERATES within a sleep. A sleep starts at a fraction of the tier's rate, ramps up to
+   the full rate over RAMP.rampS seconds, and then keeps gaining, toward RAMP.top times the rate,
+   the longer the sleep runs. So every sleep is a dive. The game (index.js) and the simulation
+   (scripts/sim-phase4.mjs) both advance the colony by sleepDaysAt(). */
+export const RAMP = { from: 0.15, rampS: 6, top: 3, climbS: 25 };
+const smooth = (k) => k * k * (3 - 2 * k);
+/**
+ * How many times the tier's rate the sleep runs at, `t` real seconds into it.
+ * @param {number} t
+ * @returns {number}
+ */
+export function sleepPace(t) {
+    const x = Math.max(0, t);
+    if (x < RAMP.rampS) return RAMP.from + (1 - RAMP.from) * smooth(x / RAMP.rampS);
+    return 1 + (RAMP.top - 1) * (1 - Math.exp(-(x - RAMP.rampS) / RAMP.climbS));
+}
+/**
+ * Colony days slept between `t0` and `t0 + seconds` real seconds into a sleep, at a tier of
+ * `tierDays` a second: the pace, summed in small steps. None while paused.
+ * @param {number} t0
+ * @param {number} seconds
+ * @param {number} tierDays
+ * @param {boolean} [paused]
+ * @returns {number}
+ */
+export function sleepDaysAt(t0, seconds, tierDays, paused = false) {
+    if (paused || !(seconds > 0)) return 0;
+    const n = Math.max(1, Math.ceil(seconds / 0.05));
+    const h = seconds / n;
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += sleepPace(t0 + (i + 0.5) * h);
+    return sum * h * Math.max(0, tierDays);
+}
+
 /**
  * The years go by under the ice. The Watcher counts them, drifts, and banks what the
  * machines spare.
@@ -811,9 +846,14 @@ export const wordCap = (w) => Math.min(SENTENCE.length - 1, ((w && w.bought) || 
  * @param {number} sleptDays - colony days slept in this sleep so far
  * @param {number} tierDays - the tier's days a second
  */
+/** deep-rebuild: Surface only comes to a mind under this stability (scripts/sim-phase4.mjs keeps the
+ *  six nights at the pace they had). */
+export const SURFACE_BELOW = 80;
 export function surfaceDue(w, sleptDays, tierDays) {
     // one demand at a time (v1.51.0): Surface waits while the lamps are asking
     if (firstSleep(w) || demand(w) || !visitDue(w.surface, w.sleeps || 0)) return false;
+    // deep-rebuild: Surface IS the hallucination. It comes only when the mind is low enough
+    if (!(w.stability < SURFACE_BELOW)) return false;
     return sleptDays >= VISIT_AFTER_SECONDS * Math.max(1, tierDays);
 }
 /**

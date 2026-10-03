@@ -1338,3 +1338,449 @@ body.in-deep #version-info { z-index: 1400; }
 /* THE MADNESS IS FELT: under 50 the Watcher's letters drift one by one (index.js stepMadness) */
 .deep-watcher-name { white-space: pre; }
 .deep-watcher-name > span { display: inline-block; will-change: transform; }
+
+/* =============================================================================================
+   deep-rebuild: MOVEMENTS I (TEND) AND II (SLEEP). docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md
+   An instrument panel instead of the bars, the advisor and the readouts; a drawer instead of the
+   full-screen tree; a lever for the sleep; the middle of the screen for the years slept.
+   ============================================================================================= */
+
+/* ---- DYMO TAPE: white raised letters on black embossed tape -------------------------------- */
+#phase-deep .dymo {
+    display: inline-block;
+    padding: 3px 9px 2px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.35) 100%),
+        #0b0c0e;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+    color: #f1efe8;
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 17px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 1px rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+    user-select: none;
+    transition: opacity 300ms ease, filter 300ms ease;
+}
+#phase-deep .dymo[hidden] { display: none; }
+#phase-deep .dymo.is-small { font-size: 12px; line-height: 12px; padding: 3px 7px 2px; letter-spacing: 0.12em; }
+#phase-deep .dymo.is-gauge { transform: rotate(-1.2deg); margin-top: 2px; }
+#phase-deep .deep-gauge:nth-child(2) .dymo.is-gauge { transform: rotate(0.8deg); }
+#phase-deep .deep-gauge:nth-child(3) .dymo.is-gauge { transform: rotate(0.4deg); }
+#phase-deep .deep-gauge:nth-child(4) .dymo.is-gauge { transform: rotate(-0.6deg); }
+
+/* ---- THE PANEL ------------------------------------------------------------------------------- */
+#deep-panel {
+    left: 36px;
+    top: 128px;
+    width: 300px;
+    padding: 18px 20px 20px;
+    border-radius: 10px;
+    background:
+        radial-gradient(120% 80% at 30% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, #1a2029 0%, #12171e 100%);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    z-index: 12;
+    transition: filter 900ms ease, opacity 900ms ease;
+}
+.deep-screw {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #5a6372, #1d232c 70%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.deep-screw::after { content: ''; position: absolute; left: 1px; right: 1px; top: 4px; height: 1px; background: rgba(0, 0, 0, 0.55); transform: rotate(35deg); }
+.deep-screw.is-tl { left: 8px; top: 8px; } .deep-screw.is-tr { right: 8px; top: 8px; }
+.deep-screw.is-bl { left: 8px; bottom: 8px; } .deep-screw.is-br { right: 8px; bottom: 8px; }
+.deep-screw.is-tr::after { transform: rotate(-20deg); } .deep-screw.is-bl::after { transform: rotate(70deg); }
+
+/* the alarm lamp: dark red glass; lit with its one word on a wake */
+.deep-alarm { display: flex; align-items: center; justify-content: center; gap: 10px; height: 24px; }
+.deep-bulb {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #4b4636, #1b1a15 70%);
+    box-shadow: 0 0 0 2px #262c35, 0 0 0 3px #0b0e12, inset 0 -2px 3px rgba(0, 0, 0, 0.6);
+    transition: background 300ms ease, box-shadow 300ms ease;
+}
+.deep-bulb.is-alarm { background: radial-gradient(circle at 35% 30%, #4a2421, #1a0d0c 70%); width: 18px; height: 18px; }
+.deep-alarm.is-lit .deep-bulb.is-alarm {
+    background: radial-gradient(circle at 35% 30%, #ffd2c4, #e2412f 45%, #7e130b 100%);
+    box-shadow: 0 0 0 2px #262c35, 0 0 0 3px #0b0e12, 0 0 14px 3px rgba(226, 65, 47, 0.75), 0 0 34px 8px rgba(226, 65, 47, 0.25);
+    animation: deep-alarm-glow 1.6s ease-in-out infinite;
+}
+@keyframes deep-alarm-glow { 50% { filter: brightness(0.82); } }
+.deep-alarm .dymo.is-alarm { animation: deep-tape-in 260ms ease-out both; }
+@keyframes deep-tape-in { from { opacity: 0; transform: translateX(-6px); } }
+
+/* the gauges, two by two */
+.deep-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; justify-items: center; }
+.deep-gauge { display: flex; flex-direction: column; align-items: center; gap: 2px; transition: filter 600ms ease, opacity 600ms ease; }
+.deep-gauge-svg { width: 124px; height: 124px; display: block; overflow: visible; }
+.deep-gauge-svg .bezel { fill: #2b323c; stroke: #0a0d11; stroke-width: 1; }
+.deep-gauge-svg .bezel-in { fill: #0b0f14; }
+.deep-gauge-svg .arc-red { fill: none; stroke: #b3281d; stroke-width: 5; stroke-linecap: butt; opacity: 0.9; }
+.deep-gauge-svg .arc-green { fill: none; stroke: #5c8a5a; stroke-width: 5; stroke-linecap: butt; opacity: 0.85; }
+.deep-gauge-svg .tk { stroke: #8994a3; stroke-width: 0.8; }
+.deep-gauge-svg .tk-major { stroke: #d9d4c7; stroke-width: 1.6; }
+.deep-gauge-svg .needle-body { fill: #efe6cf; filter: drop-shadow(0 1px 1.2px rgba(0, 0, 0, 0.8)); }
+.deep-gauge-svg .cap { fill: #2f3640; stroke: #0b0e12; stroke-width: 1; }
+.deep-gauge-svg .cap-dot { fill: #8e98a6; }
+.deep-gauge-svg .face { transition: filter 600ms ease; }
+.deep-gauge.is-red .arc-red { animation: deep-red-pulse 1.4s ease-in-out infinite; }
+@keyframes deep-red-pulse { 50% { stroke: #ef4b38; filter: drop-shadow(0 0 3px rgba(239, 75, 56, 0.8)); } }
+
+/* the one stamped word, and the empty chambers */
+.deep-advice-row { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 24px; flex-wrap: wrap; }
+#phase-deep .dymo.is-advice { font-size: 16px; line-height: 16px; transform: rotate(-0.5deg); }
+#phase-deep .dymo.is-advice.is-new { animation: deep-stamp 420ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes deep-stamp { 0% { opacity: 0; transform: rotate(-0.5deg) scale(1.12); } 60% { opacity: 1; transform: rotate(-0.5deg) scale(0.98); } 100% { transform: rotate(-0.5deg) scale(1); } }
+#deep-empty { transform: rotate(1deg); color: #f3d7a5; }
+
+/* the three lamps of cryo */
+.deep-cryo-lamps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.deep-cryo-lamps[hidden] { display: none; }
+.deep-cryo-lamp { display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center; }
+.deep-cryo-lamp .deep-bulb { width: 22px; height: 22px; }
+#phase-deep .deep-cryo-lamp .dymo.is-small { font-size: 11px; line-height: 12px; padding: 3px 6px 2px; white-space: normal; max-width: 74px; letter-spacing: 0.1em; text-align: center; }
+.deep-cryo-lamp:nth-child(1) .dymo { transform: rotate(-1deg); } .deep-cryo-lamp:nth-child(3) .dymo { transform: rotate(0.8deg); }
+.deep-cryo-lamp.is-lit .deep-bulb {
+    background: radial-gradient(circle at 35% 30%, #fff6d8, #f2b84b 45%, #8a5a12 100%);
+    box-shadow: 0 0 0 2px #262c35, 0 0 0 3px #0b0e12, 0 0 12px 3px rgba(242, 184, 75, 0.6), 0 0 30px 8px rgba(242, 184, 75, 0.18);
+}
+.deep-cryo-lamp.is-ordered .deep-bulb { animation: deep-lamp-order 1.8s ease-in-out infinite; }
+@keyframes deep-lamp-order { 50% { background: radial-gradient(circle at 35% 30%, #a68a4f, #5e4515 60%, #2a1f0a 100%); } }
+
+/* the lights go out one by one */
+.deep-light { transition: filter 450ms ease, opacity 450ms ease; }
+.deep-gauge.is-off { filter: brightness(0.32) saturate(0.4); }
+.deep-gauge.is-off .needle-body { filter: none; }
+#phase-deep .dymo.is-off, .deep-advice-row .is-off { opacity: 0.12; }
+.deep-alarm.is-off { opacity: 0.4; }
+.deep-cryo-lamp.is-off { filter: brightness(0.35); }
+
+/* the Watcher, asleep: its own label on the same tape, alone lit on the dark panel */
+#phase-deep #deep-watcher {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    animation: deep-watcher-in 900ms ease;
+}
+#phase-deep #deep-watcher[hidden] { display: none; }
+#phase-deep .deep-watcher-head { display: flex; align-items: center; gap: 10px; }
+#phase-deep .dymo.deep-watcher-name { white-space: pre; font-size: 18px; line-height: 18px; letter-spacing: 0.2em; color: #f6f2e6; text-shadow: 0 -1px 0 #000, 0 1px 0 rgba(255,255,255,.3), 0 0 10px rgba(246, 242, 230, 0.35); }
+#phase-deep .deep-watcher-meter { width: 100%; justify-content: center; }
+#phase-deep .deep-watcher-track { width: 180px; height: 2px; }
+#phase-deep .deep-watcher-arc[hidden], #phase-deep #deep-stab-val[hidden] { display: none; }
+#phase-deep .deep-puzzle { position: static; transform: none; min-height: 16px; }
+#phase-deep .deep-watcher-ask { position: static; }
+
+/* ---- WHAT WE HOLD: large, top right, with the day's flow under it ---------------------------- */
+#phase-deep #deep-hold { right: 44px; top: 40px; gap: 12px; }
+#phase-deep .deep-amount { font-size: 34px; font-weight: 700; color: #dbe4f0; letter-spacing: -0.01em; }
+#phase-deep .deep-hold-row { cursor: default; gap: 12px; }
+#phase-deep .deep-hold-row i { color: #8fa1b6; }
+#phase-deep .deep-rate { font-size: 12px; color: #7d8fa5; margin-top: 3px; }
+#phase-deep.is-night #deep-hold { opacity: 0.55; transition: opacity 1200ms ease; }
+#phase-deep.is-night .deep-rate { opacity: 0; visibility: hidden; }
+
+/* ---- THE ACT AREA: DIG, the drawer, the lever --------------------------------------------- */
+#deep-act {
+    right: 44px;
+    bottom: 64px;
+    display: flex;
+    align-items: flex-end;
+    gap: 22px;
+    z-index: 12;
+}
+.deep-act-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#phase-deep .btn.deep-round { width: 60px; height: 60px; background: linear-gradient(180deg, #252e3a, #1a212b); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06); color: #c3cfdd; }
+.deep-act-price { font-size: 11px; color: #8fa1b6; white-space: nowrap; min-height: 14px; }
+#deep-reset-view { position: absolute; right: 44px; bottom: 210px; margin: 0; z-index: 12; }
+#phase-deep #deep-tree-badge { background: #f2b84b; color: #12100a; font-weight: 700; bottom: auto; top: -4px; left: auto; right: -6px; transform: none; }
+#phase-deep.is-drawer-open #deep-tree-btn { background: #d5dbe3; color: #0a0d12; }
+
+/* the lever: a plate with a slot, a chromed arm, a red knob. Pulled, it is down */
+.deep-lever-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.deep-lever-wrap[hidden] { display: none; }
+.deep-lever-wrap.is-arriving { animation: deep-lever-in 900ms cubic-bezier(.2, .9, .2, 1) both; }
+@keyframes deep-lever-in { from { opacity: 0; transform: translateY(24px); } }
+.deep-lever {
+    position: relative;
+    width: 74px;
+    height: 150px;
+    border: 0;
+    padding: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, #2a313b, #171c23);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+.deep-lever > * { pointer-events: none; }
+.deep-lever-slot {
+    position: absolute;
+    left: 50%;
+    top: 16px;
+    bottom: 16px;
+    width: 12px;
+    transform: translateX(-50%);
+    border-radius: 6px;
+    background: #050608;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.deep-lever-arm {
+    position: absolute;
+    left: 50%;
+    top: 20px;
+    width: 8px;
+    height: 46px;
+    margin-left: -4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #6d7682, #e3e7ec 45%, #7f8893);
+    transition: transform 520ms cubic-bezier(.5, 0, .2, 1.25);
+}
+.deep-lever-knob {
+    position: absolute;
+    left: 50%;
+    top: -16px;
+    width: 34px;
+    height: 34px;
+    margin-left: -17px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff9a84, #c22a17 50%, #5e0c05 100%);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6), inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+}
+.deep-lever:hover .deep-lever-arm { transform: translateY(4px); }
+.deep-lever-wrap.is-down .deep-lever-arm { transform: translateY(66px); }
+.deep-lever-wrap.is-down .deep-lever:hover .deep-lever-arm { transform: translateY(60px); }
+.deep-lever-wrap.is-locked .deep-lever { cursor: default; opacity: 0.45; }
+.deep-lever-wrap.is-locked .deep-lever:hover .deep-lever-arm { transform: none; }
+.deep-lever-wrap.is-locked.is-down .deep-lever:hover .deep-lever-arm { transform: translateY(66px); }
+#phase-deep .deep-lever-tape { transform: rotate(-1.5deg); }
+#phase-deep.is-busy .deep-act-col .btn { pointer-events: none; opacity: 0.45; }
+#phase-deep.is-busy .deep-lever { pointer-events: none; }
+#deep-act .deep-pill.hidden { display: none; }
+
+/* ---- the night: what stays and what goes ----------------------------------------------------- */
+#phase-deep.is-night #deep-time,
+#phase-deep.is-night #deep-queue,
+#phase-deep.is-night #deep-act .deep-act-col:first-child,
+#phase-deep.is-night #deep-reset-view {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 1200ms ease, visibility 0s linear 1200ms;
+}
+#phase-deep.is-night #deep-panel { filter: brightness(0.92); }
+#deep-time, #deep-queue { transition: opacity 1200ms ease, visibility 0s; }
+
+/* ---- THE DIVE: the years slept, in the middle ----------------------------------------------- */
+.deep-dive {
+    left: 50%;
+    top: 46%;
+    width: 380px;
+    height: 380px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 11;
+    animation: deep-dive-in 1400ms ease both;
+}
+.deep-dive[hidden] { display: none; }
+@keyframes deep-dive-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); } }
+.deep-dive::before { content: ''; position: absolute; inset: 40px 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(8, 10, 14, 0.86) 0%, rgba(8, 10, 14, 0.7) 45%, rgba(8, 10, 14, 0) 100%); }
+#phase-deep.is-sleeping #deep-scene, #phase-deep.is-sleeping #deep-labels { filter: brightness(0.5) saturate(0.7); }
+.deep-dive-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.deep-dive-ring circle { fill: none; }
+.deep-dive-ring .track { stroke: rgba(213, 219, 227, 0.07); stroke-width: 1; }
+.deep-dive-ring .arc { stroke: rgba(218, 230, 214, 0.55); stroke-width: 1.5; stroke-linecap: round; transition: stroke-dashoffset 300ms linear; }
+.deep-dive-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.deep-dive-word { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.5em; color: rgba(213, 219, 227, 0.55); padding-left: 0.5em; }
+.deep-dive-word.is-unit { letter-spacing: 0.6em; color: rgba(213, 219, 227, 0.4); }
+.deep-dive-years {
+    font-size: 88px;
+    line-height: 1;
+    font-weight: 700;
+    color: #eef2f6;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 40px rgba(220, 230, 240, 0.12);
+    white-space: nowrap;
+}
+/* the counter sits over the colony: the night stage (Surface) goes under it */
+#phase-deep .deep-night-stage { bottom: 92px; }
+
+/* ---- THE DRAWER ---------------------------------------------------------------------------- */
+.deep-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: max(25vw, 360px);
+    z-index: 40;
+    transform: translateX(100%);
+    transition: transform 260ms cubic-bezier(.2, .8, .2, 1);
+    background: linear-gradient(180deg, rgba(18, 23, 30, 0.97), rgba(12, 16, 21, 0.97));
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.5), inset 1px 0 0 rgba(255, 255, 255, 0.05);
+    color: #c3cfdd;
+}
+.deep-drawer[hidden] { display: none; }
+.deep-drawer.is-open { transform: none; }
+.deep-drawer-in { height: 100%; display: flex; flex-direction: column; padding: 28px 22px 18px; gap: 14px; }
+.deep-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.deep-drawer-wallet { font-size: 14px; color: #ffffff; white-space: pre; }
+.deep-drawer-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px; scrollbar-width: thin; }
+.deep-dr-tag { font-size: 10px; letter-spacing: 0.3em; color: #6b7a8d; margin: 0 0 6px; font-weight: 400; }
+.deep-dr-group { display: flex; flex-direction: column; gap: 4px; }
+.deep-dr-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+}
+.deep-dr-row.is-buy { background: rgba(213, 219, 227, 0.06); cursor: pointer; transition: background 150ms ease, transform 150ms ease; }
+.deep-dr-row.is-buy:hover { background: rgba(213, 219, 227, 0.13); transform: translateX(-2px); }
+.deep-dr-row.is-bought { animation: deep-dr-flash 600ms ease-out; }
+@keyframes deep-dr-flash { 0% { background: rgba(242, 184, 75, 0.45); } }
+.deep-dr-top { display: flex; align-items: center; gap: 8px; }
+.deep-dr-name { font-size: 12px; letter-spacing: 0.08em; color: #ffffff; flex: 1; }
+.deep-dr-price { font-size: 12px; color: #f2d98a; white-space: nowrap; }
+.deep-dr-sub { font-size: 12px; color: #aab8c9; line-height: 1.35; }
+.deep-dr-row.is-next .deep-dr-name, .deep-dr-row.is-next .deep-dr-sub { color: #55637a; }
+.deep-dr-row.is-building .deep-dr-name { color: #8fa1b6; }
+.deep-dr-ring { display: none; flex: 0 0 auto; }
+.deep-dr-row.has-ring .deep-dr-ring { display: block; }
+.deep-dr-ring circle { fill: none; stroke-width: 2; }
+.deep-dr-ring .track { stroke: rgba(213, 219, 227, 0.12); }
+.deep-dr-ring .arc { stroke: #f2d98a; transform: rotate(-90deg); transform-origin: 9px 9px; }
+.deep-drawer-tree { align-self: flex-start; background: none; border: 0; padding: 4px 0; font-size: 11px; color: #55637a; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(85, 99, 122, 0.4); text-underline-offset: 3px; }
+.deep-drawer-tree:hover { color: #8fa1b6; }
+#phase-deep.is-drawer-open #deep-hold { right: calc(max(25vw, 360px) + 32px); transition: right 260ms ease; }
+#phase-deep.is-drawer-open #deep-act { opacity: 0.25; }
+#phase-deep.is-drawer-open #deep-act .deep-act-col:nth-child(2) { opacity: 1; }
+#phase-deep.is-drawer-open #deep-act { right: calc(max(25vw, 360px) + 32px); opacity: 1; transition: right 260ms ease; }
+
+/* ---- THE RING OF FOUR ROOMS over an empty chamber -------------------------------------------- */
+.deep-ring { position: absolute; width: 0; height: 0; z-index: 30; }
+.deep-ring[hidden] { display: none; }
+.deep-ring-hub { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; border: 1px dashed rgba(213, 219, 227, 0.35); }
+.deep-ring-say { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-1deg); }
+.deep-ring-room {
+    position: absolute;
+    width: 54px;
+    height: 54px;
+    margin: -27px 0 0 -27px;
+    border-radius: 50%;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    background: rgba(26, 33, 43, 0.96);
+    color: #55637a;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    cursor: default;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 180ms ease, transform 220ms cubic-bezier(.2, .9, .3, 1.3), background 150ms ease;
+}
+.deep-ring-room > * { pointer-events: none; }
+.deep-ring.is-open .deep-ring-room { opacity: 1; transform: none; }
+.deep-ring-room.is-ok { color: #eef2f6; cursor: pointer; background: rgba(40, 50, 63, 0.98); }
+.deep-ring-room.is-ok:hover { background: #d5dbe3; color: #0a0d12; }
+.deep-ring-room.is-no { animation: deep-shake 320ms ease; }
+.deep-ring-price { font-size: 10px; line-height: 10px; }
+.deep-ring-room.is-ok .deep-ring-price { color: #f2d98a; }
+.deep-ring-room.is-ok:hover .deep-ring-price { color: #3d2e0a; }
+
+/* ---- the plates: an empty chamber's "+", the room ordered into it, the false lamp ----------- */
+.deep-lbl-in.is-empty { width: 48px; height: 48px; }
+.deep-lbl-in .plus { position: absolute; inset: 0; opacity: 0.8; animation: deep-plus-breathe 3.2s ease-in-out infinite; }
+@keyframes deep-plus-breathe { 50% { opacity: 0.5; } }
+.deep-lbl-in .plus::before, .deep-lbl-in .plus::after { content: ''; position: absolute; left: 50%; top: 50%; background: #3a4554; border-radius: 1.5px; }
+.deep-lbl-in .plus::before { width: 24px; height: 3px; margin: -1.5px 0 0 -12px; }
+.deep-lbl-in .plus::after { width: 3px; height: 24px; margin: -12px 0 0 -1.5px; }
+.deep-lbl-in.is-empty::after { content: ''; position: absolute; inset: 4px; border: 1.5px dashed rgba(58, 69, 84, 0.6); border-radius: 50%; }
+.deep-lbl-in.is-claimed .plus, .deep-lbl-in.is-claimed::after { display: none; }
+.deep-lbl-in .claim { color: #4d5868; display: flex; }
+#phase-deep.is-sleeping .deep-lbl-in .plus, #phase-deep.is-sleeping .deep-lbl-in.is-empty::after { opacity: 0.15; }
+#deep-scene.is-over-empty canvas { cursor: pointer; }
+.deep-lbl-in .ghost-lamp { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; opacity: 0; transition: opacity 900ms ease; }
+.deep-lbl-in.has-ghost-lamp .ghost-lamp {
+    opacity: 1;
+    background: radial-gradient(circle, #fff3cf 0%, #f2b84b 40%, rgba(242, 184, 75, 0) 72%);
+    box-shadow: 0 0 30px 12px rgba(242, 184, 75, 0.4);
+    animation: deep-ghost-lamp 3.4s ease-in-out infinite;
+    filter: brightness(2.2);
+}
+@keyframes deep-ghost-lamp { 50% { opacity: 0.75; transform: scale(1.12); } }
+#deep-labels.is-flicker .ghost-lamp { opacity: 0.1 !important; }
+
+/* ---- SURFACE IS THE WATCHER: its letters on the tape, and the merge at night 6 --------------- */
+#phase-deep .deep-surface-name > span { display: inline-block; transition: all 400ms ease; }
+#phase-deep .deep-surface-name > span.is-tape {
+    background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.3)), #0b0c0e;
+    color: #f1efe8;
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 14px;
+    letter-spacing: 0.14em;
+    padding: 2px 1px 1px 3px;
+    text-shadow: 0 -1px 0 #000, 0 1px 0 rgba(255, 255, 255, 0.28);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+#phase-deep .deep-surface-name.is-merging { animation: deep-merge-flicker 1800ms steps(1) both; }
+@keyframes deep-merge-flicker {
+    0%, 8%, 20%, 34%, 52% { opacity: 1; }
+    4%, 14%, 27%, 44% { opacity: 0.1; }
+    100% { opacity: 1; }
+}
+#phase-deep .deep-voice .tape {
+    display: inline-block;
+    background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.3)), #0b0c0e;
+    color: #f1efe8;
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 26px;
+    line-height: 26px;
+    letter-spacing: 0.12em;
+    padding: 3px 6px 1px;
+    margin: 0 1px;
+    text-transform: uppercase;
+    text-shadow: 0 -1px 0 #000, 0 1px 0 rgba(255, 255, 255, 0.28);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+    transform: rotate(-0.6deg);
+}
+/* six seconds after a game's result, the whole of it fades */
+#phase-deep .deep-night-stage { transition: opacity 600ms ease; }
+#phase-deep .deep-night-stage.is-fading { opacity: 0; }
+
+/* the lever waits for its pull: the knob glows when the instruments say SLEEP */
+.deep-lever-wrap.is-ready:not(.is-down) .deep-lever-knob { animation: deep-knob-ready 2.2s ease-in-out infinite; }
+@keyframes deep-knob-ready { 50% { box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6), inset 0 -3px 6px rgba(0, 0, 0, 0.35), 0 0 18px 4px rgba(226, 65, 47, 0.55); } }
+/* the count keeps inside its ring as the years grow */
+.deep-dive-years[data-size="m"] { font-size: 66px; }
+.deep-dive-years[data-size="s"] { font-size: 50px; }

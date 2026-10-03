@@ -33,7 +33,7 @@ import {
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, recoverAwake,
   LADDER, stepNeed, buyStep, surfaceDue, openSurface, closeSurface, playSurface, bodyWhole, lastWake, snap,
-  lookDue,
+  lookDue, sleepDaysAt,
 } from '../src/phase4/watcher.js';
 import { THROWS, beats, counter, visitDue, TYPE_MS, NIGHTS } from '../src/phase4/surface.js';
 // deep-tree (step 1): every level, automation, cryo tier and Watcher step is bought ON THE TREE,
@@ -282,11 +282,15 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
     // deep-voice: is Surface due in this sleep? Then the player stays under for it
     const visitThisSleep = !firstSleep(w) && visitDue(w.surface, w.sleeps);
     let voiceLeft = 0;                 // real seconds still to give the visit once it has come
-    // one real second of sleep at a time, until something wakes the colony
+    // one real second of sleep at a time, until something wakes the colony. deep-rebuild: THE DIVE,
+    // each second sleeps sleepDaysAt() of the tier (slow at first, then up to three times the rate)
+    let into = 0;
     while (real < REAL_CAP) {
       const rate = CRYO[s.cryo].days;
-      const sum = sleep(s, rate, { alarms: true, slots: slots(), rng });
-      const spent = sum.days / rate;
+      const want = sleepDaysAt(into, 1, rate);
+      const sum = sleep(s, want, { alarms: true, slots: slots(), rng });
+      const spent = want > 0 ? sum.days / want : 1;
+      into += spent;
       real += spent; sleepReal += spent; lookClock += spent;
       earned += sum.stars; earnedAt.push([real, earned]);
       if (sum.days > 0) onCurve(sum.stars / sum.days);
@@ -384,7 +388,7 @@ function refTier(tier, every) {
     beginSleep(r, tier);
     for (let k = 0; k < REF_SLEEP * 10; k++) {
       clock += 0.1; since += 0.1;
-      watchSleep(r, { days: CRYO[tier].days * 0.1, tier });
+      watchSleep(r, { days: sleepDaysAt(k * 0.1, 0.1, CRYO[tier].days), tier });     // deep-rebuild: the dive
       if (every && since >= every - 1e-9) { since = 0; snap(r, clock * 1000, tier); }
       if (n >= 3) { low = Math.min(low, r.stability); high = Math.max(high, r.stability); }
     }

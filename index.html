@@ -421,10 +421,7 @@
              browser without WebGL -->
         <div id="deep-crust"></div>
 
-        <!-- the wake-up replay: what ran, what stopped, what came of it -->
-        <div class="deep-chrome" id="deep-replay" hidden></div>
-
-        <!-- time: year large, month and day smaller -->
+        <!-- time: year large, month and day smaller (awake; asleep the counter in the middle takes over) -->
         <div class="deep-chrome" id="deep-time">
             <div class="deep-mono deep-clock">
                 <span class="deep-y" id="deep-year">0</span>
@@ -440,169 +437,109 @@
             </div>
         </div>
 
-        <!-- what we hold -->
+        <!-- deep-rebuild: what we hold, large, with what comes in a day under it -->
         <div class="deep-chrome" id="deep-hold">
             <div class="deep-hold-row" id="deep-ore-row">
                 <span class="deep-hold-num">
                     <span class="deep-mono deep-amount" id="deep-minerals">0</span>
                     <span class="deep-mono deep-rate" id="deep-minerals-rate"></span>
                 </span>
-                <i data-lucide="pickaxe" class="w-5 h-5"></i>
-                <div class="tooltip deep-tip-wide"></div>
+                <i data-lucide="pickaxe" class="w-6 h-6"></i>
             </div>
             <div class="deep-hold-row" id="deep-stars-row">
                 <span class="deep-hold-num">
                     <span class="deep-mono deep-amount" id="deep-stars">0</span>
                     <span class="deep-mono deep-rate" id="deep-stars-rate"></span>
                 </span>
-                <i data-lucide="star" class="w-5 h-5"></i>
-                <div class="tooltip deep-tip-wide"></div>
-            </div>
-            <div class="deep-mono" id="deep-advisor"></div>
-            <div class="deep-mono" id="deep-feed"></div>
-        </div>
-
-        <!-- the four columns, the shortest marked -->
-        <div class="deep-chrome" id="deep-columns">
-            <div class="deep-mono deep-col-heads">
-                <span class="deep-col-head" id="deep-head-M">0</span>
-                <span class="deep-col-head" id="deep-head-F">0</span>
-                <span class="deep-col-head" id="deep-head-E">0</span>
-                <span class="deep-col-head" id="deep-head-H">0</span>
-            </div>
-            <div class="deep-bars">
-                <div class="deep-bar" id="deep-bar-M">
-                    <span class="deep-delta deep-mono" id="deep-delta-M"></span>
-                    <div class="deep-track">
-                        <div class="deep-ghost" id="deep-ghost-M"></div>
-                        <div class="deep-fill" id="deep-fill-M"></div>
-                    </div>
-                    <span class="deep-stop-dot hidden" id="deep-dot-M"></span>
-                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
-                </div>
-                <div class="deep-bar" id="deep-bar-F">
-                    <span class="deep-delta deep-mono" id="deep-delta-F"></span>
-                    <div class="deep-track">
-                        <div class="deep-ghost" id="deep-ghost-F"></div>
-                        <div class="deep-fill" id="deep-fill-F"></div>
-                    </div>
-                    <span class="deep-stop-dot hidden" id="deep-dot-F"></span>
-                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
-                </div>
-                <div class="deep-bar" id="deep-bar-E">
-                    <span class="deep-delta deep-mono" id="deep-delta-E"></span>
-                    <div class="deep-track">
-                        <div class="deep-ghost" id="deep-ghost-E"></div>
-                        <div class="deep-fill" id="deep-fill-E"></div>
-                    </div>
-                    <span class="deep-stop-dot hidden" id="deep-dot-E"></span>
-                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
-                </div>
-                <div class="deep-bar" id="deep-bar-H">
-                    <span class="deep-delta deep-mono" id="deep-delta-H"></span>
-                    <div class="deep-track">
-                        <div class="deep-ghost" id="deep-ghost-H"></div>
-                        <div class="deep-fill" id="deep-fill-H"></div>
-                    </div>
-                    <span class="deep-stop-dot hidden" id="deep-dot-H"></span>
-                    <div class="tooltip deep-tip-right deep-tip-wide"></div>
-                </div>
-            </div>
-            <div class="deep-mono deep-col-feet">
-                <span class="deep-col-foot">M</span>
-                <span class="deep-col-foot">F</span>
-                <span class="deep-col-foot">E</span>
-                <span class="deep-col-foot">H</span>
-            </div>
-            <!-- what comes in and what goes out of each store in a day -->
-            <div class="deep-mono deep-col-flows">
-                <span class="deep-col-flow"><span class="in" id="deep-in-M"></span><span class="out" id="deep-out-M"></span></span>
-                <span class="deep-col-flow"><span class="in" id="deep-in-F"></span><span class="out" id="deep-out-F"></span></span>
-                <span class="deep-col-flow"><span class="in" id="deep-in-E"></span><span class="out" id="deep-out-E"></span></span>
-                <span class="deep-col-flow"><span class="in" id="deep-in-H"></span><span class="out" id="deep-out-H"></span></span>
-            </div>
-            <div class="deep-per-day">
-                <span class="deep-mono" id="deep-stars-day">0</span>
-                <span class="deep-per-day-mark">
-                    <i data-lucide="star" class="w-4 h-4"></i>
-                    <span class="deep-mono">/</span>
-                    <i data-lucide="sun" class="w-4 h-4"></i>
-                </span>
+                <i data-lucide="star" class="w-6 h-6"></i>
             </div>
         </div>
 
-        <!-- the buttons. v1.51.0: three groups, each under a tiny mono word. BUILD and GROW are
-             products (round), ACT are things the colony does (wide pills with a word), so an action
-             never looks like a room. The queue lives in its own strip at the bottom of the window -->
-        <div class="deep-chrome deep-btn-col">
-            <div class="deep-group" id="deep-group-build">
-                <span class="deep-group-word deep-mono">BUILD</span>
-                <button class="btn" id="deep-dig-btn" aria-label="Dig a chamber">
+        <!-- deep-rebuild: THE INSTRUMENT PANEL (movement I). Four gauges on dymo tape, the one stamped
+             advice, the empty chambers, the three lamps of cryo before the hall, the alarm lamp of a
+             wake, and asleep the Watcher's own label. src/phase4/panel.js draws the gauges -->
+        <div class="deep-chrome deep-panel" id="deep-panel">
+            <span class="deep-screw is-tl"></span><span class="deep-screw is-tr"></span>
+            <span class="deep-screw is-bl"></span><span class="deep-screw is-br"></span>
+            <div class="deep-alarm deep-light" id="deep-alarm">
+                <span class="deep-bulb is-alarm"></span>
+                <span class="dymo is-alarm" id="deep-alarm-word" hidden></span>
+            </div>
+            <div class="deep-gauges" id="deep-gauges"></div>
+            <div class="deep-advice-row">
+                <span class="dymo is-advice deep-light" id="deep-advice" hidden></span>
+                <span class="dymo is-small deep-light" id="deep-empty" hidden></span>
+            </div>
+            <div class="deep-cryo-lamps" id="deep-lamps" hidden></div>
+            <!-- what stays awake while the colony sleeps: its own label, on the same tape -->
+            <div id="deep-watcher" hidden>
+                <div class="deep-watcher-head">
+                    <span class="deep-watcher-pulse"></span>
+                    <span class="dymo deep-watcher-name" id="deep-watcher-name">SYSTEM AWAKE</span>
+                </div>
+                <div class="deep-watcher-meter">
+                    <span class="deep-watcher-track"><span class="deep-watcher-fill" id="deep-stab-fill"></span></span>
+                    <span class="deep-mono deep-watcher-val" id="deep-stab-val" hidden>100</span>
+                </div>
+                <span class="deep-mono deep-watcher-arc" id="deep-watcher-arc" hidden></span>
+                <!-- v1.51.0: the lamps, when they come: what they ask and how far along -->
+                <div class="deep-puzzle" id="deep-puzzle">
+                    <span class="deep-mono deep-puzzle-q" id="deep-puzzle-q"></span>
+                    <span class="deep-mono deep-puzzle-said" id="deep-puzzle-said"></span>
+                </div>
+                <!-- a biological step from an older save, paid and waiting for its sector -->
+                <button class="deep-watcher-ask deep-mono" id="deep-watcher-ask" hidden>Choose a sector to seal.</button>
+            </div>
+        </div>
+
+        <!-- deep-rebuild: what the colony does. DIG with its price, the drawer, and the LEVER: before
+             the hall it appears when the three lamps are lit and Cryo I can be paid; after, it is the
+             sleep (pulled down) and the wake (pushed up) -->
+        <div class="deep-chrome deep-act" id="deep-act">
+            <div class="deep-act-col">
+                <button class="btn deep-round" id="deep-dig-btn" aria-label="Dig a chamber">
                     <i data-lucide="shovel" class="w-7 h-7"></i>
                     <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
                 </button>
-                <button class="btn deep-room-btn" id="deep-room-mine" data-room="mine" aria-label="Mine">
-                    <i data-lucide="pickaxe" class="w-7 h-7"></i>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <button class="btn deep-room-btn" id="deep-room-farm" data-room="farm" aria-label="Farm">
-                    <i data-lucide="sprout" class="w-7 h-7"></i>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <button class="btn deep-room-btn" id="deep-room-generator" data-room="generator" aria-label="Generator">
-                    <i data-lucide="zap" class="w-7 h-7"></i>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <button class="btn deep-room-btn" id="deep-room-dorm" data-room="dorm" aria-label="Dormitory">
-                    <i data-lucide="bed" class="w-7 h-7"></i>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
+                <span class="deep-mono deep-act-price" id="deep-dig-price"></span>
             </div>
-            <!-- deep-tree: the level, automate and longer-sleep buttons moved into the skill tree.
-                 One button opens it; the badge counts what can be bought now -->
-            <div class="deep-group" id="deep-group-tree">
-                <span class="deep-group-word deep-mono">TREE</span>
-                <button class="btn" id="deep-tree-btn" aria-label="The tree">
-                    <i data-lucide="network" class="w-7 h-7"></i>
+            <div class="deep-act-col">
+                <button class="btn deep-round" id="deep-tree-btn" aria-label="The drawer">
+                    <i data-lucide="panel-right-open" class="w-7 h-7"></i>
                     <span class="deep-badge deep-mono hidden" id="deep-tree-badge"></span>
-                    <div class="tooltip deep-tip-wide"></div>
                 </button>
+                <span class="deep-mono deep-act-price">&nbsp;</span>
             </div>
-            <div class="deep-group is-act" id="deep-group-act">
-                <span class="deep-group-word deep-mono">ACT</span>
-                <!-- deep-copy: Sleep is not there until Cryo I is bought in the tree; it comes with a fade -->
-                <button class="btn deep-pill hidden" id="deep-cryo-btn" aria-label="Sleep">
-                    <i data-lucide="snowflake" class="w-5 h-5"></i>
-                    <span class="deep-pill-text deep-mono" id="deep-cryo-text">Sleep</span>
-                    <div class="tooltip deep-tip-wide"></div>
+            <div class="deep-lever-wrap" id="deep-lever-wrap" hidden>
+                <span class="dymo is-small deep-lever-tape" id="deep-lever-tape">SLEEP</span>
+                <button class="deep-lever" id="deep-lever" aria-label="Sleep">
+                    <span class="deep-lever-slot"></span>
+                    <span class="deep-lever-arm"><span class="deep-lever-knob"></span></span>
                 </button>
-                <button class="btn deep-pill hidden" id="deep-wake-btn" aria-label="Wake the colony">
-                    <i data-lucide="sun" class="w-5 h-5"></i>
-                    <span class="deep-pill-text deep-mono">Wake</span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <button class="btn deep-pill hidden" id="deep-probe-btn" aria-label="Send a scout party">
-                    <i data-lucide="footprints" class="w-5 h-5"></i>
-                    <span class="deep-pill-text deep-mono" id="deep-probe-text">Scout party</span>
-                    <span class="deep-build"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
-                <!-- deep-copy: one text only, the caption beside it ("Opens at 85 % survival. Now about 15 %.") -->
-                <button class="btn deep-pill is-locked has-caption" id="deep-ascend-btn" aria-label="Go up">
-                    <i data-lucide="arrow-up-from-line" class="w-5 h-5"></i>
-                    <span class="deep-pill-text deep-mono">Go up</span>
-                    <span class="deep-caption deep-mono" id="deep-ascend-caption"></span>
-                    <div class="tooltip deep-tip-wide"></div>
-                </button>
+                <span class="deep-mono deep-act-price" id="deep-lever-price"></span>
             </div>
-            <button class="btn" id="deep-reset-view" aria-label="Reset the view">
-                <i data-lucide="scan" class="w-6 h-6"></i>
+            <!-- after the last wake-up: the Watcher goes up alone (an older save at the old ending) -->
+            <button class="btn deep-pill hidden" id="deep-ascend-btn" aria-label="Go up">
+                <i data-lucide="arrow-up-from-line" class="w-5 h-5"></i>
+                <span class="deep-pill-text deep-mono">Go up</span>
             </button>
+        </div>
+        <button class="btn deep-chrome" id="deep-reset-view" aria-label="Reset the view">
+            <i data-lucide="scan" class="w-6 h-6"></i>
+        </button>
+
+        <!-- deep-rebuild (movement II): asleep, the middle of the screen. The years the colony has
+             slept roll like the odometer; the thin ring round them is the surface healing -->
+        <div class="deep-chrome deep-dive" id="deep-dive" hidden>
+            <svg class="deep-dive-ring" viewBox="0 0 200 200" aria-hidden="true">
+                <circle class="track" cx="100" cy="100" r="96"></circle>
+                <circle class="arc" id="deep-dive-arc" cx="100" cy="100" r="96" stroke-dasharray="603.2" stroke-dashoffset="603.2"></circle>
+            </svg>
+            <div class="deep-dive-in">
+                <span class="deep-dive-word">THE COLONY HAS SLEPT</span>
+                <span class="deep-dive-years deep-mono" id="deep-dive-years">0</span>
+                <span class="deep-dive-word is-unit" id="deep-dive-unit">YEARS</span>
+            </div>
         </div>
 
         <!-- v1.51.0: THE BUILD QUEUE, a fixed strip along the bottom of the window beside the chapter
@@ -637,30 +574,10 @@
             </div>
         </div>
 
-        <!-- v1.47.0: what stays awake while the colony sleeps. Only in the sleep world: a slow
-             pulse, a name, a meter, now and then the lamps, and (v1.51.0) the ladder as one pill -->
-        <div class="deep-chrome" id="deep-watcher" hidden>
-            <div class="deep-watcher-head">
-                <span class="deep-watcher-pulse"></span>
-                <span class="deep-mono deep-watcher-name" id="deep-watcher-name">SYSTEM AWAKE</span>
-            </div>
-            <div class="deep-watcher-meter">
-                <span class="deep-mono deep-watcher-word">STABILITY</span>
-                <span class="deep-watcher-track"><span class="deep-watcher-fill" id="deep-stab-fill"></span></span>
-                <span class="deep-mono deep-watcher-val" id="deep-stab-val">100</span>
-            </div>
-            <!-- deep-night: where the sleep world stands, in one line that changes rarely:
-                 "night 3 of 6", then "the question is open", then the body -->
-            <span class="deep-mono deep-watcher-arc" id="deep-watcher-arc"></span>
-            <!-- v1.51.0: the lamps, when they come: one line, what they ask and how far along -->
-            <div class="deep-puzzle" id="deep-puzzle">
-                <span class="deep-mono deep-puzzle-q" id="deep-puzzle-q"></span>
-                <span class="deep-mono deep-puzzle-said" id="deep-puzzle-said"></span>
-            </div>
-            <!-- deep-tree: the Watcher's steps are bought in the tree. A biological step paid for and
-                 waiting for its sector says so here; a click asks again -->
-            <button class="deep-watcher-ask deep-mono" id="deep-watcher-ask" hidden>Choose a sector to seal.</button>
-        </div>
+        <!-- deep-rebuild: THE DRAWER, from the right over a quarter of the screen (src/phase4/drawer.js) -->
+        <aside class="deep-drawer" id="deep-drawer" hidden></aside>
+        <!-- deep-rebuild: the ring of four rooms over an empty chamber (src/phase4/view-hooks.js) -->
+        <div class="deep-ring" id="deep-ring" hidden></div>
 
         <!-- deep-night (step 3b): SURFACE'S VISIT IS A SEQUENCE. One stage over the Watcher holds
              its line and, under it, the game: the line types itself alone; only once it has finished
@@ -678,7 +595,7 @@
             <div id="deep-surface" hidden>
                 <div class="deep-surface-head">
                     <span class="deep-surface-glyph"></span>
-                    <span class="deep-mono deep-surface-name">SURFACE</span>
+                    <span class="deep-mono deep-surface-name" id="deep-surface-name">SURFACE</span>
                 </div>
                 <div class="deep-surface-play">
                     <div class="deep-surface-rps" id="deep-surface-rps">

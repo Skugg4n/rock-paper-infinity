@@ -219,9 +219,13 @@ describe('awake, stability comes back', () => {
 
 describe('Surface, as the Watcher keeps it', () => {
     test('it comes a few seconds into a sleep it is due in, never the first', () => {
-        const w = { ...initialWatcher(), sleeps: 1 };
+        // deep-rebuild: and only to a mind under SURFACE_BELOW
+        const w = { ...initialWatcher(), sleeps: 1, stability: 60 };
         expect(surfaceDue(w, 1e9, 30)).toBe(false);
         w.sleeps = 2;
+        w.stability = 90;
+        expect(surfaceDue(w, 1e9, 30)).toBe(false);
+        w.stability = 60;
         expect(surfaceDue(w, (VISIT_AFTER_SECONDS - 0.5) * 30, 30)).toBe(false);
         expect(surfaceDue(w, VISIT_AFTER_SECONDS * 30, 30)).toBe(true);
         openSurface(w);
