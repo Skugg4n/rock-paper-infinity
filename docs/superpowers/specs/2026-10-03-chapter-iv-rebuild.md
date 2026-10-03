@@ -280,3 +280,46 @@ V · UNITY, the wall after a reload). Shots: docs/playtests/rebuild-shots/grow-*
 **Not done here.** The strata view (another agent, `strata-view.js`) implements the same hooks. A playtest
 of the whole act. The crust's pieces are plain boxes in the crust's colour; the machine's deck stays
 machinery under the hands.
+
+## GROW, second pass (Ola on v1.76.0, 2026-10-03)
+
+Ola: "The question: we must make the consequences clearer. Maybe we taste a little bio
+before we go full blown crazy. You don't understand what the flesh does or what the point
+of it is. Almost at once you're out of people, the body starves and there are no choices
+left. A dead end on Body as I see it."
+
+### Diagnosis (Claude)
+GROW arrives as a cliff: one purchase, then a full body mechanic with a cost that empties
+the colony before the player has seen one benefit. The player never chooses flesh; it
+happens to them. And nothing on screen says what a flesh room is FOR.
+
+### The fix: three steps down instead of one cliff
+1. **A TASTE, before the question (SLEEP, from night 4).** Surface's fourth gift becomes
+   a GRAFT: the player may turn ONE chamber of their choice into flesh. It is a single
+   organ that cannot spread. On taking it, the room's output visibly multiplies (a
+   floating "×5" over the plate and the gauge needle jumps), it eats a few people a year,
+   and nothing else changes. The player has now seen the trade with their own eyes.
+   Night 5 offers a SECOND graft. The grafts are where the flesh look first appears.
+2. **THE QUESTION as an informed choice.** Its drawer row and the dymo advice say what it
+   does in one line each, not more: "The body takes the colony, room by room." /
+   "It eats people. It grows them in vats." / "It is the only way up." It is a choice:
+   it never has to be bought, and the panel says what the other road is ("THE PEOPLE
+   WAIT. SURVIVAL 85 % AROUND YEAR 802 701" as before, if the player keeps sleeping).
+3. **GROW with a feeding loop the player controls.**
+   - Vats come FIRST: the question gives the body two vats at once (the culture vats
+     the player bought become the body's), so FEED is rising when the body starts.
+   - The first takes are cheap and eat little; hunger scales with the body, not with
+     the clock. Taking a chamber never costs more people than FEED can spare: if a take
+     would starve the body, its price shows red and the dymo says "GROW VATS".
+   - Starvation is a slope, not a wall: necrosis greys the edge slowly and the body
+     keeps producing from its heart; a necrotic room revives on its own as soon as FEED
+     is above zero. There is ALWAYS a doable action shown by the dymo: GROW VATS (buyable
+     with MASS, which the body keeps making), FEED (pause spreading), or SPREAD.
+   - What flesh does, shown every time: on each take, the plate shows the multiplier
+     ("×20") and the MASS needle moves; the lamp row shows the road to the rise as counts:
+     "DEEPEST FLOOR 3 / 12", "MACHINE 0 / 1".
+4. **Sim rule:** the scripted player must reach the rise WITHOUT ever being unable to
+   act for more than 10 real seconds; the sim reports "longest stuck" for GROW and the
+   act stays 25 to 35 minutes.
+
+Built after deep-swap lands (it touches the same files).
