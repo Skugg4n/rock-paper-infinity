@@ -222,3 +222,10 @@ Ola: "SO much clearer and easier to understand, GOOD!" His nine notes, and what 
 - Surface's line typed twice: the card counted as gone while the fists shook (a throw sets the result before it is shown). Fixed in instruments.js cardGone; a line typed in a visit is never retyped.
 - **Culture vats** (HABITAT, three levels, a day purchase after the hall): asleep only the vats grow people. Without them the ice thins the sleepers until a whole one under ten is missing. **In GROW these vats are the ones the body takes over**: movement III's "dormitories that the body takes become VATS" should take these vats first, so the body grows its own people from the vats the colony built to survive the sleep.
 - Sims: plain 26m01s → 26m58s, --watcher 21m08s → 23m02s.
+
+## Ola on the views (2026-10-03)
+
+Ola chose B, the strata. Keep the 3D view and its functionality: when the strata view
+becomes the default, the 3D view stays in the code and stays selectable (a URL flag
+`?view=3d` and a choice in the menu), so we can go back, or use it for a parallel world
+later. Both views implement the same view hooks.
