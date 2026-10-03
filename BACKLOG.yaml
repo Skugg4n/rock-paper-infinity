@@ -2509,3 +2509,46 @@ items:
     request: |
       Open after deep-rebuild: the gauges' tick, the lever's clunk and the lights going out in sound.js; a new colony view implementing view-hooks.js (Ola may replace the 3D view after a mockup round); movement III (GROW) replaces the biological steps, which still run behind the scenes and are kept out of the drawer.
     status: open
+
+  - id: B290
+    added: 2026-10-03
+    source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
+    request: |
+      The strata view (direction B) as a module that can replace the 3D colony view: strata accumulating per sleep with a year ruler, flat chambers with glyphs, the shaft, the machine house, people; the light from C; hallucinations as screen ghosts from A; GROW with flesh, roots, hands and the rise.
+    status: done
+    resolved_in: deep-strata (version at merge)
+    notes: "src/phase4/strata-view.js; same surface as scene.js createScene plus showEmpty, setBody, onChamberClick, setHands, rise; extendHooks wraps createViewHooks."
+
+  - id: B291
+    added: 2026-10-03
+    source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
+    request: |
+      The section's geometry as pure, tested rules: a floor is a row outward from the shaft, sectionPlace for the growth graph, layer thickness by log of years, the per-sleep history, labels, camera home and limits.
+    status: done
+    resolved_in: deep-strata (version at merge)
+    notes: "src/phase4/strata.js, strata.test.js."
+
+  - id: B292
+    added: 2026-10-03
+    source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
+    request: |
+      A prototype page driving the strata view through TEND, SLEEP and GROW with a fake state, with screenshots.
+    status: done
+    resolved_in: deep-strata (version at merge)
+    notes: "docs/mockups/deep-strata-proto.html; docs/playtests/rebuild-shots/strata-*.png."
+
+  - id: B293
+    added: 2026-10-03
+    source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
+    request: |
+      Wire the strata view into the game in place of scene.js: createStrataView(ui.sceneHost, {insetLeft: panel width, onInteract, onClearDark}); hooks = extendHooks(createViewHooks(view, ...), view); the HUD may call the new hallucination kinds afterimage and wrong; GROW calls setBody/onChamberClick/setHands/rise; save view.strata (years per sleep) with the game so the layers survive a reload exactly.
+    status: open
+    notes: "Decide whether the body graph uses sectionPlace (the row on screen, recommended) or layout.js placement; the ids are the same either way, the sim must be rerun with the row (distances from the heart are longer)."
+
+  - id: B294
+    added: 2026-10-03
+    source: "Ola chose direction B of docs/mockups/deep-views-13.html (2026-10-03), via the coordinator"
+    request: |
+      Strata view follow-ups: setHands(false) is a no-op; the people do not walk in and out of the vats; no sound for the roots, the hands or the rise; the 3D machine is small at 12 chambers a floor (about 28 px a unit at 1440 wide).
+    status: open
+    notes: "Found while building B290."

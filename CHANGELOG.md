@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (deep-strata)
+
+### The strata view, direction B (B290 to B294)
+
+Ola chose direction B of docs/mockups/deep-views-13.html to replace the 3D colony for all of chapter IV, with A's screen ghosts and C's light. Built as a standalone module and a prototype; not wired into the game yet.
+
+- **src/phase4/strata-view.js** (B290): a vertical cross-section in three.js (orthographic): the sky and rain over the dead surface, one sediment layer per sleep (thickness by the log of its years, the top one thickening during the sleep, the year of every boundary on a ruler at the right, YEAR 0 the crust with the lid), the old ground, the machine house with the real machine seen from the side, the floors as rows of flat chambers with their room glyphs on a corridor, the shaft, people walking corridors and shaft. Empty chambers carry a faint "+", orders and digs fill a bar. THE LIGHT: the floor the camera is on is lit, deeper floors fall to black; asleep everything dims but the lamps and the cryo glow. Scroll or drag to look up through the years and down the floors; reset goes home. One instanced draw for every chamber, one shader for all the rock; no allocations per frame of its own.
+- **Hallucinations as screen ghosts** (B290): an afterimage of an earlier frame drifting, a frame that is wrong for a moment (mirrored, a floor out of place, a frame from before), the tall thin figure on the surface line (or the highest year line in view), a lamp and a person in an empty chamber (or in a room never dug, up in the young rock), a chamber's walls breathing. The snap clears them with a flicker.
+- **GROW in the section** (B290): setBody(bodyIds, necroticIds, reachableIds) with growth.js ids fills chambers with flesh.js in its cross-section projection (the front spreading from the side that touches the body, the room showing through until it is reached), corridors become muscle, the shaft a spine, dormitories vats, necrotic organs grey, reachable ones glow; roots and vessels with mycelium grow up through every layer, more as the body grows. setHands(on) raises three sinew arms with hands.js hands out of the machine house; rise(onDone) pushes the body up through all the years to the surface, bowing and cracking the layers, striking out the years it passes, and breaks the crust.
+- **src/phase4/strata.js** (B291): the section's numbers, pure and tested: a floor is a row growing outward from the shaft (-1, +1, -2, +2, ...), sectionPlace for growth.js graphFromSlots so the body's graph is the row the player sees, layer thickness and the per-sleep history (rebuilt from the totals for an old save), the ruler's labels, the camera's home and limits.
+- **docs/mockups/deep-strata-proto.html** (B292): drives the view through the whole act with a fake state (TEND, sleep with the counter, deep sleeps, each hallucination, the snap, take plates, starve, feed, reach the machine, rise); ?shot= and ?big=100. Screenshots in docs/playtests/rebuild-shots/strata-*.png.
+
 ## v1.73.0 - 2026-10-03 (chapter IV rebuilt: TEND and SLEEP)
 
 ### Chapter IV rebuilt, movements I · TEND and II · SLEEP (B260 to B269)
