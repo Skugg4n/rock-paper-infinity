@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.73.0 - 2026-10-03 (chapter IV rebuilt: TEND and SLEEP)
+
+### Chapter IV rebuilt, movements I · TEND and II · SLEEP (B260 to B269)
+
+Ola played IV through on v1.71 and called it a failed level: too much text, flapping, no feeling. This builds the first two movements of docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md. The economy underneath is untouched; the screen is new.
+
+- **The instrument panel** (B260) replaces the four bars, the advisor's feed, the rates and the bar tooltips: four round gauges with needles and a red arc, on dymo tape (ORE, FOOD, POWER, HANDS). A falling store points at its days of cover (red under 30 days); one that does not fall rests in the green. The needles ride a damped spring. Under them one stamped label is the only advice ("INSTRUMENTS: BUILD FARM", "DIG", "AUTOMATE MINES", "FEED THE MACHINE", "LONGER SLEEP", "SLEEP"); it holds a word at least four seconds. "EMPTY 2" counts the chambers dug and empty. Ore and stars stay top right, large, with "+N a day" under them.
+- **Rooms are built where they go** (B261): a dug, empty chamber is a plate with a faint "+"; a click on it opens a ring of four rooms with their prices (bright when they can be paid, the missing ore in the middle on hover); the room is ordered into that very chamber and shows its glyph and ring there. The room buttons are gone; DIG stays as one button with its price.
+- **The drawer** (B262) replaces the full-screen tree as the way to buy: from the right over a quarter of the screen, the colony live behind it. Only what can be bought now is bright (name, about five words, price); per branch the next thing is dim with what it needs. Awake the day's things, asleep the night's. An order under way shows its ring in its row. "the whole tree" opens the old board. A press outside or Escape closes it.
+- **Cryo I is three lamps and a lever** (B263): FOOD RUNS ITSELF, POWER RUNS ITSELF, ORE RUNS ITSELF, read item for item off Cryo I's own road (an automation on order blinks). When they are lit and Cryo I can be paid, the lever appears with the price; pulling it buys Cryo I and the colony goes under. After that the lever is the sleep, and pushed up, the wake.
+- **Cut** (B264): scout parties, the survival estimate and its band, the early ascent and the people's ending, the wake-up strip, the advisor's sentences. Their save fields stay and do nothing harmful; a party out in an old save still comes home.
+- **The dive** (B265): pulling the lever puts the panel's lights out one by one; the middle of the screen says "THE COLONY HAS SLEPT" over a large count of the years (months in the first two years) with the surface's true healing as a thin ring round it. **Time accelerates within a sleep**: it starts at 15 % of the tier's rate, reaches the full rate in six seconds and keeps gaining toward three times it (watcher.js sleepDaysAt; the sim sleeps the same way).
+- **Waking lights one lamp** (B266) with one word: FOOD, POWER, FAULT, VOICE or AWAKE. The panel's lights come back. The sentences are kept in the save (`wakeLog`), never on screen.
+- **The mind goes** (B267): as the Watcher's stability falls in the sleep, a lamp burns in an empty chamber (under 70), a tall thin figure stands on the crust (under 55), a needle and a year digit read wrong for a moment (under 40), a plate's walls breathe (under 25). A click on the base snaps them all away with a flicker; they come back one by one after seven seconds. Nothing explains it. The Watcher's label is dymo tape too.
+- **Surface is the hallucination** (B268): it comes only in a sleep and only to a mind under 80 (watcher.js SURFACE_BELOW). Its card fades 6 s after a game's result. From night 4 its label and words are drawn on the Watcher's own tape, more each night; at night 6 its label flickers to WATCHER before the question types. The night log stays in the whole tree.
+- **For another colony view** (B269): what lives in the view (the empty chambers, the room ring, the hallucinations, the snap) goes through src/phase4/view-hooks.js, so a new view can implement the same calls.
+- Sims: plain run 24m47s → 26m01s to year 802 701 (nights 8m09s to 18m54s → 8m27s to 20m50s); --watcher 27m26s → 21m08s to the biological ending. Attentive Watcher (snap every 12 s) holds 54 to 80 in 25 s dives (was 71 to 86).
+- Acceptance rewritten for the new UI: `node scripts/accept-iv-cut.mjs [--shots DIR]`. Checkpoint "IV · cryo I" is the lever moment now (every room automated, the hall not yet bought).
+
 ## v1.72.0 - 2026-10-03 (chapter IV, the flesh: modules and prototype)
 
 ### Chapter IV, movement III · GROW: the flesh, as modules and a prototype (B270 to B274)

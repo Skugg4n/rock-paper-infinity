@@ -348,6 +348,47 @@ export function createScene(container, opts = {}) {
     const crustLabel = new CSS2DObject(crustHost);
     crustLabel.position.set(PASS_TOP[0], crustTop + 1.1, PASS_TOP[2]);
     above.add(crustLabel);
+    // deep-rebuild: THE FIGURE. A hallucination: a tall thin dark silhouette standing on the crust
+    const figureMat = new THREE.MeshBasicMaterial({ color: 0x020304, transparent: true, opacity: 1 });
+    const figure = new THREE.Group();
+    {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.3, 0.06), figureMat);
+        body.position.y = 0.65;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), figureMat);
+        head.position.y = 1.38;
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.9, 0.035), figureMat);
+        armL.position.set(-0.08, 0.8, 0);
+        const armR = armL.clone();
+        armR.position.x = 0.08;
+        figure.add(body, head, armL, armR);
+    }
+    // it stands against a faint pale haze, so the dark of it reads in the dark of the night
+    let hazeTex = null;
+    {
+        const c = document.createElement('canvas');
+        c.width = 64; c.height = 128;
+        const g = c.getContext('2d');
+        g.translate(32, 64);
+        g.scale(1, 2);
+        const grad = g.createRadialGradient(0, 2, 1, 0, 0, 31);
+        grad.addColorStop(0, 'rgba(214, 222, 232, 0.9)');
+        grad.addColorStop(0.45, 'rgba(214, 222, 232, 0.28)');
+        grad.addColorStop(1, 'rgba(214, 222, 232, 0)');
+        g.fillStyle = grad;
+        g.fillRect(-32, -32, 64, 64);
+        hazeTex = new THREE.CanvasTexture(c);
+    }
+    const hazeMat = new THREE.SpriteMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.85 });
+    const haze = new THREE.Sprite(hazeMat);
+    haze.scale.set(1.3, 2.6, 1);
+    haze.position.set(-0.25, 0.75, -0.35);
+    haze.renderOrder = -1;
+    figure.add(haze);
+    figure.position.set(-0.55, crustTop, 1.25);
+    figure.visible = false;
+    above.add(figure);
+    let breatheSlot = -1;           // a plate whose walls breathe (the deepest hallucination)
+    let ghostLamp = -1;             // a lamp burning in an empty chamber
     let shaftOpen = false;
     function openShaft(open) {
         if (open === shaftOpen) return;
@@ -700,6 +741,16 @@ export function createScene(container, opts = {}) {
                     rec.buildEl = rec.inner.querySelector('.building');
                     rec.darkEl.addEventListener('click', () => opts.onClearDark?.(c.slot));
                     if (c.room === 'cryo') cryoAt.set(cx, y + WALK_Y, cz);
+                } else if (Number.isInteger(c.slot)) {
+                    // deep-rebuild: a chamber dug and empty is a plate with a faint "+"; a room ordered
+                    // into it shows its glyph and its ring until it lands (refresh)
+                    const rec = makeLabel('<span class="plus"></span><span class="claim"></span><span class="building"></span><span class="ghost-lamp"></span>', cx, y + 0.45, cz, 'empty');
+                    rec.obj.element.dataset.slot = String(c.slot);
+                    rec.inner.classList.add('is-empty');
+                    rec.cell = c;
+                    rec.buildEl = rec.inner.querySelector('.building');
+                    rec.claimEl = rec.inner.querySelector('.claim');
+                    rec.claim = null;
                 }
 
                 /* the way into the shaft: on a landing, two or three lanes run from
@@ -973,6 +1024,26 @@ export function createScene(container, opts = {}) {
                 l.buildEl.style.setProperty('--p', `${Math.round(p * 100)}%`);
             }
         }
+        // deep-rebuild: an empty plate a room is ordered into shows the room's glyph and its ring
+        let iconsDue = false;
+        for (const l of labels) {
+            if (l.kind !== 'empty') continue;
+            const job = (state.builds || []).find((j) => j.kind === 'room' && j.slot === l.cell.slot);
+            const claim = job ? job.type : null;
+            if (claim !== l.claim) {
+                l.claim = claim;
+                l.claimEl.innerHTML = claim ? `<i data-lucide="${ROOM_ICON[claim] || 'square'}" class="w-6 h-6"></i>` : '';
+                l.inner.classList.toggle('is-claimed', !!claim);
+                iconsDue = true;
+            }
+            l.buildEl.classList.toggle('is-on', !!job);
+            if (job) {
+                const span = (job.doneDay ?? 0) - (job.startDay ?? 0);
+                const p = job.startDay == null ? 0 : (span > 0 ? Math.max(0, Math.min(1, (state.day - job.startDay) / span)) : 1);
+                l.buildEl.style.setProperty('--p', `${Math.round(p * 100)}%`);
+            }
+        }
+        if (iconsDue) opts.onLabels?.();
         // the rubble on the pipe goes the first time anyone climbs it; the scene clears it when
         // the first of them gets to the top, not the moment the order is given
         wantOpen = !!(state.shaftOpen || (state.probesSent || 0) > 0 || state.ascended);
@@ -1104,6 +1175,13 @@ export function createScene(container, opts = {}) {
             g.scale.set(1 + BREATH_SCALE * a, 1, 1 + BREATH_SCALE * a);
             g.position.y = BREATH_RISE * a;
         });
+        for (const m of plates) {
+            if (m.userData.slot === breatheSlot) {
+                const a = Math.sin(breath * 1.9);
+                m.scale.set(1 + 0.07 * a, 1 + 0.9 * Math.max(0, a), 1 + 0.07 * a);
+            } else if (m.scale.x !== 1) m.scale.set(1, 1, 1);
+        }
+        if (figure.visible) figure.rotation.y = 0.3 * Math.sin(breath * 0.21);
         const b = whole ? Math.sin(breath * BREATH_RATE * 0.6) : 0;
         world.scale.set(1 + 0.006 * b, 1, 1 + 0.006 * b);
         world.position.y = 0.02 * b;
@@ -1488,6 +1566,45 @@ export function createScene(container, opts = {}) {
             }
             return out;
         },
+        /**
+         * deep-rebuild: the hallucinations the scene draws. `lamp`: a lamp burns in an empty chamber
+         * (or at the frontier when none is empty); `figure`: the figure on the crust; `breathe`: a
+         * plate's walls breathe. Each kind picks its place when it comes on.
+         * @param {'lamp'|'figure'|'breathe'} kind
+         * @param {boolean} on
+         * @returns {boolean} whether it shows
+         */
+        hallucinate(kind, on) {
+            if (kind === 'figure') { figure.visible = !!on; figureMat.opacity = 1; hazeMat.opacity = 0.85; return figure.visible; }
+            if (kind === 'breathe') {
+                if (!on) { breatheSlot = -1; return false; }
+                if (breatheSlot < 0 && plates.length) breatheSlot = plates[Math.floor(rnd() * plates.length)].userData.slot;
+                return breatheSlot >= 0;
+            }
+            if (kind === 'lamp') {
+                const empties = labels.filter((l) => l.kind === 'empty' && !l.claim);
+                if (!on) ghostLamp = -1;
+                else if (ghostLamp < 0) {
+                    const pickFrom = empties.length ? empties : labels.filter((l) => l.kind === 'room');
+                    ghostLamp = pickFrom.length ? pickFrom[Math.floor(rnd() * pickFrom.length)].cell.slot : -1;
+                }
+                for (const l of labels) {
+                    if (!l.cell) continue;
+                    l.inner.classList.toggle('has-ghost-lamp', l.cell.slot === ghostLamp);
+                }
+                return ghostLamp >= 0;
+            }
+            return false;
+        },
+        /** A flicker over the false things, for the moment a snap clears them. */
+        flickerHallucinations(on) {
+            labelHost.classList.toggle('is-flicker', !!on);
+            if (figure.visible) { figureMat.opacity = on ? 0.2 : 1; hazeMat.opacity = on ? 0.15 : 0.85; }
+        },
+        /** Which empty plates the scene drew a "+" on, for the tests. */
+        emptySlots() { return labels.filter((l) => l.kind === 'empty' && !l.claim).map((l) => l.cell.slot); },
+        /** What the scene hallucinates now, for the tests. */
+        get hallucinating() { return { lamp: ghostLamp, figure: figure.visible, breathe: breatheSlot }; },
         /** A click on the base while the colony sleeps: rigid again, with a soft flash. */
         snap() {
             snapping = { k: 0, from: softNow };
@@ -1516,7 +1633,7 @@ export function createScene(container, opts = {}) {
             outings = [];
             plateMat.dispose(); bodyMat.dispose(); rockMat.dispose(); laneMat.dispose();
             candMat.dispose(); hoverMat.dispose(); leaveGeo.dispose(); leaveMat.dispose();
-            crustMat.dispose(); rubbleMat.dispose(); holeMat.dispose();
+            crustMat.dispose(); rubbleMat.dispose(); holeMat.dispose(); figureMat.dispose(); hazeMat.dispose(); hazeTex.dispose();
             renderer.dispose();
             renderer.domElement.remove();
             labelHost.innerHTML = '';

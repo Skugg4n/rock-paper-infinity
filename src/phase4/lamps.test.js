@@ -158,7 +158,7 @@ describe('no numbers any more, and one demand at a time', () => {
     });
     test('never in the first sleep, never while Surface is there; Surface never while the lamps ask', () => {
         expect(puzzleDue(asleepWatcher({ sleeps: 1 }), { asleep: true })).toBe(false);
-        const w = asleepWatcher({ sleeps: 6 });
+        const w = asleepWatcher({ sleeps: 6, stability: 60 });
         const tier = 2;
         const due = VISIT_AFTER_SECONDS * CRYO[tier].days;
         expect(surfaceDue(w, due, CRYO[tier].days)).toBe(true);

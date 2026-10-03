@@ -99,3 +99,37 @@ export function normalizeLayout(state, saved) {
     }
     return { slots };
 }
+
+/**
+ * deep-rebuild: every room on order gets the empty chamber it will be built in, so the plate it
+ * goes into shows the room (and its ring) at once and no other order takes it. An order that keeps
+ * a chamber still empty keeps it; one with none (or one whose chamber is no longer empty) takes the
+ * first empty chamber nobody has claimed; one that waits for a chamber still being dug keeps -1.
+ * @param {object} state - mutated: the slot on each room order
+ * @param {{slots:(string|null)[]}} layout
+ * @returns {number} how many orders changed their chamber
+ */
+export function claimChambers(state, layout) {
+    const slots = (layout && layout.slots) || [];
+    const claimed = new Set();
+    let moved = 0;
+    const rooms = (state.builds || []).filter((j) => j.kind === 'room');
+    for (const j of rooms) {
+        if (Number.isInteger(j.slot) && j.slot >= 0 && j.slot < slots.length && !slots[j.slot] && !claimed.has(j.slot)) claimed.add(j.slot);
+        else if (j.slot !== -1) { j.slot = -1; moved++; }
+    }
+    for (const j of rooms) {
+        if (j.slot >= 0) continue;
+        const i = slots.findIndex((s, k) => !s && !claimed.has(k));
+        if (i < 0) break;
+        j.slot = i;
+        claimed.add(i);
+        moved++;
+    }
+    return moved;
+}
+/** The chambers dug and empty that no order has claimed: where a "+" stands. */
+export function emptyChambers(state, layout) {
+    const claimed = new Set((state.builds || []).filter((j) => j.kind === 'room' && j.slot >= 0).map((j) => j.slot));
+    return ((layout && layout.slots) || []).map((s, i) => (!s && !claimed.has(i) ? i : -1)).filter((i) => i >= 0);
+}

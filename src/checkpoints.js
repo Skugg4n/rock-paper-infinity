@@ -116,16 +116,16 @@ export const CHECKPOINTS = [
     } },
     { id: 'iv-cryo', label: 'IV · cryo I', apply: () => {
         clearAll();
-        // A colony that runs itself: the rooms are automated, the hall is dug, and the
-        // snowflake starts a sleep of a month a second that runs until an alarm. Day ~400,
-        // which is year 1. Enough people and ore for a scout party, and none out yet.
+        // deep-rebuild: THE LEVER MOMENT. A colony that runs itself: every room automated, the three
+        // lamps of cryo lit, stars enough for Cryo I and one chamber dug and empty. The lever is
+        // there; pulling it buys the hall and the colony goes under. Day ~400, which is year 1.
         const deep = initialDeepState({ salvage: 1500, doom0: 85 });
         Object.assign(deep, {
             day: 400, minerals: 26000, food: 9000, stars: 9.0e4, humans: 16,
-            chambers: 9, rooms: { mine: 3, farm: 2, generator: 2, dorm: 1, cryo: 1 },
+            chambers: 9, rooms: { mine: 3, farm: 2, generator: 2, dorm: 1, cryo: 0 },
             level: { mine: 1, farm: 1, generator: 1, dorm: 0 },
             auto: { mine: 1, farm: 1, generator: 1, dorm: 0 },
-            cryo: 0, feed: impliedFeed(0),     // deep-machine: the machine fed as the run feeds it by Cryo I
+            cryo: -1, feed: impliedFeed(0),     // deep-machine: the machine fed as the run feeds it by Cryo I
         });
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
@@ -151,7 +151,8 @@ export const CHECKPOINTS = [
     { id: 'iv-watcher', label: 'IV · the Watcher', apply: () => {
         clearAll();
         // Deep into the sleeps (v1.46.0): asleep at a century a second, the Watcher named, its
-        // stability at 55 (the base has begun to soften), the machines' capacity full, and a
+        // stability at 48 (deep-rebuild: low enough that a lamp burns in an empty chamber and the
+        // figure stands on the crust; the base has begun to soften), the machines' capacity full, and a
         // riddle a few seconds away. Left alone, the meter reaches zero in about fifty seconds (v1.52.0)
         // and the system reboots.
         const deep = initialDeepState({ salvage: 1500, doom0: 85 });
@@ -165,7 +166,7 @@ export const CHECKPOINTS = [
             cryo: 3, asleep: true, feed: impliedFeed(3),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             watcher: {
-                ...initialWatcher(), stage: 1, stability: 55, capacity: 100, sleptYears: slept, seed: 3, sleeps: 40,
+                ...initialWatcher(), stage: 1, stability: 48, capacity: 100, sleptYears: slept, seed: 3, sleeps: 40,
                 nextPuzzleYears: slept + puzzleGapYears(3) / 4,
             },
         });
@@ -181,6 +182,8 @@ export const CHECKPOINTS = [
         // storage are bought. Its next line is night 4, which opens Quiet hands: Surface has already
         // come in this sleep, so debug_deep('night') brings it now, or it comes by itself in the
         // next sleep, a few seconds in. The stars are there to buy Quiet hands the moment it opens.
+        // deep-rebuild: the mind at 62, under the line Surface needs (watcher.js SURFACE_BELOW), and
+        // low enough for the first hallucination.
         const deep = initialDeepState({ salvage: 1500, doom0: 85 });
         const day = 6000 * DAYS_PER_YEAR;
         const slept = 5800;
@@ -193,7 +196,7 @@ export const CHECKPOINTS = [
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             taken: { mine: 0, farm: 0, generator: 0, dorm: 2 }, takenSlots: [25, 24],
             watcher: {
-                ...initialWatcher(), stage: 1, stability: 70, capacity: 160, sleptYears: slept, seed: 5, sleeps: 40,
+                ...initialWatcher(), stage: 1, stability: 62, capacity: 160, sleptYears: slept, seed: 5, sleeps: 40,
                 nextPuzzleYears: slept + puzzleGapYears(3), saidSpace: true,
                 bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore'],
                 surface: { ...initialSurface(), visits: 6, words: 4, lastSleep: 40, wins: 4, losses: 1, lastYou: 'rock', night: 3, toLine: 0 },
