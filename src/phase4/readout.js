@@ -14,7 +14,7 @@
 import {
     COLUMN, ROOMS, ROOM, ROOM_FOR_COLUMN, tickDay, outputMultiplier, upkeepFor, BIRTH_FOOD,
     FOOD_PER_HUMAN, DAYS_PER_YEAR, MIN_SLEEPERS, CRYO, cryoName, cryoLabel, group, digCost, roomCost,
-    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending, buildEta, CREW_ORDER, ordersDone,
+    freeChambers, sleepTrouble, BAD_ALARMS, MAX_AUTO, buildPending, buildEta, CREW_ORDER, ordersDone, cryoPrice,
 } from './deep.js';
 import { ROOM_WORD, ROOM_WORDS, foodDaysLeft } from './advisor.js';
 
@@ -193,6 +193,21 @@ export function backIn(days) {
     return `${Math.max(1, d)} d`;
 }
 
+/**
+ * RATES PER REAL SECOND (deep-econ, B331). Ola: "The numbers are so big that everything stands
+ * still like still images." Every counter's rate is what the player sees happen in a second: awake
+ * a day is a second; asleep it is the dive's days a second. "+3.5 T a second", "-0.4 a second".
+ * @param {number} v - per real second
+ * @returns {string} '' when it rounds to nothing
+ */
+export function rateText(v) {
+    if (!Number.isFinite(v) || Math.abs(v) < 0.05) return '';
+    const a = Math.abs(v);
+    const n = a < 9.95 ? String(Math.round(a * 10) / 10) : short(a);
+    return `${v >= 0 ? '+' : '-'}${n} a second`;
+}
+/** Under a counter whose store a sleep has filled (deep.js SLEEP_CAP_SECONDS). */
+export const FULL_TEXT = 'store full';
 /** What a tier sleeps in a second, the way a person says it: "a month", "a century". */
 const RATE_WORDS = {
     30: 'a month', 365: 'a year', 3650: 'ten years', 36500: 'a century', 365000: 'a thousand years',
@@ -309,7 +324,7 @@ export function cryoNeed(tier, { state, trouble = null, planned = null, starsPer
         const left = (state.builds || []).reduce((a, j) => Math.max(a, (eta.get(j) ?? state.day) - state.day), 0);
         return { kind: 'wait', short: `ready in ${backIn(left)}`, long: `${name} is ready in ${backIn(left)}: it waits for the orders being built.` };
     }
-    const price = CRYO[tier]?.cost ?? 0;
+    const price = CRYO[tier] ? cryoPrice(state, tier) : 0;
     if ((state.stars || 0) < price) {
         return say('stars', `needs ${short(price)} stars`, affordText({ price, have: state.stars || 0, perDay: starsPerDay }).replace(/\.$/, '').toLowerCase());
     }
@@ -366,7 +381,7 @@ export function cryoRoad(tier, state, { maxSteps = 4000 } = {}) {
             trial.minerals = 1e300;
         } else if (key === 'food') { items.push({ key, text: `food for ${cryoLabel(days)}`, done: false }); trial.food = 1e300; } else break;
     }
-    const price = CRYO[tier].cost;
+    const price = cryoPrice(state, tier);
     items.push({ key: 'stars', text: `★ ${short(price)}`, done: (state.stars || 0) >= price });
     const done = items.filter((x) => x.done).length;
     // deep-copy: in words, "needs generators automated ✓, farms automated (on order) and ★ 15 k"

@@ -2904,3 +2904,93 @@ items:
     status: done
     resolved_in: deep-grow2 (version at merge)
     notes: "persistence.js migration 10, grow.js normalizeGrow; grow2.test.js."
+
+  - id: B330
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      Prices follow income: each upgrade's next level about 30 to 90 s of the current income; long sleeps no longer make everything free. Surface's nights on a schedule of sleeps, a tier gate only where it is said.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "deep.js PRICE_BAND/banded/setIncome/SLEEP_CAP_SECONDS/capYield; tree.js giftPrice; surface.js NIGHTS tiers 0,0,0,2,3,4, VISIT_GAPS 2,2,2,1."
+
+  - id: B331
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      Rates per real second on every counter (awake a day is a second, asleep the dive's pace).
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "readout.js rateText/FULL_TEXT; index.js daysPerSecond."
+
+  - id: B332
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      The tape always names the next goal with what it waits for: SAVE FOR X / ★ N to go; WAKE asleep; SURFACE WAITS FOR CRYO X.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "instruments.js goalOf/adviceNote/adviseAsleep; panel.js note; #deep-advice-note."
+
+  - id: B333
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      The lever pivots in the middle of its slot (ball at the top end up, at the bottom end pulled).
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "index.html .deep-lever-pivot; style-deep.css."
+
+  - id: B334
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      A locked drawer row with a price says the gap on its own line: You need ★ X more.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "instruments.js drawerNeed/gapLine."
+
+  - id: B335
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      A night that came in a sleep is said again on the wake, low, for 6 s; its gift tells the tape what to do.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "index.js recallNight; #deep-recall; instruments.js RECALL_MS."
+
+  - id: B336
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      A graft shows its effect: the room's output before and after in a second, with the ×5.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "graft.js graftEffect; index.js graftedWords."
+
+  - id: B337
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      The snap only asleep: awake a click on a room makes no sound, ring or snap cursor.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "index.js snapBase guard; acceptance Z."
+
+  - id: B338
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      Sim: longest without a decision per movement; the act 25 to 35 min in both views and --watcher.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "scripts/sim-phase4.mjs (idle, simGoal, buyGoal, the 'full' wake)."
+
+  - id: B339
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-econ"
+    request: |
+      Acceptance X Z S G L M in both views, checkpoint IV · a long sleep, econ shots.
+    status: done
+    resolved_in: deep-econ (version at merge)
+    notes: "scripts/accept-iv-cut.mjs; src/checkpoints.js iv-long; docs/playtests/rebuild-shots/econ-*.png."

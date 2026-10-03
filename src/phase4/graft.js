@@ -76,6 +76,31 @@ export function graftWords(s, layout, id) {
     return `Five times the output. Takes ${PEOPLE_SIGN} ${short(graftPeople(s))} of your ${PEOPLE_SIGN} ${short(s.humans || 0)}.`;
 }
 /**
+ * deep-econ (B336): WHAT A GRAFT DID, as a change the player can see: the room's own output as an
+ * ordinary room and as flesh, in a second awake. "Ore 12 k → 60 k a second." A dormitory counts beds.
+ * Read off the day's report: what the rooms of that type made, shared over them, a graft counted
+ * GRAFT_MULT times.
+ * @param {object} s
+ * @param {object} layout
+ * @param {object} report - tickDay's report for the day ahead
+ * @param {string} id - a grafted chamber, or one a graft may go into
+ * @returns {string} '' when the chamber holds no room that makes anything
+ */
+export function graftEffect(s, layout, report, id) {
+    const t = ((layout && layout.slots) || [])[slotOf(id)];
+    if (!ROOMS.includes(t) || !report) return '';
+    const live = (report.live && report.live[t]) || 0;
+    const lone = graftOrgans(s, layout)[t] || 0;          // the extra rooms' worth the grafts make
+    const units = live + lone;
+    if (!(units > 0)) return '';
+    const made = { mine: report.minerals, farm: report.food, generator: report.energyMade, dorm: report.capacity + (report.bodyBeds || 0) }[t];
+    const one = Math.max(0, made || 0) / units;
+    const word = { mine: 'Ore', farm: 'Food', generator: 'Power', dorm: 'Beds' }[t];
+    const tail = t === 'dorm' ? '.' : ' a second.';
+    return `${word} ${short(one)} → ${short(one * GRAFT_MULT)}${tail}`;
+}
+
+/**
  * The player grafts chamber `id`: it turns to flesh; its people walk in.
  * @returns {{id:string, type:string, people:number}|null}
  */

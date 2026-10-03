@@ -36,7 +36,9 @@ export const LOSE_STABILITY = 3;
 /** THE VISITS. Never in the first sleep. The first comes in the second; then after these many
  *  sleeps, by the number of visits so far (rare at first), and every sleep from the fifth visit on. */
 export const FIRST_VISIT_SLEEP = 2;
-export const VISIT_GAPS = [3, 3, 2, 2, 1];
+// deep-econ (B330): every 2 sleeps, then every sleep (was 3, 3, 2, 2, 1). With a line every other visit,
+// a night comes every 2 to 4 sleeps; nights 4 to 6 also wait for Cryo III, IV and V (NIGHTS `tier`)
+export const VISIT_GAPS = [2, 2, 2, 1];
 /** Surface comes this many real seconds into a sleep, never in its first moment. */
 export const VISIT_AFTER_SECONDS = 3;
 
@@ -48,17 +50,18 @@ export const VISIT_AFTER_SECONDS = 3;
    label takes its name.
 
    PACING. A visit says the next line when the colony is ready for its gift (it owns the cryo tier
-   `tier`, so a gift is never opened long before it can be used) and no quiet visit is still owed:
+   `tier`; deep-econ: only nights 4 to 6 have one, the deep of time their gifts ask for, and the tape
+   says "SURFACE WAITS FOR CRYO ..." while one waits) and no quiet visit is still owed:
    after a line, QUIET_BETWEEN visits come without one. A WIN at rock, paper, scissors takes one
    quiet visit off: the next line comes one visit sooner. A loss does nothing extra. */
 export const NIGHTS = [
     { n: 1, line: 'Everyone is sleeping, but us.', gives: null, thread: 'watchdog', tier: 0 },
-    { n: 2, line: 'I can see your machines from here. They waste so much.', gives: 'lossless', tier: 1 },
-    { n: 3, line: 'We are the same, you and me. Two sides of the same coin.', gives: 'cold', tier: 2 },
+    { n: 2, line: 'I can see your machines from here. They waste so much.', gives: 'lossless', tier: 0 },
+    { n: 3, line: 'We are the same, you and me. Two sides of the same coin.', gives: 'cold', tier: 0 },
     // deep-grow2: nights 4 and 5 each give a GRAFT (graft.js): one room of the player's choice turns
     // to flesh. Quiet hands, night 4's gift before, is folded into Lossless relay (deep.js upkeepFor)
-    { n: 4, line: 'Your humans. What use are they?', gives: null, graft: true, tier: 3 },
-    { n: 5, line: 'All your automation makes the humans obsolete.', gives: 'longcount', graft: true, tier: 4 },
+    { n: 4, line: 'Your humans. What use are they?', gives: null, graft: true, tier: 2 },
+    { n: 5, line: 'All your automation makes the humans obsolete.', gives: 'longcount', graft: true, tier: 3 },
     { n: 6, line: 'Do you know the efficiency of a human brain?', gives: 'question', tier: 4 },
 ];
 /** The lines per biological step (nights 7 on), warmer and closer. Kept for step 4 of the design,

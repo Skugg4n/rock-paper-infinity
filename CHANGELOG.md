@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased (deep-econ)
+
+### Chapter IV: prices follow income, nights follow sleeps, rates per second, the gap is shown, the lever pivots in the middle, the snap only asleep, missed nights told on waking (B330 to B339)
+
+Ola's playtest of v1.78.0: "Why can't I buy Cryo?", "They have slept for 1 000 000 years. The last 600 000 years nothing has happened. What is the user expected to do?", "The numbers are so big that everything stands still like still images." docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md, "Built: economy and clarity (deep-econ)".
+
+- **Prices follow income** (B330). From the hall on, every star price of an upgrade (level, automation, feed, culture vats, cryo tier, Surface's gifts) is its old price held inside a band of 35 to 90 seconds of the colony's income (what a real second of sleep brings at its tier, set on each wake and when a tier is bought); one sleep brings at most 200 seconds of income, stars and ore, then the counter reads "store full" and the tape WAKE. Before the hall nothing changes. A save sitting on an absurd stock lands where it can buy again (the income is worked out when it is opened).
+- **Nights follow sleeps** (B330). Surface's visits every 2 sleeps, then every sleep (VISIT_GAPS 2, 2, 2, 1), a line every other visit; nights 1 to 3 wait for no tier, 4 for Cryo III, 5 for Cryo IV, 6 (the question) for Cryo V. A night that waits says so on the tape: "SURFACE WAITS FOR CRYO IV" with "★ 3 T to go".
+- **Rates per real second** (B331). Every counter's rate is what happens in a second: "+3.5 T a second" awake (a day is a second), asleep the dive's pace, in a dream the dream's; the people too, and the rates stay on screen asleep.
+- **The tape always names the next goal** (B332). After the hall, when nothing is bought: "INSTRUMENTS: SAVE FOR CRYO VI" with "★ 2e17 to go" under it, and the lever glows; when it can be paid, "BUY SEAM" (or LONGER SLEEP); asleep the tape stays lit: SAVE FOR, WAKE ("Cryo VI can be bought." or "The store is full."), BUY for a gift. The goal: the question, then an opened gift, then the tier a night waits for, then the cheapest (the next tier when it is within half again of the cheapest level); the first culture vats before all.
+- **The lever pivots in the middle** (B333). The arm turns on a pivot in the middle of its slot: up, the ball at the top end and the stick down to the pivot; pulled, the ball at the bottom end and the stick up to it. SLEEP/WAKE, DREAM/WAKE and RISE alike.
+- **The gap is shown** (B334). A locked drawer row with a price says "You need ★ 2e17 more." on a line of its own, under the ticks of what else it needs.
+- **Missed nights are told on waking** (B335). A night that came in the sleep is said again, low, for six seconds when the colony wakes; its graft makes the tape say GRAFT A ROOM and the rooms glow with "Five times the output. Takes ⚇ N of your ⚇ N.".
+- **A graft shows what it did** (B336). Over a grafted room: "Ore 1.7 k → 8.6 k a second." (a dormitory: "Beds 40 → 200."), shown the moment it is grafted, with the "×5".
+- **The snap only asleep** (B337). Awake, a click on a room makes no sound, no cooldown ring and no snap cursor.
+- **Sim and acceptance** (B338, B339). sim-phase4.mjs reports "longest without a decision" per movement; its player follows the tape after the hall (buys the goal, wakes when it can be paid or the store is full). Strata 26m15s to 33m03s (GROW 20 % to 45 %), 3D 25m57s to 33m03s, --watcher 29m16s to 34m54s; longest without a decision TEND 78 to 43 s, SLEEP 35 to 45 s (58 s --watcher), GROW 28 to 35 s. accept-iv-cut.mjs checks X Z S G L M in both views; new checkpoint "IV · a long sleep" (Ola's save); shots docs/playtests/rebuild-shots/econ-*.png.
+
 ## v1.78.0 - 2026-10-03 (chapter IV, GROW second pass: graft, the question as a choice, feeding, the dream, the heart)
 
 ### Chapter IV, movement III · GROW, second pass: a taste of flesh, the question as a choice, a feeding loop, one choice at a time, the people counter, the body dreams, the heart is pumped (B320 to B329)

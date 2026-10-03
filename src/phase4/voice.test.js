@@ -203,13 +203,17 @@ describe('what the next night waits for (deep-night)', () => {
         expect(nightAhead(s)).toBe(false);
         expect(nightArc(s)).toBe('');
     });
-    test('after night 1 at Cryo I, the next night waits for Cryo II', () => {
+    test('deep-econ: after night 3 at Cryo II, the next night waits for Cryo III; nights 2 and 3 wait only for sleeps', () => {
         const s = colony(0);
         openSurface(s.watcher, s, { force: true });
         s.watcher.surface.visit = null;
-        expect(nightNext(s)).toMatchObject({ kind: 'tier', tier: 1, text: 'Surface waits for Cryo II.' });
-        expect(nightAhead(s)).toBe(true);
+        expect(nightNext(s).kind).toBe('sleep');
         expect(nightArc(s)).toBe('night 1 of 6');
+        s.cryo = 1;
+        openSurface(s.watcher, s, { force: true }); s.watcher.surface.visit = null;
+        openSurface(s.watcher, s, { force: true }); s.watcher.surface.visit = null;
+        expect(nightNext(s)).toMatchObject({ kind: 'tier', tier: 2, text: 'Surface waits for Cryo III.' });
+        expect(nightAhead(s)).toBe(true);
     });
     test('with the tier in hand it counts the sleeps, the quiet visits first, as the game schedules them', () => {
         for (const [visits, lastSleep, sleeps, toLine] of [[1, 2, 2, 1], [1, 2, 4, 0], [3, 10, 12, 1], [6, 20, 20, 0], [6, 20, 21, 1]]) {
