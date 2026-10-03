@@ -322,6 +322,12 @@ happens to them. And nothing on screen says what a flesh room is FOR.
      have." People get a third counter top right beside ore and stars (a person glyph, the
      count, "+N a day" or "-N a day" under it), from TEND on, and the FEED gauge carries
      the number. Every price in people is next to that count.
+   - **One choice at a time.** Ola: "It should come more gradually, not every choice at
+     once." GROW opens with ONE verb: take a chamber. Each next thing appears only when it
+     is needed, the chapter II teaser way: VATS when FEED first falls; APPETITE (how much a
+     chamber eats) after the first necrosis; SPREAD (the flesh takes on its own) after ten
+     chambers by hand; MUSCLE after the first floor is full; the machine's hands when the
+     front reaches the machine house. The drawer never shows a body item before its moment.
 4. **Sim rule:** the scripted player must reach the rise WITHOUT ever being unable to
    act for more than 10 real seconds; the sim reports "longest stuck" for GROW and the
    act stays 25 to 35 minutes.
