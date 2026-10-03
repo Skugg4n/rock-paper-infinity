@@ -353,8 +353,11 @@ function growColony({ body = null, necrotic = [], humans = 2400, organs = null, 
 const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 
 function set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
+/** deep-tension: the player's own settings survive a jump: the sound (a muted player got the music back),
+ *  the debug flag and the chosen view of chapter IV. */
+export const KEEP_KEYS = ['rpi-audio', 'rpi-debug', 'rpi-deep-view'];
 function clearAll() {
-    try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && k !== 'rpi-debug').forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
+    try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && !KEEP_KEYS.includes(k)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
 }
 
 /** Copies every game key (not slots, not the debug flag) into slot i. */

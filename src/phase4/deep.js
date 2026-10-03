@@ -43,11 +43,13 @@ export const POWER_ORDER = ['generator', 'mine', 'farm', 'dorm'];
 export const ROOM = {
     mine:      { out: 12, energy: 4, crew: 3 },
     farm:      { out: 14, energy: 3, crew: 2 },
-    generator: { out: 26, energy: 0, crew: 2, fuel: 1.5 },  // burns minerals
+    generator: { out: 21, energy: 0, crew: 2, fuel: 1.5 },  // burns minerals
     dorm:      { out: 16, energy: 2, crew: 0 },            // BEDS per room: the only room whose
     //                                                        output is not multiplied by its level
 };
 export const FOOD_PER_HUMAN = 1;            // per day
+export const HAND_DIG = 0.25;
+export const AWAKE_SHARE = 0.08;            // deep-tension: awake after the hall, at least this share of a second of sleep a day               // deep-tension: a manual mine without power digs this share by hand
 export const SLEEP_HANDS = 0.5;             // asleep the machines stand in for the hands, but only this well
 export const SLEEP_FOOD = 0.1;              // asleep a body burns this share of a ration: slowly, but it does,
                                             // so a larder without farms behind it runs out under the ice too
@@ -981,9 +983,15 @@ export function ordersDone(s) {
 }
 
 /** Fresh colony: what came down the hole. */
-export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people = 10 } = {}) {
+/** deep-tension: TEND STARTS UPHILL. Sixteen came down, one farm feeds fourteen, the larder holds
+ *  START_FOOD: the FOOD needle falls from the first second and is red inside two minutes unless a farm
+ *  is built (a player who only digs sees it go red); a generator makes 21, so the second and third
+ *  rooms bring POWER down toward the red and a generator is the next thing the colony needs. */
+export const START_PEOPLE = 16;
+export const START_FOOD = 200;
+export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people = START_PEOPLE } = {}) {
     return {
-        day: 0, minerals: salvage, food: 500, stars: 0, humans: people, asleep: false,
+        day: 0, minerals: salvage, food: START_FOOD, stars: 0, humans: people, asleep: false,
         chambers: 4, rooms: { mine: 1, farm: 1, generator: 1, dorm: 1, cryo: 0 },   // v1.48.0: a mine came down too
         level: { mine: 0, farm: 0, generator: 0, dorm: 0 },
         auto: { mine: 0, farm: 0, generator: 0, dorm: 0 },
@@ -1061,7 +1069,9 @@ export function tickDay(s, asleep = false) {
     const energySpare = powerLeft;
     // Flows: a room makes what its crew and its power allow.
     const working = (t) => running(t) * power[t];
-    const mined = working('mine') * ROOM.mine.out;
+    // deep-tension: a mine with its crew and no power digs by hand, slowly: the colony that burnt its
+    // last ore is in trouble, never dead (the generators had nothing to burn, so nothing could be dug)
+    const mined = running('mine') * Math.max(power.mine, s.auto.mine > 0 ? 0 : HAND_DIG) * ROOM.mine.out;
     const grown = working('farm') * ROOM.farm.out;
     s.minerals += mined; s.food += grown;
     // People eat, and grow toward the beds as long as the larder holds. Asleep nobody eats,
@@ -1111,7 +1121,11 @@ export function tickDay(s, asleep = false) {
     // deep-grow: the machine house taken by the body plays with hands, more games for the same energy
     const handsK = s.organs && Number.isFinite(s.organs.games) ? Math.max(0, s.organs.games) : 1;
     const games = gamesFor(fed) * handsK;
-    const stars = starsFor(fed) * handsK;
+    let stars = starsFor(fed) * handsK;
+    // deep-tension: AWAKE IS NOT A MILLION TIMES POORER. From the hall on, awake the machine plays at
+    // least AWAKE_SHARE of what a second of sleep brings (a day awake is a second): the sleep is still the
+    // way, but waking is not a pause in the income (it was 400 000 times less)
+    if (!asleep && (s.cryo ?? -1) >= 0 && !s.grow && s.income && s.income.stars > 0) stars = Math.max(stars, AWAKE_SHARE * s.income.stars);
     s.stars += stars; s.day += 1;
     // What each room actually drew and who actually stood in it. The bars are hovered and have
     // to say where their number came from (Ola: "I buy electricity and BOOM all humans drop"),
@@ -1155,10 +1169,12 @@ export function freeChambers(s) {
 }
 
 /** Can the colony pay for the next purchase that fixes this column: a room, a level or an automation? */
-export function canActOn(s, column) {
+export function canActOn(s, column, { roomOnly = false } = {}) {
     const t = ROOM_FOR_COLUMN[column];
     if (!t) return false;
     if (freeChambers(s) > 0 && !buildPending(s, 'room', t) && s.minerals >= roomCost(t, s.rooms[t] || 0)) return true;
+    // deep-tension: asleep, a next level of the same is no reason to wake anyone (instruments.js isNewKind)
+    if (roomOnly) return false;
     if (!buildPending(s, 'level', t) && s.stars >= nextPrice(s, 'level', t)) return true;
     return !buildPending(s, 'auto', t) && s.stars >= nextPrice(s, 'auto', t);
 }
@@ -1276,7 +1292,7 @@ export function sleep(s, days, opts = {}) {
                 wasAbove = above;
                 // with the Scheduler the Watcher runs the queue itself, and does not wake anyone
                 // for an order while there are more on the books (v1.49.0)
-                if (built.length && !(queueRunsAsleep(s) && (s.builds || []).length) && canActOn(s, r.weakest)
+                if (built.length && !(queueRunsAsleep(s) && (s.builds || []).length) && (s.cryo ?? -1) < 0 && canActOn(s, r.weakest)
                     && s.day - (s.actWokeDay ?? -Infinity) >= actGapDays(s)) {
                     s.actWokeDay = s.day;
                     sum.alarm = { kind: 'act', job: built[built.length - 1], column: r.weakest };

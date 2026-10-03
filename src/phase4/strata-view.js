@@ -1024,7 +1024,10 @@ export function createStrataView(container, opts = {}) {
     }
 
     /* ------------------------------------------------ camera */
-    let ppu = S.MAX_PPU, ppuTarget = S.MAX_PPU, shaftPx = W / 2;
+    let ppu = S.MAX_PPU, ppuTarget = S.MAX_PPU, shaftPx = W / 2, shaftTarget = W / 2;
+    // deep-tension: the drawer covers this much of the right (past the ruler): the colony is framed to
+    // its left, so nothing the panel points to is hidden under it
+    let insetRight = 0;
     let camX = 0, camY = -6, camTarget = -6, homeMode = true, touched = false;
     // deep-swap: sideways. 0 is the shaft in the middle of what the panel and the ruler leave free
     let panX = 0, panTarget = 0, panMax = 0, activeX = null, digsAhead = 0;
@@ -1034,7 +1037,7 @@ export function createStrataView(container, opts = {}) {
     const viewH = () => H / ppu;
     function deepestLine() { return S.floorLine(Math.max(0, floors - 1)); }
     function home() { return lastState && lastState.asleep && !rising ? S.sleepHomeY(viewH(), ppu) : S.homeY(viewH(), floors); }
-    const freeHalf = () => Math.max(100, W - insetLeft - S.RULER_PX - 32) / 2 / ppu;
+    const freeHalf = () => Math.max(100, W - insetRight - insetLeft - S.RULER_PX - 32) / 2 / ppu;
     const lim = { min: 0, max: 0 };
     function limits() {
         S.cameraLimits(viewH(), floors, surface, lim);
@@ -1049,10 +1052,11 @@ export function createStrataView(container, opts = {}) {
     function fit() {
         // the chambers, those being dug and the "+" for the next: all of them fit between the panel and the ruler
         const maxCol = S.widestColumn(Math.max(chambers.length + (growMode ? 0 : digsAhead + 1), 4));
-        const f = S.fitScale(W, insetLeft, maxCol);
+        const f = S.fitScale(W - insetRight, insetLeft, maxCol);
         ppuTarget = zoomOverride || (focusZoom ? Math.max(f.ppu, focusZoom) : f.ppu);
-        shaftPx = f.shaftPx;
-        panMax = S.panLimit(W, insetLeft, maxCol, ppuTarget);
+        shaftTarget = f.shaftPx;
+        if (!built) shaftPx = shaftTarget;
+        panMax = S.panLimit(W - insetRight, insetLeft, maxCol, ppuTarget);
         labelsDirty = true;
     }
     /** deep-swap: where things happen now (the "+" to dig, the body's front): the camera keeps it in view. */
@@ -1102,7 +1106,7 @@ export function createStrataView(container, opts = {}) {
         });
         floors = Math.max(1, ...chambers.map((c) => c.floor + 1));
         fit();
-        if (!built) { built = true; ppu = ppuTarget; camY = camTarget = home(); focusY = deepestLine(); }
+        if (!built) { built = true; ppu = ppuTarget; shaftPx = shaftTarget; camY = camTarget = home(); focusY = deepestLine(); }
         // the shaft, the corridors, the lid: flat rects with a colour each
         const pos = [], col = [];
         const rect = (x0, y0, x1, y1, hex) => {
@@ -2235,6 +2239,7 @@ export function createStrataView(container, opts = {}) {
         // the camera
         if (focusZoom && time.value > focusUntil) { focusZoom = 0; activeX = null; fit(); }
         ppu += (ppuTarget - ppu) * (1 - Math.exp(-dt * 3));
+        shaftPx += (shaftTarget - shaftPx) * (1 - Math.exp(-dt * 5));
         if (homeMode && !rising) camTarget = home();
         // sideways: back to the shaft when everything fits, else keep where things happen in view
         if (rising) panTarget = 0;
@@ -2284,6 +2289,7 @@ export function createStrataView(container, opts = {}) {
         rtGhost.setSize(W * dpr, H * dpr);
         fit();
         ppu = ppuTarget;
+        shaftPx = shaftTarget;
         labelsDirty = true;
     }
 
@@ -2387,6 +2393,13 @@ export function createStrataView(container, opts = {}) {
             const r = cv.getBoundingClientRect();
             if (p.x < r.left + 4 || p.x > r.right - 4 || p.y < r.top + 4 || p.y > r.bottom - 4) return null;
             return p;
+        },
+        /** deep-tension: the drawer is open over `px` on the right (0: closed): the colony moves left of it. */
+        setInsetRight(px) {
+            const next = Math.max(0, (px || 0) - S.RULER_PX);
+            if (Math.abs(next - insetRight) < 1) return;
+            insetRight = next;
+            fit();
         },
         /** The camera eases to the floor of the body's front, unless the player holds it. */
         focusFloor(floor) {
@@ -2507,6 +2520,7 @@ export function createStrataView(container, opts = {}) {
             zoomOverride = zoomPpu || 0;
             fit();
             ppu = ppuTarget;
+            shaftPx = shaftTarget;
             if (y == null) { homeMode = true; return; }
             homeMode = false; camTarget = y; camY = y;
         },
@@ -2537,6 +2551,7 @@ export function extendHooks(base, view) {
         markChamber: (id, on, from) => base.markChamber(id, on, from),
         clearMarks: () => base.clearMarks(),
         floatText: (id, text, cls) => base.floatText(id, text, cls),
+        callChamber: (id) => base.callChamber(id),
         get marks() { return base.marks; },
         // deep-swap (B294): the rest of the body's contract. The view steps its own flesh in its own
         // step(); the hooks' step hands it the machine's throws, so the hands keep its rhythm
@@ -2574,6 +2589,7 @@ function injectStyle() {
 .strata-label::after { content: ''; position: absolute; right: 0; top: 6px; width: 24px; height: 1px; background: rgba(213,219,227,0.5); }
 .strata-label.is-zero { color: #d5dbe3; opacity: 0.88; }
 .strata-label.is-gone { opacity: 0.12; text-decoration: line-through; }
+#phase-deep.is-grow:not(.is-rising) .strata-label, #phase-deep.is-grow .strata-up { visibility: hidden; }
 .strata-up { position: absolute; top: 12px; right: 74px; color: #d5dbe3; opacity: 0.85; letter-spacing: 0.2em; white-space: nowrap; }
 `;
     document.head.appendChild(st);

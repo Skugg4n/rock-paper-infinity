@@ -246,6 +246,8 @@ export function createPanel(els) {
             }
             els.lamps.hidden = !lamps;
         },
+        /** deep-tension: the player acted: the next word may come at once (it held DIG while a dig ran). */
+        releaseHold() { advice.at = -Infinity; },
         /** The advice as it reads now (tests). */
         get advice() { return advice.word; },
         /** The line under it as it reads now (tests). */

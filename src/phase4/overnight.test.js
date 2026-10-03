@@ -121,6 +121,7 @@ describe('people and rewards have weight', () => {
     test('a lost party is mourned: nobody is born for a colony year, then the creches run again', () => {
         const t = start();
         t.food = 1e6;
+        t.rooms.dorm += 1; t.rooms.farm += 1;   // deep-tension: sixteen fill the first dormitory and eat the farm: room and food to be born into
         t.probes = [{ sentDay: 0, dueDay: 0, people: 4 }];
         // on day 0 the odds are 40 % a reading, 40 % lost: a roll of 0.5 is a party lost
         const [l] = resolveDueProbes(t, [], () => 0.5);

@@ -138,17 +138,20 @@ describe('every take is a choice of organ', () => {
 });
 
 describe('pumping takes chambers', () => {
-    test('a pump fills the take a visible step: on the beat four times off it; with no take the guts make mass', () => {
+    test('deep-tension: the pump is a drum: on the beat a step, off it nothing (MISS); three to five on the beat take a chamber', () => {
         const { s, layout } = begun();
-        const t = startTake(s, layout, 's0', 'gut');
+        startTake(s, layout, 's0', 'gut');
+        const off = pump(s, layout, { beat: false });
+        expect(off.fill).toBe(0);
+        expect(off.miss).toBe(true);
         const on = pump(s, layout, { beat: true });
         expect(on.to).toEqual(['s0']);
-        const off = pump(s, layout, { beat: false });
-        expect(on.fill / off.fill).toBeCloseTo(4);
-        expect(s.grow.take.done).toBeCloseTo(on.fill + off.fill);
-        let n = 2;
+        expect(on.fill).toBeGreaterThan(0);
+        expect(s.grow.take.done).toBeCloseTo(on.fill);
+        let n = 1;
         while (taking(s)) { pump(s, layout, { beat: true }); n++; }
-        expect(n).toBeLessThan(t.work);                                 // a handful of pumps, not dozens
+        expect(n).toBeGreaterThanOrEqual(3);
+        expect(n).toBeLessThanOrEqual(5);
         const m = s.grow.mass;
         const free = pump(s, layout, { beat: true });
         expect(free.mass).toBeGreaterThan(0);
@@ -166,7 +169,7 @@ describe('pumping takes chambers', () => {
         while (taking(b.s) && pumped < 1000) {
             stepGrow(b.s, b.layout, 1);
             pumped++;
-            for (; k * PUMP_EVERY_S <= pumped; k++) pump(b.s, b.layout, { beat: k % 2 === 0 });
+            for (; k * PUMP_EVERY_S <= pumped; k++) pump(b.s, b.layout, { beat: k % 5 !== 4 });
         }
         expect(t.work).toBeGreaterThan(0);
         expect(alone).toBeGreaterThan(3 * pumped);
@@ -178,7 +181,9 @@ describe('pumping takes chambers', () => {
         startTake(a.s, a.layout, 's2', 'vat');
         b.s.grow.mass = 1e6;
         startTake(b.s, b.layout, 's4', 'vat');
-        expect(pump(b.s, b.layout, { beat: true }).fill).toBeGreaterThan(pump(a.s, a.layout, { beat: true }).fill);
+        // deep-tension: per unit of pace (three more organs ask more of the body)
+        const per = (x) => pump(x.s, x.layout, { beat: true }).fill / bodyRatios(x.s, x.layout).speed;
+        expect(per(b)).toBeGreaterThan(per(a));
     });
 });
 
@@ -205,7 +210,13 @@ describe('the four gauges are the four organs', () => {
     });
     test('the lamps of the rise as counts', () => {
         const { s, layout } = begun();
-        expect(riseLamps(s, layout).map((l) => l.label)).toEqual(['DEEPEST FLOOR 0 / 9', 'MACHINE 0 / 1']);
+        // deep-tension: the floors full, counted (it read "DEEPEST FLOOR 0 / 12" with floor 1 full)
+        const [floors, machine] = riseLamps(s, layout).map((l) => l.label);
+        expect(floors).toMatch(/^FLOORS 0 \/ [1-9]\d*$/);
+        expect(machine).toBe('MACHINE 0 / 1');
+        s.grow.mass = 1e9;
+        for (const n of graphOf(layout).nodes.filter((x) => x.floor === 0 && x.id !== 'h0')) takeChamber(s, layout, n.id, { organ: 'heart' });
+        expect(riseLamps(s, layout)[0].label).toMatch(/^FLOORS 1 \//);
     });
 });
 
@@ -219,7 +230,7 @@ describe('the hunger is a slope with a way back', () => {
         expect(y.died.length).toBe(1);
         expect(bodyRatios(s, layout).ratios.E).toBeLessThan(1.05);
         // grow two of the living vats into hearts: the reach comes back and the dead revive
-        for (const id of s.grow.body.filter((x) => s.grow.organs[x] === 'vat' && !s.grow.necrotic.includes(x)).slice(0, 2)) s.grow.organs[id] = 'heart';
+        for (const id of s.grow.body.filter((x) => s.grow.organs[x] === 'vat' && !s.grow.necrotic.includes(x)).slice(0, 3)) s.grow.organs[id] = 'heart';
         let back = [];
         for (let i = 0; i < 20 && !back.length; i++) back = stepGrow(s, layout, 1).revived;
         expect(back.length).toBe(1);

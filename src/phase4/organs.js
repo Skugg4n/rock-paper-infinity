@@ -37,17 +37,17 @@ export const ORGAN_NAME = { vat: 'VAT', gut: 'GUT', heart: 'HEART', nerve: 'NERV
 /** Which gauge each organ fills, and back. */
 export const ORGAN_GAUGE = { gut: 'M', vat: 'F', heart: 'E', nerve: 'H' };
 export const GAUGE_ORGAN = { M: 'gut', F: 'vat', E: 'heart', H: 'nerve' };
-/** What each does, in one short line (the ring's hover). */
+/** What each does, in one short line (the ring's hover). deep-tension: each says what it costs too. */
 export const ORGAN_DOES = {
-    vat: 'Grows people.',
-    gut: 'Turns rock into mass.',
-    heart: 'Feeds the edge. Pumps harder.',
-    nerve: 'Takes fill faster.',
+    vat: 'Grows people. Eats mass.',
+    gut: 'Turns rock into mass. The only one that does.',
+    heart: 'Reaches the edge. Pumps harder.',
+    nerve: 'Every pump counts for more.',
 };
 /** The organ the room's old function makes cheap. */
 export const CHEAP_FOR = { dorm: ['vat'], mine: ['gut'], generator: ['heart'], farm: ['vat', 'gut'], cryo: ['nerve'] };
-/** A cheap organ costs this share of the price. */
-export const CHEAP = 0.4;
+/** A cheap organ costs this share of the price. deep-tension: a temptation, not the answer. */
+export const CHEAP = 0.5;
 /** Growing an organ again into another costs this share of a take there. */
 export const REGROW = 0.6;
 export const cheapOrgans = (type) => CHEAP_FOR[type] || [];
@@ -61,49 +61,66 @@ export const SUPPLY_FLOOR = 1.35;
 export const FULL_FLOOR = 1.5;
 /** The machine house as hands asks this much of the body. */
 export const MACHINE_DEMAND = 2;
-/** One organ of a kind gives this much against one unit of size: one in four is a little more than enough. */
+/** One organ of a kind gives this much against one unit of size. deep-tension: a heart reaches two
+ *  and a half (more than one organ in three must be a heart where the floors ask more), a nerve speeds four. */
 export const ORGAN_K = 4;
+export const HEART_K = 2.5;
+export const NERVE_K = 4;
 /** The lid gives this much reach (PULSE) and this much speed (FLESH) by itself: a small body is green. */
-export const LID_REACH = 7;
-export const LID_NERVE = 5;
+export const LID_REACH = 5;
+export const LID_NERVE = 4;
 /** The weakest gauge sets the pace of every take; never slower than this. */
-export const PACE_MIN = 0.3;
+export const PACE_MIN = 0.2;
 
 /** A take costs this much MASS on floor 0 ... */
-export const TAKE_MASS = 14;
-/** ... times this for every chamber taken before it ... */
-export const TAKE_STEP = 1.035;
+export const TAKE_MASS = 12;
+/** ... times this for every chamber taken before it (the price grows with the body) ... */
+export const TAKE_STEP = 1.05;
 /** ... times this a floor down ... */
-export const TAKE_FLOOR = 1.8;
+export const TAKE_FLOOR = 1.6;
 /** ... and the machine house this many times. */
 export const TAKE_MACHINE = 3;
-/** A take needs this much WORK (a pump on the beat with one heart is 2) on floor 0 ... */
-export const TAKE_WORK = 32;
+/** A take needs this much WORK (a pump on the beat with one heart is 3) on floor 0: four pumps on the beat ... */
+export const TAKE_WORK = 13;
 /** ... times this a floor down, and the machine house this many times. */
 export const WORK_FLOOR = 1.35;
 export const WORK_MACHINE = 2;
 /** A regrow needs this share of a take's work. */
 export const REGROW_WORK = 0.5;
 
-/** THE PUMP. One pump fills this much work; on the beat it counts PUMP_ON_BEAT, off it PUMP_OFF_BEAT. */
-export const PUMP_STEP = 2;
-export const PUMP_ON_BEAT = 2;
-export const PUMP_OFF_BEAT = 0.5;
+/** THE PUMP IS A DRUM (deep-tension). One pump fills PUMP_STEP of work times PUMP_ON_BEAT on the beat
+ *  and PUMP_OFF_BEAT off it: off the beat it does nothing and breaks the streak. */
+export const PUMP_STEP = 1;
+export const PUMP_ON_BEAT = 3;
+export const PUMP_OFF_BEAT = 0;
+/** THE SURGE: every pump on the beat in a row adds SURGE_STEP to every pump after it, up to SURGE_MAX
+ *  pumps in a row; a pump off the beat, or SURGE_IDLE_S seconds without one, ends it. It carries from
+ *  one take into the next. */
+export const SURGE_STEP = 0.12;
+export const SURGE_MAX = 5;
+export const SURGE_IDLE_S = 3;
+export const surgeOf = (streak) => 1 + SURGE_STEP * Math.max(0, Math.min(SURGE_MAX, streak || 0));
 /** Each heart beyond the lid makes a pump this much stronger, up to PUMP_HEARTS_MAX times. */
 export const PUMP_PER_HEART = 0.12;
 export const PUMP_HEARTS_MAX = 1.8;
-/** Left alone, awake, a take fills by itself this much work a second at full pace (a player pumping a
- *  pump every second and a half, half of them on the beat, fills about five times that). */
+/** Left alone, awake, a take fills by itself this much work a second at full pace (a drummer fills about
+ *  ten times that). */
 export const TRICKLE = 0.3;
 /** Dreaming, this much a second (the idle player still grows; the active one is clearly faster). */
 export const DREAM_TRICKLE = 1.0;
 
-/** A gut makes this much mass a second on floor 0 (one gut pays a take in about ten seconds). */
-export const GUT_MASS = 0.4;
-/** The lid makes this much mass a second by itself. */
-export const LID_MASS = 0.22;
+/** A gut makes this much mass a second on floor 0. deep-tension: the guts are the ONLY source. */
+export const GUT_MASS = 0.19;
+/** The lid makes this much mass a second by itself (deep-tension): barely anything, but never nothing, so
+ *  a body that spent its mass on vats is slow to come back, not stuck. The vats never eat the lid's. */
+export const LID_MASS = 0.1;
+/** deep-tension: every living vat eats this much mass a second (times what it asks a floor down). */
+export const VAT_MASS = 0.12;
 /** A pump with no take in progress sends the blood to the guts: this many seconds of their mass. */
-export const PUMP_MASS_S = 1.2;
+export const PUMP_MASS_S = 0.35;
+/** deep-tension: and on the beat the blood brings this much mass by itself (a young body with one gut
+ *  drummed ten times for one take in the play pass) times the surge. */
+export const PUMP_MASS_FLAT = 0;
 
 /* ------------------------------------------------------------------ reading the body */
 /** Every node of the graph by id (cached per graph). */
@@ -143,7 +160,7 @@ export function bodySums(graph, st) {
     const full = fullFloors(graph, st);
     const give = { vat: 0, gut: 0, heart: 0, nerve: 0 };
     const count = { vat: 0, gut: 0, heart: 0, nerve: 0 };
-    let size = 0;
+    let size = 0, vatAsk = 0;
     for (const id of st.body) {
         if (isNecrotic(st, id)) continue;
         const n = nodeOf(graph, id);
@@ -153,15 +170,22 @@ export function bodySums(graph, st) {
         size += demandOf(n);
         const o = organOf(graph, st, id);
         if (ORGANS.includes(o)) { give[o] += supplyOf(n, full); count[o]++; }
+        if (o === 'vat') vatAsk += demandOf(n);
     }
-    return { size, give, count, full };
+    return { size, give, count, full, vatAsk };
 }
 /** PULSE: the hearts' reach over the body's size (1: every organ is fed to the edge). */
-export function pulseRatio(sums) { return (LID_REACH + ORGAN_K * sums.give.heart) / Math.max(1, sums.size); }
+export function pulseRatio(sums) { return reachOf(sums) / Math.max(1, sums.size); }
+/** What the hearts can carry: the lid and HEART_K for each heart. */
+export const reachOf = (sums) => LID_REACH + HEART_K * sums.give.heart;
 /** FLESH: the nerves' speed over the body's size. */
-export function nerveRatio(sums) { return (LID_NERVE + ORGAN_K * sums.give.nerve) / Math.max(1, sums.size); }
-/** The mass the body makes a second: the guts (times MUSCLE's `muscle`) and the lid. */
-export function massRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle; }
+export function nerveRatio(sums) { return (LID_NERVE + NERVE_K * sums.give.nerve) / Math.max(1, sums.size); }
+/** The mass the guts make a second (times MUSCLE's `muscle`), before the vats eat theirs. */
+export function gutRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle; }
+/** What the living vats eat of it a second. */
+export function vatMass(sums) { return VAT_MASS * (sums.vatAsk || 0); }
+/** The mass the body gains a second: the guts' less the vats' (it can be below zero). */
+export function massRate(sums, muscle = 1) { return gutRate(sums, muscle) - vatMass(sums); }
 /** The pace of a take: the weakest of the four ratios, never under PACE_MIN, never over 1. */
 export const paceOf = (ratios) => Math.max(PACE_MIN, Math.min(1, ...Object.values(ratios)));
 /** Nerves to spare (FLESH over 1) make every take quicker still: up to NERVE_SPEED more at FLESH 2. */
@@ -182,7 +206,7 @@ export const heartPump = (sums) => Math.min(PUMP_HEARTS_MAX, 1 + PUMP_PER_HEART 
  * house never starve this way. @returns {string[]} ids, farthest first
  */
 export function beyondReach(graph, st, sums, dist) {
-    const cap = LID_REACH + ORGAN_K * sums.give.heart;
+    const cap = reachOf(sums);
     let over = sums.size - cap;
     if (over <= 1e-9) return [];
     const living = st.body.filter((id) => !isNecrotic(st, id) && id !== HEART && id !== MACHINE && nodeOf(graph, id)?.kind === 'room');
@@ -199,7 +223,7 @@ export function beyondReach(graph, st, sums, dist) {
 export function fitsReach(graph, sums, id) {
     const n = nodeOf(graph, id);
     if (!n) return false;
-    return sums.size + demandOf(n) <= LID_REACH + ORGAN_K * sums.give.heart + 1e-9;
+    return sums.size + demandOf(n) <= reachOf(sums) + 1e-9;
 }
 
 /* ------------------------------------------------------------------ prices and work */
@@ -223,9 +247,9 @@ export function takeWork(graph, id, { regrow = false } = {}) {
     const w = TAKE_WORK * Math.pow(WORK_FLOOR, Math.max(0, n.floor)) * (n.kind === 'machine' ? WORK_MACHINE : 1);
     return regrow ? w * REGROW_WORK : w;
 }
-/** What one pump fills: the beat, the hearts, the pace. */
-export function pumpFill({ beat = false, hearts = 1, pace = 1 } = {}) {
-    return PUMP_STEP * (beat ? PUMP_ON_BEAT : PUMP_OFF_BEAT) * hearts * pace;
+/** What one pump fills: the beat, the hearts, the pace, the surge. */
+export function pumpFill({ beat = false, hearts = 1, pace = 1, surge = 1 } = {}) {
+    return PUMP_STEP * (beat ? PUMP_ON_BEAT : PUMP_OFF_BEAT) * hearts * pace * surge;
 }
 /** What a second fills by itself: awake (TRICKLE) or dreaming (DREAM_TRICKLE); `spread` is SPREAD's factor. */
 export function trickleFill({ pace = 1, dreaming = false, spread = 1 } = {}) {

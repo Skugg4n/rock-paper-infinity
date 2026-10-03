@@ -52,7 +52,7 @@ describe('the deep', () => {
         expect(r.fed).toBeCloseTo(r.parts.E * feedShare(0), 9);
         expect(r.games).toBeCloseTo(gamesFor(r.fed), 9);
         expect(r.stars).toBeCloseTo(r.games * WIN_ODDS, 9);
-        const noMine = initialDeepState(); noMine.rooms.mine = 0;
+        const noMine = initialDeepState({ people: 10 }); noMine.rooms.mine = 0;
         const n = tickDay(noMine);
         expect(n.parts.M).toBeLessThan(0);
         expect(n.weakest).toBe('M');                     // the smallest column is still read

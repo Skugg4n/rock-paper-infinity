@@ -5,7 +5,7 @@
  */
 import {
     initialDeepState, sleep, sleepTrouble, troubleIn, tickDay, CRYO, DAYS_PER_YEAR, MIN_SLEEPERS,
-    FOOD_ALARM_DAYS, ACT_WAKE_GAP_DAYS, startBuild, launchProbe, probeOdds, PROBE_OUTCOMES,
+    FOOD_ALARM_DAYS, startBuild, launchProbe, probeOdds, PROBE_OUTCOMES,
     estimateNow, estimateOpensDay, habitableYear, END_YEAR, RESURFACE_AT, surface, cryoDeathRate,
     CRYO_DEATH_PER_YEAR, CRYO_DEATH_DORM, SLEEP_FOOD, repairTick, REPAIR_DAYS, darkenChamber,
     scoutParty, levelCost, BED_FILL,
@@ -114,21 +114,15 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         expect(alarmLine({ kind: 'manual' })).toBe('Woke: the hall was opened by hand.');
     });
 
-    test('an order done with the next one paid for wakes the colony, at most once a decade', () => {
+    test('deep-tension: an order done wakes nobody: the long sleep wakes for something new (instruments.js)', () => {
         const s = automated();
         s.stars = 1e12;                              // anything for the weakest column is paid for
+        s.chambers += 3; s.minerals = 1e12;
         startBuild(s, 'level', { type: 'mine' });
         const sum = sleep(s, 365, { alarms: true });
-        expect(sum.alarm.kind).toBe('act');
-        expect(alarmLine(sum.alarm)).toBe('Woke: the mines are levelled, and the next one is paid for.');
-        // a second order a few days later lands without waking anyone
-        startBuild(s, 'level', { type: 'farm' });
-        const again = sleep(s, 365, { alarms: true });
-        expect(again.alarm).toBeNull();
-        expect(s.level.farm).toBe(2);
-        s.day += ACT_WAKE_GAP_DAYS;
-        startBuild(s, 'level', { type: 'farm' });
-        expect(sleep(s, 365, { alarms: true }).alarm.kind).toBe('act');
+        expect(sum.alarm).toBeNull();
+        expect(s.level.mine).toBe(2);
+        expect(alarmLine({ kind: 'act', job: { kind: 'level', type: 'mine' } })).toBe('Woke: the mines are levelled, and the next one is paid for.');
     });
 
     test('the estimate crossing the line wakes the colony, on the day it crosses', () => {
@@ -267,6 +261,7 @@ describe('people: the ice takes some, the scouts take some, the awake mend', () 
     test('deep-fix2: new beds fill a share at a time: the people grow into them over weeks, never in a day', () => {
         const s = automated();
         s.humans = 400; s.rooms.dorm = 60; s.food = 1e9; s.vats = 0;
+        s.rooms.generator += 4;              // deep-tension: a generator makes 21: the beds need the power
         const beds = tickDay(JSON.parse(JSON.stringify(s))).capacity;
         expect(beds - s.humans).toBeGreaterThan(100);
         const day1 = tickDay(s).born;

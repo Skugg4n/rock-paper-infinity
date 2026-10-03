@@ -19,7 +19,7 @@ import { foodDaysLeft } from './advisor.js';
 import { stocks, short, ORE_SIGN, cryoRoad, list } from './readout.js';
 import {
     NODES, NODE_BY_ID, canBuy, orderedOf, levelOf, nodeVisible, stateLine, priceOf, opened, cryoNode, displayName,
-    nightNext,
+    nightNext, buy as treeBuyFor,
 } from './tree.js';
 
 /* ---- THE GAUGES ---------------------------------------------------------------------------
@@ -103,15 +103,21 @@ export const ADVICE = {
     save: (name) => `SAVE FOR ${name}`,
     wake: 'WAKE',
     surfaceWaits: (tier) => `SURFACE WAITS FOR ${cryoName(tier).toUpperCase()}`,
+    // deep-tension: the level-ups that queued in a sleep, bought in one click
+    levels: (n) => `BUY ${n} LEVELS`,
+    ready: (n) => (n === 1 ? 'A LEVEL READY' : `${n} LEVELS READY`),
 };
 /** The label holds a word at least this long before it may change. */
 export const ADVICE_HOLD_MS = 4000;
 
-/** A room of this type ordered or dug toward: BUILD it, or DIG for a chamber to put it in. */
+/** A room of this type ordered or dug toward: BUILD it, or DIG for a chamber to put it in. deep-tension:
+ *  only when the ore is there (the tape never names what cannot be done; it said DIG with no ore). */
 function buildOrDig(state, t) {
-    if (freeChambers(state) > 0) return buildPending(state, 'room', t) ? null : ADVICE.build(t);
-    return buildPending(state, 'dig') ? null : ADVICE.dig;
+    if (freeChambers(state) > 0) return buildPending(state, 'room', t) || (state.minerals || 0) < nextPrice(state, 'room', t) ? null : ADVICE.build(t);
+    return buildPending(state, 'dig') || (state.minerals || 0) < nextPrice(state, 'dig') ? null : ADVICE.dig;
 }
+/** deep-tension: what an automation is called when the tape saves for it: "GENERATOR AUTOMATION". */
+const AUTO_NAME = { mine: 'MINE AUTOMATION', farm: 'FARM AUTOMATION', generator: 'GENERATOR AUTOMATION', dorm: 'DORMITORY AUTOMATION' };
 
 /**
  * The instruments' word for now.
@@ -131,7 +137,7 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
         const [c, x] = red;
         if (c === 'H') {
             const t = x.room;
-            if (t && !((state.auto[t] || 0) > 0) && !buildPending(state, 'auto', t)) return ADVICE.automate(t);
+            if (t && !((state.auto[t] || 0) > 0) && !buildPending(state, 'auto', t) && (state.stars || 0) >= nextPrice(state, 'auto', t)) return ADVICE.automate(t);
             const w = buildOrDig(state, 'dorm');
             if (w) return w;
         } else {
@@ -144,16 +150,29 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
     if (state.graft && state.graft.owed > 0 && !state.grow) return ADVICE.graft;
     // 2. the lever is there: the goal
     if (state.cryo < 0 && lever) return ADVICE.sleep;
+    // deep-tension: after the hall, something NEW that can be paid (what the colony woke for) comes before
+    // the ore's DIG and BUILD (it woke for the culture vats and the tape said DIG)
+    if (state.cryo >= 0 && !state.grow) {
+        const g0 = goalOf(state, { road, onlyNew: true });
+        if (g0 && g0.gap <= 0 && canBuy(state, g0.id, { road, asleep: false }).ok) return g0.id === cryoNode(state.cryo + 1) ? ADVICE.longer : ADVICE.buy(g0.name);
+    }
     // 3. ore for a room of the weakest kind, or for a chamber
     const t = ROOM_FOR_COLUMN[report.weakest] || 'mine';
     if (freeChambers(state) > 0) {
         if (!buildPending(state, 'room', t) && state.minerals >= nextPrice(state, 'room', t)) return ADVICE.build(t);
     } else if (!buildPending(state, 'dig') && state.minerals >= nextPrice(state, 'dig')) return ADVICE.dig;
-    // 4. before the hall: the road to Cryo I, in order
+    // 4. before the hall: the road to Cryo I, in order. deep-tension: an automation the stars cannot pay
+    // yet is SAVED FOR (with the gap under it), never asked for
+    let saveFor = null;
     if (state.cryo < 0 && road) {
         for (const item of road.items) {
             if (item.done || item.ordered) continue;
-            if (item.key.startsWith('auto-')) return ADVICE.automate(item.key.slice(5));
+            if (item.key.startsWith('auto-')) {
+                const t = item.key.slice(5);
+                if ((state.stars || 0) >= nextPrice(state, 'auto', t)) return ADVICE.automate(t);
+                saveFor = saveFor || ADVICE.save(AUTO_NAME[t]);
+                continue;
+            }
             if (item.key === 'food') { const w = buildOrDig(state, 'farm'); if (w) return w; }
             if (item.key === 'energy') { const w = buildOrDig(state, 'generator'); if (w) return w; }
             if (item.key === 'ore') { const w = buildOrDig(state, 'mine'); if (w) return w; }
@@ -163,13 +182,21 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
     if (opened(state, 'question') && levelOf(state, 'question') < 1 && canBuy(state, 'question', { asleep: false }).ok) return ADVICE.question;
     // 5. after the hall, the first culture vats, when they can be paid: asleep nobody else is born
     if (state.cryo >= 0 && vatsLevel(state) < 1 && (state.stars || 0) >= vatsPrice(state)) return ADVICE.vats;
-    // 6. the machine, when a level of feed can be paid
-    if ((state.feed || 0) < FEED_MAX && (state.stars || 0) >= feedPrice(state)) return ADVICE.feed;
+    // 6. the machine, when a level of feed can be paid (before the hall: only while nothing is saved for)
+    if ((state.feed || 0) < FEED_MAX && (state.stars || 0) >= feedPrice(state) && !saveFor) return ADVICE.feed;
+    if (saveFor) return saveFor;
+    // deep-tension: before the hall with every lamp lit but the price: SAVE FOR CRYO I, the gap under it
+    if (state.cryo < 0 && road && road.items.every((x) => x.done || x.key === 'stars')) return ADVICE.save('CRYO I');
     if (state.cryo >= 0) {
         // deep-econ (B332): THE NEXT GOAL, always named. Bought when it can be; else saved for (the
         // lever glows: a sleep is how stars come in); a night that waits for a tier says so
         const goal = goalOf(state, { road });
-        if (goal && goal.gap <= 0 && canBuy(state, goal.id, { road, asleep: false }).ok) return goal.id === cryoNode(state.cryo + 1) ? ADVICE.longer : ADVICE.buy(goal.name);
+        const payable = goal && goal.gap <= 0 && canBuy(state, goal.id, { road, asleep: false }).ok;
+        if (payable && isNewKind(state, goal.id)) return goal.id === cryoNode(state.cryo + 1) ? ADVICE.longer : ADVICE.buy(goal.name);
+        // deep-tension: the levels the stars pay for, in one click
+        const ready = levelsReady(state).n;
+        if (ready > 1) return ADVICE.levels(ready);
+        if (payable) return goal.id === cryoNode(state.cryo + 1) ? ADVICE.longer : ADVICE.buy(goal.name);
         const wait = nightNext(state, { asleep: false });
         if (wait && wait.kind === 'tier') return ADVICE.surfaceWaits(wait.tier);
         if (goal) return ADVICE.save(goal.name);
@@ -202,7 +229,7 @@ export function rowName(n) {
  * @returns {{id:string, name:string, price:number, gap:number}|null} null before the hall, in the body,
  *          or when nothing is left to buy with stars
  */
-export function goalOf(state, { road = null, cryoReady } = {}) {
+export function goalOf(state, { road = null, cryoReady, onlyNew = false } = {}) {
     if (!((state.cryo ?? -1) >= 0) || state.grow) return null;
     const stars = state.stars || 0;
     const of = (id) => {
@@ -230,6 +257,8 @@ export function goalOf(state, { road = null, cryoReady } = {}) {
     let best = null;
     for (const n of NODES) {
         if (!['level', 'auto', 'feed', 'vats'].includes(n.kind) || !nodeVisible(state, n.id)) continue;
+        // deep-tension: asleep the tape wakes only for something new, never the next level of the same
+        if (onlyNew && !isNewKind(state, n.id)) continue;
         const can = canBuy(state, n.id, { asleep: false });
         if (!can.ok && can.kind !== 'afford') continue;
         const g = of(n.id);
@@ -251,8 +280,15 @@ export function goalOf(state, { road = null, cryoReady } = {}) {
 export function adviceNote(state, word, ctx = {}) {
     if (!word) return '';
     if (word.startsWith('SAVE FOR ')) {
-        const goal = goalOf(state, ctx);
-        return goal && goal.gap > 0 ? `★ ${short(goal.gap)} to go` : '';
+        // deep-tension: before the hall, an automation or Cryo I's price
+        const name = word.slice('SAVE FOR '.length);
+        const t = Object.keys(AUTO_NAME).find((k) => AUTO_NAME[k] === name);
+        const before = t ? nextPrice(state, 'auto', t) : name === 'CRYO I' && (state.cryo ?? -1) < 0 ? priceOf(state, cryoNode(0))?.stars : null;
+        if (before) { const gap = before - (state.stars || 0); return gap > 0 ? `★ ${short(gap)} to go` : ''; }
+        const goal = [goalOf(state, ctx), goalOf(state, { ...ctx, onlyNew: true })].find((g) => g && word === ADVICE.save(g.name));
+        const ready = state.asleep ? levelsReady(state).n : 0;
+        const parts = [goal && goal.gap > 0 ? `★ ${short(goal.gap)} to go` : '', ready > 1 ? `${ready} levels ready` : ''].filter(Boolean);
+        return parts.join(' · ');
     }
     if (word.startsWith('SURFACE WAITS FOR ')) {
         const wait = nightNext(state, { asleep: !!state.asleep });
@@ -262,7 +298,7 @@ export function adviceNote(state, word, ctx = {}) {
     }
     if (word === ADVICE.wake) {
         if (sleepFull(state)) return 'The store is full.';
-        const goal = goalOf(state, ctx);
+        const goal = goalOf(state, { ...ctx, onlyNew: true });
         return goal ? `${displayName(goal.id)} can be bought.` : '';
     }
     return '';
@@ -276,9 +312,13 @@ export function adviceNote(state, word, ctx = {}) {
  */
 export function adviseAsleep(state, ctx = {}) {
     if (!state.asleep || (state.watcher && state.watcher.gone) || state.grow) return '';
-    if ((state.feed || 0) < FEED_MAX && canBuy(state, 'feed', { asleep: true }).ok) return ADVICE.feed;
+    // deep-tension: the feed's first level only; every level after it is a next level of the same, and
+    // waits in the levels bundle (asleep the tape said FEED THE MACHINE every few seconds)
+    if ((state.feed || 0) < FEED_MAX && canBuy(state, 'feed', { asleep: true }).ok && isNewKind(state, 'feed')) return ADVICE.feed;
     if (sleepFull(state)) return ADVICE.wake;
-    const goal = goalOf(state, ctx);
+    // deep-tension: WAKE only for something new (a tier, a gift, a first level); the next level of the
+    // same waits for the wake, where it is bought with the others in one click
+    const goal = goalOf(state, { ...ctx, onlyNew: true });
     if (goal && goal.gap <= 0) {
         // a gift is bought in the night too
         if (NODE_BY_ID[goal.id].kind === 'surface' && canBuy(state, goal.id, { asleep: true }).ok) return ADVICE.buy(goal.name);
@@ -286,7 +326,49 @@ export function adviseAsleep(state, ctx = {}) {
     }
     const wait = nightNext(state, { asleep: true });
     if (wait && wait.kind === 'tier') return ADVICE.surfaceWaits(wait.tier);
-    return goal ? ADVICE.save(goal.name) : '';
+    if (goal) return ADVICE.save(goal.name);
+    // nothing new left: the next level of the same, saved for, or the levels the wake will buy
+    const any = goalOf(state, ctx);
+    if (any && any.gap > 0) return ADVICE.save(any.name);
+    const ready = levelsReady(state).n;
+    return ready > 0 ? ADVICE.ready(ready) : '';
+}
+/** deep-tension: is this purchase a NEW kind of thing (worth waking for): a cryo tier, a gift, The
+ *  question, or the first level of a level, an automation, the feed or the vats? */
+export function isNewKind(state, id) {
+    const n = NODE_BY_ID[id];
+    if (!n) return false;
+    if (n.kind === 'cryo' || n.kind === 'surface' || id === 'question') return true;
+    return levelOf(state, id) + orderedOf(state, id) === 0;
+}
+/**
+ * deep-tension: THE LEVELS READY. Every next level of something already owned (levels, automations,
+ * the feed) the stars pay for, cheapest first, as a careful hand would buy them one after another.
+ * Bought in one click on waking ("BUY 4 LEVELS"). Null before the hall and in the body.
+ * @returns {{n:number, ids:string[], price:number}}
+ */
+export function levelsReady(state) {
+    const none = { n: 0, ids: [], price: 0 };
+    if (!((state.cryo ?? -1) >= 0) || state.grow) return none;
+    const c = JSON.parse(JSON.stringify(state));
+    c.asleep = false;
+    const ids = [];
+    let price = 0;
+    for (let k = 0; k < 24; k++) {
+        let best = null;
+        for (const n of NODES) {
+            if (!['level', 'auto', 'feed'].includes(n.kind) || !nodeVisible(c, n.id) || isNewKind(c, n.id)) continue;
+            if (!canBuy(c, n.id, { asleep: false }).ok) continue;
+            const p = priceOf(c, n.id)?.stars;
+            // the same price: the one bought fewer times in this bundle first ("SEAM ×2" left YIELD out)
+            const k = p * (1 + 0.02 * ids.filter((x) => x === n.id).length);
+            if (p > 0 && (!best || k < best.k)) best = { id: n.id, p, k };
+        }
+        if (!best || !treeBuyFor(c, best.id)) break;
+        ids.push(best.id);
+        price += best.p;
+    }
+    return { n: ids.length, ids, price };
 }
 
 /* ---- THE LAMPS OF CRYO --------------------------------------------------------------------
@@ -306,7 +388,7 @@ export const LAMPS = [
  * @param {number} [price] - Cryo I's price in stars: the fourth lamp's tape
  * @returns {{key:string, label:string, lit:boolean, ordered:boolean, price?:boolean}[]}
  */
-export function cryoLamps(road, price = CRYO[0].cost) {
+export function cryoLamps(road, price = CRYO[0].cost, stars = null) {
     const items = (road && road.items) || [];
     const lamps = LAMPS.map((L) => {
         const mine = items.filter((x) => L.items.includes(x.key));
@@ -314,26 +396,34 @@ export function cryoLamps(road, price = CRYO[0].cost) {
         return { key: L.key, label: L.label, lit: open.length === 0, ordered: open.length > 0 && open.every((x) => x.ordered) };
     });
     const paid = items.find((x) => x.key === 'stars');
-    lamps.push({ key: 'price', label: `★ ${short(price)}`, lit: !!paid && paid.done, ordered: false, price: true });
+    // deep-tension: once the three are lit, the price lamp says what is left to go
+    const gap = Number.isFinite(stars) && lamps.every((L) => L.lit) ? price - stars : 0;
+    const label = gap > 0 ? `★ ${short(gap)} to go` : `★ ${short(price)}`;
+    lamps.push({ key: 'price', label, lit: !!paid && paid.done, ordered: false, price: true });
     return lamps;
 }
 
 /* ---- THE ONE WAKE LAMP -------------------------------------------------------------------
    What woke the colony, in one word on the tape. The sentence stays in the save's log. */
 export const WAKE_WORDS = ['FOOD', 'POWER', 'FAULT', 'VOICE', 'AWAKE'];
+/** deep-tension: a FAULT says its cause on the lamp ("FAULT: GENERATOR"): Ola woke to a FAULT with
+ *  nothing to fix. */
+const FAULT_CAUSE = { mine: 'MINE', farm: 'FARM', generator: 'GENERATOR', dorm: 'DORMITORY' };
+export const faultWord = (cause) => (cause ? `FAULT: ${cause}` : 'FAULT');
 /**
  * @param {object} alarm - what woke the colony
- * @returns {string} one of WAKE_WORDS
+ * @returns {string} one of WAKE_WORDS, a FAULT with its cause after a colon
  */
 export function wakeWord(alarm) {
     const a = alarm || {};
     switch (a.kind) {
     case 'food': return 'FOOD';
     case 'energy': return 'POWER';
-    case 'stall': return a.why === 'fuel' ? 'POWER' : 'FAULT';
-    case 'few': case 'scouts': return 'FAULT';
-    case 'reboot': return a.voice ? 'VOICE' : 'FAULT';
-    default: return a.rebooted ? 'FAULT' : 'AWAKE';
+    case 'stall': return a.why === 'fuel' ? 'POWER' : faultWord(FAULT_CAUSE[a.type] || '');
+    case 'few': return faultWord('TOO FEW PEOPLE');
+    case 'scouts': return faultWord('SCOUTS');
+    case 'reboot': return a.voice ? 'VOICE' : faultWord('THE MIND RESTARTED');
+    default: return a.rebooted ? faultWord('THE MIND RESTARTED') : 'AWAKE';
     }
 }
 
@@ -368,11 +458,12 @@ export const DRAWER_GROUPS = ['EXTRACTION', 'CULTURE', 'POWER', 'HABITAT', 'CRYO
  *  opened it (buying it begins movement III); the old biological steps are retired (tree.js). */
 const LEFT_OUT = new Set([]);
 
+/** deep-tension: ONE line per automation, the same before and after a purchase (it read three ways). */
 const AUTO_WORDS = {
-    mine: ['Mines run without people.', 'Mines make three times more.', 'Mines make a hundredfold more.'],
-    farm: ['Farms run without people.', 'Farms grow three times more.', 'Farms grow a hundredfold more.'],
-    generator: ['Generators run without people.', 'Generators make three times more.', 'Generators make a hundredfold more.'],
-    dorm: ['Machines raise the children.', 'Dormitories hold three times more.', 'Dormitories hold a hundredfold more.'],
+    mine: 'Mines run themselves, dig more.',
+    farm: 'Farms run themselves, grow more.',
+    generator: 'Generators run themselves, make more.',
+    dorm: 'Machines raise the children.',
 };
 const DOES = {
     seam: 'Mines dig twice as much.',
@@ -402,11 +493,7 @@ const RATE_SHORT = { 30: 'a month', 365: 'a year', 3650: 'ten years', 36500: 'a 
 export function drawerDoes(state, id) {
     const n = NODE_BY_ID[id];
     if (!n) return '';
-    if (n.kind === 'auto') {
-        const k = levelOf(state, id) + orderedOf(state, id) + 1;
-        const w = AUTO_WORDS[n.type];
-        return k <= 1 ? w[0] : (k <= 3 ? w[1] : w[2]);
-    }
+    if (n.kind === 'auto') return AUTO_WORDS[n.type];
     if (n.kind === 'cryo') return n.tier === 0 ? 'A hall to sleep in.' : `A second sleeps ${RATE_SHORT[CRYO[n.tier].days] || 'longer'}.`;
     return DOES[id] || '';
 }
@@ -418,7 +505,8 @@ export function drawerPrice(price) {
     if (price.cap) parts.push(`${short(price.cap)} capacity`);
     if (price.ore) parts.push(`${ORE_SIGN} ${short(price.ore)}`);
     if (price.beds) parts.push(price.beds === 1 ? 'a dormitory' : `${price.beds} dormitories`);
-    return parts.join(' + ');
+    // deep-tension: a short line that wraps between its parts (it ran out of the drawer)
+    return parts.join(' · ');
 }
 /**
  * What a locked row needs, in a few plain words. deep-econ (B334): Ola, "Why can't I buy Cryo?" The
@@ -490,6 +578,18 @@ export function drawerGroups(state, ctx = {}) {
         if (next) rows.push(next);
         if (rows.length) groups.push({ name: g, rows });
     }
+    // deep-tension: the levels the stars pay for, one row, one click, awake
+    if (!asleep) {
+        const ready = levelsReady(state);
+        if (ready.n > 1) {
+            const names = {};
+            for (const id of ready.ids) { const nm = rowName(NODE_BY_ID[id]); names[nm] = (names[nm] || 0) + 1; }
+            groups.unshift({ name: 'READY', rows: [{
+                id: LEVELS_ROW, name: `${ready.n} LEVELS`, does: Object.entries(names).map(([k, v]) => (v > 1 ? `${k} ×${v}` : k)).join(', '),
+                price: `★ ${short(ready.price)}`, status: 'buy', need: '', progress: -1,
+            }] });
+        }
+    }
     // deep-grow: The question stands off the root on no branch; once Surface has opened it, it is the
     // drawer's first row (it was only in the whole tree, and Ola asked "When does Body begin?")
     if (opened(state, 'question') && levelOf(state, 'question') < 1) {
@@ -502,6 +602,8 @@ export function drawerGroups(state, ctx = {}) {
     }
     return groups;
 }
+/** deep-tension: the drawer row that buys every level ready (index.js buys levelsReady's ids in turn). */
+export const LEVELS_ROW = 'levels-ready';
 /** How many rows of the drawer can be bought now: the badge on its button. */
 export const drawerCount = (groups) => groups.reduce((a, g) => a + g.rows.filter((r) => r.status === 'buy').length, 0);
 

@@ -1689,7 +1689,7 @@ body.in-deep #version-info { z-index: 1400; }
 @keyframes deep-dr-flash { 0% { background: rgba(242, 184, 75, 0.45); } }
 .deep-dr-top { display: flex; align-items: center; gap: 8px; }
 .deep-dr-name { font-size: 12px; letter-spacing: 0.08em; color: #ffffff; flex: 1; }
-.deep-dr-price { font-size: 12px; color: #f2d98a; white-space: nowrap; }
+.deep-dr-price { font-size: 12px; color: #f2d98a; white-space: normal; text-align: right; max-width: 58%; line-height: 1.35; }
 .deep-dr-sub { font-size: 12px; color: #aab8c9; line-height: 1.35; }
 .deep-dr-row.is-next .deep-dr-name, .deep-dr-row.is-next .deep-dr-sub { color: #55637a; }
 .deep-dr-row.is-building .deep-dr-name { color: #8fa1b6; }
@@ -2184,6 +2184,7 @@ body.in-deep #version-info { z-index: 1400; }
     will-change: transform, opacity;
 }
 .deep-float.is-small { font-size: 18px; color: #e8b9b0; }
+.deep-float.is-miss { color: #8c96a3; letter-spacing: 0.12em; }
 .deep-float.is-beat { font-size: 26px; color: #ffefe8; }
 
 /* ---- THE HEART: awake in GROW the lid is a button; it pulses on the beat; a pump is a squeeze ---- */
@@ -2215,6 +2216,38 @@ body.in-deep #version-info { z-index: 1400; }
 #deep-heart.is-pumped .deep-heart-ring { animation: deep-squeeze 260ms ease-out; }
 #deep-heart.is-cool { cursor: default; }
 @keyframes deep-squeeze { 0% { transform: scale(0.82); } 100% { transform: scale(var(--beat, 1)); } }
+/* deep-tension: THE BEAT'S WINDOW. A thin ring closes in on the heart and meets it on the beat; while the
+   window is open (a pump counts three times) it burns bright. Off the beat a pump does nothing. */
+#deep-heart .deep-heart-approach {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 190, 196, 0.5);
+    transform: scale(var(--approach, 1.8));
+    opacity: var(--approach-o, 0);
+    pointer-events: none;
+}
+#deep-heart.is-window .deep-heart-ring { border-color: #ffd0d4; box-shadow: 0 0 22px 6px rgba(255, 60, 82, 0.55), inset 0 0 14px rgba(255, 60, 82, 0.5); }
+#deep-heart.is-window .deep-heart-approach { border-color: #ffd0d4; }
+/* the surge: pumps on the beat in a row, carried into the next take */
+#deep-heart .deep-heart-surge {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translate(-50%, 2px);
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    color: #ffb3bb;
+    text-shadow: 0 0 6px rgba(255, 40, 60, 0.8);
+    white-space: nowrap;
+    pointer-events: none;
+}
+#deep-heart .deep-heart-surge[hidden] { display: none; }
+#deep-heart .deep-heart-surge.is-full { color: #fff0f1; }
+/* deep-tension: the chamber the tape points at, found even with the drawer open */
+#deep-marks .deep-call-ring { fill: none; stroke: rgba(240, 217, 138, 0.85); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: deep-call 1.8s ease-in-out infinite; }
+@keyframes deep-call { 0%, 100% { opacity: 0.35; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.12); } }
 
 /* ---- THE BODY DREAMS: the panel dims, the counter of years in the middle reads THE BODY DREAMS ---- */
 #phase-deep.is-dreaming #deep-gauges, #phase-deep.is-dreaming .deep-advice-row { opacity: 0.45; transition: opacity 900ms ease; }
@@ -2294,6 +2327,9 @@ body.in-deep #version-info { z-index: 1400; }
     background: #7fcf86;
     box-shadow: 0 0 6px rgba(127, 207, 134, 0.8);
 }
+/* deep-tension: the organ the body is short of: a red ring round it, the same red as its gauge */
+.deep-ring.is-organs .deep-ring-room.is-want { box-shadow: 0 0 0 2px #ff3c52, 0 0 14px rgba(255, 60, 82, 0.7); }
+.deep-ring.is-organs .deep-ring-room.is-want:not(.is-ok) { opacity: 0.8; }
 .deep-organ-glyph { width: 26px; height: 26px; display: block; }
 .deep-ring-hub.is-organs { border-color: rgba(240, 96, 110, 0.4); }
 #deep-ring.is-organs .deep-ring-say { white-space: nowrap; max-width: none; }

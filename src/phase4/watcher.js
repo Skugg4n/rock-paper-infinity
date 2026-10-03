@@ -2,8 +2,8 @@
  * Chapter IV · THE DEEP: the Watcher (v1.46.0). The rules of the game inside the sleep.
  *
  * When the colony sleeps, something stays awake: the system that keeps the watch. The player
- * is that system, and nothing says so. It first shows itself as a label, SYSTEM AWAKE, and
- * after enough slept years, once and quietly, as THE WATCHER. Under it a STABILITY meter
+ * is that system, and nothing says so. It shows itself as a label, THE WATCHER (deep-tension: it read
+ * SYSTEM AWAKE while the colony slept, which read wrong). Under it a STABILITY meter
  * that drifts down with the years and drops on alarms. Low, the base softens, the feed lines
  * get slightly wrong, and at zero the system reboots and wakes the colony. A click on the
  * base snaps it back. Since v1.51.0 the riddles are gone; now and then the lamps ask for
@@ -20,7 +20,7 @@ import { sectorOf, SECTORS } from './layout.js';
 export const STABILITY_MAX = 100;
 /** What the label reads, in order. It moves on once and never back: deep-voice, on Surface's first
  *  night ("Everyone is sleeping, but us."). Until v1.60 it was after a century of slept years. */
-export const WATCHER_NAMES = ['SYSTEM AWAKE', 'THE WATCHER'];
+export const WATCHER_NAMES = ['THE WATCHER', 'THE WATCHER'];
 
 /**
  * THE DRIFT. Stability falls with slept years: one point per `driftYears(tier)` years. The

@@ -119,6 +119,7 @@ const PORT = OWN_PORT || server.address().port;
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'rpi-accept-'));
 const chrome = spawn(CHROME, [
     ...(process.argv.includes('--headed') ? [] : ['--headless=new']),
+    '--mute-audio',                     // deep-tension: never a sound out of a test browser
     '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1440,900',
     '--no-first-run', '--no-default-browser-check', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding', 'about:blank',
@@ -706,7 +707,7 @@ try {
         tape: document.getElementById('deep-lever-tape').textContent, lever: !document.getElementById('deep-lever-wrap').hidden,
         people: rpiDeep.people, feedNum: (document.querySelector('#deep-gauges .deep-gauge[data-col="F"] .deep-gauge-num') || {}).textContent || '' })`);
     check(e0.groups && !Object.values(e0.groups).some(Boolean) && e0.btn === 'hidden', `E. the body opens with one verb: the drawer is empty and its button gone (${e0.btn})`);
-    check(e0.lamps.length === 2 && /^DEEPEST FLOOR \d+ \/ \d+$/.test(e0.lamps[0]) && e0.lamps[1] === 'MACHINE 0 / 1', `E. the lamps read as counts: ${e0.lamps.join(', ')}`);
+    check(e0.lamps.length === 2 && /^FLOORS \d+ \/ \d+$/.test(e0.lamps[0]) && e0.lamps[1] === 'MACHINE 0 / 1', `E. the lamps read as counts: ${e0.lamps.join(', ')}`);
     check(e0.lever && e0.tape === 'DREAM', `D. the lever is back, and reads ${e0.tape}`);
     check(e0.people.shown && e0.feedNum.trim() === e0.people.count, `P. the FEED gauge carries the people: "${e0.feedNum.trim()}" (the counter "${e0.people.count}")`);
     await sleepMs(9000);
