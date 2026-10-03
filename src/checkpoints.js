@@ -53,7 +53,7 @@ const completeCity = () => {
     return b;
 };
 const completeFlags = {
-    gmoLevel: 10, apartmentResearched: true, storeResearched: true, toolCaseUnlocked: true, carUnlocked: true,
+    gmoLevel: 10, apartmentResearched: true, storeResearched: true, greenhouseResearched: true, toolCaseUnlocked: true, carUnlocked: true,
     computerUnlocked: true, urbanismResearched: true, megastructureResearched: true, landExpanded: true, landExpansion2: true,
     superconductorLevel: 5, stalls: 200, islandRevealed: true,
 };

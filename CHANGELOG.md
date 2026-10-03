@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.82.0 - 2026-10-03 (chapter II, the greenhouse)
+
+### A third level of food
+
+Ola: "we need to be able to develop better food production, one more level of the buildings that produce food" (B221).
+
+- **Greenhouses.** A new research (the sprout, from 2 500 people, usable at 5 000, 1.50 M ★ and 150 k ⚛) lets a super store become a greenhouse: five times the food (300 a second, ×1 024 with GMO maxed, about 300 000 people fed per greenhouse). The upgrade is the "+" on the plate, as with the houses.
+- **Sound**: the research and the upgrade play the food word (grain), not glass or wood.
+- **A complete city now includes the greenhouse research**, so the neighbour's raid waits until it is bought.
+- **Simulation**: `scripts/sim-phase2.mjs` knows the greenhouse; WAR is still reached at 19:13, and the 38 market stalls the greedy player bought at the end are replaced by one greenhouse.
+- In the war a greenhouse feeds at its share of HP like the stores; the armory never takes one.
 ## v1.81.1 - 2026-10-03 (chapter I, the foam fills faster)
 
 ### Chapter I · TRIVIAL: the foam bar before the lightning fills four times faster (B360)

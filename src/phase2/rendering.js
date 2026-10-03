@@ -16,12 +16,13 @@ import { FORT_COST, plateMaxHp } from '../phase3/war.js';
 import { formatCount } from './economy.js';
 
 /** People needed before a plate may be upgraded to each type. */
-const UPGRADE_POP_REQ = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000 };
+const UPGRADE_POP_REQ = { apartment: 30, superStore: 50, skyscraper: 200, district: 5000, greenhouse: 5000 };
 
 /** What this plate can become with the research done so far; null if nothing. */
 function upgradeTargetFor(building, r) {
     if (building.type === 'home' && r.apartmentResearched) return 'apartment';
     if (building.type === 'store' && r.storeResearched) return 'superStore';
+    if (building.type === 'superStore' && r.greenhouseResearched) return 'greenhouse';
     if (building.type === 'apartment' && r.urbanismResearched) return 'skyscraper';
     if (building.type === 'skyscraper' && r.megastructureResearched) return 'district';
     return null;
@@ -59,7 +60,7 @@ function upgradeButtonHTML(building, upgradeTarget, canAfford, isNew) {
  * @param {boolean} context.initialLoadDone - Whether the first load cycle has completed
  * @returns {string} HTML string to insert into the slot element
  */
-export function createBuildingHTML(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched, stars, population, notifiedUpgrades, initialLoadDone, war = null }) {
+export function createBuildingHTML(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched, greenhouseResearched = false, stars, population, notifiedUpgrades, initialLoadDone, war = null }) {
     let icon = '';
     let content = '';
     let classes = 'building';
@@ -92,7 +93,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
         </button>`;
     }
 
-    const upgradeTarget = upgradeTargetFor(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched });
+    const upgradeTarget = upgradeTargetFor(building, { apartmentResearched, storeResearched, urbanismResearched, megastructureResearched, greenhouseResearched });
 
     if (upgradeTarget) {
         const canAfford = stars >= buildingData[upgradeTarget].cost;
@@ -114,6 +115,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
         case 'district': icon = 'custom-district'; break;
         case 'store': icon = 'store'; break;
         case 'superStore': icon = 'shopping-cart'; break;
+        case 'greenhouse': icon = 'sprout'; break;
         case 'factory': icon = 'factory'; classes += ' factory'; break;
         case 'bank': icon = 'landmark'; break;
     }
@@ -207,6 +209,7 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
         if (building) {
             slot.innerHTML = createBuildingHTML(building, {
                 apartmentResearched: gameState.apartmentResearched,
+                greenhouseResearched: !!gameState.greenhouseResearched,
                 storeResearched: gameState.storeResearched,
                 urbanismResearched: gameState.urbanismResearched,
                 megastructureResearched: gameState.megastructureResearched,

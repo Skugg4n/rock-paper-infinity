@@ -20,7 +20,7 @@
 import { layoutRect } from './layout.js';
 
 const HOUSING = new Set(['home', 'apartment', 'skyscraper', 'district']);
-const WORK = new Set(['store', 'superStore', 'factory', 'bank']);
+const WORK = new Set(['store', 'superStore', 'greenhouse', 'factory', 'bank']);
 
 /**
  * Number of dots for a population. Grows with the square root so a village

@@ -2155,7 +2155,8 @@ items:
     request: |
       We need to be able to develop better food production: one more level
       of the buildings that produce food.
-    status: open
+    status: done
+    resolved_in: v1.82.0
     notes: "Chapter II (CAPITAL). Design first: a third tier above the super store (research + upgrade like the houses), balanced in scripts/sim-phase2.mjs. CAPITAL uses ids B220 to B229."
 
   - id: B222

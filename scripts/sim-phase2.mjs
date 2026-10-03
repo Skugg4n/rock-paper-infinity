@@ -29,7 +29,7 @@ const C = P.cost;
 const st = {
   t: 0, stars: START_STARS, science: 0, pop: 0, supplies: 150, alloc: 0.5,
   slots: 10, buildings: [{ type: 'factory' }, { type: 'bank' }],
-  gmo: 0, toolCase: false, car: false, computer: false, urbanism: false, mega: false, aptResearch: MODE === 'old', storeResearch: MODE === 'old',
+  gmo: 0, toolCase: false, car: false, computer: false, urbanism: false, mega: false, aptResearch: MODE === 'old', storeResearch: MODE === 'old', greenhouseResearch: false,
   land1: false, land2: false, sc: 0, stalls: 0, buys: [],
 };
 const POP = { home: 10, apartment: 50, skyscraper: 500, district: 100000 };
@@ -49,7 +49,7 @@ function tick() {
   for (const b of st.buildings) {
     if (b.type === 'factory') income += P.factoryIncome;
     if (b.type === 'bank') income -= 30;
-    if (b.type === 'store' || b.type === 'superStore') { supply += B[b.type].supply * gmoM; income -= B[b.type].upkeep; }
+    if (b.type === 'store' || b.type === 'superStore' || b.type === 'greenhouse') { supply += B[b.type].supply * gmoM; income -= B[b.type].upkeep; }
     if (POP[b.type]) {
       if (st.supplies > 0 && b.pop < POP[b.type]) b.pop = Math.min(POP[b.type], b.pop + GROWTH[b.type]);
       pop += b.pop;
@@ -78,6 +78,10 @@ function shop(flow) {
       const store = st.buildings.find(b => b.type === 'store');
       if (store && pop >= 50 && !st.storeResearch && buy(B.storeResearch.cost, B.storeResearch.scienceCost)) { st.storeResearch = true; log('store research'); continue; }
       if (store && pop >= 50 && st.storeResearch && buy(C.superStore)) { store.type = 'superStore'; log('superStore'); flow.supply += 40; continue; }
+      // the third tier (B221): a super store becomes a greenhouse
+      const sup = st.buildings.find(b => b.type === 'superStore');
+      if (sup && pop >= 5000 && !st.greenhouseResearch && buy(B.greenhouseResearch.cost, B.greenhouseResearch.scienceCost)) { st.greenhouseResearch = true; log('greenhouse research'); mark('greenhouseResearch'); continue; }
+      if (sup && pop >= 5000 && st.greenhouseResearch && buy(B.greenhouse.cost)) { sup.type = 'greenhouse'; log('greenhouse'); mark('greenhouse'); flow.supply += (B.greenhouse.supply - B.superStore.supply) * Math.pow(2, st.gmo); continue; }
       if (st.storeShown && free() > 0 && buy(C.store)) { st.buildings.push({ type: 'store' }); log('store'); flow.supply += 20; continue; }
       // stalls only while they are cheaper per unit than a store, or no land
       const stallsCheaper = stallCost(st.stalls) / STALL_SUPPLY < C.store / 20 || free() === 0;
@@ -110,7 +114,7 @@ function shop(flow) {
     if (st.urbanism && up('apartment', 'skyscraper', 200)) { mark('skyscraper'); continue; }
     if (st.aptResearch && up('home', 'apartment', 30)) { mark('apartment'); continue; }
     // keep one slot for a store while the city is small
-    const storeCount = st.buildings.filter(b => b.type === 'store' || b.type === 'superStore').length;
+    const storeCount = st.buildings.filter(b => b.type === 'store' || b.type === 'superStore' || b.type === 'greenhouse').length;
     if (free() > (storeCount === 0 ? 1 : 0) && buy(C.home)) { st.buildings.push({ type: 'home', pop: 0 }); log('home'); continue; }
     break;
   }
