@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.67.1 - 2026-10-03 (chapter II, the raid when played through)
+
+Ola played chapter II through (not from a checkpoint): the raid came with no boat and no pier, the watchmen stood on the shore and then crossed the water on foot, the pier reached our island, and their defence looked like a line.
+
+- **No raid before the shipyard.** The city was complete before the neighbour had built its shipyard, so the raid started with an invisible pier and an invisible boat (they only exist from stage 5). The raid now waits for the shipyard.
+- **The first pair of raiders was invisible** ashore (a counting slip: the ones without a boarding delay never stepped off the boat). Fixed; the boat's crew count is right again.
+- **The pier is shorter** (64 px, was 86) and there is more water between the islands (176 px between the grids), so the pier ends in the water and the boat lies off it, not on our beach.
+- **Their fortification is a tone, not a band.** The island itself hardens (a shade darker at stage 3, darker again at 4) instead of a band inside the shore that read as an outline.
+
 ## v1.67.0 - 2026-10-03 (chapter IV, the overnight fixes)
 
 ### Chapter IV: the overnight playtest of v1.66.0, fixed (B230 to B237)

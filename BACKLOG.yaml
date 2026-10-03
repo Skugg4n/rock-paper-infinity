@@ -2139,3 +2139,33 @@ items:
       second; (4) an effect line shows at most three changed quantities, chosen per node; (5) the cryo
       road's later parts (ore, power, food) are found by patching the copy one trouble at a time.
     status: open
+
+  - id: B220
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      Our soldiers come out of a store. We should add a separate building
+      that is an armory for our side.
+    status: open
+    notes: "Chapter III, the WAR session's (where our guards and sorties spawn from). Forwarded 2026-10-03."
+
+  - id: B221
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      We need to be able to develop better food production: one more level
+      of the buildings that produce food.
+    status: open
+    notes: "Chapter II (CAPITAL). Design first: a third tier above the super store (research + upgrade like the houses), balanced in scripts/sim-phase2.mjs. CAPITAL uses ids B220 to B229."
+
+  - id: B222
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      Played through, the raid was a mess: no defence line, the boat only
+      visible at the end, the pier all the way to us, the soldiers standing
+      and watching when they should attack, then walking over the water.
+      From a checkpoint it looked right.
+    status: done
+    resolved_in: v1.67.1
+    notes: "The raid could start before the shipyard (stage 5) existed; the first pair of raiders was never shown ashore; the pier was too long for the strait; the rampart band read as a line."

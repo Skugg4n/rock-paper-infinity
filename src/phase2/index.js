@@ -1280,12 +1280,12 @@ export function init() {
               });
 
               // Raids. The competitor waits until our city is complete (everything
-              // bought) and its own capital stands (stage 3+), then comes by boat,
+              // bought) and its shipyard stands (stage 5: pier and boat), then comes by boat,
               // razes one outer house, sails home, and comes back every
               // RAID_INTERVAL until the player chooses WAR. (WAR_POP is only a
               // safety net.) We are defenceless; the swords arrive only after the
               // boat has gone and a beat of nothing (Ola 2026-10-02).
-              const capitalReady = gameState.competitorSpawned && (gameState.competitorStage || 1) >= 3;
+              const capitalReady = gameState.competitorSpawned && (gameState.competitorStage || 1) >= 5;   // no boat before the shipyard
               const complete = cityComplete() || gameState.population >= WAR_POP * 4;
               if (complete && !skipGrowth) gameState.completeTicks = (gameState.completeTicks || 0) + 1;
               const ready = capitalReady && !gameState.warChosen && !gameState.war?.active && complete && (gameState.completeTicks || 0) >= 30;

@@ -85,8 +85,9 @@ export function coastPath(rect, opts = {}) {
  * @param {HTMLElement} opts.target - element the island encloses (grid / island tiles)
  * @param {string} opts.id - path id
  * @param {object} [opts.shape] - coastPath options
- * @param {boolean} [opts.rampart=false] - the island can be fortified: a band inside
- *        the shore (`.rampart`) with the land drawn again inside it; see setRampart
+ * @param {boolean} [opts.rampart=false] - the island can be fortified: the land itself
+ *        takes a harder tone (`.fortified-1`, `.fortified-2`); see setRampart. A band
+ *        inside the shore read as a line (Ola 2026-10-03), so it is a tone now.
  */
 export function createIsland({ svg, area, target, id, shape = {}, rampart = false }) {
     const make = (pid, cls) => {
@@ -100,39 +101,26 @@ export function createIsland({ svg, area, target, id, shape = {}, rampart = fals
         return el;
     };
     const path = make(id, 'island');
-    const band = rampart ? make(`${id}-rampart`, 'island rampart') : null;
-    const inner = rampart ? make(`${id}-inner`, 'island') : null;
+    void rampart;
     let lastKey = '';
-    let level = 0;           // 0 none, 1 narrow, 2 wide
-    let lastRect = null;
-    const innerPad = () => (shape.pad ?? 28) - (level === 2 ? 8 : 4);
-    function drawInner() {
-        if (!band || !lastRect) return;
-        const on = level > 0;
-        band.classList.toggle('is-visible', on);
-        inner.classList.toggle('is-visible', on);
-        if (!on) return;
-        band.setAttribute('d', coastPath(lastRect, shape));
-        inner.setAttribute('d', coastPath(lastRect, { ...shape, pad: innerPad() }));
-    }
+    let level = 0;           // 0 none, 1 fortified, 2 well fortified
     function update(visible) {
         path.classList.toggle('is-visible', !!visible);
-        if (!visible) { band?.classList.remove('is-visible'); inner?.classList.remove('is-visible'); return; }
+        if (!visible) return;
         const rect = layoutRect(target, area);
         const key = `${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.w)},${Math.round(rect.h)}`;
-        if (key === lastKey) { drawInner(); return; }
+        if (key === lastKey) return;
         lastKey = key;
-        lastRect = rect;
         svg.setAttribute('viewBox', `0 0 ${area.offsetWidth} ${area.offsetHeight}`);
         path.setAttribute('d', coastPath(rect, shape));
-        drawInner();
     }
-    /** How fortified the island is: 0 none, 1 a narrow band inside the shore, 2 a wide one. */
+    /** How fortified the island is: 0 none, 1 a harder tone, 2 harder still. */
     function setRampart(next) {
         const n = Math.max(0, Math.min(2, next | 0));
         if (n === level) return;
         level = n;
-        drawInner();
+        path.classList.toggle('fortified-1', n === 1);
+        path.classList.toggle('fortified-2', n === 2);
     }
     return { update, path, setRampart };
 }

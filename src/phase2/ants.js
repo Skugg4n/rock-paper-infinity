@@ -719,9 +719,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const walkAll = (speed, onDone) => {
             for (const m of watchmen) {
                 if (!m.walk) continue;
-                const was = m.walk.wait > 0;
                 const done = advance(m.walk, dt, speed);
-                if (was && m.walk.wait <= 0 && m.aboard) { m.aboard = false; m.hidden = false; boat.aboard = Math.max(0, boat.aboard - 1); }   // steps off the boat
+                if (m.aboard && m.walk.wait <= 0) { m.aboard = false; m.hidden = false; boat.aboard = Math.max(0, boat.aboard - 1); }   // steps off the boat (the first pair has no delay)
                 const p = m.walk.path ? pos(m.walk) : m.walk.end;
                 if (p) { m.x = p.x; m.y = p.y; }
                 if (done) { m.walk = null; onDone?.(m); }

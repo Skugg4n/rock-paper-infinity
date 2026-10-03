@@ -615,7 +615,7 @@ input[type=range]::-webkit-slider-thumb {
 #islands-svg .island {
     fill: #f1f5f9;
     opacity: 0;
-    transition: opacity 2000ms ease;
+    transition: opacity 2000ms ease, fill 2000ms ease;
 }
 #islands-svg .island.is-visible { opacity: 1; }
 #islands-svg .island.enemy { fill: #e4eaf1; }
@@ -779,18 +779,20 @@ body.tilt #city-area {
 #competitor-island .enemy-pier {
     position: absolute;
     right: 18px;
-    top: -68px;
+    top: -50px;
     width: 10px;
-    height: 76px;
+    height: 58px;
     border-radius: 4px;
     background: #94a3b8;
     opacity: 0;
     transition: opacity 1500ms ease-in;
 }
-@media (min-width: 640px) { #competitor-island .enemy-pier { right: 22px; top: -78px; height: 86px; } }
+@media (min-width: 640px) { #competitor-island .enemy-pier { right: 22px; top: -56px; height: 64px; } }
 #competitor-island.competitor-stage-5 .enemy-pier { opacity: 1; }
 /* The rampart: a band inside the shore when they fortify (islands.js setRampart) */
-#islands-svg .island.rampart { fill: #c3ccd8; }
+/* Fortified: the whole island hardens in tone (no band, no line) */
+#islands-svg .island.enemy.fortified-1 { fill: #dde4ec; }
+#islands-svg .island.enemy.fortified-2 { fill: #d5dde7; }
 
 #competitor-island {
     opacity: 0;
