@@ -2169,3 +2169,25 @@ items:
     status: done
     resolved_in: v1.67.1
     notes: "The raid could start before the shipyard (stage 5) existed; the first pair of raiders was never shown ashore; the pier was too long for the strait; the rampart band read as a line."
+
+  - id: B204
+    added: 2026-10-03
+    source: "WAR sound session (coordinator, from sound board 2)"
+    request: |
+      Chapter III's sound in the game from docs/mockups/sound-board-war-2.html: their drum as the clock to
+      the next landing, layers arriving with the controls, words on the drum's grid, the three silences, the
+      rocket, the cut and the E flat falling to D on the IV card.
+    status: done
+    resolved_in: v1.68.0
+
+  - id: B205
+    added: 2026-10-03
+    source: "WAR sound session (for Ola's ear, in the game)"
+    request: |
+      To judge by ear in the game, not on the board: (1) early in the war a bar is 40 s, so their drum
+      strikes every 5 s; with only drum and bass that first minute may feel empty; (2) at the hand-over
+      (24 s after the swords) the war's first stroke is on the landing clock, not on the set piece's
+      2.8 s strokes; (3) a landing is heard at the impact, which comes 10 to 20 s after the drum's
+      downbeat (the departure); (4) the ◆ reveal calls arrive() once per plate: the war plays one rise,
+      the city's own rise word would still stack outside the war.
+    status: open

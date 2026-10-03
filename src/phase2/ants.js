@@ -984,16 +984,18 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
      * sails to the shore of their island nearest the tile, goes ashore and walks
      * to the tile. Their watchmen and people meet it on their beach. The
      * survivors (the share `onImpact` returns) walk back, sail home and go
-     * indoors; `onHome` fires when our boat is back at the pier.
+     * indoors; `onHome` fires when our boat is back at the pier. `onPhase(name)`
+     * at every step (for the sound): muster, castOff, ashore, impact, home.
      */
-    function launchSortie({ tile, tileIndex, count, losses, onImpact, onHome }) {
+    function launchSortie({ tile, tileIndex, count, losses, onImpact, onHome, onPhase }) {
         const R = ring(), foot = ourFoot();
         const standing = rects.filter(r => !r.building.razed);
         if (!foot || !standing.length) return false;
         const bottom = Math.max(...standing.map(r => r.rect.y));
         const near = standing.filter(r => Math.abs(r.rect.y - bottom) < 1).sort((a, b) => Math.abs(c(a.rect).x - foot.x) - Math.abs(c(b.rect).x - foot.x)).slice(0, 3);
         const n = Math.min(14, Math.max(3, Math.round(count / 3)));
-        sorties.push({ tile, tileIndex, dots: musterParty(n, R, foot, near.map(r => c(r.rect)), 'person'), phase: 'muster', losses, onImpact, onHome, home: [] });
+        sorties.push({ tile, tileIndex, dots: musterParty(n, R, foot, near.map(r => c(r.rect)), 'person'), phase: 'muster', losses, onImpact, onHome, onPhase, home: [] });
+        onPhase?.('muster');
         return true;
     }
     function stepSorties(dt) {
@@ -1030,6 +1032,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
                         s.home = s.back.map((d, i) => ({ kind: 'person', path: [s.dock, foot, ...ringWalk(R, ringCoord(R, foot), ringCoord(R, inPt)).slice(1), indoors ? c(indoors.rect) : foot], seg: 0, t: 0, wait: pairDelay(i, 0.3) }));
                         ourBoat.aboard = 0;
                         s.phase = 'home';
+                        s.onPhase?.('home');
                         s.onHome?.();
                     }, back);
                 }
@@ -1050,8 +1053,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const seconds = sailSeconds(courseLength(roundCourse([dock, ...via, shore])));
         const path = ashorePath(shore, inland);
         Object.assign(s, { phase: 'sail', tile, land, shore, dock, via, path });
+        s.onPhase?.('castOff');
         sail(ourBoat, dock, shore, seconds, () => {
             s.phase = 'ashore';
+            s.onPhase?.('ashore');
             ourBoat.angle = Math.atan2(land.y - shore.y, land.x - shore.x);
             s.dots.forEach((d, i) => {
                 Object.assign(d, { kind: 'person', at: { rect: tile }, path: ashorePath(shore, inland), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, strike: true, boarded: true, aboard: false });
@@ -1059,7 +1064,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             // their defence meets them on their beach and in the first street
             scriptLosses(s.dots, s.losses, 1, Math.min(3, inland.length));
             s.wave = { dots: s.dots, target: { rect: tile }, done: false, kind: 'ours',
-                onImpact: (f) => { const share = s.onImpact?.(f); s.homeShare = typeof share === 'number' ? share : 0; } };
+                onImpact: (f) => { s.onPhase?.('impact'); const share = s.onImpact?.(f); s.homeShare = typeof share === 'number' ? share : 0; } };
             waves.push(s.wave);
         }, via);
     }
@@ -1137,14 +1142,18 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         return Array.from({ length: n }, (_, i) => ringPoint(R, (i + 0.5) * P / n));
     }
 
-    /** Our strike on an enemy tile (by index in enemyRects). Melee by boat from our pier, blue; ranged/area as arcs. */
-    function launchStrike({ tileIndex, count, mode, losses = 0, onImpact, onHome }) {
+    /**
+     * Our strike on an enemy tile (by index in enemyRects). Melee by boat from our pier, blue; ranged/area as arcs.
+     * `onPhase(name)` for the sound, as the raid has it: by boat muster, castOff, ashore, impact, home; otherwise castOff at once.
+     */
+    function launchStrike({ tileIndex, count, mode, losses = 0, onImpact, onHome, onPhase }) {
         measure();
         const tile = enemyRects[tileIndex] ?? enemyRects[0];
-        if (!tile) { onImpact?.(); return; }
+        if (!tile) { onPhase?.('castOff'); onImpact?.(); return; }
         // By boat from our pier, when we have one (chapter III builds it)
         // ('boat': onHome will fire when the survivors are back at our pier)
-        if (mode === 'melee' && ourPierRect && ourDockPoint() && townRing() && launchSortie({ tile, tileIndex, count, losses, onImpact, onHome })) return 'boat';
+        if (mode === 'melee' && ourPierRect && ourDockPoint() && townRing() && launchSortie({ tile, tileIndex, count, losses, onImpact, onHome, onPhase })) return 'boat';
+        onPhase?.('castOff');
         // they set out from the standing plate on our south coast closest to the tile
         const standing = rects.filter(r => !r.building.razed);
         const lowest = Math.max(...standing.map(r => r.rect.y), -Infinity);

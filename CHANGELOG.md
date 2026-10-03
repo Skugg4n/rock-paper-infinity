@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.68.0 - 2026-10-03 (the war has sound)
+
+### Chapter III's sound, from sound board 2 (B204)
+
+The war from `docs/mockups/sound-board-war-2.html` (approved in direction), now in the game. New `src/audio-war.js` on the same graph, switches and first-click unlocking as chapters I and II (`audio.graph()`); score in `docs/superpowers/specs/2026-10-02-score-sheet.md`, section 4.
+
+- **Their drum is the clock.** One bar is the time to their next departure, phase-locked to the game's own numbers once a second (`war.set` from the end of warTick): slow early, tighter late, sixteen strokes on a push and in the last bars. It takes over from the II → III set piece as its bass fades (24 s after the swords): their drum and our bass alone.
+- **Layers arrive with the controls, one at a time.** The organ with the first shield or sword (one voice per plate: a razed plate is a hole), the arms factory with the strike (soft machine toward stars, hammered metal toward hammers), folk life with the ◆, the doomsday drone from the first landing (D gliding to E♭), our drum with the laboratory (answers when we lead, alternates when level, one hit behind), shells from their tier V. The bass drops to the low A while a plate lies razed.
+- **Words on the grid, never late for the rule.** A creak as their boat leaves, the far detonation on the landing, the held breath and the fall when a plate goes (lower for a district), the tear when our boat casts off and the far thud when it lands, a dull impact and a low tone for their tile, struck metal for shield, sword and air defence, the ◆, the three rising notes (one rise for a burst of buttons), a knock when hammers are short, a metallic rise for a new weapon. The radar ticks the last four seconds toward the coast that will be hit; a salvo whistles down and air defence cracks it.
+- **Three silences.** The raiding party: two dry ticks, their drum stops for twenty seconds and everything holds its breath (-6 dB, a dry room) until the beat it returns. The silent island: their last stroke falls and the drum is gone; it comes back heavier and a step lower. The first nuclear blow and the rocket are booms.
+- **The ending.** From 55 % the rocket rumbles and crackles; as they withdraw the drum tightens and rises; at ignition a nine-second ramp swallows everything, then three seconds of true silence on every bus, then the drone alone on E♭, very quiet. At the hatch the IV card (now silent) takes the E♭ and lets it fall two octaves to D over ten seconds, into IV's own low D.
+- Paused or hidden: silent. Our strike tells its phases (`launchStrike` got `onPhase`, as the raid has).
+- **Levels** (offline, the shared master and compressor): the first 60 s of the war peak -4.0 dBFS, RMS -16.5; a dense late minute -3.6, RMS -17.4; the ending -3.3 at the ramp's end, the cut measured at digital silence. Sim unchanged (war.js untouched).
 ## v1.67.1 - 2026-10-03 (chapter II, the raid when played through)
 
 Ola played chapter II through (not from a checkpoint): the raid came with no boat and no pier, the watchmen stood on the shore and then crossed the water on foot, the pier reached our island, and their defence looked like a line.

@@ -17,6 +17,7 @@ import { layoutRect } from './layout.js';
 import { createIsland } from './islands.js';
 import { audio } from '../audio.js';
 import { city, popLevel } from '../audio-city.js';
+import { war, handoverAt, ROCKET_FROM as SOUND_ROCKET_FROM } from '../audio-war.js';
 import {
     TIERS, UNIT_COST, FORT_COST, ENEMY_REBUILD_S, ENEMY_DEFENCE_REGROW, enemyDefenceCap, waveStandingK, defenceStandingK,
     SALVAGE_PER_TILE, DOOMSDAY_LEAVE, ENEMY_REGROUP_S, scorchYield, SHIP_SALVAGE, UPKEEP_SHARE_PER_UNIT, FOOD_PER_UNIT,
@@ -57,7 +58,7 @@ async function goDeep() {
     }
     playChapterCard({
         // Slow and dark like the WAR card: a long fade, IV, then THE DEEP; a click or 5 s ends the hold.
-        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, hold: 5000,
+        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, hold: 5000, silent: true,   // the war's E♭ falls to D under it, into IV's own low D
         onMidpoint: () => {
             setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
         },
@@ -373,6 +374,7 @@ export function init() {
               const silent = standing === 0 && !w.enemyLeft;
               if (silent) {
                   if (!w.regroupAt) {
+                      war.event('islandSilent');
                       w.regroupAt = w.t + ENEMY_REGROUP_S;
                       w.enemyRazedUntil = (w.enemyRazedUntil || [0, 0, 0, 0, 0]).map(() => w.regroupAt);
                       logWar('Interior: their island is silent. They are digging in. Expect them back, and stronger.', true);
@@ -380,6 +382,7 @@ export function init() {
                   w.nextTierAt -= 1; w.lastWaveAt = w.t;
               } else if (w.regroupAt && w.t >= w.regroupAt) {
                   w.regroupAt = 0; w.enemyDefence = enemyDefenceCap(w.waveCount, w.tier);
+                  war.event('islandBack');
                   if (w.enemyTier < w.tier) { w.enemyTier = w.tier; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier); }
                   logWar(`Status: they are back. Rebuilt, dug in, and they field ${TIERS[w.enemyTier].id}.`, true);
               }
@@ -391,7 +394,7 @@ export function init() {
               const raided = (w.raidUntil || 0) > w.t;          // our raiding party holds their defence down
               if (raided) w.enemyDefence = 0;
               else if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW(w.tier) * defenceStandingK(standing), enemyDefenceCap(w.waveCount, w.tier) * defenceStandingK(standing));
-              if (!raided && w.raidUntil && !w.saidRaidOver) { w.saidRaidOver = true; logWar('Interior: the raiding party is back. Their defence is regrouping.'); }
+              if (!raided && w.raidUntil && !w.saidRaidOver) { w.saidRaidOver = true; war.event('raidEnd'); logWar('Interior: the raiding party is back. Their defence is regrouping.'); }
               // waves, as long as the enemy is still here; every fifth is a push
               if (!silent && !w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
                   w.lastWaveAt = w.t; w.waveCount++;
@@ -405,6 +408,8 @@ export function init() {
                       const targetEl = ui.landGrid.children[ti]?.querySelector('.building');
                       if (w.radar && targetEl) targetEl.classList.add('targeted');
                       const skyward = isAirMode(w.pendingWave.mode);
+                      // a salvo: the whistle falls toward the impact (the launch, then the arc)
+                      if (skyward) war.event('shell', { impactIn: WAVE_WARNING_S + 1.4, col: ti % 5, defended: (w.air || 0) > 0 });
                       // A landing gathers on their pier while the radar watches; the boat casts off at launchAt.
                       if (!skyward) _ants?.musterLanding({ targetBuildingId: target.id, count: size, push });
                       if (w.radar && skyward) logWar(push ? `Intel: a large salvo is heading for ${target.type}.` : `Radar: a salvo is on its way to ${target.type}.`, push);
@@ -432,6 +437,7 @@ export function init() {
                       if (first) w.firstLanding = true;
                       const castOff = () => {
                           const ww = gameState.war; if (!ww?.active) return;
+                          war.event('castOff', { col: ti % 5 });
                           if (ww.radar) logWar(`Radar: their boat has left the pier. ${size} ${enemy.id} heading for ${b.type}.`, push);
                           else if (first) logWar('Status: their boat has left the pier. It is heading for us.', true);
                       };
@@ -510,6 +516,29 @@ export function init() {
                   const row = ui.armsSlider.parentElement;
                   row.classList.remove('pulse-once'); void row.offsetWidth; row.classList.add('pulse-once');
               }
+              war.set(warSoundState(w, doom));
+          }
+          /** What the war's sound needs from the war, once a second (src/audio-war.js). */
+          function warSoundState(w, doom) {
+              const silentNow = (5 - (w.enemyRazedUntil || []).filter(x => x > 0).length) === 0 && !w.enemyLeft;
+              const p = w.pendingWave;
+              const nextLandingIn = w.enemyLeft || silentNow ? null
+                  : p ? Math.max(0, p.launchAt - w.t)
+                  : Math.max(0, waveInterval(w.waveCount) - (w.t - w.lastWaveAt)) + WAVE_WARNING_S;
+              const ti = p ? gameState.buildings.findIndex(b => b && b.id === p.targetId) : -1;
+              return {
+                  nextLandingIn, interval: waveInterval(w.waveCount),
+                  push: p ? !!p.push : isPush(w.waveCount + 1, w.tier, w.enemyTier),
+                  col: ti >= 0 ? ti % 5 : null,
+                  lead: w.tier - w.enemyTier,
+                  plates: gameState.buildings.map(b => (b ? !b.razed : null)),
+                  armsShare: w.armsShare, population: popLevel(gameState.population), doomsday: doom,
+                  enemyTier: w.enemyTier, radar: !!w.radar, airDefence: w.air || 0,
+                  raidLeft: Math.max(0, (w.raidUntil || 0) - w.t), silentIsland: silentNow,
+                  rocket: Math.max(0, Math.min(1, (doom - SOUND_ROCKET_FROM) / (DOOMSDAY_LEAVE - SOUND_ROCKET_FROM))),
+                  units: (w.defence || 0) + (w.force || 0) + (w.air || 0), landings: w.landings || 0, shown: { ...(w.shown || {}) },
+                  leaveStage: w.enemyLeft ? (w.leaveStage || 0) : -1,
+              };
           }
           /** What the war room says when a control opens. */
           const REVEAL_LINES = {
@@ -537,6 +566,8 @@ export function init() {
               const b = gameState.buildings[i];
               w.landings = (w.landings || 0) + 1;
               if (w.landings === 1) w.revealHoldUntil = w.t + 3;
+              war.event('landing', { col: i % 5, air: isAirMode(mode) });
+              if (w.enemyTier === TIERS.length - 1 && !w.nukeHeard) { w.nukeHeard = true; war.event('nuke'); }
               if (!b || b.razed) return;
               const hp = b.hp ?? plateMaxHp(b.type, b.fort || 0);
               const ratio = relativePower(w.enemyTier, w.tier);
@@ -560,6 +591,7 @@ export function init() {
               const cost = lost ? ` We lost ${lost}.` : '';
               if (r.razed) {
                   b.razed = true; b.population = 0; b.fort = 0; b.hp = 0;
+                  war.event('razed', { district: b.type === 'district' });
                   w.scorchOurs += enemy.scorch * 4;
                   renderGridSlot(i);
                   logWar(`Status: ${story} and razed it.${cost}`, true);
@@ -590,6 +622,9 @@ export function init() {
                   const hp = ww.enemyTileHp?.[pickIdx] ?? ENEMY_TILE_HP;
                   const enemyDefenceAtImpact = ww.enemyDefence;
                   const r = resolveOurStrike({ force, ourTier, enemyTier: ww.enemyTier, enemyDefence: ww.enemyDefence, tileHp: hp });
+                  war.event('strike', { at: 'impact' });
+                  if (r.razed) war.event('enemyRazed');
+                  if (ourTier === TIERS.length - 1 && !ww.nukeHeard) { ww.nukeHeard = true; war.event('nuke'); }
                   ww.force += r.forceLeft; ww.enemyDefence = r.enemyDefenceLeft;
                   // by boat the survivors are still over there: the rule has them back, the counter waits
                   if (byBoat) { coming = r.forceLeft; forceAway += coming; }
@@ -617,8 +652,10 @@ export function init() {
                   forceAway = Math.max(0, forceAway - coming); coming = 0;
                   updateAllUI();
               };
-              if (_ants) byBoat = _ants.launchStrike({ tileIndex: pickIdx, count: force, mode: tier.mode, losses, onImpact: impact, onHome: home }) === 'boat';
-              else impact();
+              // the tear when our force sets out (by boat: when it casts off)
+              const onPhase = (phase) => { if (phase === 'castOff') war.event('strike', { at: 'castOff' }); };
+              if (_ants) byBoat = _ants.launchStrike({ tileIndex: pickIdx, count: force, mode: tier.mode, losses, onImpact: impact, onHome: home, onPhase }) === 'boat';
+              else { onPhase('castOff'); impact(); }
               updateAllUI();
               return true;
           }
@@ -1433,7 +1470,7 @@ export function init() {
                   const i = gameState.buildings.findIndex(b => b && b.id === id); const b = gameState.buildings[i];
                   if (w?.active && b && !b.razed) {
                       const cost = FORT_COST(b.fort || 0);
-                      if (w.arms >= cost) { w.arms -= cost; b.fort = (b.fort || 0) + 1; b.hp = plateMaxHp(b.type, b.fort); renderGridSlot(i); logWar(`Interior: ${b.type} fortified and repaired. HP ${b.hp}.`); updateAllUI(); }
+                      if (w.arms >= cost) { w.arms -= cost; b.fort = (b.fort || 0) + 1; b.hp = plateMaxHp(b.type, b.fort); war.event('fortify'); renderGridSlot(i); logWar(`Interior: ${b.type} fortified and repaired. HP ${b.hp}.`); updateAllUI(); }
                       else flashArms();
                   }
                   return;
@@ -1466,28 +1503,32 @@ export function init() {
               // Drawn out like the card for II: black, a rest, III, a rest, WAR, the hold.
               // The sound is the set piece in audio-city.js (everything falls away, one
               // C sharp hangs, three strokes for III, the boom on WAR), timed to the card.
-              const sounded = city.war({ III: 3.4, WAR: 5.9, LIFT: 13.6 });
+              const marks = { III: 3.4, WAR: 5.9, LIFT: 13.6 };
+              const sounded = city.war(marks);
+              // their drum alone and our bass: the war's own music takes over as the set piece's bass fades
+              setTimeout(() => { if (!signal.aborted && gameState.war?.active && !gameState.shipChosen) war.start(); }, handoverAt(marks) * 1000);
               playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, pause: 1400, hold: 5000, silent: sounded, onMidpoint: () => startWar() })
                   .then(() => setTimeout(() => document.body.classList.add('tilt'), 1500));
           }, { signal });
           /** One click buys a tenth of your arms' worth of units (at least one). */
           const batchSize = (arms) => Math.max(1, Math.floor(arms * 0.1 / UNIT_COST));
-          ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.defence += n; updateAllUI(); }, { signal });
-          ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active || w.arms < UNIT_COST) return; const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.force += n; updateAllUI(); }, { signal });
+          ui.buyDefenceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active) return; if (w.arms < UNIT_COST) { war.event('noArms'); return; } const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.defence += n; war.event('buyShield'); updateAllUI(); }, { signal });
+          ui.buyForceBtn.addEventListener('click', () => { const w = gameState.war; if (!w?.active) return; if (w.arms < UNIT_COST) { war.event('noArms'); return; } const n = batchSize(w.arms); w.arms -= n * UNIT_COST; w.force += n; war.event('buySword'); updateAllUI(); }, { signal });
           ui.buyAirBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || !isShown(w, 'air')) return;
               if (w.arms < AIR_UNIT_COST) { flashArms(); return; }
               const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
-              w.arms -= n * AIR_UNIT_COST; w.air = (w.air || 0) + n; updateAllUI();
+              w.arms -= n * AIR_UNIT_COST; w.air = (w.air || 0) + n; war.event('buyAir'); updateAllUI();
           }, { signal });
           /** Short of arms: the arms counter flashes, so the eye goes to where hammers come from. */
           function flashArms() {
+              war.event('noArms');
               const row = ui.warArmsRow;
               row.classList.remove('flash-short'); void row.offsetWidth; row.classList.add('flash-short');
           }
           ui.intelBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.intel) return;
-              if (w.arms >= INTEL_COST) { w.arms -= INTEL_COST; w.intel = true; logWar(`Intel: office opened. The enemy fields ${TIERS[w.enemyTier].id}.`); updateAllUI(); }
+              if (w.arms >= INTEL_COST) { w.arms -= INTEL_COST; w.intel = true; war.event('buy'); logWar(`Intel: office opened. The enemy fields ${TIERS[w.enemyTier].id}.`); updateAllUI(); }
           }, { signal });
           ui.raidBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.enemyLeft || (w.raidUntil || 0) > w.t) return;
@@ -1495,6 +1536,7 @@ export function init() {
               if (w.arms < cost) return;
               w.arms -= cost; w.raids = (w.raids || 0) + 1; w.raidUntil = w.t + RAID_S; w.saidRaidOver = false;
               w.enemyDefence = 0;
+              war.event('raidStart', { seconds: RAID_S });
               logWar(`Interior: a raiding party slipped onto their island. Their defence is down for ${RAID_S} s. Strike now.`);
               updateAllUI();
           }, { signal });
@@ -1505,6 +1547,7 @@ export function init() {
               if ((w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S) return;
               if (gameState.science >= cost) {
                   gameState.science -= cost; w.tier++; w.lastTierAt = w.t || 0;
+                  war.event('tier');
                   logWar(`Interior: ${TIERS[w.tier].id} developed. Units are stronger.`);
                   const pulled = enemyCatchUp(w.tier, w.enemyTier);
                   if (pulled > w.enemyTier) { w.enemyTier = pulled; logWar(`Intel: enemy has stolen blueprints for ${TIERS[w.enemyTier].id}.`, true); }
@@ -1516,12 +1559,12 @@ export function init() {
           }, { signal });
           ui.radarBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active || w.radar) return;
-              if (w.arms >= RADAR_COST) { w.arms -= RADAR_COST; w.radar = true; logWar('Interior: radar online. Landings are marked before they arrive.'); updateAllUI(); }
+              if (w.arms >= RADAR_COST) { w.arms -= RADAR_COST; w.radar = true; war.event('buy'); logWar('Interior: radar online. Landings are marked before they arrive.'); updateAllUI(); }
           }, { signal });
           ui.autoBtn.addEventListener('click', () => {
               const w = gameState.war; if (!w?.active) return;
               if (!w.autoBought) {
-                  if (w.arms >= AUTO_COST) { w.arms -= AUTO_COST; w.autoBought = true; w.auto = true; w.stance = 'balanced'; logWar('Interior: a quartermaster now buys units for us. Set the stance.'); }
+                  if (w.arms >= AUTO_COST) { w.arms -= AUTO_COST; war.event('buy'); w.autoBought = true; w.auto = true; w.stance = 'balanced'; logWar('Interior: a quartermaster now buys units for us. Set the stance.'); }
               } else {
                   const i = STANCES.indexOf(w.stance || 'balanced');
                   w.stance = STANCES[(i + 1) % STANCES.length];
@@ -1554,6 +1597,9 @@ export function init() {
               const card = () => {
                   if (fastUiInterval) clearInterval(fastUiInterval);
                   city.stop();
+                  // the IV card takes the war's E flat and lets it fall to D
+                  war.finale('fall');
+                  war.stop();
                   goDeep();
               };
               if (_ants && hatch) { _ants.gatherAt(hatch, () => setTimeout(card, 1200)); setTimeout(card, 20000); } else card();
@@ -1693,7 +1739,8 @@ export function init() {
 
             /** A button that arrives: one soft pop, so a new choice is seen. */
             function arrive(btn) {
-                city.word('rise');                                   // something new: chapter I's three notes
+                if (gameState.war?.active) war.event('reveal');      // something new: chapter I's three notes, on their grid
+                else city.word('rise');                              // something new: chapter I's three notes
                 btn.classList.remove('btn-arrive');
                 void btn.offsetWidth;
                 btn.classList.add('btn-arrive');
@@ -1786,6 +1833,7 @@ export function init() {
                 // The city's music, unless the war is on (it has its own) or the way down is chosen
                 audio.wake();
                 if (!gameState.war?.active && !gameState.shipChosen) city.start();
+                else if (gameState.war?.active && !gameState.shipChosen) war.start();
                 saveGameState();
             }
 
@@ -1823,6 +1871,7 @@ export function init() {
 
 export function teardown() {
   city.stop();
+  war.stop();
   if (_ants) { _ants.stop(); _ants = null; delete window.rpiAnts; }
   if (abortController) abortController.abort();
   clearInterval(logicInterval);
