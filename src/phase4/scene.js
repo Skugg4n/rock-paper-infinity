@@ -533,6 +533,15 @@ export function createScene(container, opts = {}) {
         + `<circle class="ring-fg" cx="20" cy="20" r="18" fill="none" stroke-width="3" stroke-dasharray="${RING_LEN}" `
         + `stroke-dashoffset="${RING_LEN}" style="stroke:#4a5666;"></circle></svg>`;
 
+    /** deep-fix2: what the "+" on the next chamber says on hover (its price) and whether it can be paid. */
+    let digOffer = { html: '', ok: false, on: true };
+    function paintDigOffer() {
+        if (!digLabel || !digLabel.priceEl) return;
+        if (digLabel.priceEl.dataset.html !== digOffer.html) { digLabel.priceEl.dataset.html = digOffer.html; digLabel.priceEl.innerHTML = digOffer.html; }
+        digLabel.inner.classList.toggle('is-dig-ok', !!digOffer.ok);
+        digLabel.inner.classList.toggle('is-dig-off', !digOffer.on);
+    }
+
     /** The cells of a floor: its landing, and every chamber dug on it. */
     function planFloors(state, layout) {
         const slots = layout.slots || [];
@@ -825,10 +834,24 @@ export function createScene(container, opts = {}) {
             });
         });
 
-        // the next chamber: a ring where the shovel will go
+        // the next chamber: a ring where the shovel will go. deep-fix2: with a "+" in it, and a click
+        // there digs, as the DIG button does (Ola: "give it a plus so you can click there to dig")
         const next = placeChamber((layout.slots || []).length);
-        digLabel = makeLabel(RING_SVG, next.x * PITCH, plan[next.floor].y + 0.42, next.z * PITCH, 'dig');
+        digLabel = makeLabel(`${RING_SVG}<button class="dig-plus" type="button" aria-label="Dig a chamber here"></button>`
+            + '<span class="dig-price deep-mono"></span>', next.x * PITCH, plan[next.floor].y + 0.42, next.z * PITCH, 'dig');
         digLabel.ring = digLabel.inner.querySelector('.ring-fg');
+        digLabel.plusEl = digLabel.inner.querySelector('.dig-plus');
+        digLabel.priceEl = digLabel.inner.querySelector('.dig-price');
+        digLabel.plusEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const ok = opts.onDig ? opts.onDig() : false;
+            if (!ok) {
+                digLabel.inner.classList.remove('is-no');
+                void digLabel.inner.offsetWidth;
+                digLabel.inner.classList.add('is-no');
+            }
+        });
+        paintDigOffer();
 
         // where the people may stand, floor by floor
         plan.forEach((floor, fi) => {
@@ -1013,10 +1036,13 @@ export function createScene(container, opts = {}) {
             digLabel.ring.setAttribute('stroke-dashoffset', (RING_LEN * (1 - frac)).toFixed(1));
             digLabel.inner.classList.toggle('is-building', !!digJob);
         }
-        // and a ring on any plate whose room is being built or upgraded
+        // and a ring on the ONE plate an order belongs to (deep-fix2, Ola: "a progress bar spins
+        // around ALL e.g. mines, not just the one being built"). A room is ordered into its own
+        // chamber (the empty plate below shows it); levels and automation are not per chamber, so
+        // their ring is in the drawer's row and the queue, never on the plates.
         for (const l of labels) {
             if (l.kind !== 'room' || !l.cell?.room || !l.buildEl) continue;
-            const job = (state.builds || []).find((j) => j.type === l.cell.room && j.kind !== 'dig');
+            const job = (state.builds || []).find((j) => j.kind === 'room' && j.slot === l.cell.slot);
             l.buildEl.classList.toggle('is-on', !!job);
             if (job) {
                 const span = job.doneDay - job.startDay;
@@ -1360,6 +1386,19 @@ export function createScene(container, opts = {}) {
     }
 
     return {
+        /**
+         * deep-fix2: the "+" on the next chamber. Its hover shows `html` (the price, as the DIG button
+         * shows it); `ok` lights it when it can be paid; `on` false hides it (asleep, busy).
+         * @param {{html:string, ok:boolean, on:boolean}} offer
+         */
+        setDigOffer(offer) { digOffer = { ...digOffer, ...offer }; paintDigOffer(); },
+        /** Where the "+" on the next chamber is on the screen, or null (tests). */
+        digPlusAt() {
+            const el = digLabel && digLabel.plusEl;
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+        },
         /** Draws this state. Rebuilds only when the colony's shape changed. */
         setState(state, layout) {
             const key = structureKey(state, layout);

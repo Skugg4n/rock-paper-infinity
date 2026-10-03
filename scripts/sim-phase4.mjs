@@ -23,6 +23,8 @@
 // In both runs the player feeds it on the tree ("The machine: feed") the moment the next level can be
 // paid and pays for itself within FEED_PAYBACK real seconds (90; env FEED_PAYBACK to try another).
 // The output adds `stars/day curve` (when the rate first reaches each power of ten) and the feed times.
+// deep-fix2: asleep only the culture vats grow people; both runs buy each level the moment it can be
+// paid awake, after the hall. New beds fill a share at a time (deep.js BED_FILL).
 import {
   ROOMS, COLUMN, ROOM_FOR_COLUMN, ROOM, initialDeepState, tickDay, sleep, surface, canResurface, canAscend,
   roomMultiplier, digCost, roomCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, survival,
@@ -133,6 +135,16 @@ function buyFeed(asleep) {
     feedAt.push({ level: s.feed, real, year: s.day / DAYS_PER_YEAR });
     events.push({ real, day: s.day, e: `feed ${s.feed}` });
     k++;
+  }
+}
+/* deep-fix2: CULTURE VATS. Asleep only the vats grow people; the player buys each level awake the
+   moment it can be paid, once the hall stands (the panel says BUILD CULTURE VATS for the first). */
+const vatsAt = [];                 // { level, real, year }
+function buyVats() {
+  while (treeCanBuy(s, 'vats', { ...SIM, asleep: false }).ok) {
+    onTree('vats');
+    vatsAt.push({ level: s.vats, real, year: s.day / DAYS_PER_YEAR });
+    events.push({ real, day: s.day, e: `culture vats ${s.vats}` });
   }
 }
 let bodyEnd = null;                // v1.50.0: the last wake-up, { real, year, were }
@@ -268,6 +280,7 @@ while (real < REAL_CAP && (WATCHER ? !bodyEnd : !canAscend(s))) {
   let bought, n = 0;
   buyGifts(false);
   buyFeed(false);
+  buyVats();
   while ((bought = buy(r)) && n < 25) { events.push({ real, day: s.day, e: bought }); n++; buysThisWake++; }
   maybeScout(r);
   // Nothing affordable and the wait is long: go to sleep, if a dry run says the colony would
@@ -412,6 +425,7 @@ if (process.argv.includes('--gifts')) {
 const gat = (id) => (giftAt[id] ? fmt(giftAt[id].real) : 'never');
 console.log(`stars/day curve (first reaches 10^k)  ${curve.map((t, k) => (t === undefined ? null : `${k}:${fmt(t)}`)).filter(Boolean).join(' ')}`);
 console.log(`the machine (deep-machine)  fed ${feedAt.map((x) => `${x.level} ${fmt(x.real)}`).join('  ') || 'never'}`);
+console.log(`culture vats (deep-fix2)  ${vatsAt.map((x) => `${x.level} ${fmt(x.real)}`).join('  ') || 'never'}`);
 console.log(`surface (both runs: wins 1 in 3)  games ${surfaceGames}  nights ${nightAt.map((x) => `${x.n} ${fmt(x.real)}`).join('  ') || 'none'}  |  gifts bought: ${Object.keys(GIFT_PRICE).map((id) => `${id} ${gat(id)}`).join('  ')}  (of ${NIGHTS.length} nights)`);
 console.log(`watcher (unattended: no snaps, no riddles, reboots do not wake)  stability ${Math.round(w.stability)} at the end, lowest ${Math.round(lowest)}, ${w.reboots} reboots  slept ${Math.round(w.sleptYears)} y  named at ${named ? `${fmt(named.real)} (year ${Math.round(named.year)})` : 'never'} (night 1)  capacity first full at ${capFullAt === null ? 'never' : fmt(capFullAt)}  |  ${REF_SLEEP} s sleeps from full, first reboot in sleep: ${absent}`);
 console.log(`watcher (attentive: snap every ${SNAP_EVERY} s)  stability ${Math.round(w2.stability)} at the end, lowest ${Math.round(lowest2)}, ${w2.reboots} reboots  |  ${REF_SLEEP} s sleeps, held (low-high from the third sleep): ${held}`);

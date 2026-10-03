@@ -208,3 +208,17 @@ the card gone 7 s after a result. Screenshots in docs/playtests/rebuild-shots/.
 
 **Not done here.** The gauges' tick, the lever and the lights in sound.js (B269); any further 3D work
 (Ola may replace the view after a mockup round); movement III.
+
+## Fixed after the first playtest of v1.73.0 (deep-fix2)
+
+Ola: "SO much clearer and easier to understand, GOOD!" His nine notes, and what was done (B280 to B288):
+
+- The build ring is on the one chamber a room is built into; levels and automation ring in the drawer's row only.
+- The circle where the next chamber goes has a "+"; a click digs (DIG's price, shown on hover).
+- Only a press on the empty scene closes the drawer; it overlays and moves nothing (DIG, the drawer button and the lever sit above it).
+- One sign for ore: the pickaxe on every amount (readout.js ORE_SIGN and signHtml); the word ORE only on the gauge, beside it. Stars are ★ everywhere.
+- People grow into new beds a share a day (deep.js BED_FILL), the HANDS gauge has one continuous scale and a slow spring.
+- Cryo I's price is the fourth lamp, "★ 15 k", dim until it can be paid; the lever comes only when all four are lit.
+- Surface's line typed twice: the card counted as gone while the fists shook (a throw sets the result before it is shown). Fixed in instruments.js cardGone; a line typed in a visit is never retyped.
+- **Culture vats** (HABITAT, three levels, a day purchase after the hall): asleep only the vats grow people. Without them the ice thins the sleepers until a whole one under ten is missing. **In GROW these vats are the ones the body takes over**: movement III's "dormitories that the body takes become VATS" should take these vats first, so the body grows its own people from the vats the colony built to survive the sleep.
+- Sims: plain 26m01s → 26m58s, --watcher 21m08s → 23m02s.

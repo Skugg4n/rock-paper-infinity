@@ -72,7 +72,7 @@ describe('Cryo I shows its whole road', () => {
 describe('every effect line carries before and after', () => {
     test('a level: what the room makes, from a dry run', () => {
         const s = initialDeepState();
-        expect(effectLine(s, 'seam')).toMatch(/^Ore 12 → 24 a day/);
+        expect(effectLine(s, 'seam')).toMatch(/^⛏ 12 → 24 a day/);
         expect(effectLine(s, 'output')).toMatch(/^Energy 26 → 52 a day, ★ \d+ → \d+ a day/);
         expect(effectLine(s, 'feed')).toMatch(/^Its share 6 % → 9 %, ★ 81 → \d+ a day\.$/);
     });
@@ -80,7 +80,7 @@ describe('every effect line carries before and after', () => {
         const s = { ...initialDeepState(), tree: { opened: ['lossless', 'cold', 'quiet'], bought: [], unseen: false } };
         s.auto = { mine: 1, farm: 1, generator: 1, dorm: 0 };
         s.level = { mine: 3, farm: 3, generator: 3, dorm: 0 };
-        expect(effectLine(s, 'lossless')).toMatch(/^Ore [\d.]+( k)? → [\d.]+( k)? a day/);
+        expect(effectLine(s, 'lossless')).toMatch(/^⛏ [\d.]+( k)? → [\d.]+( k)? a day/);
         expect(effectLine(s, 'quiet')).toMatch(/^Power drawn \d+ → \d+ a day/);
         expect(effectLine(s, 'cold')).toMatch(/^(Food under the ice lasts|Sleepers eat) .+ → .+/);
         // not opened: nothing to say yet

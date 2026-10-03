@@ -2509,3 +2509,84 @@ items:
     request: |
       Open after deep-rebuild: the gauges' tick, the lever's clunk and the lights going out in sound.js; a new colony view implementing view-hooks.js (Ola may replace the 3D view after a mockup round); movement III (GROW) replaces the biological steps, which still run behind the scenes and are kept out of the drawer.
     status: open
+
+  - id: B280
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "When you build something a progress bar spins around ALL e.g. mines, not just the one being built." The build ring shows only on the one chamber a room order belongs to; levels and automation ring in the drawer row and the queue, never on plates.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "scene.js refresh: the room-plate ring keys on j.kind === 'room' && j.slot === the plate's slot."
+
+  - id: B281
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "The circle that shows WHERE the next room will be dug: remove it or give it a plus so you can click there to dig." A + in the ring; a click digs like DIG (same price), the hover shows the price with the pickaxe.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "scene.js digLabel .dig-plus, setDigOffer; index.js onDig."
+
+  - id: B282
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "With the drawer open you can click Dig, but the drawer just closes and nothing is dug." Only a press on the empty scene closes the drawer; DIG, the lever, the drawer button, the + and the menu do their job.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "Cause: the capture pointerdown closed the drawer and the buttons slid right before the click landed. index.js closes only on presses inside #deep-scene."
+
+  - id: B283
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "Opening and closing the drawer moves the buttons next to it." The drawer overlays; nothing moves. DIG, the drawer button, the lever and the reset sit above it, the drawer's list ends above them, the counters fade under it.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "style-deep.css: no right: shift; #deep-act z 42; .deep-drawer-in padding-bottom (292 px with the lever)."
+
+  - id: B284
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "Sometimes it says Ore and sometimes there is a pickaxe symbol." One sign: every amount of ore carries the pickaxe glyph (counters, DIG, the ring, the + hover, the drawer, its wallet, the whole tree's wallet and info box); the word ORE only on the gauge's tape, beside the same glyph. Stars: the star everywhere, the counter too.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "readout.js ORE_SIGN, ORE_GLYPH, signHtml; tree.js priceText/costLine/QTY."
+
+  - id: B285
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "I build more beds but don't see more people on the gauge. Oh, now it jumps up." People grow into new beds over weeks (a share of the empty beds a day) and the HANDS needle has one continuous scale (no jump from red to green when the last post is filled) on a slow, critically damped spring.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "deep.js BED_FILL 0.08; instruments.js handsK/HANDS_FULL; panel.js SPRING_SLOW."
+
+  - id: B286
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "Cryo I needs the three lamps lit. They are lit, but it ALSO needs 15 k stars. It didn't say." The price is the fourth lamp, its tape the stars it costs, dim until it can be paid; the lever appears only when all four are lit, and no price under it.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "instruments.js cryoLamps adds { key: 'price', price: true }; panel.js is-price."
+
+  - id: B287
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "Surface's messages sometimes come twice in a row." Cause: a throw set the visit's result before the result was shown, so for the fists' 1.3 s the card read as gone, the line was cleared, and at the result it typed itself again. The card is never gone while a game is under way; a line already typed in a visit is never retyped.
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "instruments.js cardGone (tested); index.js typedKeys, rpiDeep.typeStarts (acceptance checks 1)."
+
+  - id: B288
+    added: 2026-10-03
+    source: "playtest of v1.73.0 (Ola, 2026-10-03)"
+    request: |
+      "We should introduce 'Grow humans in vats' to excuse how there can be more humans although we are in cryo." CULTURE VATS, a HABITAT node in the drawer ('Grows people while the colony sleeps.'), bought awake after the hall, three levels (★ 20 k, 1 M, 100 M). Asleep only the vats grow people (0.3, 0.6, 1 x the awake rate); without them the ice thins the sleepers and they wake when a whole sleeper under ten is missing. Old saves with a hall get level 1 (schema 9).
+    status: done
+    resolved_in: deep-fix2 (version at merge)
+    notes: "deep.js VAT_GROWTH/VATS_COST/FEW_AT, the thinning fast-forward in sleep(); tree.js node 'vats'; the panel says BUILD CULTURE VATS. Sims: plain 26m01s to 26m58s, --watcher 21m08s to 23m02s. In GROW these are the vats the body takes over."

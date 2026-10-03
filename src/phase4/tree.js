@@ -33,14 +33,14 @@
 import {
     CRYO, CRYO_TOP, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
     tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedCost, feedShare, ROOMS, BIRTH_FOOD,
-    FOOD_ALARM_DAYS, NIGHT_VISION_LATE, scoutOdds, isQueued, MIN_SLEEPERS, buildEta,
+    FOOD_ALARM_DAYS, NIGHT_VISION_LATE, scoutOdds, isQueued, MIN_SLEEPERS, buildEta, VATS_MAX, vatsCost, vatsLevel,
 } from './deep.js';
 import { NIGHTS, nightsSaid, visitDue } from './surface.js';
 import {
     LADDER, has as watcherHas, nextStep, stepNeed, buyStep, peopleFor, firstSleep,
     DRIFT_PER_SECOND, driftFactor, snapGain, capacityMax, capacityGain, puzzleGain, CAPACITY_PER_SECOND,
 } from './watcher.js';
-import { affordText, cryoNeed, cryoRoad, rateWords, short, span, list } from './readout.js';
+import { affordText, cryoNeed, cryoRoad, rateWords, short, span, list, ORE_SIGN } from './readout.js';
 import { ROOM_WORD, ROOM_WORDS } from './advisor.js';
 
 export const BOARD = { w: 1000, h: 730 };
@@ -102,6 +102,9 @@ export const NODES = [
         does: 'What a pair of hands is worth.' },
     { id: 'quiet', branch: 'HABITAT', x: 140, y: 90, lab: 't', kind: 'surface', name: 'QUIET\nHANDS', max: 1, parent: 'hands',
         does: 'Automated rooms cost no more to run than a bare room.' },
+    // deep-fix2: the culture vats grow people while the colony sleeps (deep.js VAT_GROWTH)
+    { id: 'vats', branch: 'HABITAT', x: 250, y: 90, lab: 't', kind: 'vats', name: 'CULTURE\nVATS', max: VATS_MAX, parent: 'creche',
+        does: 'Grows people while the colony sleeps.' },
 
     // CRYO: a chain, root to VII, right to left
     ...ROMAN.map((r, i) => ({
@@ -283,6 +286,7 @@ export function levelOf(state, id) {
         case 'watcher': case 'bio': return watcherHas(state.watcher, n.step) ? 1 : 0;
         case 'surface': return gift(state, id) ? 1 : 0;
         case 'feed': return Math.max(0, Math.min(FEED_MAX, Math.floor(state.feed || 0)));
+        case 'vats': return vatsLevel(state);
         default: return 0;
     }
 }
@@ -332,6 +336,10 @@ export function priceOf(state, id) {
         const p = feedCost(levelOf(state, id));
         return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
     }
+    if (n.kind === 'vats') {
+        const p = vatsCost(levelOf(state, id));
+        return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
+    }
     if (n.kind === 'watcher' || n.kind === 'bio') {
         const step = LADDER.find((u) => u.id === n.step);
         if (!step) return null;
@@ -342,13 +350,13 @@ export function priceOf(state, id) {
     }
     return null;
 }
-/** The price as the info box writes it: "★ 4.4 k", "120 cap + ★ 1 B + 1 M ore + a dormitory". */
+/** The price as the info box writes it: "★ 4.4 k", "120 cap + ★ 1 B + ⛏ 1 M + a dormitory". */
 export function priceText(price) {
     if (!price) return '';
     const parts = [];
     if (price.cap) parts.push(`${short(price.cap)} cap`);
     if (price.stars) parts.push(`★ ${short(price.stars)}`);
-    if (price.ore) parts.push(`${short(price.ore)} ore`);
+    if (price.ore) parts.push(`${ORE_SIGN} ${short(price.ore)}`);
     if (price.beds) parts.push(price.beds === 1 ? 'a dormitory' : `${price.beds} dormitories`);
     if (price.people) parts.push(`${short(price.people)} people`);
     return parts.join(' + ');
@@ -415,6 +423,14 @@ export function canBuy(state, id, ctx = {}) {
         return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
     }
 
+    // deep-fix2: the culture vats, bought awake once the hall stands, with stars, at once
+    if (n.kind === 'vats') {
+        if ((state.cryo ?? -1) < 0) return no('prereq', `Needs ${cryoName(0)} first.`);
+        if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
+        const miss = affordText({ price: vatsCost(levelOf(state, id)), have: state.stars || 0, perDay });
+        return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
+    }
+
     if (n.kind === 'level' || n.kind === 'auto') {
         if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
         if (!((state.rooms[n.type] || 0) > 0) && !buildPending(state, 'room', n.type)) {
@@ -452,7 +468,7 @@ export function canBuy(state, id, ctx = {}) {
         case 'sector': return { ok: true, reason: 'Paid. Choose a sector to seal.', kind: 'choose' };
         case 'capacity': return no('afford', `Needs ${short(next.cap)} capacity: ${Math.floor(w.capacity)} now.`);
         case 'stars': return no('afford', affordText({ price: next.stars, have: state.stars || 0, perDay }));
-        case 'ore': return no('afford', `Needs ${short(next.ore)} ore: ${short(state.minerals || 0)} now.`);
+        case 'ore': return no('afford', `You need ${ORE_SIGN} ${short(Math.max(0, next.ore - (state.minerals || 0)))} more.`);
         case 'dorm': return no('gate', 'Needs a dormitory to spare.');
         case 'people': return no('gate', 'Needs more people: some must stay under the ice.');
         case 'growing': return no('gate', 'It is still growing.');
@@ -547,8 +563,8 @@ const dayOf = (c, asleep) => {
     };
 };
 const QTY = {
-    ore: ['ore', ' a day'], food: ['food', ' a day'], energy: ['energy', ' a day'], drawn: ['power drawn', ' a day'],
-    burned: ['ore burned', ' a day'], beds: ['beds', ''], hands: ['free hands', ''], stars: ['★', ' a day'],
+    ore: [ORE_SIGN, ' a day'], food: ['food', ' a day'], energy: ['energy', ' a day'], drawn: ['power drawn', ' a day'],
+    burned: [`${ORE_SIGN} burned`, ' a day'], beds: ['beds', ''], hands: ['free hands', ''], stars: ['★', ' a day'],
 };
 /** The quantities that change, in the order asked, at most `max` of them. */
 function changed(a, b, keys, max = 3) {
@@ -663,7 +679,7 @@ export function costLine(price) {
     const parts = [];
     if (price.stars) parts.push(`★ ${short(price.stars)}`);
     if (price.cap) parts.push(`${short(price.cap)} capacity`);
-    if (price.ore) parts.push(`${short(price.ore)} ore`);
+    if (price.ore) parts.push(`${ORE_SIGN} ${short(price.ore)}`);
     if (price.beds) parts.push(price.beds === 1 ? 'a dormitory' : `${price.beds} dormitories`);
     if (price.people) parts.push(`${short(price.people)} people`);
     return parts.length ? `Costs ${list(parts)}.` : '';
@@ -793,6 +809,12 @@ export function buy(state, id, ctx = {}) {
         state.stars -= price;
         state.feed = levelOf(state, id) + 1;
         return { id, kind: 'feed', level: state.feed, price };
+    }
+    if (n.kind === 'vats') {
+        const price = vatsCost(levelOf(state, id));
+        state.stars -= price;
+        state.vats = levelOf(state, id) + 1;
+        return { id, kind: 'vats', level: state.vats, price };
     }
     if (n.kind === 'surface') {
         const price = GIFT_PRICE[id];

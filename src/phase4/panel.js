@@ -3,7 +3,7 @@
  *
  * Four round gauges with needles and a red arc, each labelled on dymo tape (ORE, FOOD, POWER,
  * HANDS); one stamped label under them, the only advice; a small "EMPTY 2" when dug chambers stand
- * empty; before the hall, the three lamps of cryo; and one alarm lamp that lights on a wake with
+ * empty; before the hall, the lamps of cryo (three conditions and the price); and one alarm lamp that lights on a wake with
  * its word. What the needles read is instruments.js's; this file only draws and moves them.
  *
  * The needles move on a damped spring, a frame at a time (`step(dt)`). The panel's lights go out
@@ -11,6 +11,7 @@
  */
 
 import { GAUGES, RED_K, GREEN_FROM, GREEN_SPAN, ADVICE_PREFIX, ADVICE_HOLD_MS } from './instruments.js';
+import { ORE_GLYPH } from './readout.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const CX = 60, CY = 62, R = 46;
@@ -29,9 +30,12 @@ function arc(k0, k1, r) {
 }
 /** The spring the needles ride on: stiff, a little underdamped, so a swing overshoots and settles. */
 export const SPRING = { k: 60, damp: 9 };
+/** deep-fix2: HANDS rides a slow, critically damped spring: people come into new beds over days, and
+ *  the needle eases up with them, never a jump (Ola: "Nice if it rose more slowly"). */
+export const SPRING_SLOW = { k: 5, damp: 2 * Math.sqrt(5) };
 /** One step of a damped spring toward `target`. Pure. */
-export function springStep(x, v, target, dt) {
-    const a = SPRING.k * (target - x) - SPRING.damp * v;
+export function springStep(x, v, target, dt, spring = SPRING) {
+    const a = spring.k * (target - x) - spring.damp * v;
     const v2 = v + a * dt;
     return { x: x + v2 * dt, v: v2 };
 }
@@ -92,9 +96,17 @@ export function createPanel(els) {
         cell.dataset.col = c;
         const svg = gaugeSvg(c);
         cell.appendChild(svg);
-        cell.appendChild(dymo(label, 'is-gauge'));
+        const tape = dymo(label, 'is-gauge');
+        // deep-fix2: the word ORE stands beside the pickaxe that every amount of ore carries
+        if (c === 'M') {
+            const row = document.createElement('span');
+            row.className = 'deep-gauge-label';
+            row.innerHTML = ORE_GLYPH;
+            row.appendChild(tape);
+            cell.appendChild(row);
+        } else cell.appendChild(tape);
         els.gauges.appendChild(cell);
-        g[c] = { cell, needle: svg.querySelector('.needle'), x: 0, v: 0, target: 0, red: false, twitch: 0 };
+        g[c] = { cell, needle: svg.querySelector('.needle'), x: 0, v: 0, target: 0, red: false, twitch: 0, spring: c === 'H' ? SPRING_SLOW : SPRING };
     }
     // the three lamps of cryo, built once; their words are fixed
     let lampEls = [];
@@ -102,14 +114,15 @@ export function createPanel(els) {
         els.lamps.textContent = '';
         lampEls = list.map((L) => {
             const cell = document.createElement('div');
-            cell.className = 'deep-cryo-lamp deep-light';
+            // deep-fix2: the fourth lamp is the price, its tape the stars it costs
+            cell.className = `deep-cryo-lamp deep-light${L.price ? ' is-price' : ''}`;
             cell.dataset.lamp = L.key;
             const bulb = document.createElement('span');
             bulb.className = 'deep-bulb';
             cell.appendChild(bulb);
             cell.appendChild(dymo(L.label, 'is-small'));
             els.lamps.appendChild(cell);
-            return { key: L.key, cell };
+            return { key: L.key, label: L.label, cell };
         });
     }
     const advice = { word: '', at: 0, want: '' };
@@ -150,7 +163,7 @@ export function createPanel(els) {
             els.empty.hidden = !em;
             // the lamps: only before the hall
             if (lamps) {
-                if (lampEls.length !== lamps.length || lampEls.some((l, i) => l.key !== lamps[i].key)) buildLamps(lamps);
+                if (lampEls.length !== lamps.length || lampEls.some((l, i) => l.key !== lamps[i].key || l.label !== lamps[i].label)) buildLamps(lamps);
                 lamps.forEach((L, i) => {
                     lampEls[i].cell.classList.toggle('is-lit', L.lit);
                     lampEls[i].cell.classList.toggle('is-ordered', !L.lit && L.ordered);
@@ -167,7 +180,7 @@ export function createPanel(els) {
                 const n = g[c];
                 const target = n.twitch > 0 ? n.twitchTo : n.target;
                 if (n.twitch > 0) n.twitch -= d;
-                const s = springStep(n.x, n.v, target, d);
+                const s = springStep(n.x, n.v, target, d, n.twitch > 0 ? SPRING : n.spring);
                 n.x = s.x; n.v = s.v;
                 n.needle.setAttribute('transform', `rotate(${angleOf(n.x).toFixed(2)} ${CX} ${CY})`);
             }

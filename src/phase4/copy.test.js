@@ -28,7 +28,7 @@ describe('the price in words', () => {
     test('stars first, then capacity, ore, a dormitory, people', () => {
         expect(costLine({ currency: 'cap+stars', cap: 20, stars: 2e4 })).toBe('Costs ★ 20 k and 20 capacity.');
         expect(costLine({ currency: 'stars', stars: 4e4 })).toBe('Costs ★ 40 k.');
-        expect(costLine({ cap: 60, stars: 5e8, ore: 1e6, beds: 1 })).toBe('Costs ★ 500 M, 60 capacity, 1 M ore and a dormitory.');
+        expect(costLine({ cap: 60, stars: 5e8, ore: 1e6, beds: 1 })).toBe('Costs ★ 500 M, 60 capacity, ⛏ 1 M and a dormitory.');
         expect(costLine(null)).toBe('');
     });
 });

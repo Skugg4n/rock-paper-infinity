@@ -12,10 +12,10 @@
 
 import {
     ROOM_FOR_COLUMN, MIN_SLEEPERS, freeChambers, buildPending, nextPrice, CRYO, CRYO_TOP,
-    sleepTrouble, feedCost, FEED_MAX, buildProgress, isQueued, RESURFACE_AT, surface,
+    sleepTrouble, feedCost, FEED_MAX, buildProgress, isQueued, RESURFACE_AT, surface, vatsCost, vatsLevel,
 } from './deep.js';
 import { foodDaysLeft } from './advisor.js';
-import { stocks, short } from './readout.js';
+import { stocks, short, ORE_SIGN } from './readout.js';
 import {
     NODES, NODE_BY_ID, canBuy, orderedOf, levelOf, nodeVisible, stateLine, priceOf, opened,
 } from './tree.js';
@@ -67,9 +67,18 @@ export function gauges(state, report) {
     for (const t of Object.keys(report.staff || {})) {
         if ((report.live?.[t] || 0) > 0 && report.staff[t] < 0.999) { short0 = t; break; }
     }
-    out.H = short0 ? { ...fall(0, RED_K * report.staff[short0]), room: short0 } : rising('H');
+    // deep-fix2: one continuous scale, so the needle never jumps when the last post is filled: short
+    // of crew it sits in the red by how short; fully crewed it climbs from the red's edge toward the
+    // top as the share of free hands grows (full at HANDS_FULL of the people free)
+    if (short0) out.H = { ...fall(0, RED_K * report.staff[short0]), room: short0 };
+    else if (state.asleep) out.H = rising('H');
+    else out.H = { k: handsK(report.awake > 0 ? report.hands / report.awake : 0), falling: false, red: false, days: Infinity };
     return out;
 }
+/** At this share of the people free the HANDS needle reaches the top of its green. */
+export const HANDS_FULL = 0.5;
+/** Where the HANDS needle stands for a share of free hands, fully crewed: from the red's edge up. */
+export const handsK = (free) => RED_K + (GREEN_FROM + GREEN_SPAN - RED_K) * Math.max(0, Math.min(1, (free || 0) / HANDS_FULL));
 
 /* ---- THE ONE STAMPED LABEL ----------------------------------------------------------------
    "INSTRUMENTS: BUILD FARM". The only advice in the game. It never explains itself. */
@@ -80,6 +89,7 @@ export const ADVICE = {
     build: (t) => `BUILD ${ROOM_UP[t]}`,
     automate: (t) => `AUTOMATE ${ROOMS_UP[t]}`,
     dig: 'DIG',
+    vats: 'BUILD CULTURE VATS',
     feed: 'FEED THE MACHINE',
     longer: 'LONGER SLEEP',
     sleep: 'SLEEP',
@@ -138,23 +148,27 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
             if (item.key === 'ore') { const w = buildOrDig(state, 'mine'); if (w) return w; }
         }
     }
-    // 5. the machine, when a level of feed can be paid
+    // 5. after the hall, the first culture vats, when they can be paid: asleep nobody else is born
+    if (state.cryo >= 0 && vatsLevel(state) < 1 && (state.stars || 0) >= vatsCost(0)) return ADVICE.vats;
+    // 6. the machine, when a level of feed can be paid
     if ((state.feed || 0) < FEED_MAX && (state.stars || 0) >= feedCost(state.feed || 0)) return ADVICE.feed;
     if (state.cryo >= 0) {
-        // 6. a longer sleep can be bought
+        // 7. a longer sleep can be bought
         const tier = state.cryo + 1;
         if (tier <= CRYO_TOP && road && road.open) return ADVICE.longer;
-        // 7. the colony can sleep safely: sleep
+        // 8. the colony can sleep safely: sleep
         if (lever && !sleepTrouble(state, CRYO[Math.min(CRYO.length - 1, state.cryo)].days, 1500)) return ADVICE.sleep;
     }
     return ADVICE.wait;
 }
 
-/* ---- THE THREE LAMPS OF CRYO --------------------------------------------------------------
+/* ---- THE LAMPS OF CRYO --------------------------------------------------------------------
    Cryo I's own road (readout.js cryoRoad), item for item: every room a crew runs must be
-   automated, and a dry run of the sleep must meet no shortage of ore, power or food. Each lamp
-   holds the items of one store; lit when all of them are done. The price and the people are the
-   lever's: it appears when tree.js says Cryo I can be bought. */
+   automated, and a dry run of the sleep must meet no shortage of ore, power or food. Each of the
+   first three lamps holds the items of one store; lit when all of them are done. deep-fix2: the
+   price is the fourth lamp (Ola: "They are lit, but it ALSO needs 15 k stars. It didn't say."), its
+   tape the price in stars, dim until the stars are there. The lever appears when tree.js says Cryo I
+   can be bought, which is never before all four are lit. */
 export const LAMPS = [
     { key: 'food', label: 'FOOD RUNS ITSELF', items: ['auto-farm', 'food'] },
     { key: 'power', label: 'POWER RUNS ITSELF', items: ['auto-generator', 'energy'] },
@@ -162,15 +176,19 @@ export const LAMPS = [
 ];
 /**
  * @param {object|null} road - cryoRoad(0, state)
- * @returns {{key:string, label:string, lit:boolean, ordered:boolean}[]}
+ * @param {number} [price] - Cryo I's price in stars: the fourth lamp's tape
+ * @returns {{key:string, label:string, lit:boolean, ordered:boolean, price?:boolean}[]}
  */
-export function cryoLamps(road) {
+export function cryoLamps(road, price = CRYO[0].cost) {
     const items = (road && road.items) || [];
-    return LAMPS.map((L) => {
+    const lamps = LAMPS.map((L) => {
         const mine = items.filter((x) => L.items.includes(x.key));
         const open = mine.filter((x) => !x.done);
         return { key: L.key, label: L.label, lit: open.length === 0, ordered: open.length > 0 && open.every((x) => x.ordered) };
     });
+    const paid = items.find((x) => x.key === 'stars');
+    lamps.push({ key: 'price', label: `★ ${short(price)}`, lit: !!paid && paid.done, ordered: false, price: true });
+    return lamps;
 }
 
 /* ---- THE ONE WAKE LAMP -------------------------------------------------------------------
@@ -247,6 +265,7 @@ const DOES = {
     secondcore: 'The lamps steady it more.',
     mast: 'Sees further up the shaft.',
     reactor: 'Capacity fills three times faster.',
+    vats: 'Grows people while the colony sleeps.',
 };
 const RATE_SHORT = { 30: 'a month', 365: 'a year', 3650: 'ten years', 36500: 'a century', 365000: 'a millennium', 3650000: 'ten millennia', 36500000: 'a hundred millennia' };
 
@@ -262,20 +281,20 @@ export function drawerDoes(state, id) {
     if (n.kind === 'cryo') return n.tier === 0 ? 'A hall to sleep in.' : `A second sleeps ${RATE_SHORT[CRYO[n.tier].days] || 'longer'}.`;
     return DOES[id] || '';
 }
-/** The price on a row: "★ 4.4 k", "★ 20 k + 20 capacity". */
+/** The price on a row: "★ 4.4 k", "★ 20 k + 20 capacity", ore always with its sign (readout.js ORE_SIGN). */
 export function drawerPrice(price) {
     if (!price) return '';
     const parts = [];
     if (price.stars) parts.push(`★ ${short(price.stars)}`);
     if (price.cap) parts.push(`${short(price.cap)} capacity`);
-    if (price.ore) parts.push(`${short(price.ore)} ore`);
+    if (price.ore) parts.push(`${ORE_SIGN} ${short(price.ore)}`);
     if (price.beds) parts.push(price.beds === 1 ? 'a dormitory' : `${price.beds} dormitories`);
     return parts.join(' + ');
 }
 /** What a locked row needs, in a few plain words. */
 export function drawerNeed(state, id, ctx) {
     const n = NODE_BY_ID[id];
-    if (n.kind === 'cryo' && n.tier === 0) return 'Needs the three lamps lit.';
+    if (n.kind === 'cryo' && n.tier === 0) return 'Needs all four lamps lit.';
     return stateLine(state, id, ctx).text;
 }
 /** How far along the order of this node under way is, 0 to 1, or -1 when none is. */
@@ -304,7 +323,7 @@ export function drawerGroups(state, ctx = {}) {
             if (!nodeVisible(state, n.id)) continue;
             if (n.kind === 'surface' && !opened(state, n.id)) continue;
             // asleep only the night's things: the levels, automations and cryo tiers wait for the wake
-            if (asleep && (n.kind === 'level' || n.kind === 'auto' || n.kind === 'cryo')) continue;
+            if (asleep && (n.kind === 'level' || n.kind === 'auto' || n.kind === 'cryo' || n.kind === 'vats')) continue;
             const can = canBuy(state, n.id, { ...ctx, asleep });
             const prog = (n.kind === 'level' || n.kind === 'auto') ? orderProgress(state, n) : -1;
             const row = {
@@ -335,3 +354,18 @@ export function surfaceTape(night, word = 'SURFACE') {
 export const MERGE_MS = 1800;
 /** Surface's card fades out this long after a game's result. */
 export const RPS_FADE_MS = 6000;
+/** After the card fades it is gone this long later (the fade's own time). */
+export const RPS_GONE_MS = RPS_FADE_MS + 600;
+/**
+ * deep-fix2: is Surface's card (and its line) gone from the screen? Only once a game has been
+ * played AND its result shown RPS_GONE_MS ago. While the fists shake and turn the game is under way
+ * (`playing`), never gone: before this the card vanished at the throw, came back at the result, and
+ * the night's line typed itself a second time. A game played before a reload is gone at once.
+ * @param {{result:boolean, playing:boolean, doneAt:number, now:number}} o
+ * @returns {boolean}
+ */
+export function cardGone({ result, playing, doneAt, now }) {
+    if (!result || playing) return false;
+    if (!doneAt) return true;
+    return now - doneAt >= RPS_GONE_MS;
+}

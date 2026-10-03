@@ -31,7 +31,7 @@ import {
     cancelOrder, digSpare, nextCryo, CRYO_TOP, FEED_MAX, buildProgress,
 } from './deep.js';
 import { pushFeed, alarmLine } from './advisor.js';
-import { short, span, cryoRoad, cryoNeed } from './readout.js';
+import { short, span, cryoRoad, cryoNeed, ORE_SIGN, signHtml } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout, sectorOf, claimChambers, emptyChambers } from './layout.js';
 import { createScene, supportsWebGL } from './scene.js';
 import { serializeDeep, saveToStorage, loadFromStorage } from './persistence.js';
@@ -51,7 +51,7 @@ import { machineTempo, machineSays } from './machine.js';
 import { createTreeView } from './tree-view.js';
 import {
     gauges as readGauges, advise, cryoLamps, wakeWord, hallucinationsAt, SNAP_CLEAR_MS, healing,
-    drawerGroups, drawerCount, surfaceTape, MERGE_MS, RPS_FADE_MS,
+    drawerGroups, drawerCount, surfaceTape, MERGE_MS, RPS_FADE_MS, cardGone,
 } from './instruments.js';
 import { createPanel } from './panel.js';
 import { createDrawer } from './drawer.js';
@@ -204,6 +204,8 @@ export function init() {
                 onInteract: () => ui.resetBtn.classList.add('is-on'),
                 onLabels: scheduleIconRefresh,
                 onClearDark: (slot) => clearDark(slot),
+                // deep-fix2: the "+" on the next chamber digs, as the DIG button does
+                onDig: () => (!busy && !state.asleep && !paused() && !state.watcher.gone ? dig() : false),
             });
         } catch (e) {
             console.error('the deep: the model could not be built', e);
@@ -414,9 +416,12 @@ export function init() {
         // DIG: one button, its price under it
         const full = (state.builds || []).length >= QUEUE_MAX;
         const digPrice = nextPrice(state, 'dig');
-        ui.digBtn.classList.toggle('is-locked', asleep || busy || state.minerals < digPrice || full);
-        const dp = `${formatCount(digPrice)} ore`;
-        if (ui.digPrice.textContent !== dp) ui.digPrice.textContent = dp;
+        const digLocked = asleep || busy || state.minerals < digPrice || full;
+        ui.digBtn.classList.toggle('is-locked', digLocked);
+        // deep-fix2: ore always with its pickaxe, here, on the "+" of the next chamber, in the ring
+        const dp = `${ORE_SIGN} ${formatCount(digPrice)}`;
+        if (ui.digPrice.dataset.text !== dp) { ui.digPrice.dataset.text = dp; ui.digPrice.innerHTML = signHtml(dp); }
+        scene?.setDigOffer({ html: signHtml(dp), ok: !digLocked, on: !asleep && !busy });
         showBuild(ui.digBtn, 'dig', null);
         drawQueue();
 
@@ -439,12 +444,13 @@ export function init() {
         }
         leverWas = leverOn;
         ui.leverWrap.hidden = !leverOn;
+        ui.root.classList.toggle('has-lever', leverOn);
         ui.leverWrap.classList.toggle('is-down', !!state.asleep);
         ui.leverWrap.classList.toggle('is-ready', !state.asleep && inst.advice === 'SLEEP');
         const few = !state.asleep && state.humans < MIN_SLEEPERS;
         ui.leverWrap.classList.toggle('is-locked', busy || few);
-        const price = !owns && leverOn ? `★ ${formatCount(CRYO[0].cost)}` : '';
-        if (ui.leverPrice.textContent !== price) ui.leverPrice.textContent = price;
+        // deep-fix2: the price is the fourth lamp on the panel; it is not said again under the lever
+        if (ui.leverPrice.textContent !== '') ui.leverPrice.textContent = '';
         ui.lever.setAttribute('aria-label', state.asleep ? 'Wake' : 'Sleep');
         const tape = state.asleep ? 'WAKE' : 'SLEEP';
         if (ui.leverTape.textContent !== tape) ui.leverTape.textContent = tape;
@@ -455,7 +461,7 @@ export function init() {
         updateWatcher();
         scheduleIconRefresh();
     }
-    const wallet = () => `★ ${formatCount(state.stars)}   ore ${formatCount(state.minerals)}`;
+    const wallet = () => `★ ${formatCount(state.stars)}   ${ORE_SIGN} ${formatCount(state.minerals)}`;
 
     /* ---- THE WATCHER: asleep, its own label on the panel, and a thin meter ---- */
     function updateWatcher() {
@@ -654,9 +660,10 @@ export function init() {
     }
     /** The played card fades RPS_FADE_MS after the result, and is gone after it. */
     function surfaceGone(v) {
-        if (!v || !v.result) return false;
-        if (!rpsDoneAt) return true;            // played before a reload: already gone
-        return performance.now() - rpsDoneAt >= RPS_FADE_MS + 600;
+        // deep-fix2: while the fists shake and turn the game is under way, not gone. Before, the card
+        // and the line vanished the moment a throw was made and came back at the result, and the
+        // line typed itself a second time (Ola: "Surface's messages sometimes come twice in a row")
+        return cardGone({ result: !!(v && v.result), playing: !!rps, doneAt: rpsDoneAt, now: performance.now() });
     }
     function drawSurface() {
         if (!ui.surface) return;
@@ -727,28 +734,39 @@ export function init() {
         }
         const key = `${state.watcher.surface.visits}|${line}`;
         if (!voice || voice.key !== key) {
+            // deep-fix2: a line already typed in this visit is shown whole, never typed again
+            const again = typedKeys.has(key);
             const night = v.night || state.watcher.surface.night || 0;
             const share = tapeShare(night);
             const words = line.split(' ');
             const merge = night >= 6 && line !== SENTENCE_LINE;
             voice = {
-                key, text: line, t0: performance.now() + (merge ? MERGE_MS : 0), doneAt: 0, merge, started: false,
+                key, text: line, t0: performance.now() + (merge && !again ? MERGE_MS : 0), doneAt: 0, merge: merge && !again, started: false,
                 tape: words.map((_, i) => ((i * 7 + 3) % 10) / 10 < share),
             };
+            if (again) { voice.started = true; voice.t0 -= TYPE_MS * (line.length + 1); voiceShown = -1; }
             ui.voiceText.textContent = '';
             ui.voiceRest.textContent = line;
-            ui.voice.classList.add('is-typing');
+            ui.voice.classList.toggle('is-typing', !again);
             ui.voice.classList.toggle('is-tape', share >= 1);
         }
         if (ui.voice.hidden) ui.voice.hidden = false;
         stepVoice();
     }
     let voiceShown = -1;
+    const typedKeys = new Set();    // deep-fix2: the lines that have begun to type, by visit and line
+    let typeStarts = 0;             // how many times a line began to type (tests)
     function stepVoice() {
         if (!voice) return;
         const now = performance.now();
         if (now < voice.t0) return;
-        if (!voice.started) { voice.started = true; voiceShown = -1; sound?.event('type', { text: voice.text, letterS: TYPE_MS / 1000 }); }
+        if (!voice.started) {
+            voice.started = true;
+            voiceShown = -1;
+            typedKeys.add(voice.key);
+            typeStarts++;
+            sound?.event('type', { text: voice.text, letterS: TYPE_MS / 1000 });
+        }
         const n = Math.min(voice.text.length, Math.floor((now - voice.t0) / TYPE_MS));
         if (n !== voiceShown) {
             voiceShown = n;
@@ -764,7 +782,7 @@ export function init() {
             ui.voiceText.innerHTML = html;
             ui.voiceRest.textContent = voice.text.slice(n);
         }
-        if (n >= voice.text.length && ui.voice.classList.contains('is-typing')) {
+        if (n >= voice.text.length && !voice.doneAt) {
             ui.voice.classList.remove('is-typing');
             voice.doneAt = now;
         }
@@ -943,11 +961,12 @@ export function init() {
     const queueFull = () => (state.builds || []).length >= QUEUE_MAX;
     function dig() {
         const price = nextPrice(state, 'dig');
-        if (state.minerals < price || queueFull()) return;
+        if (state.minerals < price || queueFull()) return false;
         state.minerals -= price;
         orderBuild(state, 'dig');
         bought();
         afterChange();
+        return true;
     }
     /** A room ordered into this empty chamber (deep-rebuild: from the ring over the plate). */
     function buildRoom(type, slot = -1) {
@@ -970,9 +989,9 @@ export function init() {
             const price = nextPrice(state, 'room', t);
             const miss = Math.ceil(price - state.minerals);
             out[t] = {
-                price: formatCount(price),
+                price: `${ORE_SIGN} ${formatCount(price)}`,
                 ok: !full && miss <= 0,
-                need: full ? 'THE QUEUE IS FULL' : `${formatCount(miss)} MORE ORE`,
+                need: full ? 'THE QUEUE IS FULL' : `${ORE_SIGN} ${formatCount(miss)} MORE`,
             };
         }
         return out;
@@ -1377,10 +1396,12 @@ export function init() {
         ui.snapArc?.setAttribute('stroke-dashoffset', (RING_LEN * wait / SNAP_COOLDOWN_MS).toFixed(1));
     }
 
-    // outside the ring or the drawer, a press closes it
+    // outside the ring, a press closes it. deep-fix2: the drawer closes only on a press on the empty
+    // scene behind it; DIG, the lever, the drawer button, the "+" and the menu do their own job and
+    // leave it open (Ola: "you can click Dig, but the drawer just closes and nothing is dug")
     document.addEventListener('pointerdown', (e) => {
         if (hooks.ringSlot >= 0 && !ui.ring.contains(e.target)) hooks.closeRoomRing();
-        if (drawer.isOpen() && !ui.drawer.contains(e.target) && !ui.treeBtn.contains(e.target)) closeDrawer();
+        if (drawer.isOpen() && ui.sceneHost.contains(e.target)) closeDrawer();
     }, { signal, capture: true });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
@@ -1508,8 +1529,9 @@ export function init() {
         get treeOpen() { return !!treeView?.isOpen(); },
         get voice() {
             return voice ? { text: voice.text, typed: ui.voiceText.textContent, shown: !ui.voice.hidden,
-                typing: ui.voice.classList.contains('is-typing') } : null;
+                typing: ui.voice.classList.contains('is-typing'), starts: typeStarts } : null;
         },
+        get typeStarts() { return typeStarts; },
         get treeDrawn() { return treeView ? treeView.drawn : {}; },
         get machineTip() { return { text: machineText, shown: !!ui.machineTip && !ui.machineTip.hidden }; },
         get road() { return roadNow; },

@@ -8,6 +8,8 @@
  * drawerGroups(); a click goes back to the phase, which buys through tree.js as before.
  */
 
+import { signHtml } from './readout.js';
+
 const RING = 2 * Math.PI * 7;
 
 /**
@@ -58,9 +60,10 @@ export function createDrawer(host, { onBuy, onWholeTree, onClose }) {
                     if (r.status === 'buy') el.type = 'button';
                     el.className = `deep-dr-row is-${r.status}`;
                     el.dataset.id = r.id;
-                    const right = r.status === 'next' ? '' : `<span class="deep-dr-price deep-mono">${r.price}</span>`;
-                    const sub = r.status === 'next' ? r.need : r.does;
-                    el.innerHTML = `<span class="deep-dr-top"><span class="deep-dr-name deep-mono">${r.name}</span>${right}`
+                    // deep-fix2: ore in a price or a need carries the pickaxe (readout.js signHtml)
+                    const right = r.status === 'next' ? '' : `<span class="deep-dr-price deep-mono">${signHtml(r.price)}</span>`;
+                    const sub = signHtml(r.status === 'next' ? r.need : r.does);
+                    el.innerHTML = `<span class="deep-dr-top"><span class="deep-dr-name deep-mono">${signHtml(r.name)}</span>${right}`
                         + '<svg class="deep-dr-ring" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><circle class="track" cx="9" cy="9" r="7"></circle>'
                         + `<circle class="arc" cx="9" cy="9" r="7" stroke-dasharray="${RING.toFixed(1)}" stroke-dashoffset="${RING.toFixed(1)}"></circle></svg></span>`
                         + `<span class="deep-dr-sub">${sub}</span>`;
@@ -89,10 +92,10 @@ export function createDrawer(host, { onBuy, onWholeTree, onClose }) {
         },
         /**
          * @param {object[]} groups - instruments.js drawerGroups()
-         * @param {string} walletText - "★ 1.1 M   ore 181 k"
+         * @param {string} walletText - "★ 1.1 M   ⛏ 181 k"
          */
         refresh(groups, walletText) {
-            if (wallet.textContent !== walletText) wallet.textContent = walletText;
+            if (wallet.dataset.text !== walletText) { wallet.dataset.text = walletText; wallet.innerHTML = signHtml(walletText); }
             // the progress of each row moves every day; rebuild only when the rows change
             const fresh = new Map(groups.flatMap((g) => g.rows.map((r) => [r.id, r])));
             for (const x of rows) { const f = fresh.get(x.r.id); if (f) x.r = f; }
