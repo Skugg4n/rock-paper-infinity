@@ -884,3 +884,22 @@ body.tilt #city-area {
 #phase-city.war #our-pier { opacity: 1; }
 /* The ◆ on every plate arrives with the same pop as a button */
 #phase-city .fort-btn.btn-arrive { animation: btn-arrive 700ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+
+/* ---- the armory (B220) ------------------------------------------------------ */
+/* Our soldiers' building: a plate in our light blue with a castle in our blue,
+   no ring (nobody lives there), the soldiers stationed in a small badge bottom
+   right. Damage greys it like every plate. No line round it. */
+#phase-city .building-slot .building.armory { background-color: #e4ebf7; }
+#phase-city.war .building-slot .building.armory:not(.razed) { background-color: color-mix(in srgb, #e4ebf7 calc(var(--hp, 1) * 100%), #94a3b8); }
+.building.armory .armory-icon { color: #1e3a8a; opacity: 0.85; }
+.building.armory .armory-count {
+    position: absolute; right: -6px; bottom: -6px; z-index: 11;
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: #1e3a8a; color: #fff; font-family: monospace; font-size: 10px; line-height: 18px; text-align: center;
+    pointer-events: none;
+}
+.building.armory .armory-count.hidden { display: none; }
+.building.armory .hp-dot { right: auto; left: 50%; bottom: 4px; transform: translateX(-50%); }
+@media (min-width: 640px) { .building.armory .armory-count { font-size: 11px; height: 20px; line-height: 20px; border-radius: 10px; } }
+/* It arrives with the war's controls: the same pop (index.js popArmory → arrive) */
+.building.armory.btn-arrive { animation: btn-arrive 700ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }

@@ -65,6 +65,7 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     let classes = 'building';
     if (building.razed) classes += ' razed';
     let actionButtons = '';
+    if (building.type === 'armory') return armoryHTML(building, { war, stars });
 
     // Chapter III: fortify a standing plate (arms), clear a ruin (stars)
     if (war && building.razed) {
@@ -138,6 +139,27 @@ export function createBuildingHTML(building, { apartmentResearched, storeResearc
     }
 
     return `<div class="${classes}">${content}${actionButtons}</div>`;
+}
+
+/** Clearing a razed armory rebuilds it (B220): 30 % of what stood there before (a home for an empty plot). */
+export function armoryClearCost(building) {
+    return Math.round((buildingData[building.was]?.cost || buildingData.home.cost) * 0.3);
+}
+/**
+ * The armory (B220): our soldiers' building, a plate in our light colour with a
+ * castle, no ring (nobody lives there), the soldiers stationed in a small badge
+ * (index.js fills it), the ◆ like every plate the enemy can target, no sell.
+ * Razed: a ruin whose clear button raises the armory again.
+ */
+function armoryHTML(building, { war, stars }) {
+    if (building.razed) {
+        const cost = armoryClearCost(building);
+        return `<div class="building armory razed"><button class="building-action-btn clear-btn" data-building-id="${building.id}" ${stars >= cost ? '' : 'disabled'}>×
+            <div class="tooltip"><div class="effect"><i data-lucide='castle' class='w-4 h-4'></i></div><div class="cost">${formatCount(cost)} <i data-lucide='star' class='w-4 h-4 text-slate-300'></i></div></div>
+        </button></div>`;
+    }
+    const fort = war && war.fort ? fortButtonHTML(building, war.arms) : '';
+    return `<div class="building armory"><i data-lucide="castle" class="w-10 h-10 armory-icon"></i><span class="armory-count hidden" aria-hidden="true"></span>${fort}<span class="hp-dot" aria-hidden="true"></span></div>`;
 }
 
 /** The inner parts of the ◆ button: level, price, and the tooltip (HP now → after). */
@@ -237,7 +259,7 @@ export function createRenderer({ landGrid, scheduleIconRefresh, notifiedUpgrades
             if (tip && tip.dataset.key !== hpKey) { tip.dataset.key = hpKey; tip.innerHTML = f.tip; }
         }
         const clearBtn0 = innerDiv.querySelector('.clear-btn');
-        if (clearBtn0) clearBtn0.disabled = gameState.stars < Math.round((buildingData[building.type]?.cost || 0) * 0.3);
+        if (clearBtn0) clearBtn0.disabled = gameState.stars < (building.type === 'armory' ? armoryClearCost(building) : Math.round((buildingData[building.type]?.cost || 0) * 0.3));
 
         const upgradeTarget = upgradeTargetFor(building, gameState);
         if (!upgradeTarget) {

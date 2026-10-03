@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.81.0 - 2026-10-03 (chapter III, an armory for our soldiers)
+
+### Chapter III · WAR: our soldiers come out of an armory, not a store (B220)
+
+Ola: "Our soldiers come out of a store. We should add a separate building that is an armory for our side." docs/superpowers/specs/2026-09-19-chapter-iii-war-design.md, "The armory".
+
+- **Where.** At the start of the war the empty plot nearest our pier becomes the armory; with no plot free, the nearest home or store (else the nearest apartment, super store or skyscraper), its people moving into the town's free room. Never the factory, the bank, a district, a ruin or the last plot (the hatch at the end). Saved in the war (`w.armory`), so a reload finds it; a war saved without one gets it on load. The pure choice is `chooseArmoryPlot` in ants.js, tested.
+- **How it looks.** A plate in our light blue with a castle in our blue (the same glyph as their tower: military is a castle on both islands, the colour says whose), no ring, the soldiers stationed (guards and the force at home) in a small badge, the ◆ like every plate they can target, no sell. It arrives with the war's pop and its 'reveal' word as the card lifts, and the war room says "Interior: the old warehouse by the pier is an armory now." (the plot, the old house, the old warehouse...).
+- **What it does.** Guards walk out of it onto the coast road when shields are bought and back in when they are no longer needed or stand down (into it and on to the hatch at the end); a strike's party files out of it to the pier, and the survivors walk from the pier back into it. The people of the town are no longer where soldiers come from.
+- **Targeting.** A landing can hit it like any plate (to them it is worth what an apartment is). Razed: "Status: the armory is lost. Our soldiers have nowhere to gather.", soldiers come out of the plate nearest the pier, and the clear button raises the armory again (30 % of what stood there). It changes no number: defence and force are the same with or without it. `sim-phase3.mjs 1` prints the same line.
+
 ## v1.80.0 - 2026-10-03 (chapter IV, GROW built from organs; pumping takes chambers)
 
 ### Chapter IV, movement III · GROW, third pass: the body is built from organs you choose; pumping takes chambers; challenge and payoff per floor (B340 to B349)

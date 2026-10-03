@@ -2145,8 +2145,9 @@ items:
     request: |
       Our soldiers come out of a store. We should add a separate building
       that is an armory for our side.
-    status: open
-    notes: "Chapter III, the WAR session's (where our guards and sorties spawn from). Forwarded 2026-10-03."
+    status: done
+    resolved_in: v1.81.0
+    notes: "Chapter III, the WAR session's (where our guards and sorties spawn from). Forwarded 2026-10-03. Built: the plot or plate nearest our pier becomes the armory at war start (ants.js chooseArmoryPlot); guards walk out of it and back in, strikes muster from it and the survivors go home into it; razed, the nearest plate stands in until it is cleared and rebuilt. No rule changed."
 
   - id: B221
     added: 2026-10-03
@@ -3084,3 +3085,14 @@ items:
     status: done
     resolved_in: deep-organs (version at merge)
     notes: "src/checkpoints.js growColony organs/mass; scripts/accept-iv-cut.mjs O P W N D A."
+
+  - id: B210
+    added: 2026-10-03
+    source: "war-armory (B220)"
+    request: |
+      The armory open ends: when no plot is free and the nearest home is taken, its people move into
+      the town's free room, but whatever does not fit is not rehoused (no rule for it); the armory has
+      the default plate HP (10 + fortification, war.js has no entry for it); soldiers step out from the
+      plate's middle, so the first steps cross the plate like every walker's.
+    status: open
+    notes: "Decide with Ola whether the armory needs its own HP in war.js PLATE_HP (a balance change, sim first)."

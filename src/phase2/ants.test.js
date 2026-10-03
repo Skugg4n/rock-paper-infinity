@@ -1,6 +1,6 @@
 /* eslint-env jest */
 import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge, landKeeper, shoreline, inPolygon } from './ants.js';
-import { boatCourse, roundCourse, courseAt, courseLength, sailSeconds } from './ants.js';
+import { boatCourse, roundCourse, courseAt, courseLength, sailSeconds, chooseArmoryPlot, plateExit } from './ants.js';
 
 describe('ants', () => {
     test('antCount grows with the square root and is capped', () => {
@@ -186,5 +186,48 @@ describe('landKeeper and shoreline (v1.70.0: nobody stands in the water)', () =>
         const p = shoreline({ x: 50, y: 150 }, { x: 50, y: 50 }, square);
         expect(p.x).toBeCloseTo(50); expect(p.y).toBeCloseTo(100, 0);
         expect(shoreline({ x: 50, y: 150 }, { x: 50, y: 130 }, square)).toBeNull();
+    });
+
+    // B220: the armory. A 5 x 4 grid of 100 px plates with a 10 px street, our pier under the bottom-left corner.
+    const grid = Array.from({ length: 20 }, (_, i) => ({ x: (i % 5) * 110, y: Math.floor(i / 5) * 110, w: 100, h: 100 }));
+    const pier = { x: 18, y: 444, w: 10, h: 80 };
+    const town = () => {
+        const b = [{ id: 1, type: 'factory' }, { id: 2, type: 'bank' }];
+        for (let i = 3; i <= 20; i++) b.push({ id: i, type: i <= 12 ? 'skyscraper' : i <= 16 ? 'superStore' : i <= 18 ? 'district' : 'apartment', population: 1 });
+        return b;
+    };
+
+    test('chooseArmoryPlot prefers the empty plot nearest the pier', () => {
+        const b = town(); b[7] = undefined; b[17] = undefined;
+        expect(chooseArmoryPlot(b, pier, grid)).toEqual({ index: 17, was: 'plot' });
+    });
+
+    test('chooseArmoryPlot never takes the last plot (the hatch) nor a ruin', () => {
+        const b = town(); b[19] = undefined; b[15] = { id: 16, type: 'home', razed: true };
+        expect(chooseArmoryPlot(b, pier, grid)).toEqual({ index: 10, was: 'skyscraper' });
+    });
+
+    test('chooseArmoryPlot without an empty plot takes the nearest home or store', () => {
+        const b = town(); b[3] = { id: 4, type: 'home', population: 10 }; b[5] = { id: 6, type: 'store' };
+        // the store (row 1, first column) is nearer the pier than the home (row 0)
+        expect(chooseArmoryPlot(b, pier, grid)).toEqual({ index: 5, was: 'store' });
+    });
+
+    test('chooseArmoryPlot with no home or store takes the nearest of the rest, never a district, the factory or the bank', () => {
+        expect(chooseArmoryPlot(town(), pier, grid)).toEqual({ index: 15, was: 'superStore' });
+        const onlyBig = [{ id: 1, type: 'factory' }, { id: 2, type: 'bank' }, { id: 3, type: 'district' }, { id: 4, type: 'district' }];
+        expect(chooseArmoryPlot(onlyBig, pier, grid)).toBeNull();
+        expect(chooseArmoryPlot([{ id: 1, type: 'factory' }], pier, grid)).toBeNull();
+    });
+
+    test('plateExit leaves a bottom-row plate straight onto the road, an inner one by the street on its left', () => {
+        const R = coastRing({ x: 0, y: 0, w: 540, h: 430 }, 10);
+        const bottom = plateExit(grid[16], R, 10);
+        expect(bottom).toEqual([{ x: 160, y: 380 }, { x: 160, y: R.y + R.h }]);
+        const inner = plateExit(grid[7], R, 10);
+        expect(inner[0]).toEqual({ x: 270, y: 160 });
+        expect(inner[1]).toEqual({ x: 270, y: 215 });
+        expect(inner[2]).toEqual({ x: 215, y: 215 });
+        expect(inner[3]).toEqual({ x: 215, y: R.y + R.h });
     });
 });

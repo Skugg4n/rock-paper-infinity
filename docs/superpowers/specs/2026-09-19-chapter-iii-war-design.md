@@ -455,3 +455,37 @@ Ola's playtest of v1.65 to v1.68. No rule changed (`sim-phase3.mjs 1` prints the
   joint #5b6676, steel tube with a soft glow, exhaust #3a434f, smoke #c6cfd9), pure CSS on
   `.deep-facility`; re-added when the plate re-renders.
 - Open: the gather into the hatch still often ends on its 20 s fallback (about 50 of 60 people in).
+
+## The armory (2026-10-03, v1.81.0, B220)
+
+Ola: "Our soldiers come out of a store. We should add a separate building that is an armory for
+our side." Until now a guard appeared on the south coast from nowhere and a strike mustered from
+the three bottom-row plates nearest the pier, so our soldiers walked out of shops and houses.
+
+- **Where.** `startWar` (and, for a war saved before, the load) turns the empty plot nearest our
+  pier into the armory; with none free, the nearest standing home or store; with none of those,
+  the nearest apartment, super store or skyscraper. Never the factory, the bank, a district, a ruin
+  or the last plot (the hatch). `chooseArmoryPlot(buildings, pierRect, slots)` in ants.js is the
+  pure choice. A home's people move into the town's free room; whatever does not fit is not
+  rehoused (there is no rule for it, B210). The building is `{ type: 'armory', was }`; the war
+  keeps `w.armory = { id, was }`.
+- **Look.** Our light blue plate, a Lucide castle in our blue (their tower is a castle too: the
+  military glyph is the same on both islands, the colour says whose), no ring, a badge with the
+  soldiers stationed (defence plus the force at home, `formatCount`), the ◆, no sell. It pops in with
+  `arrive()` (the war's 'reveal' word) as the card lifts; the war room names what was there.
+- **The picture.** `ants.js`: `barracks()` is the armory, or while it is down the standing plate
+  nearest our pier; `gate()` is the way out of it (`plateExit`: down to the street under its row,
+  an inner plate by the street on its left, onto the coast road). New guards walk out through the
+  gate one after another and on to their posts; guards no longer counted walk back in; at the end
+  of the war they go in and on to the hatch. A sortie musters from the gate along the road to the
+  pier; the survivors walk from the pier back in.
+- **Targeting.** `pickTarget` sees the armory as an apartment (value 2) through `warPlates` in
+  index.js; war.js does not know it. Its HP is war.js's default (10 plus fortification). Razed, the
+  war room says "Status: the armory is lost. Our soldiers have nowhere to gather."; the clear
+  button (30 % of what stood there, a home's price for a plot) raises the armory again, not the
+  old building.
+- **No rule changed.** Defence and force are the same with or without the armory; it is where they
+  come out and go in. `sim-phase3.mjs 1` prints the same line before and after.
+- Open (B210): the default HP, people who do not fit when a home is taken, the first steps of a
+  soldier cross the plate from its middle like every walker's.
+

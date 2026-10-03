@@ -61,6 +61,54 @@ export function streetPath(src, dst, gap) {
 }
 
 /**
+ * Where the armory goes at the start of the war (B220): the empty plot nearest
+ * our pier; without one, the standing home or store nearest it; without those,
+ * the nearest standing apartment, super store or skyscraper. Never the factory,
+ * the bank, a district, a ruin or the last plot (the hatch at the end of the war).
+ *
+ * @param {Array<object|undefined|null>} buildings - gameState.buildings (an empty plot is undefined/null)
+ * @param {{x:number,y:number,w:number,h:number}} pierRect - our pier (its top is on our coast)
+ * @param {Array<{x:number,y:number,w:number,h:number}>} slots - each plot's rect, by index
+ * @returns {{index:number, was:string}|null} was = 'plot' or the building type it replaces
+ */
+export function chooseArmoryPlot(buildings, pierRect, slots) {
+    const n = Math.min(buildings.length, slots.length);
+    if (n < 2 || !pierRect) return null;
+    const at = { x: pierRect.x + pierRect.w / 2, y: pierRect.y };
+    const dist = (i) => Math.hypot(slots[i].x + slots[i].w / 2 - at.x, slots[i].y + slots[i].h / 2 - at.y);
+    const idx = Array.from({ length: n - 1 }, (_, i) => i);          // the last plot is the hatch's
+    const nearest = (list) => list.sort((a, b) => dist(a) - dist(b) || a - b)[0];
+    const empty = idx.filter(i => !buildings[i]);
+    if (empty.length) return { index: nearest(empty), was: 'plot' };
+    const standing = (types) => idx.filter(i => buildings[i] && !buildings[i].razed && types.includes(buildings[i].type));
+    for (const types of [['home', 'store'], ['apartment', 'superStore', 'skyscraper']]) {
+        const list = standing(types);
+        if (list.length) { const i = nearest(list); return { index: i, was: buildings[i].type }; }
+    }
+    return null;
+}
+
+/**
+ * The way out of a plate to the coast road (B220: soldiers leave the armory):
+ * down to the street under its row; a plate above the bottom row then takes the
+ * street on its left side (toward our pier) down to the road. The last point is
+ * on the ring's south side; walking back in is the same path reversed.
+ *
+ * @param {{x,y,w,h}} rect - the plate
+ * @param {{x,y,w,h}} R - the coast ring (coastRing)
+ * @param {number} gap - street width
+ */
+export function plateExit(rect, R, gap) {
+    const g = Math.max(2, gap);
+    const a = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+    const south = R.y + R.h;
+    const below = rect.y + rect.h + g / 2;
+    if (below >= south - g) return [a, { x: a.x, y: south }];     // the bottom row: straight out onto the road
+    const vx = rect.x - g / 2;
+    return [a, { x: a.x, y: below }, { x: vx, y: below }, { x: vx, y: south }];
+}
+
+/**
  * The coast road round our island: a rectangle just outside the plates'
  * bounding box, in the water's edge. Guards stand on it; landings arrive on it.
  * @param {{x,y,w,h}} grid - bounding box of all plates
@@ -393,7 +441,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     const LAND_MARGIN = 8;
     let coastOurs = null, coastTheirs = null;
     let landOurs = null, landTheirs = null;
-    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [], war: false };
+    let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [], war: false, armoryId: null };
     let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
     const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
@@ -962,6 +1010,31 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     /** Their pier's foot on their coast road, and ours on ours. */
     function theirFoot() { const R = townRing(); return R && pierRect ? ringPoint(R, ringCoord(R, { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h })) : null; }
     function ourFoot() { const R = ring(); return ourPierRect ? ringPoint(R, ringCoord(R, { x: ourPierRect.x + ourPierRect.w / 2, y: ourPierRect.y })) : null; }
+    // --- The armory (B220) ------------------------------------------------------
+    // Every soldier of ours comes out of the armory and goes back into it: the
+    // guards to and from their posts, a strike's party to the pier and home
+    // again. Razed (or before there is one), the standing plate nearest our pier
+    // stands in for it. Nothing here touches a number: it is the picture.
+    const armoryPlate = () => (state.armoryId == null ? null : rects.find(r => r.building.id === state.armoryId && !r.building.razed) || null);
+    function barracks() {
+        const a = armoryPlate(); if (a) return a;
+        const standing = rects.filter(r => !r.building.razed);
+        if (!standing.length) return null;
+        const g = gridBox(), at = ourFoot() || { x: g.x, y: g.y + g.h };
+        return standing.reduce((best, r) => (Math.hypot(c(r.rect).x - at.x, c(r.rect).y - at.y) < Math.hypot(c(best.rect).x - at.x, c(best.rect).y - at.y) ? r : best));
+    }
+    /** The way out of the barracks onto the coast road: `path` (centre → road) and its ring coordinate `s`. */
+    function gate(R = ring()) {
+        const b = barracks(); if (!b) return null;
+        const raw = plateExit(b.rect, R, getGap());
+        const s = ringCoord(R, raw[raw.length - 1]);
+        const path = raw.slice(0, -1).map((p, i) => (i && landOurs ? landOurs(p) : p)).concat([ringPoint(R, s)]);
+        return { plate: b, path, s };
+    }
+    /** From where a soldier stands on the road (ring coordinate s0, point p) back in through the gate. */
+    function walkIn(R, p, s0, G) {
+        return [p, ...ringWalk(R, s0, G.s).slice(1), ...[...G.path].reverse().slice(1)];
+    }
     /**
      * Marks a shore walk: the first leg (boat to the shoreline) is water,
      * everything after is the island. With a `beach` (the shoreline) they wade
@@ -1097,12 +1170,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
      */
     function launchSortie({ tile, tileIndex, count, losses, onImpact, onHome, onPhase }) {
         const R = ring(), foot = ourFoot();
-        const standing = rects.filter(r => !r.building.razed);
-        if (!foot || !standing.length) return false;
-        const bottom = Math.max(...standing.map(r => r.rect.y));
-        const near = standing.filter(r => Math.abs(r.rect.y - bottom) < 1).sort((a, b) => Math.abs(c(a.rect).x - foot.x) - Math.abs(c(b.rect).x - foot.x)).slice(0, 3);
+        const G = gate(R);
+        if (!foot || !G) return false;
         const n = Math.min(14, Math.max(3, Math.round(count / 3)));
-        sorties.push({ tile, tileIndex, dots: musterParty(n, R, foot, near.map(r => c(r.rect)), 'person'), phase: 'muster', losses, onImpact, onHome, onPhase, home: [] });
+        // out of the armory (or the plate standing in for it), along the coast road to the pier
+        const dots = musterParty(n, R, foot, [G.path[G.path.length - 1]], 'person');
+        dots.forEach((d, i) => { d.path = [...G.path.slice(0, -1), ...d.path]; d.wait = i * 0.22; });
+        sorties.push({ tile, tileIndex, dots, phase: 'muster', losses, onImpact, onHome, onPhase, home: [] });
         onPhase?.('muster');
         return true;
     }
@@ -1133,11 +1207,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
                     const back = [...s.via].reverse();
                     sail(ourBoat, s.shore, dock || s.dock, sailSeconds(courseLength(roundCourse([s.shore, ...back, s.dock]))), () => {
                         ourBoat.moored = true; ourBoat.owner = null;
-                        // home: down the gangway, along the pier and indoors
-                        const R = ring();
-                        const indoors = rects.filter(r => !r.building.razed).sort((a, b) => Math.hypot(c(a.rect).x - foot.x, c(a.rect).y - foot.y) - Math.hypot(c(b.rect).x - foot.x, c(b.rect).y - foot.y))[0];
-                        const inPt = indoors ? ringPoint(R, ringCoord(R, c(indoors.rect))) : foot;
-                        s.home = s.back.map((d, i) => ({ kind: 'person', path: [s.dock, foot, ...ringWalk(R, ringCoord(R, foot), ringCoord(R, inPt)).slice(1), indoors ? c(indoors.rect) : foot], seg: 0, t: 0, wait: pairDelay(i, 0.3) }));
+                        // home: down the gangway, along the pier, the coast road and into the armory
+                        const R = ring(), G = gate(R);
+                        const inside = G ? walkIn(R, foot, ringCoord(R, foot), G) : [foot];
+                        s.home = s.back.map((d, i) => ({ kind: 'person', path: [s.dock, ...inside], seg: 0, t: 0, wait: pairDelay(i, 0.3) }));
                         ourBoat.aboard = 0;
                         s.phase = 'home';
                         s.onPhase?.('home');
@@ -1183,9 +1256,15 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         for (const l of landings) if (l.phase === 'muster' || l.phase === 'board') for (const d of l.dots) { if (d.aboard) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.enemy); }
         for (const d of disbanded) { const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.enemy); }
         for (const s of sorties) {
-            if (s.phase === 'muster' || s.phase === 'board') for (const d of s.dots) { if (d.aboard) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.person); }
+            // out of the armory's door: not seen before they step out, fading in on the first steps
+            if (s.phase === 'muster' || s.phase === 'board') for (const d of s.dots) { if (d.aboard || (d.wait > 0 && d.seg === 0 && !d.boarding)) continue; const p = d.path ? pos(d) : d.end; if (!p) continue; if (d.path && d.seg === 0 && !d.boarding) { ctx.globalAlpha = 0.9 * Math.min(1, d.t * 2.2); ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.arc(p.x, p.y, RADIUS.enemy, 0, Math.PI * 2); ctx.fill(); } else dot(p, COLORS.person); }
             if (s.phase === 'regroup') for (const d of s.back) { if (d.aboard || d.wait > 0) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.person); }
-            if (s.phase === 'home') for (const d of s.home) { if (d.inside || d.wait > 0) continue; const p = d.path ? pos(d) : d.end; if (p) dot(p, COLORS.person); }
+            if (s.phase === 'home') for (const d of s.home) {
+                if (d.inside || d.wait > 0) continue; const p = d.path ? pos(d) : d.end; if (!p) continue;
+                // in through the armory's door: fading out on the last steps
+                const k = d.path && d.seg === d.path.length - 2 ? Math.min(1, (1 - d.t) * 2.2) : 1;
+                ctx.globalAlpha = 0.9 * k; ctx.beginPath(); ctx.fillStyle = COLORS.person; ctx.arc(p.x, p.y, RADIUS.enemy, 0, Math.PI * 2); ctx.fill();
+            }
         }
     }
 
@@ -1432,9 +1511,22 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const want = guardsGone || state.guardsOff ? 0 : Math.min(40, Math.round((state.defence || 0) / 5));
         const R = ring();
         const posted = guards.filter(g => !g.leaving);
-        const homeS = R.w + R.h + R.w / 2;             // new guards step out onto the south coast
-        while (posted.length < want) { const g = { s: homeS + (Math.random() - 0.5) * 20, resp: null, leaving: null, id: guardSeq++ }; guards.push(g); posted.push(g); }
-        while (posted.length > want) { const g = posted.pop(); guards.splice(guards.indexOf(g), 1); }
+        // New guards walk out of the armory onto the coast road, one after another;
+        // the ones no longer needed walk back in (B220). Without a way out they step onto the south coast.
+        const G = gate(R);
+        let k = guards.filter(g => g.out).length;
+        while (posted.length < want) {
+            const g = { s: G ? G.s : R.w + R.h + R.w / 2 + (Math.random() - 0.5) * 20, resp: null, leaving: null, id: guardSeq++,
+                out: G ? { path: G.path.map(p => ({ ...p })), seg: 0, t: 0, wait: Math.min(8, k++ * 0.3) } : null };
+            guards.push(g); posted.push(g);
+        }
+        while (posted.length > want) {
+            // the one nearest the gate goes in first
+            const g = G ? posted.reduce((a, b) => (Math.abs(ringDelta(R, b.s, G.s)) < Math.abs(ringDelta(R, a.s, G.s)) ? b : a)) : posted[posted.length - 1];
+            posted.splice(posted.indexOf(g), 1);
+            if (!G) { guards.splice(guards.indexOf(g), 1); continue; }
+            sendIn(g, R, G);
+        }
         // hand out the homes in ring order so nobody crosses anybody
         const homes = guardHomes(posted.length, R);
         const P = ringLength(R);
@@ -1450,6 +1542,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
                 if (!g.leaving.path) guards.splice(i, 1);
                 continue;
             }
+            if (g.out) { if (advance(g.out, dt, GUARD_SPEED * 0.8)) g.out = null; continue; }   // still walking out of the armory
             const target = g.resp ? g.resp.s : (g.home ?? g.s);
             const d = ringDelta(R, g.s, target);
             const step = GUARD_SPEED * (g.resp ? 1.4 : 1) * dt;
@@ -1466,12 +1559,25 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         chosen.forEach((g, i) => { g.resp = { s: sL + (i - (k - 1) / 2) * 5 }; });
         return chosen;
     }
-    /** The guards leave the coast: into the nearest plate, and on to `hatch` if given. */
+    /** One guard leaves the road: back along it to the gate and into the armory. */
+    function sendIn(g, R, G) {
+        const here = g.out ? (g.out.path ? pos(g.out) : g.out.end) : ringPoint(R, g.s);
+        const path = g.out ? [here, ...G.path.slice(0, g.out.path ? g.out.seg + 1 : G.path.length).reverse()] : walkIn(R, here, g.s, G);
+        g.out = null; g.resp = null;
+        g.leaving = { path, seg: 0, t: 0, wait: Math.random() * 0.4 };
+    }
+    /** The guards leave the coast: into the armory (else the nearest plate), and on to `hatch` if given. */
     function dismissGuards(hatch) {
         if (!rects.length) { guards.length = 0; guardsGone = true; return; }
         const R = ring();
+        const armory = armoryPlate() ? gate(R) : null;
         for (const g of guards) {
             if (g.leaving && !hatch) continue;
+            if (armory && !g.leaving) {
+                sendIn(g, R, armory);
+                if (hatch && armory.plate.rect !== hatch.rect) g.leaving.path.push(...streetsOurs(armory.plate.rect, hatch.rect, getGap()).slice(1));
+                continue;
+            }
             const p = g.leaving ? pos(g.leaving) || ringPoint(R, g.s) : ringPoint(R, g.s);
             const near = rects.filter(r => !r.building.razed).sort((a, b) => Math.hypot(c(a.rect).x - p.x, c(a.rect).y - p.y) - Math.hypot(c(b.rect).x - p.x, c(b.rect).y - p.y))[0];
             if (!near) { g.leaving = { path: null }; continue; }
@@ -1491,6 +1597,8 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const R = ring();
         return guards.map((g, i) => {
             if (g.leaving) { const p = g.leaving.path ? pos(g.leaving) : null; return p ? { ...p, i, leaving: true, fade: g.leaving.seg >= (g.leaving.path?.length || 2) - 2 ? 1 - g.leaving.t : 1 } : null; }
+            // walking out of the armory: not there until out of the door, fading in on the first steps
+            if (g.out) { if (g.out.wait > 0 || !g.out.path) return null; const p = pos(g.out); return p ? { ...p, i, out: true, fade: g.out.seg === 0 ? Math.min(1, g.out.t * 2.2) : 1 } : null; }
             const p = ringPoint(R, g.s);
             return { x: p.x, y: p.y + Math.sin(clock * 2.2 + g.id * 1.3) * 0.7, i };
         }).filter(Boolean);
@@ -1573,5 +1681,5 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     const _where = () => ({ guards: guardPositions().map(g => ({ x: g.x, y: g.y, leaving: !!g.leaving })), ants: ants.map(a => pos(a)).filter(Boolean), watchmen: watchmen.filter(m => !m.hidden).map(m => watchPos(m)).filter(Boolean), ring: ring(), grid: gridBox() });
     return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, musterLanding, cancelLanding, withdraw, gatherAt, measure, sailBoat, dockPoint, ourDockPoint, _where, _debug: () => ({ raid: raid?.phase, boat: boatInfo(boat), ourBoat: boatInfo(ourBoat),
         landings: landings.map(l => ({ phase: l.phase, go: l.go, dots: l.dots.length, shore: l.shore && [Math.round(l.shore.x), Math.round(l.shore.y)], land: l.land && [Math.round(l.land.x), Math.round(l.land.y)] })),
-        sorties: sorties.map(s => ({ phase: s.phase, dots: s.dots.length, back: s.back?.length ?? 0, shore: s.shore && [Math.round(s.shore.x), Math.round(s.shore.y)] })), watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, fellAt: w.dots.filter(d => d.killed).map(d => +(d.fellAt ?? -1).toFixed(2)), segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
+        sorties: sorties.map(s => ({ phase: s.phase, dots: s.dots.length, back: s.back?.length ?? 0, shore: s.shore && [Math.round(s.shore.x), Math.round(s.shore.y)] })), watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, guardsOut: guards.filter(g => g.out).length, guardsIn: guards.filter(g => g.leaving).length, armory: armoryPlate() ? c(armoryPlate().rect) : null, barracks: barracks() ? c(barracks().rect) : null, home: sorties.flatMap(s => (s.home || []).filter(d => !d.inside).map(d => (d.path ? pos(d) : d.end))), responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, fellAt: w.dots.filter(d => d.killed).map(d => +(d.fellAt ?? -1).toFixed(2)), segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

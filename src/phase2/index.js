@@ -7,12 +7,12 @@ import { phases, setPhase } from '../gamePhase.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
 import { buildingData } from './buildings-config.js';
-import { createRenderer } from './rendering.js';
+import { createRenderer, armoryClearCost } from './rendering.js';
 import { timed, counter } from '../perf.js';
 import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY, formatCount,
 } from './economy.js';
-import { createAnts } from './ants.js';
+import { createAnts, chooseArmoryPlot } from './ants.js';
 import { layoutRect } from './layout.js';
 import { createIsland, coastPoints } from './islands.js';
 import { audio } from '../audio.js';
@@ -299,7 +299,8 @@ export function init() {
           // Rules live in src/phase3/war.js; this is the glue to the map.
           const warRand = warRng(Date.now() % 100000);
           const enemyTileEls = () => [...ui.competitorIsland.querySelectorAll('.enemy-factory, .enemy-tile:not(.enemy-rocket)')];
-          const warPlates = () => gameState.buildings.map((b, i) => b ? { id: b.id, type: b.type, fort: b.fort || 0, row: Math.floor(i / 5), razed: !!b.razed, b, i } : null).filter(Boolean);
+          // The armory (B220) is worth to them what an apartment is (pickTarget value 2); war.js does not know it.
+          const warPlates = () => gameState.buildings.map((b, i) => b ? { id: b.id, type: b.type === 'armory' ? 'apartment' : b.type, fort: b.fort || 0, row: Math.floor(i / 5), razed: !!b.razed, b, i } : null).filter(Boolean);
 
           function startWar() {
               if (gameState.war?.active) return;
@@ -314,6 +315,7 @@ export function init() {
               gameState.warChosen = true;
               applyWarPresentation({ tilt: false });        // the camera lowers after the card
               logWar('We are at war. The generals are ready for your command.');
+              ensureArmory();
               logWar('War room: the factory can make arms. Push the slider toward the hammer. Fists first.');
               logWar('Research runs at half. The factory is yours.');
               logWar('Intel: enemy shipyard active. Expect landings from the south.');
@@ -364,6 +366,55 @@ export function init() {
               const [x, y] = at.split(',');
               el.style.left = `${x}px`; el.style.top = `${y}px`;
           }
+          /**
+           * The armory (B220): our soldiers' building. At the start of the war the
+           * empty plot nearest our pier becomes it, or (with no plot free) the
+           * nearest home or store, its people moving into the town's free room.
+           * Kept in the war state (w.armory = { id, was }) so a reload finds it; a
+           * war saved before it had one gets it on load. Returns its index if it
+           * was made now, else -1. It changes no number: defence and force are
+           * the same with or without it; it is where they come out and go in.
+           */
+          const ARMORY_NOUN = { plot: 'the empty plot', home: 'the old house', store: 'the old warehouse', superStore: 'the old warehouse', apartment: 'the old apartment block', skyscraper: 'the old tower' };
+          function ensureArmory() {
+              const w = gameState.war;
+              if (!w?.active || w.enemyLeft || (w.armory && gameState.buildings.some(b => b && b.id === w.armory.id))) return -1;
+              placeOurPier();
+              const pier = ourPier();
+              const slots = [...ui.landGrid.children].map(el => layoutRect(el, ui.cityArea));
+              const pick = chooseArmoryPlot(gameState.buildings, layoutRect(pier, ui.cityArea), slots);
+              if (!pick) return -1;
+              const old = gameState.buildings[pick.index];
+              const moving = old?.population || 0;
+              if (moving > 0) {
+                  // the people move out into the town's free room (whatever does not fit is not rehoused: there is no rule for it)
+                  let left = moving;
+                  for (const b of gameState.buildings) {
+                      if (!left) break;
+                      if (!b || b === old || b.razed || !b.capacity || !['home', 'apartment', 'skyscraper', 'district'].includes(b.type)) continue;
+                      const take = Math.min(left, b.capacity - (b.population || 0));
+                      if (take > 0) { b.population = (b.population || 0) + take; left -= take; }
+                  }
+              }
+              const id = Date.now() + Math.random();
+              gameState.buildings[pick.index] = { id, type: 'armory', was: pick.was, population: 0, fort: 0, hp: plateMaxHp('armory', 0) };
+              w.armory = { id, was: pick.was };
+              renderGridSlot(pick.index);
+              logWar(`Interior: ${ARMORY_NOUN[pick.was] || 'the plot'} by the pier is an armory now.`);
+              return pick.index;
+          }
+          /** The armory's plate pops in like the war's controls (arrive(): the war's 'reveal' word). */
+          function popArmory() {
+              const i = gameState.buildings.findIndex(b => b && b.type === 'armory');
+              const el = ui.landGrid.children[i]?.querySelector('.building');
+              if (el) arrive(el);
+          }
+          /** The armory standing now, or null (none yet, or razed). */
+          const armoryStanding = () => {
+              const id = gameState.war?.armory?.id;
+              return id == null ? null : gameState.buildings.find(b => b && b.id === id && !b.razed) || null;
+          };
+
           // Survivors of a strike by boat who are still on their way home: the
           // rule has already given them back to the force; the counter waits for them.
           let forceAway = 0;
@@ -429,8 +480,8 @@ export function init() {
                       if (skyward) war.event('shell', { impactIn: WAVE_WARNING_S + 1.4, col: ti % 5, defended: (w.air || 0) > 0 });
                       // A landing gathers on their pier while the radar watches; the boat casts off at launchAt.
                       if (!skyward) _ants?.musterLanding({ targetBuildingId: target.id, count: size, push });
-                      if (w.radar && skyward) logWar(push ? `Intel: a large salvo is heading for ${target.type}.` : `Radar: a salvo is on its way to ${target.type}.`, push, { hold: !push });
-                      else if (w.radar) logWar(push ? `Intel: a large force is gathering on their pier for ${target.type}.` : `Radar: a landing party is gathering on their pier.`, push, { hold: !push });
+                      if (w.radar && skyward) logWar(push ? `Intel: a large salvo is heading for ${target.b.type}.` : `Radar: a salvo is on its way to ${target.b.type}.`, push, { hold: !push });
+                      else if (w.radar) logWar(push ? `Intel: a large force is gathering on their pier for ${target.b.type}.` : `Radar: a landing party is gathering on their pier.`, push, { hold: !push });
                   }
               }
               if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
@@ -681,6 +732,7 @@ export function init() {
                   w.scorchOurs += enemy.scorch * 4;
                   renderGridSlot(i);
                   logWar(`Status: ${story} and razed it.${cost}`, true);
+                  if (b.type === 'armory') logWar('Status: the armory is lost. Our soldiers have nowhere to gather.', true);
               } else {
                   logWar(`Status: ${story}. It stands, HP ${Math.round(b.hp)}/${plateMaxHp(b.type, b.fort || 0)}.${cost}`, false, { hold: true });
               }
@@ -759,6 +811,16 @@ export function init() {
               if (!active) return;
               if (w.enemyLeft && w.leaveStage >= 6) placeFacility();
               const tier = TIERS[w.tier];
+              {
+                  // the armory's badge: the soldiers stationed (guards and the force at home)
+                  const i = gameState.buildings.findIndex(b => b && b.type === 'armory' && !b.razed);
+                  const badge = i >= 0 ? ui.landGrid.children[i]?.querySelector('.armory-count') : null;
+                  if (badge) {
+                      const n = Math.round((w.defence || 0) + Math.max(0, (w.force || 0) - forceAway));
+                      badge.textContent = formatCount(n);
+                      badge.classList.toggle('hidden', n <= 0);
+                  }
+              }
               ui.warDefence.textContent = Math.round(w.defence).toLocaleString('en-US');
               const airOpen = isShown(w, 'air');
               ui.warAirRow.classList.toggle('hidden', !airOpen);
@@ -1413,6 +1475,7 @@ export function init() {
                   guardsOff: !!gameState.war?.enemyLeft || !!gameState.shipChosen,
                   hitEdges: gameState.war?.hitEdges || [],
                   war: !!gameState.war?.active,
+                  armoryId: armoryStanding()?.id ?? null,
               });
 
               // Raids. The competitor waits until our city is complete (everything
@@ -1578,7 +1641,14 @@ export function init() {
               if (clearBtn) {
                   const id = Number(clearBtn.dataset.buildingId);
                   const i = gameState.buildings.findIndex(b => b && b.id === id); const b = gameState.buildings[i];
-                  if (b && b.razed) {
+                  if (b && b.razed && b.type === 'armory') {
+                      // cleared, the armory stands again (not what stood there before it)
+                      const cost = armoryClearCost(b);
+                      if (gameState.stars >= cost) {
+                          gameState.stars -= cost; Object.assign(b, { razed: false, fort: 0, hp: plateMaxHp('armory', 0) });
+                          renderGridSlot(i); popArmory(); logWar('Interior: the armory stands again. Our soldiers gather there.'); logicTick(true); updateAllUI();
+                      }
+                  } else if (b && b.razed) {
                       const cost = Math.round((buildingData[b.type]?.cost || 0) * 0.3);
                       if (gameState.stars >= cost) { gameState.stars -= cost; gameState.buildings[i] = undefined; renderGridSlot(i); logicTick(true); updateAllUI(); }
                   }
@@ -1607,7 +1677,7 @@ export function init() {
               // their drum alone and our bass: the war's own music takes over as the set piece's bass fades
               setTimeout(() => { if (!signal.aborted && gameState.war?.active && !gameState.shipChosen) war.start(); }, handoverAt(marks) * 1000);
               playChapterCard({ roman: 'III', title: 'WAR', dark: true, slow: true, pause: 1400, hold: 5000, silent: sounded, onMidpoint: () => startWar() })
-                  .then(() => setTimeout(() => document.body.classList.add('tilt'), 1500));
+                  .then(() => { popArmory(); setTimeout(() => document.body.classList.add('tilt'), 1500); });
           }, { signal });
           /** One click buys a tenth of your arms' worth of units (at least one). */
           const batchSize = (arms) => Math.max(1, Math.floor(arms * 0.1 / UNIT_COST));
@@ -1917,7 +1987,7 @@ export function init() {
                     scheduleIconRefresh();
                 }
                 if (gameState.warReady) _warCardTriggered = true;
-                if (gameState.war?.active) applyWarPresentation();
+                if (gameState.war?.active) { applyWarPresentation(); if (ensureArmory() >= 0) requestAnimationFrame(popArmory); }
                 // Came back after choosing the way down: straight on down again.
                 if (gameState.shipChosen) {
                     _warCardTriggered = true;
