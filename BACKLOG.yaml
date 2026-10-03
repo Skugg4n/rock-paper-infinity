@@ -2364,3 +2364,61 @@ items:
       repeating them; (4) the wake pill's hover no longer counts down to the look wake; (5) numbers past
       a thousand trillion still read "8e15" (readout.js short), as before.
     status: open
+
+  - id: B270
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (III · GROW), the deep-flesh brief"
+    request: |
+      The body's rules as a pure module over a graph of chambers any view can draw: the lid is the first
+      organ, the front grows only into neighbours on the same floor, a full floor opens the spine to the
+      landing below and the neck up to the machine house; hunger eats people per organ, the outermost
+      organs go necrotic when people run out and revive innermost first when they return; dormitories
+      become vats; an output multiplier, a mass, rise readiness.
+    status: done
+    resolved_in: deep-flesh (version at merge)
+    notes: "src/phase4/growth.js + growth.test.js. Numbers are first guesses (named constants at the top): tune with the sim at integration."
+
+  - id: B271
+    added: 2026-10-03
+    source: "deep-flesh brief; Ola has asked twice where the biological graphics went"
+    request: |
+      The flesh as a procedural material (no texture files): veins, mycelium threads, sinew striation,
+      bone-pale ribbing, a wet sheen, one arterial red pulse running out from the heart; a front that
+      spreads over ~2 s from the edge touching the body; necrosis greys and stills; a slight breath;
+      tendrils across bridges. On any flat surface (3D slab, flat plan from above, a cross-section),
+      with the state as uniforms independent of geometry.
+    status: done
+    resolved_in: deep-flesh (version at merge)
+    notes: "src/phase4/flesh.js. 60 fps with 108 flesh meshes and the plan on an M4 Max; not measured on a weaker GPU."
+
+  - id: B272
+    added: 2026-10-03
+    source: "deep-flesh brief"
+    request: |
+      The machine's three tube heads become hands when the body reaches the machine house: a fist (rock),
+      a flat hand (paper), two fingers (scissors), in the flesh, throwing on the machine's rhythm.
+    status: done
+    resolved_in: deep-flesh (version at merge)
+    notes: "src/phase4/hands.js. Finds the heads in createMachine's group by shape (findArmHeads); the integration should expose arms[i].head and the game clock from machine-model.js instead."
+
+  - id: B273
+    added: 2026-10-03
+    source: "deep-flesh brief + Ola via the coordinator ('not that fond of the Deep we built graphically')"
+    request: |
+      A standalone prototype of GROW: take a glowing plate, fill the floor (the spine), reach the
+      machine (the hands), starve and feed; and a toggle showing the same body on a flat top-down plan
+      (orthographic, plain slabs) beside the 3D view, for Ola to compare.
+    status: done
+    resolved_in: deep-flesh (version at merge)
+    notes: "docs/mockups/deep-flesh-proto.html (?stage=1..4, ?plan=1). Shots in docs/playtests/rebuild-shots/flesh-*.png."
+
+  - id: B274
+    added: 2026-10-03
+    source: "deep-flesh (for the integration)"
+    request: |
+      Integrate GROW into the game: build the growth graph from the layout, feed growth.tick from the
+      deep state's people, use roomOutput in place of room counts, dress the scene's plates with
+      fleshify (scene.js keeps its meshes private: it needs to hand out plates, bridges, lanes, the
+      shaft, the neck and the machine's arm heads), the panel overgrown, RISE, and tune the constants
+      with the sim. Decide 3D or plan from Ola's look at the prototype.
+    status: open

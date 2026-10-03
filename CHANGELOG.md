@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.72.0 - 2026-10-03 (chapter IV, the flesh: modules and prototype)
+
+### Chapter IV, movement III · GROW: the flesh, as modules and a prototype (B270 to B274)
+
+Built beside the game, not in it: nothing existing changed except this file, the backlog and the module list. Integration comes later (B274).
+
+- **The body's rules** (`src/phase4/growth.js`, pure, `growth.test.js`, B270). The colony is a graph of chambers on floors (`graphFromSlots` builds it from the layout; any view can bring its own). The lid is the first organ; a plate is reachable only from a living organ next to it on the same floor, so the body is always one connected front; a full floor opens the spine to the landing below, and floor 1 full opens the neck to the machine house. Every year the body eats people (per organ, by its room's level, hungrier a floor down); short, the outermost organ goes necrotic, one a year, and fed again the innermost revives first; dormitories become vats that grow people; living organs make x20 (x1.5 more a floor down), necrotic ones nothing; `mass`, `roomOutput`, `riseReady` (deepest floor full and the machine taken). Every number a named constant at the top, to be tuned with the sim.
+- **The flesh** (`src/phase4/flesh.js`, B271): a procedural material (MeshPhysical with the shader patched, one program for every mesh) drawing in world space, so the same tissue lies on a 3D slab, a flat plan quad and a section, and runs on across plates and bridges: branching vessels that taper out, sinew bellies, fine pale mycelium, bone-pale ribbing on the sides, a wet clearcoat, and one arterial red (#a8132c) in a double heartbeat running out from the heart along the vessel cores. `fleshify` spreads it from the touching edge over about 2 s (vessels creep ahead over the concrete, lanes and houses sink in as the front passes), `setNecrotic` greys, dries and stills it, `setReachable` lets the body lean over a plate's edge with a faint glow, a slight breath on the vertical axis, `growTendrils` lays sinew and a vessel across a bridge. Front, origin, necrosis, hint and pulse are uniforms, independent of geometry.
+- **The machine's hands** (`src/phase4/hands.js`, B272): a fist, a flat hand and two fingers of capsules in the flesh with bone knuckles and tendons, hung on the machine's arm heads (found in its group; machine-model.js untouched), the tubes shrinking away and the arms turning to sinew; they wind up as fists and shoot their shape on the machine's own game clock.
+- **The prototype** (`docs/mockups/deep-flesh-proto.html`, B273) runs the real modules and the real machine over a two-floor colony in scene.js's look: click a glowing plate, take a reachable plate, fill the floor (the shaft turns into a spine with vertebrae), reach the machine (the hands), starve and feed, and PLAN VIEW: the same body on flat slabs from above, beside the 3D view. `?stage=1..4` and `?plan=1`. Shots: `docs/playtests/rebuild-shots/flesh-*.png`.
+
 ## v1.71.0 - 2026-10-03 (chapter IV in plain words)
 
 ### Chapter IV in plain words (B250 to B255)
