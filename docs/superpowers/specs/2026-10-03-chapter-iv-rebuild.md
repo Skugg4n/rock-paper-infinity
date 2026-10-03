@@ -318,6 +318,10 @@ happens to them. And nothing on screen says what a flesh room is FOR.
    - What flesh does, shown every time: on each take, the plate shows the multiplier
      ("×20") and the MASS needle moves; the lamp row shows the road to the rise as counts:
      "DEEPEST FLOOR 3 / 12", "MACHINE 0 / 1".
+   - **Show what you pay with.** Ola: "It costs people but it doesn't say how many you
+     have." People get a third counter top right beside ore and stars (a person glyph, the
+     count, "+N a day" or "-N a day" under it), from TEND on, and the FEED gauge carries
+     the number. Every price in people is next to that count.
 4. **Sim rule:** the scripted player must reach the rise WITHOUT ever being unable to
    act for more than 10 real seconds; the sim reports "longest stuck" for GROW and the
    act stays 25 to 35 minutes.
