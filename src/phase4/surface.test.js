@@ -157,16 +157,16 @@ describe('a game', () => {
         expect(r.capacity).toBe(WIN_CAPACITY);
         expect(r.word).toBe(true);
         expect(w.words).toBe(1);
-        expect(r.text).toBe('You: scissors. Surface: paper. It gives 8 capacity and a word.');
+        expect(r.text).toBe('You threw scissors, Surface threw paper. It gives 8 capacity and a word.');
         expect(play(w, 'rock')).toBe(null);          // one game a visit
         const l = at('paper');
         const q = play(l, 'rock');
         expect(q.outcome).toBe('lose');
         expect(q.stability).toBe(LOSE_STABILITY);
-        expect(q.text).toBe('Surface: paper. You: rock. It takes 3 stability.');
+        expect(q.text).toBe('Surface threw paper, you threw rock. It takes 3 stability.');
         expect(l.words).toBe(0);
         const d = play(at('rock'), 'rock');
-        expect(d.text).toBe('You: rock. Surface: rock. It waits.');
+        expect(d.text).toBe('You both threw rock. It waits.');
         expect(play(at('rock'), 'lizard')).toBe(null);
     });
     test('the words come one at a time, and never past what the ladder allows', () => {
@@ -181,7 +181,7 @@ describe('a game', () => {
         expect(sf.words).toBe(4);
         expect(sentenceShown(sf)).toBe('COME UP THERE IS · · · · ·');
         expect(resultText({ you: 'rock', it: 'scissors', outcome: 'win', capacity: 8, stability: 0, word: false }))
-            .toBe('You: rock. Surface: scissors. It gives 8 capacity.');
+            .toBe('You threw rock, Surface threw scissors. It gives 8 capacity.');
         expect(SENTENCE[SENTENCE.length - 1]).toBe('US');
     });
     test('a broken record in a save is mended', () => {

@@ -61,29 +61,25 @@ export function list(words) {
 export function ledger(column, state, report) {
     const asleep = !!state.asleep;
     if (column === 'M') {
-        return `Ore: ${n(state.minerals)} in store. +${n(report.minerals)} mined, -${n(report.fuel)} burned a day.`;
+        return 'Ore. Above, what is in store. Below, what is mined and what is burned in a day.';
     }
+    // deep-copy: the numbers are over and under the bar already; the hover says what they are
     if (column === 'F') {
-        const days = foodDays(state);
-        const left = Number.isFinite(days) ? `${n(days)} ${Math.round(days) === 1 ? 'day' : 'days'} left` : 'nobody to feed';
-        if (asleep) return `Food: ${left} when we wake. +${n(report.food)} grown, -${n(report.eaten + report.born * BIRTH_FOOD)} eaten a day in the ice.`;
-        return `Food: ${left}. +${n(report.food)} grown, -${n(report.eaten + report.born * BIRTH_FOOD)} eaten a day.`;
+        if (!Number.isFinite(foodDays(state))) return 'Food. There is nobody to feed.';
+        if (asleep) return 'Food. Above, how many days it lasts when we wake. Below, what is grown and eaten in a day in the ice.';
+        return 'Food. Above, how many days it lasts. Below, what is grown and what is eaten in a day.';
     }
     if (column === 'E') {
-        const used = ROOMS.reduce((a, t) => a + report.draw[t], 0);
-        return `Energy: ${n(report.energySpare)} spare. +${n(report.energyMade)} made, -${n(used)} used a day.`;
+        return 'Energy. Above, what is spare. Below, what is made and what is used in a day.';
     }
     // deep-fix: the beds the body took with its people are said, so a lower count reads as a cost
     const held = report.bodyBeds >= 0.5 ? ` ${n(report.bodyBeds)} beds went to the body.` : '';
-    if (asleep) return `People: ${n(state.humans)} asleep in the ice. Beds for ${n(report.capacity)}.${held}`;
-    const onDuty = ROOMS.filter((t) => report.crew[t] > 0.5);
-    const busy = onDuty.reduce((a, t) => a + report.crew[t], 0);
-    // a fully automated colony has nobody on a shift at all, and "0 on duty in nothing"
-    // is not a sentence anyone would write
-    const duty = onDuty.length
-        ? `${n(busy)} on duty in the ${list(onDuty.map((t) => ROOM_WORD[t]))}.`
-        : 'Nobody on duty; the rooms run themselves.';
-    return `People: ${n(report.hands)} free of ${n(report.awake)} awake. ${duty} Beds for ${n(report.capacity)}.${held}`;
+    if (asleep) return `People asleep in the ice. There are beds for ${n(report.capacity)}.${held}`;
+    // a fully automated colony has nobody on a shift at all
+    const duty = ROOMS.some((t) => report.crew[t] > 0.5)
+        ? 'Above, free hands. Below, everyone awake and those on duty.'
+        : 'Nobody on duty. The rooms run themselves.';
+    return `People. ${duty} There are beds for ${n(report.capacity)}.${held}`;
 }
 
 /** Days the larder feeds the colony awake: the food store in the only unit that means anything. */
@@ -186,17 +182,17 @@ export const rateWords = (days) => RATE_WORDS[days] || span(days);
 export const AFFORD_FAR_DAYS = 1000 * DAYS_PER_YEAR;
 export function affordText({ price, have, perDay, blocked }) {
     if (blocked === 'pending') return 'Already being built.';
-    if (blocked === 'full') return 'Eight orders are on the books: wait for one to land.';
+    if (blocked === 'full') return 'The build queue is full.';
     if (blocked === 'top') return 'The ladder is at its top.';
-    if (blocked === 'asleep') return 'The colony is asleep: wake it to buy.';
+    if (blocked === 'asleep') return 'Only while the colony is awake.';
     if (blocked === 'gone') return 'Nobody is left to build it.';
     if (blocked === 'people') return `Needs at least ${MIN_SLEEPERS} people to stay behind.`;
-    if (blocked === 'chamber') return have >= price ? 'Needs a free chamber: dig one first.' : `Needs a free chamber, and ${affordText({ price, have, perDay }).toLowerCase()}`;
+    if (blocked === 'chamber') return have >= price ? 'Dig a chamber first.' : `Dig a chamber first. ${affordText({ price, have, perDay })}`;
     if (!(price > have)) return '';
     if (!(perDay > 0)) return 'Not affordable at today\'s flow.';
     const wait = (price - have) / perDay;
     // "Affordable in 1 695 937 617 years" is true and useless: past a millennium, say so
-    if (wait > AFFORD_FAR_DAYS) return 'More than a thousand years away at today\'s flow; asleep, the stars come faster.';
+    if (wait > AFFORD_FAR_DAYS) return 'More than a thousand years away at today\'s flow.';
     return `Affordable in ${span(wait)}.`;
 }
 
@@ -340,9 +336,10 @@ export function cryoRoad(tier, state, { maxSteps = 4000 } = {}) {
         } else if (key === 'food') { items.push({ key, text: `food for ${cryoLabel(days)}`, done: false }); trial.food = 1e300; } else break;
     }
     const price = CRYO[tier].cost;
-    items.push({ key: 'stars', text: `${short(price)} ★`, done: (state.stars || 0) >= price });
+    items.push({ key: 'stars', text: `★ ${short(price)}`, done: (state.stars || 0) >= price });
     const done = items.filter((x) => x.done).length;
-    const text = `needs: ${items.map((x) => `${x.text}${x.done ? ' ✓' : x.ordered ? ' (ordered)' : ''}`).join(', ')}`;
+    // deep-copy: in words, "needs generators automated ✓, farms automated (on order) and ★ 15 k"
+    const text = `needs ${list(items.map((x) => `${x.text}${x.done ? ' ✓' : x.ordered ? ' (on order)' : ''}`))}`;
     return { items, text, done, total: items.length, open: done === items.length };
 }
 
@@ -457,7 +454,7 @@ export const rewardShows = (counter, reward) => reward > 0 && short((counter || 
 
 /** What the advisor says, once, the day a longer sleep can be bought. deep-fix: "Cryo II is ready"
  *  read as if it were already bought (the playtest of v1.66.0); it is something to buy. */
-export const cryoReadyLine = (tier) => `${cryoName(tier)} can be bought: ${rateWords(CRYO[tier].days)} a second.`;
+export const cryoReadyLine = (tier) => `${cryoName(tier)} can be bought. A second of sleep becomes ${rateWords(CRYO[tier].days)}.`;
 
 /**
  * What a purchase costs the colony to RUN and what it gives back, in one sentence.
@@ -475,8 +472,8 @@ export function buySentence(kind, type, state) {
     const auto = state.auto[type] || 0;
     if (kind === 'auto') {
         return auto === 0
-            ? `Runs the ${ROOM_WORDS[type]} without people; every hand goes back to the others.`
-            : `Triples what the ${ROOM_WORDS[type]} make; they draw more power for it.`;
+            ? `Runs the ${ROOM_WORDS[type]} without people. Their hands go back to the others.`
+            : `Triples what the ${ROOM_WORDS[type]} make, for more power.`;
     }
     const after = kind === 'level' ? lvl + 1 : lvl;
     // deep-voice: with Surface's gifts (the relay, quiet hands) as the rules count them
@@ -490,7 +487,7 @@ export function buySentence(kind, type, state) {
     if (type === 'generator') needs.push(`${n(ROOM.generator.fuel * up)} ore a day`);
     const gives = type === 'dorm' ? `${n(made)} beds` : `${n(made)} ${{ mine: 'ore', farm: 'food', generator: 'energy' }[type]}`;
     const head = kind === 'level' ? `Doubles every ${ROOM_WORD[type]}.` : `One more ${ROOM_WORD[type]}.`;
-    return needs.length ? `${head} Needs ${list(needs)}; makes ${gives}.` : `${head} Makes ${gives}.`;
+    return needs.length ? `${head} Needs ${list(needs)}. Makes ${gives}.` : `${head} Makes ${gives}.`;
 }
 
 /** A state a purchase can be tried on without touching the real one. */
@@ -592,11 +589,11 @@ export function consequence(state, kind, type, { price = 0, currency = 'minerals
             ? `Food for ${more(da - db)} of sleep.`
             : `Lets the colony sleep ${more(da - db)}${ta ? '' : ' or longer'} without an alarm.`;
     }
-    if (da < db) return `The colony would wake ${span(db - da)} sooner: ${clause(ta)}.`;
+    if (da < db) return `The colony would wake ${span(db - da)} sooner, when ${clause(ta)}.`;
     const ra = tickDay(cloneState(after), !!state.asleep).stars;
     const delta = ra - (report?.stars || 0);
-    if (delta >= 0.5) return `+${n(delta)} stars a day toward ${goal}.`;
-    if (delta <= -0.5) return `-${n(-delta)} stars a day: less energy to spare for the machine.`;
-    if (type === 'dorm') return 'More beds; the colony grows into them while it is fed.';
-    return 'No change to the stars: the machine plays on spare energy.';
+    if (delta >= 0.5) return `${n(delta)} more stars a day toward ${goal}.`;
+    if (delta <= -0.5) return `${n(-delta)} fewer stars a day. The machine gets less energy.`;
+    if (type === 'dorm') return 'More beds. The colony grows into them.';
+    return 'No change to the stars.';
 }

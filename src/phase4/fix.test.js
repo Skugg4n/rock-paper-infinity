@@ -33,7 +33,7 @@ describe('Cryo I shows its whole road', () => {
     test('at the descent every part at once, none ticked', () => {
         const s = initialDeepState();
         const r = cryoRoad(0, s);
-        expect(r.text).toBe('needs: generators automated, farms automated, mines automated, 15 k ★');
+        expect(r.text).toBe('needs generators automated, farms automated, mines automated and ★ 15 k');
         expect(r.done).toBe(0);
         expect(r.total).toBe(4);
         expect(r.open).toBe(false);
@@ -46,7 +46,7 @@ describe('Cryo I shows its whole road', () => {
         s.auto = { ...s.auto, generator: 1 };
         s.builds = [{ kind: 'auto', type: 'farm', slot: -1, startDay: 0, doneDay: 12 }];
         const r = cryoRoad(0, s);
-        expect(r.text).toBe('needs: generators automated ✓, farms automated (ordered), mines automated, 15 k ★ ✓');
+        expect(r.text).toBe('needs generators automated ✓, farms automated (on order), mines automated and ★ 15 k ✓');
         expect(r.done).toBe(2);
     });
     test('everything in: the road is open, and the node can be bought', () => {
@@ -65,24 +65,24 @@ describe('Cryo I shows its whole road', () => {
         expect(r.items[r.items.length - 1]).toMatchObject({ key: 'stars', done: false });
     });
     test('"can be bought", never "is ready"', () => {
-        expect(cryoReadyLine(1)).toBe('Cryo II can be bought: a year a second.');
+        expect(cryoReadyLine(1)).toBe('Cryo II can be bought. A second of sleep becomes a year.');
     });
 });
 
 describe('every effect line carries before and after', () => {
     test('a level: what the room makes, from a dry run', () => {
         const s = initialDeepState();
-        expect(effectLine(s, 'seam')).toMatch(/^Doubles every mine: ore 12 → 24 a day/);
-        expect(effectLine(s, 'output')).toMatch(/^Doubles every generator: energy 26 → 52 a day, ★ \d+ → \d+ a day/);
-        expect(effectLine(s, 'feed')).toMatch(/^The machine draws 9 % of the spare energy: ★ 81 → \d+ a day\.$/);
+        expect(effectLine(s, 'seam')).toMatch(/^Ore 12 → 24 a day/);
+        expect(effectLine(s, 'output')).toMatch(/^Energy 26 → 52 a day, ★ \d+ → \d+ a day/);
+        expect(effectLine(s, 'feed')).toMatch(/^Its share 6 % → 9 %, ★ 81 → \d+ a day\.$/);
     });
     test('Surface\'s gifts: the arrow and two numbers', () => {
         const s = { ...initialDeepState(), tree: { opened: ['lossless', 'cold', 'quiet'], bought: [], unseen: false } };
         s.auto = { mine: 1, farm: 1, generator: 1, dorm: 0 };
         s.level = { mine: 3, farm: 3, generator: 3, dorm: 0 };
-        expect(effectLine(s, 'lossless')).toMatch(/^Automation output ×3: ore [\d.]+( k)? → [\d.]+( k)? a day/);
-        expect(effectLine(s, 'quiet')).toMatch(/^Automated rooms need no upkeep crew: power drawn \d+ → \d+ a day/);
-        expect(effectLine(s, 'cold')).toMatch(/^Sleepers eat nothing: .+ → .+/);
+        expect(effectLine(s, 'lossless')).toMatch(/^Ore [\d.]+( k)? → [\d.]+( k)? a day/);
+        expect(effectLine(s, 'quiet')).toMatch(/^Power drawn \d+ → \d+ a day/);
+        expect(effectLine(s, 'cold')).toMatch(/^(Food under the ice lasts|Sleepers eat) .+ → .+/);
         // not opened: nothing to say yet
         expect(effectLine(s, 'question')).toBe('');
         expect(arrow(576, 1728)).toBe('576 → 1.7 k');
@@ -90,9 +90,9 @@ describe('every effect line carries before and after', () => {
     test('the Watcher\'s steps and the body\'s', () => {
         const s = late();
         s.watcher.bought = [];
-        expect(effectLine(s, 'watchdog')).toMatch(/stability drift [\d.]+ → [\d.]+ a second\.$/);
+        expect(effectLine(s, 'watchdog')).toMatch(/^Drift [\d.]+ → [\d.]+ a second\.$/);
         s.watcher.bought = HARDWARE.slice();
-        expect(effectLine(s, 'brain')).toMatch(/^BIOLOGICAL: .+: people .+ → .+, beds .+ → .+\.$/);
+        expect(effectLine(s, 'brain')).toMatch(/^People .+ → .+, beds .+ → .+, for good\.$/);
     });
 });
 

@@ -21,7 +21,7 @@
 // deep-tree (step 1 of the tree): the level, automate and longer-sleep buttons and the Watcher's
 // pill are gone; the tree has them. So, before 1 and 2:
 // 0. From "IV · the deep" (awake): the old buttons are gone, the way up is a greyed teaser
-//    ("survival 85 % needed"); the tree button opens the panel, a hovered Seam node writes the info
+//    ("Opens at 85 % survival. Now about 15 %." since deep-copy); the tree button opens the panel, a hovered Seam node writes the info
 //    box, a click orders a mine level (paid, in the queue, built a few days later), Escape closes the
 //    panel, and no button in the column moved.
 // 1. also: from "IV · Surface" the tree shows the WATCHER branch (the steps bought filled) and
@@ -63,6 +63,13 @@
 // D. From "IV · the body", Surface visiting, a biological step bought: while the sector is chosen
 //    Surface's game and line are not on screen (and no lamps), and the meter holds.
 // 2. also: the people and the beds the step took stay lower 10 s later.
+// deep-copy (Ola on v1.67: chapter IV in plain words):
+// 0. also: the wallet ("★ 1.1 M   ore 181 k") is drawn inside the board's frame and inside the window;
+//    the info box is four plain lines (Seam: "Costs ★ 4.4 k.", "You can buy it."); after the click
+//    Seam has the ring and "+1" and says "Being built: N days left."; a click inside the board keeps
+//    the panel open and a click on the backdrop closes it; before Cryo I there is no Sleep pill; Go
+//    up has exactly one text, its caption, with no hover text.
+// F. also: from "IV · cryo I" the Sleep pill is there, and the scout party's hover has no "%".
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -193,16 +200,21 @@ try {
             rate: v('#deep-stars-rate'), year: v('#deep-year'), watcher: v('#deep-watcher'), wake: v('#deep-wake-btn'),
             tree: v('#deep-tree-btn'), reset: v('#deep-reset-view') }; })()`;
     const info = () => evaluate(`(() => { const q = (c) => document.querySelector('#deep-tree-info .' + c).textContent;
-        return { name: q('ib-name'), lvl: q('ib-lvl'), cost: q('ib-cost'), eff: q('ib-eff'), x: q('ib-x') }; })()`);
+        return { name: q('ib-name'), lvl: q('ib-lvl'), does: q('ib-does'), cost: q('ib-cost'), eff: q('ib-eff'), x: q('ib-x') }; })()`);
 
     // ================= 0. IV · the deep: the tree, and the buttons it replaced ==================
     await jump('iv-start', { asleep: false });
     const gone0 = await evaluate(`['deep-level-btn', 'deep-auto-btn', 'deep-cryo-up', 'deep-ladder', 'deep-ladder-pill', 'deep-group-grow']
         .filter((id) => document.getElementById(id))`);
     check(gone0.length === 0, `the level, automate and longer-sleep buttons and the Watcher's pill are gone${gone0.length ? `: still ${gone0.join(', ')}` : ''}`);
-    const up0 = await evaluate(`(() => { const b = document.getElementById('deep-ascend-btn'); return { locked: b.classList.contains('is-locked'),
-        caption: document.getElementById('deep-ascend-caption').textContent, shown: b.classList.contains('is-captioned') }; })()`);
-    check(up0.locked && up0.shown && up0.caption === 'survival 85 % needed', `the way up is a greyed teaser: "${up0.caption}" (locked ${up0.locked})`);
+    const up0 = await evaluate(`(() => { const b = document.getElementById('deep-ascend-btn'); const t = b.querySelector('.tooltip');
+        return { locked: b.classList.contains('is-locked'), caption: document.getElementById('deep-ascend-caption').textContent,
+            shown: b.classList.contains('is-captioned'), tip: t ? t.textContent : '', tipShown: !!t && getComputedStyle(t).display !== 'none' }; })()`);
+    check(up0.locked && up0.shown && /^Opens at 85 % survival\. Now about \d+ %\.$/.test(up0.caption), `the way up is a greyed teaser: "${up0.caption}" (locked ${up0.locked})`);
+    check(up0.tip === '' && !up0.tipShown, `Go up has exactly one text: the caption, no hover text ("${up0.tip}")`);
+    // deep-copy: before Cryo I there is no Sleep pill at all
+    const sl0 = await evaluate(`(() => { const b = document.getElementById('deep-cryo-btn'); return { there: !!b.offsetParent, caption: !!document.getElementById('deep-cryo-caption') }; })()`);
+    check(!sl0.there && !sl0.caption, `before Cryo I the Sleep pill is not there (${sl0.there}), nor its caption (${sl0.caption})`);
     await evaluate('debug_deep("stars")');
     await sleepMs(300);
     const col0 = await evaluate(COLUMN_RECTS);
@@ -214,29 +226,40 @@ try {
     const open0 = await evaluate(`({ open: rpiDeep.treeOpen, shown: !document.getElementById('deep-tree').hidden,
         watcher: rpiDeep.treeDrawn.watchdog?.visible, seam: rpiDeep.treeDrawn.seam?.status })`);
     check(open0.open && open0.shown, `the tree button opens the panel (open ${open0.open})`);
-    const bal0 = await evaluate(`({ text: rpiDeep.treeBalances, dom: document.getElementById('deep-tree-bal').textContent,
-        shown: getComputedStyle(document.getElementById('deep-tree-bal')).visibility !== 'hidden' && !!document.getElementById('deep-tree-bal').offsetParent })`);
-    check(/^ORE \S+( [kMBT])? [+-]\S+\/d · ★ \S+( [kMBT])? \+\S+\/d$/.test(bal0.text) && bal0.shown && !/CAPACITY/.test(bal0.text),
-        `the tree's top edge shows the balances: "${bal0.text}"`);
+    // deep-copy: THE WALLET, inside the board's frame (its header band), larger than the labels, in the window
+    const bal0 = await evaluate(`(() => { const w = document.querySelector('#deep-tree .tt-wallet'); const f = document.querySelector('#deep-tree .tt-hit');
+        const r = w.getBoundingClientRect(), b = f.getBoundingClientRect();
+        const label = document.querySelector('#deep-tree g.tn[data-id="seam"] text'); const lr = label.getBoundingClientRect();
+        return { text: rpiDeep.treeBalances, dom: w.textContent, inside: r.left >= b.left && r.right <= b.right && r.top >= b.top && r.bottom <= b.bottom,
+            onScreen: r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth, h: r.height, labelH: lr.height }; })()`);
+    check(/^★ \S+( [kMBT])?   ore \S+( [kMBT])?$/.test(bal0.text) && bal0.dom === bal0.text.replace(/   /g, ''),
+        `the wallet reads "${bal0.text}"`);
+    check(bal0.inside && bal0.onScreen && bal0.h > bal0.labelH * 1.4, `the wallet is inside the board and the window, larger than a label (${bal0.h.toFixed(0)} px against ${bal0.labelH.toFixed(0)})`);
     check(open0.watcher === false && open0.seam === 'buyable', `at the descent: no WATCHER branch yet (${open0.watcher}), Seam can be bought (${open0.seam})`);
     const seam = await nodeAt('seam');
     await mouse('mouseMoved', seam.x, seam.y);
     await sleepMs(350);
     const i1 = await info();
     const lit = await evaluate(`document.querySelectorAll('#deep-tree .tt-lit path').length`);
-    check(i1.name === 'SEAM' && i1.lvl === '0 / 20' && i1.cost === 'next ★ 4.4 k' && /^Doubles every mine: ore \d+ → \d+ a day/.test(i1.eff) && /^click/.test(i1.x),
-        `the info box on Seam: "${i1.name} | ${i1.lvl} | ${i1.cost} | ${i1.eff} | ${i1.x}"`);
+    check(i1.name === 'SEAM' && i1.lvl === '0 / 20' && i1.does === 'Every mine makes twice as much and costs a little more to run.'
+        && i1.cost === 'Costs ★ 4.4 k.' && /^You can buy it\./.test(i1.x) && /^Ore \d+ → \d+ a day/.test(i1.eff),
+        `the info box on Seam: "${i1.name} | ${i1.lvl} | ${i1.does} | ${i1.cost} | ${i1.x} | ${i1.eff}"`);
+    const pr0 = await evaluate(`(() => { const t = [...document.querySelectorAll('#deep-tree g.tn[data-id="seam"] text')].find((x) => x.textContent.startsWith('★'));
+        const d = rpiDeep.treeDrawn, have = rpiDeep.state.stars;
+        const far = Object.keys(d).find((id) => d[id].visible && d[id].price && d[id].price.stars > have);
+        const f = far && [...document.querySelectorAll('#deep-tree g.tn[data-id="' + far + '"] text')].find((x) => x.textContent.startsWith('★'));
+        return { seam: t && t.getAttribute('fill'), seamText: t && t.textContent, far, farFill: f ? f.getAttribute('fill') : null }; })()`);
+    check(pr0.seam === '#ffffff' && (!pr0.far || (pr0.farFill && pr0.farFill !== '#ffffff')),
+        `a price that can be paid is white (Seam "${pr0.seamText}" ${pr0.seam}), one that cannot is dim (${pr0.far} ${pr0.farFill})`);
     check(lit === 1, `the trace from the root lights on hover (${lit} lit)`);
     // deep-fix: Cryo I's whole road at once, on the node and under the sleep pill
     const cryoAt = await nodeAt('cryo-i');
     await mouse('mouseMoved', cryoAt.x, cryoAt.y);
     await sleepMs(300);
     const ic = await info();
-    const capt = await evaluate(`document.getElementById('deep-cryo-caption').textContent`);
-    check(/^Cryo I needs: generators automated( ✓)?, farms automated( ✓)?, mines automated( ✓)?, 15 k ★( ✓)?$/.test(ic.x),
-        `Cryo I lists its whole road at once: "${ic.x}"`);
-    check(capt === ic.x, `the sleep pill's caption says the same: "${capt}"`);
-    check(/a second of sleep is nothing → a month/.test(ic.eff), `Cryo I's effect line: "${ic.eff}"`);
+    check(/^Needs generators automated( ✓)?, farms automated( ✓)?, mines automated( ✓)? and ★ 15 k( ✓)?\.$/.test(ic.x),
+        `Cryo I lists its whole road at once, only on its node: "${ic.x}"`);
+    check(ic.does === 'A cryo hall, where a second of sleep is a month.' && ic.cost === 'Costs ★ 15 k.', `Cryo I in words: "${ic.does} | ${ic.cost}"`);
     await mouse('mouseMoved', seam.x, seam.y);
     await sleepMs(300);
     await shot('0-the-tree');
@@ -250,13 +273,28 @@ try {
     const paid = s0.stars - s1.stars;
     check(paid <= 4400 + 1 && paid >= 4400 - 2 * s0.perDay - 1 && s1.order === 1 && s1.level === 0,
         `a click on Seam ordered a mine level: ${Math.round(paid)} stars paid (less ${Math.round(s0.perDay)} a day earned), ${s1.order} order in the queue, level ${s1.level} until it is built`);
-    check(i2.lvl === '0 / 20 · 1 ordered' && i2.cost === 'next ★ 40 k', `the info box follows: "${i2.lvl} | ${i2.cost}"`);
+    check(i2.lvl === '0 / 20' && i2.cost === 'Costs ★ 40 k.' && /^Being built: \d+ days? left\./.test(i2.x), `the info box follows: "${i2.lvl} | ${i2.cost} | ${i2.x}"`);
+    const ord = await evaluate(`(() => { const g = document.querySelector('#deep-tree g.tn[data-id="seam"]');
+        return { ring: !!g.querySelector('.ord-ring'), plus: g.querySelector('.ord-plus')?.textContent || '', flash: g.classList.contains('is-flash') }; })()`);
+    check(ord.ring && ord.plus === '+1' && ord.flash, `the order shows on the node: a ring (${ord.ring}), "${ord.plus}" by its pips, a flash (${ord.flash})`);
     const queued = await evaluate(`document.getElementById('deep-queue').textContent`);
     check(/lv mine/.test(queued), `the order is in the queue strip with its ring ("${queued.trim()}")`);
     await key('Escape');
     await sleepMs(300);
     const col1 = await evaluate(COLUMN_RECTS);
     check(!(await evaluate('rpiDeep.treeOpen')) && (await evaluate(`document.getElementById('deep-tree').hidden`)), 'Escape closes the panel');
+    // deep-copy: a click inside the board keeps it open; a click on the backdrop outside it closes it
+    await click(treeBtn.x, treeBtn.y);
+    await sleepMs(300);
+    const inBoard = await evaluate(`(() => { const svg = document.querySelector('#deep-tree svg.deep-tree-board'); const p = svg.createSVGPoint();
+        p.x = 300; p.y = 330; const m = svg.getScreenCTM(); const q = p.matrixTransform(m); return { x: q.x, y: q.y }; })()`);
+    await click(inBoard.x, inBoard.y);
+    await sleepMs(250);
+    const stillOpen = await evaluate('rpiDeep.treeOpen');
+    await click(14, 450);
+    await sleepMs(250);
+    const shutBy = await evaluate('rpiDeep.treeOpen');
+    check(stillOpen && !shutBy, `a click inside the board keeps the tree open (${stillOpen}); a click on the backdrop closes it (${!shutBy})`);
     check(col0 === col1, `no button in the column moved${col0 === col1 ? '' : `: ${col0} / ${col1}`}`);
     for (let i = 0; i < 40 && (await evaluate('rpiDeep.state.level.mine')) < 1; i++) await sleepMs(250);
     check((await evaluate('rpiDeep.state.level.mine')) === 1, 'the order lands: the mines are at level 1, Seam reads 1');
@@ -278,7 +316,7 @@ try {
     // deep-fix: the games and the energy fed, in the readouts' short form (whole numbers under a thousand)
     const n0 = m0.fed >= 0.5 && m0.fed < 999.5 ? String(Math.round(m0.fed)) : null;
     const g0 = m0.games >= 0.5 && m0.games < 999.5 ? String(Math.round(m0.games)) : null;
-    check(m1.on && m1.hit && /^The machine plays \S+( [kMBT])? games a day on .+ energy\. Each win is a star: \+\S+( [kMBT])?\/d\.$/.test(m1.el)
+    check(m1.on && m1.hit && /^The machine plays \S+( [kMBT])? games a day on .+ energy and wins \S+( [kMBT])?\. Each win is a star\.$/.test(m1.el)
         && (!n0 || m1.el.includes(` on ${n0} energy`)) && (!g0 || m1.el.includes(`plays ${g0} games`)),
         `the hover over the machine: "${m1.el}" (${m1.on ? 'shown' : 'hidden'})`);
     await shot('M-1-the-machine-on-top');
@@ -352,7 +390,7 @@ try {
     const iq = await evaluate(`document.querySelector('#deep-tree-info .ib-q').textContent`);
     check(iq.includes('Your humans. What use are they?'), `the info box quotes the line that opened it: ${iq}`);
     const iqe = (await info()).eff;
-    check(/^Automated rooms need no upkeep crew: .*\d[\d.]*( [kMBT])? → \d[\d.]*( [kMBT])?/.test(iqe), `a gift's effect line has an arrow with two numbers: "${iqe}"`);
+    check(/^Power drawn .*\d[\d.]*( [kMBT])? → \d[\d.]*( [kMBT])?/.test(iqe), `a gift's numbers line has an arrow with two numbers: "${iqe}"`);
     await shot('V-3-the-night-log');
     const longAt = await centre('#deep-tree g.tn[data-id="longcount"] rect[stroke-dasharray]');
     await mouse('mouseMoved', longAt.x, longAt.y);
@@ -419,7 +457,7 @@ try {
     await sleepMs(500);
     const nt6 = await evaluate(`({ next: rpiDeep.treeLogNext, drawn: [...document.querySelectorAll('#deep-tree .tt-log text.log-next')].map((t) => t.textContent).join(' ') })`);
     await shot('N-4-the-log-says-what-is-next');
-    check(nt6.next === 'next: after Cryo II' && nt6.drawn === nt6.next, `the night log ends with what the next night waits for: "${nt6.drawn}"`);
+    check(nt6.next === 'Surface waits for Cryo II.' && nt6.drawn === nt6.next, `the night log ends with what the next night waits for: "${nt6.drawn}"`);
     await key('Escape');
     await sleepMs(300);
     // a sleep with no night: the alarm line, then the same sentence for five seconds, once
@@ -436,7 +474,7 @@ try {
     const a2 = await adv();
     await sleepMs(Math.max(0, nWoke + 13200 - Date.now()));
     const a3 = await adv();
-    check(/Woke:/.test(a1) && a2 === 'next: after Cryo II' && a3 !== a2 && !/^next:/.test(a3),
+    check(/Woke:/.test(a1) && a2 === 'Surface waits for Cryo II.' && a3 !== a2,
         `a wake with no night: "${a1}", then "${a2}", then "${a3}"`);
 
     // ================= F. IV · cryo I: the TREE button through the walk into the hall ==================
@@ -453,6 +491,23 @@ try {
     check(f0.busy && !f0.open && f1, `0.5 s after Sleep (walking in: ${f0.busy}) a click on TREE opens it (${f1})`);
     await key('Escape');
     await sleepMs(300);
+    // deep-copy: with Cryo I the Sleep pill is there; the scout party says no odds
+    await jump('iv-cryo', { asleep: false });
+    await mouse('mouseMoved', 5, 5);
+    const fc = await evaluate(`(() => { const b = document.getElementById('deep-cryo-btn'); const p = document.getElementById('deep-probe-btn');
+        return { sleep: !!b.offsetParent, probe: !!p.offsetParent, tip: p.querySelector('.tooltip').textContent, caption: !!p.querySelector('.deep-caption') }; })()`);
+    check(fc.sleep, 'from IV · cryo I the Sleep pill is there');
+    check(fc.probe && !fc.caption && !/%/.test(fc.tip) && /Send \d+ people up for/.test(fc.tip) && /Some may not come back\./.test(fc.tip),
+        `the scout party: hover text only, no odds: "${fc.tip}"`);
+    const pb = await centre('#deep-probe-btn');
+    await mouse('mouseMoved', pb.x, pb.y);
+    await sleepMs(350);
+    const ov = await evaluate(`(() => { const t = document.querySelector('#deep-probe-btn .tooltip').getBoundingClientRect();
+        return [...document.querySelectorAll('#deep-group-act .deep-caption')].filter((c) => c.offsetParent && parseFloat(getComputedStyle(c).opacity) > 0.05)
+            .filter((c) => { const r = c.getBoundingClientRect(); return r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top; }).length; })()`);
+    await shot('F-the-scout-party');
+    check(ov === 0, `the scout party's hover lies on no other caption (${ov} under it)`);
+    await mouse('mouseMoved', 5, 5);
 
     // ================= W. IV · the Watcher: the madness reaches the text ==================
     await jump('iv-watcher');
@@ -494,7 +549,7 @@ try {
     check(t1.gifts.every((x) => x === 'bought+filled'), `its gifts bought, the ring filled: ${t1.gifts.join(', ')}`);
     check(t1.seam === 'The colony is asleep: wake it to buy.', `asleep, a level says why not: "${t1.seam}"`);
     const bal1 = await evaluate('rpiDeep.treeBalances');
-    check(/ · CAPACITY \d+ \/ \d+$/.test(bal1), `asleep the tree's top edge adds the capacity: "${bal1}"`);
+    check(/   capacity \d+$/.test(bal1), `asleep the wallet adds the capacity: "${bal1}"`);
     await key('Escape');
     await sleepMs(300);
     check(!(await evaluate('rpiDeep.treeOpen')) && (await evaluate('rpiDeep.state.asleep')), 'Escape closes the tree; the colony sleeps on');
@@ -620,7 +675,8 @@ try {
     };
     const sv0 = await evaluate('({ beds: rpiDeep.report.capacity })');
     const ib = await brainOnTree();
-    check(ib.name === 'BRAIN TISSUE' && /^BIOLOGICAL: /.test(ib.eff), `the tree's BIOLOGICAL branch: "${ib.name} | ${ib.cost} | ${ib.eff}"`);
+    check(ib.name === 'BRAIN TISSUE' && /^People .+ → .+, beds .+ → .+, for good\.$/.test(ib.eff) && /people\.$/.test(ib.cost),
+        `the tree's BIOLOGICAL branch: "${ib.name} | ${ib.cost} | ${ib.eff}"`);
     const c1 = await evaluate(`(() => {
         const d = window.rpiDeep;
         return { choosing: d.choosing, sealing: d.state.watcher.sealing, humans: d.state.humans, cap: d.state.watcher.capacity,
@@ -630,7 +686,7 @@ try {
     })()`);
     await shot('1-choose-a-sector');
     check(c1.choosing && c1.sealing === 'brain' && !c1.tree, `the tree bought Brain tissue, closed, and asks for a sector (choosing ${c1.choosing}, waiting ${c1.sealing})`);
-    check(c1.sub === 'BIOLOGICAL · Choose a sector to seal', `the line under the meter reads "${c1.sub}"`);
+    check(c1.sub === 'Choose a sector to seal.', `the line under the meter reads "${c1.sub}"`);
     check(c1.cands.length === 4 && c1.glow > 0 && c1.crosshair, `the arms glow as candidates: sectors ${c1.cands.join(',')}, ${c1.glow} plates, crosshair ${c1.crosshair}`);
     check(c1.humans === b0.humans && c1.cap < b0.cap, `paid in capacity (${b0.cap} to ${c1.cap}), nobody taken yet (${c1.humans})`);
     await key('Escape');

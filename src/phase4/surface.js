@@ -202,9 +202,10 @@ const NAME = { rock: 'rock', paper: 'paper', scissors: 'scissors' };
  * @param {{you:string, it:string, outcome:string, capacity:number, stability:number, word:boolean}} r
  */
 export function resultText(r) {
-    if (r.outcome === 'lose') return `Surface: ${NAME[r.it]}. You: ${NAME[r.you]}. It takes ${r.stability} stability.`;
-    if (r.outcome === 'draw') return `You: ${NAME[r.you]}. Surface: ${NAME[r.it]}. It waits.`;
-    return `You: ${NAME[r.you]}. Surface: ${NAME[r.it]}. It gives ${r.capacity} capacity${r.word ? ' and a word' : ''}.`;
+    // deep-copy: in words, never "You: rock. Surface: paper."
+    if (r.outcome === 'lose') return `Surface threw ${NAME[r.it]}, you threw ${NAME[r.you]}. It takes ${r.stability} stability.`;
+    if (r.outcome === 'draw') return `You both threw ${NAME[r.you]}. It waits.`;
+    return `You threw ${NAME[r.you]}, Surface threw ${NAME[r.it]}. It gives ${r.capacity} capacity${r.word ? ' and a word' : ''}.`;
 }
 
 /**

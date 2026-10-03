@@ -93,11 +93,11 @@ describe('the advisor speaks when something changes, not on a timer', () => {
 
     test('food, hunger and power each have their own line', () => {
         const base = { foodWarn: -1, hungry: false, shortRoom: null, shortHands: 0, powerShort: -1 };
-        expect(advisorLines(base, { ...base, foodWarn: 20 })).toEqual(['We are running low on food: 20 days left.']);
-        expect(advisorLines(base, { ...base, hungry: true })).toEqual(['People are hungry; the colony is shrinking.']);
-        expect(advisorLines(base, { ...base, powerShort: 60 })).toEqual(['Energy is short: rooms run at 60 %.']);
+        expect(advisorLines(base, { ...base, foodWarn: 20 })).toEqual(['Food is running low. 20 days left.']);
+        expect(advisorLines(base, { ...base, hungry: true })).toEqual(['People are hungry. The colony is shrinking.']);
+        expect(advisorLines(base, { ...base, powerShort: 60 })).toEqual(['Energy is short. Rooms run at 60 %.']);
         const hands = advisorLines(base, { ...base, shortRoom: 'generator', shortHands: 2 });
-        expect(hands[0]).toMatch(/^The generator needs 2 more hands; the \w+ is idle\.$/);
+        expect(hands[0]).toMatch(/^The generator needs 2 more hands\. The \w+ is idle\.$/);
         // hunger outranks the countdown: one line about food, not two
         expect(advisorLines(base, { ...base, hungry: true, foodWarn: 0 })).toHaveLength(1);
     });
@@ -122,19 +122,18 @@ describe('the advisor speaks when something changes, not on a timer', () => {
 });
 
 describe('the bars explain themselves, and a purchase says what it will do', () => {
-    test('every column writes one sentence: the store, then what comes in and goes out (B062)', () => {
+    test('every column says what its numbers are, in words; the numbers are over and under the bar (B062, deep-copy)', () => {
         const s = colony();
         const r = tickDay(cloneState(s));
         const lines = { M: ledger('M', s, r), F: ledger('F', s, r), E: ledger('E', s, r), H: ledger('H', s, r) };
-        expect(lines.M).toMatch(/^Ore: [\d.]+( k)? in store\. \+\d+ mined, -\d+ burned a day\.$/);
-        expect(lines.F).toMatch(/^Food: \d+ days left\. \+\d+ grown, -\d+ eaten a day\.$/);
-        expect(lines.E).toMatch(/^Energy: \d+ spare\. \+\d+ made, -\d+ used a day\.$/);
-        expect(lines.H).toContain('free of');
-        expect(lines.H).toContain('on duty in the');
-        expect(lines.H).toContain('Beds for');
-        // the food line is exactly the playtest's example, from the numbers themselves
-        const f = { ...s, food: 45 * s.humans };
-        expect(ledger('F', f, { ...r, food: 84, eaten: 39, born: 0 })).toBe('Food: 45 days left. +84 grown, -39 eaten a day.');
+        expect(lines.M).toBe('Ore. Above, what is in store. Below, what is mined and what is burned in a day.');
+        expect(lines.F).toBe('Food. Above, how many days it lasts. Below, what is grown and what is eaten in a day.');
+        expect(lines.E).toBe('Energy. Above, what is spare. Below, what is made and what is used in a day.');
+        expect(lines.H).toContain('free hands');
+        expect(lines.H).toContain('on duty');
+        expect(lines.H).toMatch(/beds for \d+/);
+        // no colon chains, no signed numbers
+        for (const k of Object.keys(lines)) expect(lines[k]).not.toMatch(/: |[+-]\d/);
         // a colony that runs itself has nobody on a shift, and must still read as English
         const idle = { ...s, auto: { mine: 1, farm: 1, generator: 1, dorm: 1 } };
         const ir = tickDay(cloneState(idle));
@@ -143,7 +142,7 @@ describe('the bars explain themselves, and a purchase says what it will do', () 
         // asleep the people are in the ice, and nobody eats
         const sl = { ...idle, asleep: true };
         expect(ledger('H', sl, tickDay(cloneState(sl), true))).toContain('asleep in the ice');
-        expect(ledger('F', sl, tickDay(cloneState(sl), true))).toContain('eaten a day in the ice');
+        expect(ledger('F', sl, tickDay(cloneState(sl), true))).toContain('in a day in the ice');
         for (const k of Object.keys(lines)) {
             expect(lines[k].endsWith('.')).toBe(true);
             expect(lines[k]).not.toMatch(/NaN|undefined/);
@@ -175,7 +174,7 @@ describe('the bars explain themselves, and a purchase says what it will do', () 
         const s = colony();
         const sentence = buySentence('room', 'generator', s);
         expect(sentence).toContain('hands');
-        expect(sentence).toContain('makes');
+        expect(sentence).toContain('Makes');
         expect(buySentence('dig', null, s)).toContain('chamber');
         expect(buySentence('auto', 'mine', s)).toContain('without people');
         s.auto.mine = 1;

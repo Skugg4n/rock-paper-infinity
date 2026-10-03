@@ -129,7 +129,7 @@ describe('you can always try to go up', () => {
         expect(believedSurvival(s).spread).toBe(ASCENT_TAUGHT_SPREAD);
         expect(s.mournUntil).toBe(s.day + MOURN_DAYS);   // and nobody is born for a year
         expect(s.shaftOpen).toBe(true);
-        expect(ascentFailLine(out)).toBe(`13 went up and did not come back. Survival up there is ${Math.round(truth)} %; we need 85.`);
+        expect(ascentFailLine(out)).toBe(`13 went up and did not come back. Survival up there is ${Math.round(truth)} %. We need 85 %.`);
     });
 
     test('a failed try is a worse instrument than a scout party: a third of the colony for ± 15', () => {
@@ -189,6 +189,6 @@ describe('every number in one short form', () => {
         expect(cryoGateShort(1, { kind: 'energy', pct: 80 })).toBe('needs spare power');
         expect(cryoGateShort(2, null, { stars: 0 })).toBe(`needs ${short(CRYO[2].cost)} stars`);
         expect(cryoGateShort(2, null, { stars: CRYO[2].cost })).toBe('');
-        expect(cryoReadyLine(3)).toBe('Cryo IV can be bought: a century a second.');
+        expect(cryoReadyLine(3)).toBe('Cryo IV can be bought. A second of sleep becomes a century.');
     });
 });

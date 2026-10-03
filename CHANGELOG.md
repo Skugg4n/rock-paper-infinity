@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.71.0 - 2026-10-03 (chapter IV in plain words)
+
+### Chapter IV in plain words (B250 to B255)
+
+Ola after playing v1.67: "I can't tell how many stars I have to buy with", "'85 %: 15'? Who writes like that?", "'Next 20 cap something something', what?". A copy and clarity pass over every line in IV. No rule and no balance constant moved; both sims unchanged.
+
+- **The wallet is in the tree** (B250). The board has a header band inside its frame with "★ 1.1 M   ore 181 k" (asleep "capacity 84") in the board's own mono, larger than any label. The strip above the board is gone. A price on a node is white when it can be paid and dim when not.
+- **The info box in four plain lines** (B251): the name and level ("2 / 20"); what it does in one sentence ("Stability falls more slowly while they sleep."); the price in words ("Costs ★ 20 k and 20 capacity."); where it stands ("You can buy it.", "You need ★ 12 k more.", "Only while the colony sleeps.", "Being built: 3 days left.", "Opens after Cryo II."). The before and after numbers are a quiet fifth line ("Drift 0.90 → 0.68 a second."). Until the first Watcher step is bought, its nodes say what capacity is.
+- **The queue shows in the tree** (B252): a node with an order under way has a thin ring filling round it and "+1" by its pips; a purchase flashes the node once. **A click on the backdrop closes the tree**, as Escape and the button do; a click inside the board does not.
+- **Sleep is not there until Cryo I is bought** (B253); it arrives with a short fade, and its caption is gone. What Cryo I needs is listed on its node only, with ticks. The pill reads "Sleep" ("1 m/s" read as metres a second); its hover says the rate in words.
+- **One text per thing** (B254). Go up has no hover, one caption: "Opens at 85 % survival. Now about 15 %." The scout party has no caption, a hover of three lines ("Send 4 people up for 2 years." / "Costs 3 k ore." / "Some may not come back.") and no odds; an open tooltip hides the other captions in the column. The ring's ± is the one place the doubt is explained ("What the scouts believe. More scouts, less doubt.").
+- **The audit** (B255): no "A: B", no "next:", no "cap", no "+81/d" in IV's tooltips, the advisor, the feed, the night log, the bars' hovers (which now say what the numbers over and under each bar are, not the numbers again), the machine's hover, Surface's game result and the scouts' lines. Surface's own lines are untouched; the alarm lines keep their meaning.
+- Tests: `src/phase4/copy.test.js` (the info box, the price in words, no internal names on any node); acceptance (`scripts/accept-iv-cut.mjs`) adds the wallet inside the board, white and dim prices, the ring and "+1", the backdrop click, Sleep absent before Cryo I and present after, Go up's one text, and a scout hover with no "%" lying on no caption.
+
 ## v1.70.0 - 2026-10-03 (the end of the war, with feeling)
 
 ### Chapter III, batch 5: Ola's playtest of v1.65 to v1.68 (B206 to B209)
