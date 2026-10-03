@@ -2364,3 +2364,91 @@ items:
       repeating them; (4) the wake pill's hover no longer counts down to the look wake; (5) numbers past
       a thousand trillion still read "8e15" (readout.js short), as before.
     status: open
+
+  - id: B260
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      The instrument panel: four gauges on dymo tape (ORE, FOOD, POWER, HANDS) with needles and a red arc, one stamped advice, EMPTY count; replaces the bars, the advisor feed, the rates and the bar tooltips.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "src/phase4/panel.js, instruments.js gauges/advise."
+
+  - id: B261
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Empty chambers on the map: a dug chamber without a room is a plate with a faint +; a click opens a ring of four rooms with prices; the room is built into that chamber. Room buttons removed; DIG stays.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "view-hooks.js openRoomRing, layout.js claimChambers, scene.js empty labels."
+
+  - id: B262
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      The drawer from the right: only what can be bought now (bright) and the next per branch (dim, what it needs); awake day items, asleep night items; rings for orders; 'the whole tree' link. The tree button is the drawer button.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "drawer.js, instruments.js drawerGroups."
+
+  - id: B263
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Cryo I as three lamps (FOOD/POWER/ORE RUNS ITSELF, matching Cryo I's real road) and a lever that buys Cryo I and starts the sleep; afterwards the lever is sleep and wake.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "instruments.js cryoLamps; the lever in index.html and index.js."
+
+  - id: B264
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Cut: scout parties, the survival estimate and band, the early ascent and the human ending UI, the replay strip, the advisor's sentence feed. Save fields kept harmless.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "Ascend pill kept only for a save at the old 'nobody came out' end."
+
+  - id: B265
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      The dive: lights out one by one, 'THE COLONY HAS SLEPT' over a large rolling year count with the healing ring; time accelerates within a sleep (15 % to 100 % in 6 s, toward 3x), sim updated and kept inside 20 to 30 minutes.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "watcher.js sleepPace/sleepDaysAt; sim plain 26m01s, --watcher 21m08s."
+
+  - id: B266
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Waking shows one lamp with one word: FOOD, POWER, FAULT, VOICE or AWAKE; no wake sentence on screen (kept in state.wakeLog).
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "instruments.js wakeWord."
+
+  - id: B267
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Hallucinations as stability falls asleep: lamp in an empty chamber (<70), figure on the crust (<55), needle twitch and wrong year digit (<40), breathing plate walls (<25); a snap clears them with a flicker.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "instruments.js hallucinationsAt, view-hooks.js, scene.js figure/breathe/ghost lamp."
+
+  - id: B268
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Surface is the hallucination: only asleep and only under stability 80; the RPS card fades 6 s after the result; from night 4 its label and words use the Watcher's tape; at night 6 SURFACE flickers to WATCHER before the question.
+    status: done
+    resolved_in: deep-rebuild (version at merge)
+    notes: "watcher.js SURFACE_BELOW, instruments.js surfaceTape."
+
+  - id: B269
+    added: 2026-10-03
+    source: "docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md (Ola: IV a failed level)"
+    request: |
+      Open after deep-rebuild: the gauges' tick, the lever's clunk and the lights going out in sound.js; a new colony view implementing view-hooks.js (Ola may replace the 3D view after a mockup round); movement III (GROW) replaces the biological steps, which still run behind the scenes and are kept out of the drawer.
+    status: open

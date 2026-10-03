@@ -159,3 +159,52 @@ having fallen to it at the start. sound.js already has most of these; it gets th
    floor, vats and hunger, the panel and drawer overgrown, the machine's hands, the rise and
    the end. Built first as pure modules and a scene prototype, then integrated.
 4. **Sound** for the new events. **Sims** keep 20 to 30 minutes. **A playtest** at the end.
+
+## Built: movements I and II (deep-rebuild)
+
+Built on the branch `deep-rebuild` (2026-10-03). Movement III is not built; the biological steps
+still run behind the scenes for old saves and the sims, and are kept out of the drawer.
+
+**Where it lives.** `src/phase4/instruments.js` (pure: the gauges, the one word of advice, the three
+lamps, the wake word, the hallucination lines, the drawer's rows, Surface's tape), `panel.js` (the
+gauges, the tape, the lamps, the alarm lamp, the lights going out), `drawer.js`, `view-hooks.js`
+(everything that lives IN the colony view: the "+" on an empty chamber, the ring of four rooms, the
+hallucinations, the snap; the 3D view implements it through scene.js, another view can implement the
+same calls), `layout.js claimChambers` (every room ordered has its chamber), `watcher.js
+sleepPace/sleepDaysAt` (the dive) and `SURFACE_BELOW`. index.js wires them; the four bars, the
+advisor's feed, the scout and ascent pills, the replay strip and the survival ring are gone from it.
+
+**Decisions taken where the plan left room.**
+- The needle: a falling store points at 0.8 x days / (days + 60) of the sweep (the red arc is the
+  first 30 days); a store that does not fall rests between 0.86 and 0.98, further the fuller it is.
+  Power and hands are flows: short, the needle sits in the red by how short.
+- The word of advice, in order: a red needle's fix (BUILD its room, or DIG, or AUTOMATE the room
+  short of hands); SLEEP when the lever is ready before the hall; BUILD the weakest column's room when
+  there is ore and an empty chamber, else DIG when there is ore for it; the next undone item of
+  Cryo I's road (AUTOMATE ...); FEED THE MACHINE when a level can be paid; LONGER SLEEP when the next
+  tier's road is open; SLEEP when the colony can sleep safely; WAIT. It holds a word four seconds.
+- The lamps map exactly onto Cryo I's road (readout.js cryoRoad): FOOD is the farms' automation and
+  no food shortage in a dry run of the sleep, POWER the generators' and no power shortage, ORE the
+  mines' and no shortage of ore to burn. The people and the price are the lever's: it appears when
+  tree.js says Cryo I can be bought. After the hall the lamps leave the panel.
+- The wake words: food FOOD; energy, and generators with no ore, POWER; a room stalled for hands,
+  too few people, a reboot FAULT; a reboot by a game with Surface VOICE; anything else AWAKE.
+- The counter shows the years slept in all (months under two years), the ring the true healing.
+- The dive: 15 % of the tier's rate at the start, the full rate after 6 s, then toward 3 x with a
+  25 s time constant. Stability drifts by the years, so a deep dive also loosens the mind faster.
+- Surface's line: 80. The plain sim's six nights came at 8m27s to 20m50s (8m09s to 18m54s before).
+- After a snap nothing false comes back for 7 s, and then one kind at a time.
+- The checkpoint "IV · cryo I" is now the lever moment (every room automated, the hall not bought).
+
+**Numbers.** Plain sim 24m47s → 26m01s to year 802 701; --watcher 27m26s → 21m08s to the biological
+ending (the faster sleeps fill capacity sooner). The attentive Watcher (a snap every 12 s) holds
+54 to 80 in 25 s dives (71 to 86 before), so Surface and the first hallucinations come to an
+attentive player too.
+
+**Acceptance.** `node scripts/accept-iv-cut.mjs --shots docs/playtests/rebuild-shots` (rewritten):
+the panel, DIG and the empty chamber, the ring, the drawer, the lamps and the lever, the dive
+accelerating, the wake lamp, a hallucination and the snap, Surface's tape and the night-6 merge,
+the card gone 7 s after a result. Screenshots in docs/playtests/rebuild-shots/.
+
+**Not done here.** The gauges' tick, the lever and the lights in sound.js (B269); any further 3D work
+(Ola may replace the view after a mockup round); movement III.
