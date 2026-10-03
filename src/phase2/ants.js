@@ -72,14 +72,86 @@ export function coastRing(grid, gap) {
 }
 /** Perimeter of the ring. Ring coordinate s runs clockwise from the top-left corner. */
 export const ringLength = (R) => 2 * (R.w + R.h);
-/** The point at ring coordinate s. */
+/**
+ * The point at ring coordinate s. A ring that carries a `land` keeper (see
+ * landKeeper) bends its corners in onto the island, so the road never runs
+ * out over the water where the coast curves in.
+ */
 export function ringPoint(R, s) {
     const P = ringLength(R);
     let u = ((s % P) + P) % P;
-    if (u < R.w) return { x: R.x + u, y: R.y };
-    u -= R.w; if (u < R.h) return { x: R.x + R.w, y: R.y + u };
-    u -= R.h; if (u < R.w) return { x: R.x + R.w - u, y: R.y + R.h };
-    u -= R.w; return { x: R.x, y: R.y + R.h - u };
+    let p;
+    if (u < R.w) p = { x: R.x + u, y: R.y };
+    else if ((u -= R.w) < R.h) p = { x: R.x + R.w, y: R.y + u };
+    else if ((u -= R.h) < R.w) p = { x: R.x + R.w - u, y: R.y + R.h };
+    else { u -= R.w; p = { x: R.x, y: R.y + R.h - u }; }
+    return R.land ? R.land(p) : p;
+}
+/**
+ * Is p inside the closed polygon `poly` (even-odd rule)?
+ * @param {Array<{x:number,y:number}>} poly
+ * @param {{x:number,y:number}} p
+ */
+export function inPolygon(poly, p) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const a = poly[i], b = poly[j];
+        if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+}
+/** Distance from p to the nearest edge of the polygon. */
+function edgeDistance(poly, p) {
+    let best = Infinity;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const a = poly[j], b = poly[i];
+        const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+        const k = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2));
+        best = Math.min(best, Math.hypot(p.x - (a.x + dx * k), p.y - (a.y + dy * k)));
+    }
+    return best;
+}
+/**
+ * Keeps people on land (v1.69.0). Given an island's coast (the vertices from
+ * islands.js coastPoints, which lie on or inside the drawn shore), returns a
+ * function that leaves a point alone when it stands at least `margin` px inside
+ * the coast, and otherwise moves it toward the island's middle until it does.
+ * Null without a coast.
+ * @param {Array<{x:number,y:number}>|null} poly
+ * @param {number} [margin=8]
+ * @returns {null|function({x:number,y:number}): {x:number,y:number}}
+ */
+export function landKeeper(poly, margin = 8) {
+    if (!poly || poly.length < 3) return null;
+    const cx = poly.reduce((s, q) => s + q.x, 0) / poly.length, cy = poly.reduce((s, q) => s + q.y, 0) / poly.length;
+    const ok = (p) => inPolygon(poly, p) && edgeDistance(poly, p) >= margin;
+    return (p) => {
+        if (ok(p)) return p;
+        let hi = 1, lo = 0;
+        for (let i = 0; i < 16; i++) {
+            const m = (lo + hi) / 2;
+            if (ok({ x: p.x + (cx - p.x) * m, y: p.y + (cy - p.y) * m })) hi = m; else lo = m;
+        }
+        return { x: p.x + (cx - p.x) * hi, y: p.y + (cy - p.y) * hi };
+    };
+}
+/**
+ * Where a walk from `from` (on the water) to `to` (on land) steps ashore: the
+ * point where the straight line crosses the coast. Null when `to` is not on the
+ * island; `from` itself when it already is.
+ * @param {{x:number,y:number}} from
+ * @param {{x:number,y:number}} to
+ * @param {Array<{x:number,y:number}>} poly
+ */
+export function shoreline(from, to, poly) {
+    if (!poly || !inPolygon(poly, to)) return null;
+    if (inPolygon(poly, from)) return from;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 18; i++) {
+        const m = (lo + hi) / 2;
+        if (inPolygon(poly, { x: from.x + (to.x - from.x) * m, y: from.y + (to.y - from.y) * m })) hi = m; else lo = m;
+    }
+    return { x: from.x + (to.x - from.x) * hi, y: from.y + (to.y - from.y) * hi };
 }
 /** Ring coordinate of the ring point nearest to p. */
 export function ringCoord(R, p) {
@@ -141,10 +213,12 @@ function landingRoute(dst, gap, R, edge) {
     const vx = dst.x - g / 2;                 // the street left of its column
     const below = dst.y + dst.h + g / 2;      // the street under its row
     const above = dst.y - g / 2;              // the street over its row
-    if (edge === 'n') return [{ x: vx, y: R.y }, { x: vx, y: above }, { x: b.x, y: above }, b];
-    if (edge === 'e') return [{ x: R.x + R.w, y: below }, { x: b.x, y: below }, b];
-    if (edge === 'w') return [{ x: R.x, y: below }, { x: b.x, y: below }, b];
-    return [{ x: vx, y: R.y + R.h }, { x: vx, y: below }, { x: b.x, y: below }, b];
+    let pts;
+    if (edge === 'n') pts = [{ x: vx, y: R.y }, { x: vx, y: above }, { x: b.x, y: above }];
+    else if (edge === 'e') pts = [{ x: R.x + R.w, y: below }, { x: b.x, y: below }];
+    else if (edge === 'w') pts = [{ x: R.x, y: below }, { x: b.x, y: below }];
+    else pts = [{ x: vx, y: R.y + R.h }, { x: vx, y: below }, { x: b.x, y: below }];
+    return [...(R.land ? pts.map(R.land) : pts), b];
 }
 /**
  * A route between the islands, every leg straight: from a tile along their
@@ -162,10 +236,12 @@ function landingRoute(dst, gap, R, edge) {
  * @param {number} gap
  * @param {{x,y,w,h}} grid - bounding box of all plates
  * @param {{x,y,w,h}} [theirs] - bounding box of their tiles (defaults to `from`)
+ * @param {function|null} [land] - keeps the coast road on our island (landKeeper)
  */
-export function crossPath(from, dst, gap, grid, theirs = from) {
+export function crossPath(from, dst, gap, grid, theirs = from, land = null) {
     const g = Math.max(2, gap);
     const R = coastRing(grid, g);
+    if (land) R.land = land;
     const a = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
     const edge = nearestEdge(dst, grid, 's');
     const inland = landingRoute(dst, g, R, edge);
@@ -177,7 +253,8 @@ export function crossPath(from, dst, gap, grid, theirs = from) {
     else if (edge === 'n') X = L.x > R.x + R.w / 2 ? R.x + R.w : R.x;
     const Xc = Math.max(theirs.x - g, Math.min(theirs.x + theirs.w + g, X));
     const Ty = theirs.y - g * 0.8;           // their coast road, on the side facing us
-    const C2 = { x: Math.max(R.x, Math.min(R.x + R.w, Xc)), y: R.y + R.h };
+    const C2raw = { x: Math.max(R.x, Math.min(R.x + R.w, Xc)), y: R.y + R.h };
+    const C2 = land ? land(C2raw) : C2raw;
     const walk = ringWalk(R, ringCoord(R, C2), ringCoord(R, L)).slice(1, -1);
     const path = [a, { x: a.x, y: Ty }, { x: Xc, y: Ty }, C2, ...walk, ...inland];
     path.theirCoast = 1; path.crossFrom = 2; path.ourCoast = 3; path.land = 4 + walk.length; path.edge = edge;
@@ -297,8 +374,10 @@ export function reversePath(path) {
  * @param {function(): Element|null} [opts.getTown] - the element that holds all their tiles (their island's bounding box)
  * @param {function(): Element|null} [opts.getPier] - their pier; the boat lies at its end
  * @param {function(): Element|null} [opts.getOurPier] - our pier (chapter III); our boat lies at its end
+ * @param {function(): ({ours: Array, theirs: Array}|null)} [opts.getCoasts] - both islands' coast vertices
+ *        in the area's layout px (islands.js coastPoints): roads, streets and guards stay inside them
  */
-export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getCivilTiles = () => [], getTown = () => null, getPier = () => null, getOurPier = () => null }) {
+export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getCivilTiles = () => [], getTown = () => null, getPier = () => null, getOurPier = () => null, getCoasts = () => null }) {
     const ctx = canvas.getContext('2d');
     const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const ants = [];
@@ -309,6 +388,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     let townRect = null;     // their whole island's tiles
     let pierRect = null;
     let ourPierRect = null;
+    // The islands' coasts (v1.69.0): the coast road, the outer streets and the
+    // guards are kept LAND_MARGIN px inside them; a boat lands at the shoreline.
+    const LAND_MARGIN = 8;
+    let coastOurs = null, coastTheirs = null;
+    let landOurs = null, landTheirs = null;
     let state = { population: 0, carUnlocked: false, enemyStage: 0, enemyTicks: 0, ourTier: 0, enemyTier: 0, defence: 0, airDefence: 0, guardsOff: false, hitEdges: [], war: false };
     let clock = 0;           // seconds, for the guards' bob
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
@@ -355,7 +439,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
                 const to = a.at && byId.get(a.at.building.id);
                 if (from && to) {
                     a.from = from; a.at = to;
-                    if (a.path) a.path = streetPath(from.rect, to.rect, getGap());
+                    if (a.path) a.path = streetsOurs(from.rect, to.rect, getGap());
                 } else { a.path = null; a.at = to || null; a.wait = Math.random() * 0.5; }
             }
         } else {
@@ -373,6 +457,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const town = getTown(); townRect = town ? layoutRect(town, area) : null;
         const pier = getPier(); pierRect = pier ? layoutRect(pier, area) : null;
         const ourPier = getOurPier(); ourPierRect = ourPier ? layoutRect(ourPier, area) : null;
+        const coasts = getCoasts();
+        coastOurs = coasts?.ours || null; coastTheirs = coasts?.theirs || null;
+        landOurs = landKeeper(coastOurs, LAND_MARGIN); landTheirs = landKeeper(coastTheirs, LAND_MARGIN);
         dpr = window.devicePixelRatio || 1;
         const w = area.offsetWidth, h = area.offsetHeight;
         if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
@@ -394,7 +481,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         return { x, y, w: Math.max(...enemyRects.map(r => r.x + r.w)) - x, h: Math.max(...enemyRects.map(r => r.y + r.h)) - y };
     };
     const townBox = () => townRect || theirBox();
-    const cross = (from, dst) => crossPath(from, dst, getGap(), gridBox(), townBox() || from);
+    const cross = (from, dst) => crossPath(from, dst, getGap(), gridBox(), townBox() || from, landOurs);
+    /** A street walk on our island (or theirs), its outer corners kept on land. */
+    const streetsOurs = (src, dst, gap) => { const p = streetPath(src, dst, gap); return landOurs ? p.map(landOurs) : p; };
+    const streetsTheirs = (src, dst, gap) => { const p = streetPath(src, dst, gap); return landTheirs ? p.map(landTheirs) : p; };
     const homes = () => rects.filter(r => HOUSING.has(r.building.type) && r.building.population > 0 && !r.building.razed);
     const works = () => rects.filter(r => WORK.has(r.building.type) && !r.building.razed);
 
@@ -406,7 +496,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const candidates = pool.filter(r => r !== from);
         const to = candidates.length ? pick(candidates) : null;
         if (!to) return false;
-        ant.path = streetPath(from.rect, to.rect, getGap());
+        ant.path = streetsOurs(from.rect, to.rect, getGap());
         ant.seg = 0; ant.t = 0; ant.from = from; ant.at = to; ant.wait = 0;
         return true;
     }
@@ -426,7 +516,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const from = e.at ?? pick(tiles);
         const others = tiles.filter(r => r !== from);
         const to = others.length ? pick(others) : from;
-        e.path = streetPath(from, to, Math.max(6, getGap() / 2));
+        e.path = streetsTheirs(from, to, Math.max(6, getGap() / 2));
         e.seg = 0; e.t = 0; e.at = to; e.wait = 0;
         return true;
     }
@@ -475,14 +565,14 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         for (const a of ants) {
             const afraid = scare && a.kind === 'person' && Math.hypot((pos(a)?.x ?? 1e9) - scare.x, (pos(a)?.y ?? 1e9) - scare.y) < 170;
             stepDot(a, dt, speedOf(a.kind) * (afraid ? 2.4 : 1), (d) => {
-                if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetPath(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
+                if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetsOurs(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
                 if (afraid) { d.wait = 1; return; }      // stays in
                 if (!newTrip(d)) d.wait = 1;
             });
         }
         for (const e of enemies) {
             if (withdrawing) stepDot(e, dt, SPEED.enemy * 1.5, (d) => {
-                if (d.at !== withdrawing.rect) { const from = d.at?.rect ?? d.at ?? withdrawing.rect; d.path = (from.x !== undefined && from.w !== undefined) ? streetPath(from, withdrawing.rect, Math.max(6, getGap() / 2)) : null; d.seg = 0; d.t = 0; d.at = withdrawing.rect; d.wait = Math.random() * 0.5; d.razing = false; d.homeBound = false; }
+                if (d.at !== withdrawing.rect) { const from = d.at?.rect ?? d.at ?? withdrawing.rect; d.path = (from.x !== undefined && from.w !== undefined) ? streetsTheirs(from, withdrawing.rect, Math.max(6, getGap() / 2)) : null; d.seg = 0; d.t = 0; d.at = withdrawing.rect; d.wait = Math.random() * 0.5; d.razing = false; d.homeBound = false; }
             });
             else stepDot(e, dt, SPEED.enemy, (d) => { if (!newEnemyTrip(d)) d.wait = 1; });
         }
@@ -541,7 +631,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     const watchmen = [];      // { id, duty: 'patrol'|'watch'|'pier', s, k, walk, hidden, x, y }
     let watchSeq = 0;
     const WATCH_SPEED = 16;   // px/s along the coast
-    const townRing = () => { const b = townBox(); return b ? coastRing(b, Math.max(6, getGap() / 2)) : null; };
+    const townRing = () => { const b = townBox(); return b ? { ...coastRing(b, Math.max(6, getGap() / 2)), land: landTheirs } : null; };
     const watchmenAt = (stage) => [0, 0, 0, 4, 8, 10][Math.max(0, Math.min(5, stage))];
     function dutyOf(i, stage) {
         if (stage >= 5 && i >= 8) return 'pier';
@@ -856,13 +946,30 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     }
     /** The points a boat passes between a and b along the lanes S (corners included). */
     const lane = (S, a, b) => ringWalk(S, ringCoord(S, a), ringCoord(S, b));
+    /**
+     * The boat's last stop for a beach: from the lane point straight in toward
+     * the landing point `land`, to BOW_OFF px off the shoreline, and the
+     * shoreline itself, where they step ashore (null without a coast).
+     */
+    const BOW_OFF = 12;
+    function approach(laneShore, land, poly) {
+        const beach = shoreline(laneShore, land, poly);
+        if (!beach || beach === laneShore) return { shore: laneShore, beach: null };
+        const dx = laneShore.x - beach.x, dy = laneShore.y - beach.y, L = Math.hypot(dx, dy) || 1;
+        const off = Math.min(L, BOW_OFF);
+        return { shore: { x: beach.x + dx / L * off, y: beach.y + dy / L * off }, beach };
+    }
     /** Their pier's foot on their coast road, and ours on ours. */
     function theirFoot() { const R = townRing(); return R && pierRect ? ringPoint(R, ringCoord(R, { x: pierRect.x + pierRect.w / 2, y: pierRect.y + pierRect.h })) : null; }
     function ourFoot() { const R = ring(); return ourPierRect ? ringPoint(R, ringCoord(R, { x: ourPierRect.x + ourPierRect.w / 2, y: ourPierRect.y })) : null; }
-    /** Marks a shore walk: the first leg (boat to beach) is water, everything after is the island. */
-    function ashorePath(shore, inland) {
-        const path = [shore, ...inland];
-        path.crossFrom = 0; path.ourCoast = 1; path.land = 1;
+    /**
+     * Marks a shore walk: the first leg (boat to the shoreline) is water,
+     * everything after is the island. With a `beach` (the shoreline) they wade
+     * from the bow to it, then walk in to the coast road and the streets.
+     */
+    function ashorePath(shore, inland, beach = null) {
+        const path = beach ? [shore, beach, ...inland] : [shore, ...inland];
+        path.crossFrom = 0; path.ourCoast = 1; path.land = beach ? 2 : 1;
         return path;
     }
     /** A party gathers on the coast road before a pier: walkers to a queue, a pair at a time. */
@@ -958,10 +1065,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const route = cross(pierRect, target.rect);
         const land = route[route.land];
         const S = seaOurs(), dock = dockPoint();
-        const shore = shoreOf(S, land, route.edge);
-        const via = lane(S, dock, shore);
+        const laneShore = shoreOf(S, land, route.edge);
+        const { shore, beach } = approach(laneShore, land, coastOurs);
+        const via = lane(S, dock, laneShore);
         const seconds = l.first ? 9 : sailSeconds(courseLength(roundCourse([dock, ...via, shore])));
-        Object.assign(l, { phase: 'sail', target, route, land, shore, dock, via });
+        Object.assign(l, { phase: 'sail', target, route, land, shore, beach, dock, via });
         // sighted: the nearest guards walk the coast to the beach it is heading for
         l.responders = respond(land);
         l.onCastOff?.(seconds);
@@ -970,10 +1078,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             boat.angle = Math.atan2(land.y - shore.y, land.x - shore.x);
             const streets = route.slice(route.land + 1);
             l.dots.forEach((d, i) => {
-                Object.assign(d, { kind: 'enemy', at: target, path: ashorePath(shore, [land, ...streets]), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, boarded: true, aboard: false });
+                Object.assign(d, { kind: 'enemy', at: target, path: ashorePath(shore, [land, ...streets], beach), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, boarded: true, aboard: false });
             });
             // our guards meet them on the beach; the fallen fall there and in the first street
-            scriptLosses(l.dots, l.losses, 1, 2.9);
+            scriptLosses(l.dots, l.losses, 1, beach ? 3.9 : 2.9);
             waves.push({ dots: l.dots, target, onImpact: l.onImpact, done: false, kind: 'enemy', responders: l.responders, hold: l.first ? 1 : 0 });
             combat = true;
         }, via);
@@ -1048,10 +1156,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         const Rt = townRing(), S = seaTheirs(), dock = ourDockPoint();
         const edge = nearestEdge(tile, townBox(), 'n');
         const inland = landingRoute(tile, Math.max(6, getGap() / 2), Rt, edge);
-        const land = inland[0], shore = shoreOf(S, land, edge);
-        const via = lane(S, dock, shore);
+        const land = inland[0], laneShore = shoreOf(S, land, edge);
+        const { shore, beach } = approach(laneShore, land, coastTheirs);
+        const via = lane(S, dock, laneShore);
         const seconds = sailSeconds(courseLength(roundCourse([dock, ...via, shore])));
-        const path = ashorePath(shore, inland);
+        const path = ashorePath(shore, inland, beach);
         Object.assign(s, { phase: 'sail', tile, land, shore, dock, via, path });
         s.onPhase?.('castOff');
         sail(ourBoat, dock, shore, seconds, () => {
@@ -1059,10 +1168,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             s.onPhase?.('ashore');
             ourBoat.angle = Math.atan2(land.y - shore.y, land.x - shore.x);
             s.dots.forEach((d, i) => {
-                Object.assign(d, { kind: 'person', at: { rect: tile }, path: ashorePath(shore, inland), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, strike: true, boarded: true, aboard: false });
+                Object.assign(d, { kind: 'person', at: { rect: tile }, path: ashorePath(shore, inland, beach), seg: 0, t: 0, wait: 0.2 + pairDelay(i, 0.26), wave: true, strike: true, boarded: true, aboard: false });
             });
             // their defence meets them on their beach and in the first street
-            scriptLosses(s.dots, s.losses, 1, Math.min(3, inland.length));
+            scriptLosses(s.dots, s.losses, 1, Math.min(3, inland.length) + (beach ? 1 : 0));
             s.wave = { dots: s.dots, target: { rect: tile }, done: false, kind: 'ours',
                 onImpact: (f) => { s.onPhase?.('impact'); const share = s.onImpact?.(f); s.homeShare = typeof share === 'number' ? share : 0; } };
             waves.push(s.wave);
@@ -1299,7 +1408,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     let guardSeq = 0;
     let guardsGone = false;
     const GUARD_SPEED = 55;   // px/s along the coast
-    const ring = () => coastRing(gridBox(), getGap());
+    const ring = () => ({ ...coastRing(gridBox(), getGap()), land: landOurs });
     /** Home positions (ring coordinates) for n guards, spread over the coasts that have seen a landing. */
     function guardHomes(n, R) {
         if (!n) return [];
@@ -1370,7 +1479,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             const edgeX = Math.max(near.rect.x - 1, Math.min(near.rect.x + near.rect.w + 1, p.x));
             const edgeY = Math.max(near.rect.y - 1, Math.min(near.rect.y + near.rect.h + 1, p.y));
             let path = [p, { x: edgeX, y: edgeY }, c(near.rect)];
-            if (hatch && near.rect !== hatch.rect) path = [p, { x: edgeX, y: edgeY }, ...streetPath(near.rect, hatch.rect, getGap())];
+            if (hatch && near.rect !== hatch.rect) path = [p, { x: edgeX, y: edgeY }, ...streetsOurs(near.rect, hatch.rect, getGap())];
             g.leaving = { path, seg: 0, t: 0, wait: Math.random() * 0.8 };
             g.resp = null;
         }
@@ -1460,7 +1569,9 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     function setState(next) { state = { ...state, ...next }; }
 
     const boatInfo = (b) => ({ x: Math.round(b.x), y: Math.round(b.y), aboard: b.aboard, shown: +b.shown.toFixed(2), trip: !!b.trip, moored: b.moored, owner: !!b.owner });
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, musterLanding, cancelLanding, withdraw, gatherAt, measure, sailBoat, dockPoint, ourDockPoint, _debug: () => ({ raid: raid?.phase, boat: boatInfo(boat), ourBoat: boatInfo(ourBoat),
+    /** Debug: every guard, walker and watchman where it stands now (layout px), for the on-land check. */
+    const _where = () => ({ guards: guardPositions().map(g => ({ x: g.x, y: g.y, leaving: !!g.leaving })), ants: ants.map(a => pos(a)).filter(Boolean), watchmen: watchmen.filter(m => !m.hidden).map(m => watchPos(m)).filter(Boolean), ring: ring(), grid: gridBox() });
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, musterLanding, cancelLanding, withdraw, gatherAt, measure, sailBoat, dockPoint, ourDockPoint, _where, _debug: () => ({ raid: raid?.phase, boat: boatInfo(boat), ourBoat: boatInfo(ourBoat),
         landings: landings.map(l => ({ phase: l.phase, go: l.go, dots: l.dots.length, shore: l.shore && [Math.round(l.shore.x), Math.round(l.shore.y)], land: l.land && [Math.round(l.land.x), Math.round(l.land.y)] })),
         sorties: sorties.map(s => ({ phase: s.phase, dots: s.dots.length, back: s.back?.length ?? 0, shore: s.shore && [Math.round(s.shore.x), Math.round(s.shore.y)] })), watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, fellAt: w.dots.filter(d => d.killed).map(d => +(d.fellAt ?? -1).toFixed(2)), segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

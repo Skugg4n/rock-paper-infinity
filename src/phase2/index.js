@@ -14,7 +14,7 @@ import {
 } from './economy.js';
 import { createAnts } from './ants.js';
 import { layoutRect } from './layout.js';
-import { createIsland } from './islands.js';
+import { createIsland, coastPoints } from './islands.js';
 import { audio } from '../audio.js';
 import { city, popLevel } from '../audio-city.js';
 import { war, handoverAt, ROCKET_FROM as SOUND_ROCKET_FROM } from '../audio-war.js';
@@ -57,8 +57,8 @@ async function goDeep() {
         return;
     }
     playChapterCard({
-        // Slow and dark like the WAR card: a long fade, IV, then THE DEEP; a click or 5 s ends the hold.
-        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, hold: 5000, silent: true,   // the war's E♭ falls to D under it, into IV's own low D
+        // Slow and dark like the WAR card: a long fade, a rest, IV, a rest, THE DEEP; a click or 7 s ends the hold.
+        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, pause: 1400, hold: 7000, silent: true,   // the war's E♭ falls to D under it, into IV's own low D
         onMidpoint: () => {
             setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
         },
@@ -273,13 +273,21 @@ export function init() {
           const RAID_INTERVAL_MS = 90000;
           const RADAR_COST = 300;
 
-          /** War room: short lines from the advisor. Kept in the save (last 8). */
-          function logWar(text, grim = false) {
+          /**
+           * War room: short lines from the advisor. Kept in the save (last 8).
+           * `hold`: a background line (a control opening, a radar call, a doom
+           * status, a plate that stood) waits while a climate line is fresh, so
+           * the end of the world is read one line at a time (v1.70.0).
+           */
+          function logWar(text, grim = false, { hold = false } = {}) {
               const w = gameState.war; if (!w) return;
               if (text.startsWith('Intel:') && !w.intel) return;   // you have to buy the eyes
+              if (hold && climateFresh(w)) { w.heldLines = (w.heldLines || []).slice(-3).concat([{ text, grim }]); return; }
               w.log = (w.log || []).slice(-7).concat([{ text, grim, t: w.t || 0 }]);
               renderWarRoom();
           }
+          /** A climate line was said less than CLIMATE_FRESH_S ago. */
+          const climateFresh = (w) => w.climateAt !== undefined && (w.t || 0) - w.climateAt < CLIMATE_FRESH_S;
           function renderWarRoom() {
               const w = gameState.war;
               ui.warRoom.classList.toggle('hidden', !w?.active && !gameState.shipChosen);
@@ -328,6 +336,7 @@ export function init() {
               ui.competitorIsland.classList.toggle('enemy-rubble', w.leaveStage >= 3);
               renderWarRoom();
               gameState.buildings.forEach((b, i) => { if (b) renderGridSlot(i); });
+              if (w.enemyLeft && w.leaveStage >= 6) placeFacility();
               placeOurPier();
           }
           /**
@@ -384,17 +393,25 @@ export function init() {
                   w.regroupAt = 0; w.enemyDefence = enemyDefenceCap(w.waveCount, w.tier);
                   war.event('islandBack');
                   if (w.enemyTier < w.tier) { w.enemyTier = w.tier; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier); }
-                  logWar(`Status: they are back. Rebuilt, dug in, and they field ${TIERS[w.enemyTier].id}.`, true);
+                  if (!w.enemyLeft) logWar(`Status: they are back. Rebuilt, dug in, and they field ${TIERS[w.enemyTier].id}.`, true);
+              }
+              // Their houses and their store are never targets: we do not bomb
+              // civilians. When every military structure is down, the war room
+              // says so, once per silence (B206).
+              if (!w.enemyLeft) {
+                  const nothing = strikeTargets().length === 0;
+                  if (nothing && !w.saidNothingToStrike) { w.saidNothingToStrike = true; logWar('Interior: their military structures are destroyed. We do not bomb their homes. They are rebuilding.'); }
+                  else if (!nothing) w.saidNothingToStrike = false;
               }
               // the enemy escalates on its own jittered clock
               if (w.t >= w.nextTierAt && enemyMayResearch(w.t) && w.enemyTier < TIERS.length - 1 && !w.enemyLeft) {
                   w.enemyTier++; w.nextTierAt = nextEnemyTierAt(w.t, warRand, w.enemyTier, w.tier - w.enemyTier);
-                  logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier);
+                  logWar(`Intel: enemy has developed ${TIERS[w.enemyTier].id}.`, w.enemyTier > w.tier, { hold: w.enemyTier <= w.tier });
               }
               const raided = (w.raidUntil || 0) > w.t;          // our raiding party holds their defence down
               if (raided) w.enemyDefence = 0;
               else if (!silent) w.enemyDefence = Math.min(w.enemyDefence + ENEMY_DEFENCE_REGROW(w.tier) * defenceStandingK(standing), enemyDefenceCap(w.waveCount, w.tier) * defenceStandingK(standing));
-              if (!raided && w.raidUntil && !w.saidRaidOver) { w.saidRaidOver = true; war.event('raidEnd'); logWar('Interior: the raiding party is back. Their defence is regrouping.'); }
+              if (!raided && w.raidUntil && !w.saidRaidOver) { w.saidRaidOver = true; war.event('raidEnd'); logWar('Interior: the raiding party is back. Their defence is regrouping.', false, { hold: true }); }
               // waves, as long as the enemy is still here; every fifth is a push
               if (!silent && !w.enemyLeft && !w.pendingWave && w.t - w.lastWaveAt >= waveInterval(w.waveCount)) {
                   w.lastWaveAt = w.t; w.waveCount++;
@@ -412,8 +429,8 @@ export function init() {
                       if (skyward) war.event('shell', { impactIn: WAVE_WARNING_S + 1.4, col: ti % 5, defended: (w.air || 0) > 0 });
                       // A landing gathers on their pier while the radar watches; the boat casts off at launchAt.
                       if (!skyward) _ants?.musterLanding({ targetBuildingId: target.id, count: size, push });
-                      if (w.radar && skyward) logWar(push ? `Intel: a large salvo is heading for ${target.type}.` : `Radar: a salvo is on its way to ${target.type}.`, push);
-                      else if (w.radar) logWar(push ? `Intel: a large force is gathering on their pier for ${target.type}.` : `Radar: a landing party is gathering on their pier.`, push);
+                      if (w.radar && skyward) logWar(push ? `Intel: a large salvo is heading for ${target.type}.` : `Radar: a salvo is on its way to ${target.type}.`, push, { hold: !push });
+                      else if (w.radar) logWar(push ? `Intel: a large force is gathering on their pier for ${target.type}.` : `Radar: a landing party is gathering on their pier.`, push, { hold: !push });
                   }
               }
               if (w.pendingWave && w.t >= w.pendingWave.launchAt) {
@@ -438,7 +455,7 @@ export function init() {
                       const castOff = () => {
                           const ww = gameState.war; if (!ww?.active) return;
                           war.event('castOff', { col: ti % 5 });
-                          if (ww.radar) logWar(`Radar: their boat has left the pier. ${size} ${enemy.id} heading for ${b.type}.`, push);
+                          if (ww.radar) logWar(`Radar: their boat has left the pier. ${size} ${enemy.id} heading for ${b.type}.`, push, { hold: !push });
                           else if (first) logWar('Status: their boat has left the pier. It is heading for us.', true);
                       };
                       if (_ants) {
@@ -449,30 +466,25 @@ export function init() {
               }
               // food and land suffer: scorch cuts production, and the war room says so once
               const doom = doomsday(w.scorchOurs + w.scorchTheirs);
+              climateTick(w, doom);      // first: on the tick doomsday passes 55 %, the climate speaks before the larders
               for (const [th, text] of [[15, 'Status: artillery is scarring the fields.'], [35, 'Status: wheat fields obliterated. Food is short.'], [55, 'Status: chemical weapons have struck our larders.'], [80, 'Status: the ground is poisoned. Little grows.']]) {
-                  if (doom >= th && !(w.saidDoom || []).includes(th)) { w.saidDoom = (w.saidDoom || []).concat([th]); logWar(text, true); }
+                  if (doom >= th && !(w.saidDoom || []).includes(th)) { w.saidDoom = (w.saidDoom || []).concat([th]); logWar(text, true, { hold: true }); }
               }
-              if (gameState.supplies <= 0 && gameState.population > 0 && (w.t - (w.lastFoodWarn || -999)) > 60) { w.lastFoodWarn = w.t; logWar('Status: food storages critical. People are starving.', true); }
+              if (gameState.supplies <= 0 && gameState.population > 0 && !(w.enemyLeft && w.leaveStage >= 2) && (w.t - (w.lastFoodWarn || -999)) > 60) { w.lastFoodWarn = w.t; logWar('Status: food storages critical. People are starving.', true); }
               // rebuilt enemy tiles
               (w.enemyRazedUntil || []).forEach((until, i) => { if (until && w.t >= until) w.enemyRazedUntil[i] = 0; });
               // The end comes from the clock, not from their island: when the
               // surface is nearly done (doomsday), they withdraw, launch, leave rubble.
               if (!w.enemyLeft && doom >= DOOMSDAY_LEAVE) {
-                  w.enemyLeft = true; w.leaveStage = 0; w.leaveAt = w.t;
-                  logWar('Intel: the enemy is withdrawing all forces to a launch site.', true);
+                  w.enemyLeft = true; w.leaveStage = 0; w.leaveAt = w.t; w.endV = 2;
+                  w.heldLines = [];                                  // the war is over: what waited is not said
+                  logWar(w.intel ? 'Intel: the enemy is withdrawing all forces to a launch site.' : 'Status: the enemy is withdrawing all forces to a launch site.', true);
                   const rocket = ui.competitorIsland.querySelector('.enemy-rocket');
                   ui.competitorIsland.classList.add('enemy-launch');
                   if (_ants && rocket) _ants.withdraw(rocket, () => { w.leaveStage = Math.max(w.leaveStage, 1); w.leaveAt = w.t; });
                   else { w.leaveStage = 1; }
               }
-              if (w.enemyLeft) {
-                  // 0 boarding (quiet) → 1 all aboard: ignition, 5 s → 2 lift-off, 11 s → 3 rubble
-                  if (w.leaveStage === 0 && w.t - w.leaveAt > 25) { w.leaveStage = 1; w.leaveAt = w.t; }
-                  if (w.leaveStage >= 1 && w.leaveStage < 3) ui.competitorIsland.classList.add('enemy-ignite');
-                  if (w.leaveStage === 1 && w.t - w.leaveAt >= 5) { w.leaveStage = 2; w.leaveAt = w.t; ui.competitorIsland.classList.add('enemy-left'); logWar('Our scientists have declared the surface uninhabitable for life. The enemy has left for space.', true); }
-                  if (w.leaveStage === 2 && w.t - w.leaveAt >= 11) { w.leaveStage = 3; ui.competitorIsland.classList.remove('enemy-launch', 'enemy-ignite'); ui.competitorIsland.classList.add('enemy-rubble'); logWar('We have not had the resources to do the same. But there is a secret plan. Go deep.'); }
-                  if (w.leaveStage >= 3 && w.salvage >= SHIP_SALVAGE && !w.shipReady) { w.shipReady = true; }
-              }
+              if (w.enemyLeft) leaveTick(w);
               // Their rocket is underway long before they leave: from doomsday
               // ROCKET_FROM the tile stands on their island, its ring filling
               // until DOOMSDAY_LEAVE.
@@ -481,7 +493,7 @@ export function init() {
                   ui.competitorIsland.classList.toggle('enemy-rocket-building', building);
                   if (building) {
                       rocketRing.style.strokeDashoffset = String(113 - 113 * Math.min(1, (doom - ROCKET_FROM) / (DOOMSDAY_LEAVE - ROCKET_FROM)));
-                      if (!w.saidRocket) { w.saidRocket = true; logWar('Intel: they have started building something tall on their island. A rocket.', true); }
+                      w.saidRocket = true;          // the climate lines tell it now (climateTick), the vast ship last
                   }
               } else ui.competitorIsland.classList.remove('enemy-rocket-building');
               // The quartermaster only buys, at the stance ratio, and keeps
@@ -502,7 +514,7 @@ export function init() {
               }
               // One control at a time, teased grey until it can be afforded.
               // After the first landing has struck, three seconds of nothing new (revealHoldUntil).
-              const opened = w.t >= (w.revealHoldUntil || 0) ? revealNext(w) : null;
+              const opened = w.t >= (w.revealHoldUntil || 0) && !climateFresh(w) ? revealNext(w) : null;
               if (opened) {
                   if (REVEAL_LINES[opened]) logWar(REVEAL_LINES[opened]);
                   if (opened === 'fort') {
@@ -540,6 +552,74 @@ export function init() {
                   leaveStage: w.enemyLeft ? (w.leaveStage || 0) : -1,
               };
           }
+          /**
+           * The end of the war, said slowly (v1.70.0, B208). From doomsday 55 %
+           * (the rocket's first ring) the war room speaks of the climate, one line
+           * at a time, CLIMATE_GAP_S apart at least and each a few points of
+           * doomsday later than the one before; while a line is fresh the
+           * background lines wait (logWar `hold`), then come out one a second.
+           */
+          function climateTick(w, doom) {
+              if (!climateFresh(w) && w.heldLines?.length) {
+                  const next = w.heldLines.shift();
+                  if (!next.text.startsWith('Radar:')) { logWar(next.text, next.grim); w.releasedAt = w.t; }   // a radar call that waited is stale: the instrument has it
+              }
+              if (w.enemyLeft || doom < CLIMATE_FROM) return;
+              const i = w.climateSaid || 0;
+              if (i >= 4 || doom < CLIMATE_FROM + i * CLIMATE_STEP) return;
+              if (w.climateAt !== undefined && w.t - w.climateAt < CLIMATE_GAP_S) return;
+              if (w.heldLines?.length || w.t - (w.releasedAt ?? -999) < CLIMATE_CLEAR_S) return;   // what waited comes out first, then a breath
+              const lines = ['Status: the enemy is being destroyed. So is the climate.', 'Status: frigid winds sweep the surface of the earth.', 'Status: the lands are becoming less fertile.',
+                  w.intel ? 'Intel: the enemy is building a vast spaceship.' : 'Status: something vast is being built on their island.'];
+              w.climateSaid = i + 1;
+              logWar(lines[i], true);
+              w.climateAt = w.t;
+          }
+          /**
+           * The leaving, stage by stage, on the war's own clock (w.t, w.leaveAt),
+           * so a reload resumes where it was. 0 withdraw → 1 ignition (5 s) →
+           * 2 lift-off → 3 rubble, the scientists → 4 the resources → 5 the plan →
+           * 6 "Go deep." and the facility → 7 the shovel. The sound reads
+           * leaveStage (audio-war.js: 0 leave, 1 launch, 2 and up the drone).
+           */
+          function leaveTick(w) {
+              // A save from before v1.70.0 said everything at stage 3: it is at the shovel.
+              if (!w.endV) { w.endV = 2; if (w.leaveStage >= 3) { w.leaveStage = LEAVE_SHOVEL; w.leaveAt = w.t; } }
+              const since = w.t - w.leaveAt;
+              const next = (stage) => { w.leaveStage = stage; w.leaveAt = w.t; };
+              if (w.leaveStage === 0 && since > 25) next(1);
+              else if (w.leaveStage === 1 && since >= 5) { next(2); ui.competitorIsland.classList.add('enemy-left'); }
+              else if (w.leaveStage === 2 && since >= 13) {
+                  next(3);
+                  ui.competitorIsland.classList.remove('enemy-launch', 'enemy-ignite'); ui.competitorIsland.classList.add('enemy-rubble');
+                  logWar('Our scientists have declared the surface uninhabitable for life. The enemy has left for space.', true);
+              } else if (w.leaveStage === 3 && since >= 10) { next(4); logWar('We have not had the resources to do the same.'); }
+              else if (w.leaveStage === 4 && since >= 8) { next(5); logWar('But there is a secret plan.'); }
+              else if (w.leaveStage === 5 && since >= 6) { next(6); logWar('Go deep.'); placeFacility(true); }
+              else if (w.leaveStage === 6 && since >= 6) next(LEAVE_SHOVEL);
+              if (w.leaveStage >= 1 && w.leaveStage < 3) ui.competitorIsland.classList.add('enemy-ignite');
+              if (w.leaveStage >= LEAVE_SHOVEL && w.salvage >= SHIP_SALVAGE && !w.shipReady) w.shipReady = true;
+          }
+          /**
+           * The facility (B209): the plate everyone walks into at the end is the
+           * building that stands above ground in chapter IV, seen from above: a
+           * light plate, the round hatch with its bar, a little mast with a glowing
+           * tube, an exhaust with smoke. It arrives with "Go deep." (the plate
+           * changes over two seconds) and stays through a reload; the plate's own
+           * render (renderGridSlot) wipes the slot, so it is put back when missing.
+           */
+          function hatchSlot() { const slots = ui.landGrid.children; return slots[slots.length - 1] || null; }
+          function placeFacility(arriving = false) {
+              const slot = hatchSlot(); if (!slot) return;
+              slot.classList.add('deep-hatch');
+              if (slot.querySelector('.deep-facility')) return;
+              const f = document.createElement('div');
+              f.className = `deep-facility${arriving ? ' arriving' : ''}`;
+              f.setAttribute('aria-hidden', 'true');
+              f.innerHTML = '<span class="df-hatch"><span class="df-bar"></span></span><span class="df-mast"></span><span class="df-tube"></span>'
+                  + '<span class="df-exhaust"><span class="df-puff"></span><span class="df-puff"></span><span class="df-puff"></span></span>';
+              slot.appendChild(f);
+          }
           /** What the war room says when a control opens. */
           const REVEAL_LINES = {
               strike: 'Interior: our force can cross now. The crosshair shows ✓ when a strike would raze.',
@@ -553,6 +633,12 @@ export function init() {
               air: 'Interior: air defence can be built (twice the price of a guard). Guards still stop what walks ashore.',
           };
           const ROCKET_FROM = 55;
+          const CLIMATE_FROM = ROCKET_FROM;      // the climate lines start with the rocket
+          const CLIMATE_STEP = 6;                // doomsday points between two of them, at least
+          const CLIMATE_GAP_S = 24;              // seconds between two of them, at least
+          const CLIMATE_FRESH_S = 20;            // seconds a climate line stands alone
+          const CLIMATE_CLEAR_S = 6;             // seconds after the last line that waited, before the next climate line
+          const LEAVE_SHOVEL = 7;                // the leave stage at which the shovel arrives
 
           /**
            * A landing resolves when the survivors reach the plate. `size` is the
@@ -596,7 +682,7 @@ export function init() {
                   renderGridSlot(i);
                   logWar(`Status: ${story} and razed it.${cost}`, true);
               } else {
-                  logWar(`Status: ${story}. It stands, HP ${Math.round(b.hp)}/${plateMaxHp(b.type, b.fort || 0)}.${cost}`);
+                  logWar(`Status: ${story}. It stands, HP ${Math.round(b.hp)}/${plateMaxHp(b.type, b.fort || 0)}.${cost}`, false, { hold: true });
               }
               updateAllUI();
           }
@@ -608,8 +694,7 @@ export function init() {
           function tryStrike() {
               const w = gameState.war; if (!w?.active || w.enemyLeft || w.force <= 0) return false;
               const visible = strikeTargets();
-              if (!visible.length) { if (!w.saidNothingToStrike) { w.saidNothingToStrike = true; logWar('Interior: nothing left standing over there to strike. They are rebuilding.'); } return false; }
-              w.saidNothingToStrike = false;
+              if (!visible.length) return false;      // nothing military standing: the war room says so (warTick)
               const pickIdx = visible[Math.floor(Math.random() * visible.length)].i;
               const force = w.force, ourTier = w.tier, tier = TIERS[w.tier];
               const strikeRatio = relativePower(w.tier, w.enemyTier), enemyDefence0 = w.enemyDefence;
@@ -669,8 +754,10 @@ export function init() {
               showBtn(ui.tierBtn, active && isShown(w, 'tier'));
               showBtn(ui.autoStrikeBtn, active && isShown(w, 'autoStrike') && !w.enemyLeft);
               if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); ui.raidBtn.classList.add('hidden'); }
-              ui.shipBtn.classList.toggle('hidden', !(active && w.enemyLeft));
+              // the shovel arrives only after "Go deep." has stood six seconds (leave stage 7)
+              showBtn(ui.shipBtn, active && w.enemyLeft && (w.leaveStage || 0) >= LEAVE_SHOVEL);
               if (!active) return;
+              if (w.enemyLeft && w.leaveStage >= 6) placeFacility();
               const tier = TIERS[w.tier];
               ui.warDefence.textContent = Math.round(w.defence).toLocaleString('en-US');
               const airOpen = isShown(w, 'air');
@@ -775,7 +862,7 @@ export function init() {
               setTooltip(ui.buyDefenceBtn, { effect: `+${batch} <i data-lucide='shield' class='w-4 h-4'></i>`, armsCost: batch * UNIT_COST });
               setTooltip(ui.buyForceBtn, { effect: `+${batch} <i data-lucide='swords' class='w-4 h-4'></i>`, armsCost: batch * UNIT_COST });
               setTooltip(ui.strikeBtn, !targets.length && !w.enemyLeft
-                  ? { unlockReq: `<i data-lucide='factory' class='w-4 h-4'></i> rebuilding…` }
+                  ? { unlockReq: `<i data-lucide='factory' class='w-4 h-4'></i> military structures destroyed` }
                   : { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> ${w.intel ? `→ ${Math.round(w.force * relativePower(w.tier, w.enemyTier)).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ` : ''}${canRaze ? '✓' : '×'}` });
               setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : (cooling ? { unlockReq: `${TIERS[w.tier + 1].numeral} · ${Math.max(0, TIER_COOLDOWN_S - ((w.t || 0) - (w.lastTierAt ?? 0)))} s` } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost }));
               setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV · THE DEEP ▾` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
@@ -783,7 +870,7 @@ export function init() {
               enemyTileEls().forEach((el, i) => el.classList.toggle('enemy-razed', (w.enemyRazedUntil?.[i] || 0) > 0));
           }
 
-          window.debug_war = (what) => {
+          window.debug_war = (what, arg) => {
               if (what === 'start') { if (!gameState.competitorSpawned) { gameState.competitorSpawned = true; gameState.competitorSpawnedAt = Date.now() - 300000; gameState.competitorStage = 5; } startWar(); return; }
               const w = gameState.war; if (!w?.active) return;
               if (what === 'arms') w.arms += 1000;
@@ -793,6 +880,10 @@ export function init() {
               if (what === 'leave') w.scorchTheirs += 2500 * 2.5;
               if (what === 'salvage') w.salvage += 2000;
               if (what === 'stage') w.leaveAt = -999;
+              // doomsday to `arg` % (the climate lines), raze all five of their military tiles, read the state
+              if (what === 'doom') { while (doomsday(w.scorchOurs + w.scorchTheirs) < (arg ?? 55)) w.scorchTheirs += 5; }
+              if (what === 'raze') w.enemyRazedUntil = w.enemyRazedUntil.map(() => w.t + ENEMY_REBUILD_S);
+              if (what === 'state') return w;
               updateAllUI();
           };
           /** Everything chapter II sells has been bought. */
@@ -874,10 +965,13 @@ export function init() {
 
           // Ants: people and cars on the streets, the enemy on its island
           // Islands: our coast appears when the land is full, theirs with the competitor
+          // Pads large enough that no plate hangs over the water (B191)
+          const OUR_COAST = { pad: 48, points: 22, wobble: 0.3, seed: 11 };
+          const THEIR_COAST = { pad: 50, points: 16, wobble: 0.3, seed: 5 };
+          const enemyGridEl = () => ui.competitorIsland.querySelector('.enemy-grid') || ui.competitorIsland;
           _islands = {
-              // Pads large enough that no plate hangs over the water (B191)
-              ours: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.landGrid, id: 'island-ours', shape: { pad: 48, points: 22, wobble: 0.3, seed: 11 } }),
-              enemy: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.competitorIsland.querySelector('.enemy-grid') || ui.competitorIsland, id: 'island-enemy', shape: { pad: 50, points: 16, wobble: 0.3, seed: 5 }, rampart: true }),
+              ours: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: ui.landGrid, id: 'island-ours', shape: OUR_COAST }),
+              enemy: createIsland({ svg: ui.islandsSvg, area: ui.cityArea, target: enemyGridEl(), id: 'island-enemy', shape: THEIR_COAST, rampart: true }),
           };
           _islands.enemy.path.classList.add('enemy');
           function updateIslands() {
@@ -908,6 +1002,11 @@ export function init() {
               getPier: () => ui.competitorIsland.querySelector('.enemy-pier'),
               getOurPier: () => (gameState.war?.active ? document.getElementById('our-pier') : null),
               getGap: () => parseFloat(getComputedStyle(ui.landGrid).columnGap) || 8,
+              // the same coasts the islands draw: people stay on land (v1.70.0)
+              getCoasts: () => ({
+                  ours: coastPoints(layoutRect(ui.landGrid, ui.cityArea), OUR_COAST),
+                  theirs: ui.competitorIsland.classList.contains('visible') ? coastPoints(layoutRect(enemyGridEl(), ui.cityArea), THEIR_COAST) : null,
+              }),
           });
 
           function calculateBaseStarPerPerson() {
@@ -1586,15 +1685,16 @@ export function init() {
               if (!(await askDeepGate())) return;
               if (gameState.shipChosen) return;
               gameState.shipChosen = true;
-              logWar('Go deep.');
               saveGameState();
               savingEnabled = false;
               if (logicInterval) clearInterval(logicInterval);
-              // The hatch: the bottom-right plate goes dark and everyone walks in.
-              const slots = ui.landGrid.children;
-              const hatch = slots[slots.length - 1];
-              hatch?.classList.add('deep-hatch');
+              // The facility on the bottom-right plate (there since "Go deep."): everyone walks into its hatch.
+              placeFacility();
+              const hatch = hatchSlot();
+              let carded = false;
               const card = () => {
+                  if (carded) return;
+                  carded = true;
                   if (fastUiInterval) clearInterval(fastUiInterval);
                   city.stop();
                   // the IV card takes the war's E flat and lets it fall to D

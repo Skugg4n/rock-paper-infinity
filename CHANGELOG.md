@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.70.0 - 2026-10-03 (the end of the war, with feeling)
+
+### Chapter III, batch 5: Ola's playtest of v1.65 to v1.68 (B206 to B209)
+
+- **Nothing to strike, said plainly (B206).** With every military structure of theirs down, the crosshair shows the factory icon and "military structures destroyed" (it said "rebuilding…", and Ola kept hitting it while their people walked about). The war room says it once per silence: "Interior: their military structures are destroyed. We do not bomb their homes. They are rebuilding." Their houses and their store are still never targets.
+- **Nobody stands in the water (B207).** Since the islands grew, the coast road ran out over the water where the coast curves in (the corners), and so did the outermost streets. The coast road, the streets, the guards, the air defence posts and their watchmen are now kept 8 px inside the island's own coast (the vertices islands.js draws; read, not changed). A boat comes in to just off the shoreline and the party wades ashore there and walks in to the road. Checked headless at 1440 and 1024 px: no guard, walker or watchman outside the grey island in 30 samples each, with guards on all four coasts.
+- **The end of the war, with feeling (B208).** From doomsday 55 % (when their rocket starts) the war room speaks of the climate, one line at a time: "the enemy is being destroyed. So is the climate.", "frigid winds sweep the surface of the earth.", "the lands are becoming less fertile.", then "Intel: the enemy is building a vast spaceship." (without intel: "something vast is being built on their island"). At least 24 s and 6 points of doomsday apart; while a line is fresh (20 s) the background lines wait (a control opening, radar calls, doom statuses, a plate that stood), then come out one a second; a radar call that waited is dropped. The leaving is spaced out on the war's own clock, so a reload resumes it: the withdrawal, the rocket, a pause, "Our scientists have declared the surface uninhabitable...", 10 s, "We have not had the resources to do the same.", 8 s, "But there is a secret plan.", 6 s, "Go deep.", 6 s, and only then the shovel arrives. The IV card after the gather is slower: a rest, IV, a rest, THE DEEP, a 7 s hold (a click ends it); the descent is unchanged. A save from before this version that was already at the end goes straight to the shovel.
+- **The facility that goes down (B209).** The plate they walk into is now the building that stands above ground in chapter IV, seen from above: a light plate, the rock-dark hatch with a plate-coloured bar across it, a little mast with a glowing tube (the only light), an exhaust with three small puffs. It arrives with "Go deep." over two seconds.
+- No rule changed: `node scripts/sim-phase3.mjs 1 --quiet` prints the same line before and after (war.js untouched).
 ## v1.69.0 - 2026-10-03 (chapter IV, sound)
 
 ### Chapter IV has its sound (B238)

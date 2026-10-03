@@ -1,5 +1,5 @@
 /* eslint-env jest */
-import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge } from './ants.js';
+import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge, landKeeper, shoreline, inPolygon } from './ants.js';
 import { boatCourse, roundCourse, courseAt, courseLength, sailSeconds } from './ants.js';
 
 describe('ants', () => {
@@ -163,5 +163,28 @@ describe('the war by boat: courses', () => {
         expect(sailSeconds(10)).toBe(5);
         expect(sailSeconds(1e4)).toBe(9);
         expect(sailSeconds(385)).toBeCloseTo(7, 6);
+    });
+});
+
+describe('landKeeper and shoreline (v1.70.0: nobody stands in the water)', () => {
+    const square = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+    test('a point well inside stays where it is; one outside or on the edge comes in to the margin', () => {
+        const keep = landKeeper(square, 8);
+        expect(keep({ x: 50, y: 50 })).toEqual({ x: 50, y: 50 });
+        for (const p of [{ x: -20, y: -20 }, { x: 120, y: 50 }, { x: 99, y: 99 }]) {
+            const q = keep(p);
+            expect(inPolygon(square, q)).toBe(true);
+            expect(Math.min(q.x, q.y, 100 - q.x, 100 - q.y)).toBeGreaterThanOrEqual(7.9);
+        }
+        expect(landKeeper(null)).toBeNull();
+    });
+    test('a ring with a keeper bends its corners onto the land', () => {
+        const R = { ...coastRing({ x: 10, y: 10, w: 80, h: 80 }, 20), land: landKeeper(square, 8) };
+        for (let s = 0; s < ringLength(R); s += 7) expect(inPolygon(square, ringPoint(R, s))).toBe(true);
+    });
+    test('shoreline is where the walk from the water reaches the coast', () => {
+        const p = shoreline({ x: 50, y: 150 }, { x: 50, y: 50 }, square);
+        expect(p.x).toBeCloseTo(50); expect(p.y).toBeCloseTo(100, 0);
+        expect(shoreline({ x: 50, y: 150 }, { x: 50, y: 130 }, square)).toBeNull();
     });
 });

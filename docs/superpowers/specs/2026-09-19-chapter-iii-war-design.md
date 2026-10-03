@@ -423,3 +423,35 @@ Open: the two islands nearly touch at 1440 px (our pad 48 + their pad 50 against
 the 96 px margin between the grids), so the channel is a strait a hull's width
 wide and their pier ends on our beach. Widening the margin is the islands' job
 (CAPITAL), not the war's (B203).
+
+## The end of the war (2026-10-03, v1.70.0, batch 5)
+
+Ola's playtest of v1.65 to v1.68. No rule changed (`sim-phase3.mjs 1` prints the same line).
+
+- **Nothing to strike.** Their civil tiles (houses, store) are never targets: we do not bomb
+  civilians. With every military tile razed the crosshair says so (factory icon, "military
+  structures destroyed") and the war room says it once per silence.
+- **On land.** The coast road is a rectangle round the plates, and since the islands grew its
+  corners (and the outermost streets) lay over the water where the coast curves in. `ants.js`
+  now gets both islands' coast vertices (`getCoasts`, from `islands.js coastPoints` with the same
+  shapes the islands draw) and a `landKeeper` moves any road, street or guard point that is not at
+  least 8 px inside the coast toward the island's middle. A ring carries it as `R.land`, so
+  `ringPoint`, `landingRoute` and `crossPath` stay on land without their callers changing. A
+  boat comes in from its lane to 12 px off the `shoreline` and the party wades ashore there
+  (`ashorePath` with a beach: the water leg is boat to shoreline, `onIsland` from the beach on).
+- **The ending, spaced.** From doomsday 55 % four climate lines, at least 24 s and 6 points of
+  doomsday apart (`climateTick`). While a climate line is fresh (20 s) background lines wait
+  (`logWar(..., { hold: true })`: reveals, radar calls, doom statuses, a plate that stood; reveals
+  themselves wait too) and then come out one a second, six seconds before the next climate line;
+  a radar call that waited is dropped. The leave stages (`leaveTick`, all on `w.t`/`w.leaveAt`,
+  so a reload resumes): 0 withdraw → 1 ignition (5 s) → 2 lift-off → 13 s → 3 rubble and "Our
+  scientists..." → 10 s → 4 "We have not had the resources to do the same." → 8 s → 5 "But there
+  is a secret plan." → 6 s → 6 "Go deep." and the facility → 6 s → 7 the shovel (`arrive()`, still
+  gated on salvage). The sound reads the same stages (2 and up is the drone). A save from before
+  (`w.endV` unset) at the old stage 3 goes to 7. The IV card: dark, slow, silent, `pause` 1400,
+  `hold` 7000.
+- **The facility.** The bottom-right plate becomes chapter IV's building seen from above (colours
+  from `deep-machine-12.html` / `machine-model.js`: plate, rock-dark hatch #0a0d12, bar #d5dbe3,
+  joint #5b6676, steel tube with a soft glow, exhaust #3a434f, smoke #c6cfd9), pure CSS on
+  `.deep-facility`; re-added when the plate re-renders.
+- Open: the gather into the hatch still often ends on its 20 s fallback (about 50 of 60 people in).

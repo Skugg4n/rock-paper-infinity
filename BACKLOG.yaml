@@ -2251,3 +2251,42 @@ items:
       the low D during the card, the awake level against chapter III, the pause and resume (the layers
       start over, they do not resume mid-phrase), and the wake fade of about 1.5 s.
     status: open
+
+  - id: B206
+    added: 2026-10-03
+    source: "Ola's playtest of v1.65 to v1.68 (WAR batch 5, item 1)"
+    request: |
+      The crosshair's disabled state said "rebuilding…" and I thought I should keep hitting them
+      while their people ran around. Their houses and store are never targets on purpose: we do
+      not bomb civilians. Say so.
+    status: done
+    resolved_in: v1.70.0
+
+  - id: B207
+    added: 2026-10-03
+    source: "Ola's playtest of v1.65 to v1.68 (WAR batch 5, item 2)"
+    request: |
+      People in the water: since the islands grew, the guards' coast line and the outermost street
+      nodes sit on or beyond the shore. Keep the coast road inside the shore; the boat lands at the
+      shore and the party walks in.
+    status: done
+    resolved_in: v1.70.0
+
+  - id: B208
+    added: 2026-10-03
+    source: "Ola's playtest of v1.65 to v1.68 (WAR batch 5, item 3)"
+    request: |
+      The end of the war, with feeling: sparse climate lines from doomsday 55 %, the vast spaceship,
+      then the leaving spaced out line by line, and the shovel only after "Go deep." has stood; the
+      IV card slow and silent with a long hold.
+    status: done
+    resolved_in: v1.70.0
+
+  - id: B209
+    added: 2026-10-03
+    source: "Ola's playtest of v1.65 to v1.68 (WAR batch 5, item 4)"
+    request: |
+      The facility that goes down: the plate everyone walks into at the end becomes the same
+      building that stands above ground in chapter IV, seen from above, so the chapters join.
+    status: done
+    resolved_in: v1.70.0
