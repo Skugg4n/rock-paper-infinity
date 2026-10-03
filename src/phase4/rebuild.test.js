@@ -10,12 +10,16 @@ import { canBuy, NODE_BY_ID } from './tree.js';
 import {
     gauges, advise, ADVICE, cryoLamps, wakeWord, WAKE_WORDS, hallucinationsAt, drawerGroups, drawerCount,
     healing, surfaceTape, RED_K, GREEN_FROM, fallK, RED_DAYS, drawerDoes,
+    GREEN_SPAN, handsK, HANDS_FULL, cardGone, RPS_GONE_MS, drawerPrice,
 } from './instruments.js';
 import { sleepPace, sleepDaysAt, RAMP, surfaceDue, SURFACE_BELOW, initialWatcher } from './watcher.js';
 import { VISIT_AFTER_SECONDS } from './surface.js';
 import { initialLayout, claimChambers, emptyChambers } from './layout.js';
 import { serializeDeep, deserializeDeep } from './persistence.js';
-import { springStep } from './panel.js';
+import { springStep, SPRING_SLOW } from './panel.js';
+import { ORE_SIGN, signHtml, ORE_GLYPH } from './readout.js';
+import { buy as treeBuy, priceOf } from './tree.js';
+import { VATS_COST, VATS_MAX } from './deep.js';
 
 const start = (o = {}) => ({ ...initialDeepState({ salvage: 1500, doom0: 85 }), watcher: initialWatcher(), ...o });
 const dry = (s) => tickDay(JSON.parse(JSON.stringify(s)), !!s.asleep);
@@ -35,13 +39,41 @@ describe('the gauges', () => {
     test('a store that does not fall rests in the green; one that falls points at its days of cover', () => {
         const s = start();
         const g = gauges(s, dry(s));
-        for (const c of ['M', 'F', 'E', 'H']) expect(g[c].k).toBeGreaterThanOrEqual(GREEN_FROM);
+        for (const c of ['M', 'F', 'E']) expect(g[c].k).toBeGreaterThanOrEqual(GREEN_FROM);
+        // deep-fix2: HANDS, fully crewed, stands on its own continuous scale out of the red
+        expect(g.H.red).toBe(false);
+        expect(g.H.k).toBeGreaterThanOrEqual(RED_K);
         // no farms: the larder falls
         const t = start({ food: 300, rooms: { mine: 1, farm: 0, generator: 1, dorm: 1, cryo: 0 } });
         const f = gauges(t, dry(t)).F;
         expect(f.falling).toBe(true);
         expect(f.k).toBeLessThan(GREEN_FROM);
         expect(f.red).toBe(f.days < RED_DAYS);
+    });
+    test('deep-fix2: the HANDS needle has no jump where the last post is filled', () => {
+        // short of crew it sits at RED_K x the share crewed; fully crewed it starts from RED_K
+        expect(handsK(0)).toBeCloseTo(RED_K, 9);
+        expect(handsK(HANDS_FULL)).toBeCloseTo(GREEN_FROM + GREEN_SPAN, 9);
+        expect(handsK(HANDS_FULL / 2)).toBeGreaterThan(RED_K);
+        expect(handsK(HANDS_FULL / 2)).toBeLessThan(GREEN_FROM);
+        // a colony growing into new beds: day by day the needle's target moves by a little only
+        const s = leverReady();
+        s.rooms.dorm = 3; s.food = 1e6; s.humans = 16;
+        let k0 = gauges(s, dry(s)).H.k, worst = 0;
+        for (let d = 0; d < 120; d++) {
+            tickDay(s);
+            const k = gauges(s, dry(s)).H.k;
+            worst = Math.max(worst, Math.abs(k - k0));
+            k0 = k;
+        }
+        expect(worst).toBeLessThan(0.08);
+    });
+    test('deep-fix2: the HANDS needle eases on a slow spring, the others on the stiff one', () => {
+        let x = 0, v = 0;
+        for (let i = 0; i < 30; i++) ({ x, v } = springStep(x, v, 1, 1 / 60, SPRING_SLOW));
+        expect(x).toBeLessThan(0.5);          // half a second in, not yet half way
+        for (let i = 0; i < 600; i++) ({ x, v } = springStep(x, v, 1, 1 / 60, SPRING_SLOW));
+        expect(x).toBeCloseTo(1, 2);
     });
     test('the red arc is the first RED_DAYS of cover', () => {
         expect(fallK(0)).toBe(0);
@@ -86,9 +118,11 @@ describe('the one stamped word', () => {
 
 describe('the three lamps are Cryo I\'s own road', () => {
     test('at the descent all three are dark; with every room automated all three are lit', () => {
-        expect(cryoLamps(cryoRoad(0, start())).map((l) => l.lit)).toEqual([false, false, false]);
+        expect(cryoLamps(cryoRoad(0, start())).map((l) => l.lit)).toEqual([false, false, false, false]);
         const lit = cryoLamps(cryoRoad(0, leverReady()));
-        expect(lit.map((l) => l.key)).toEqual(['food', 'power', 'ore']);
+        // deep-fix2: the fourth lamp is the price, its tape the stars
+        expect(lit.map((l) => l.key)).toEqual(['food', 'power', 'ore', 'price']);
+        expect(lit[3]).toMatchObject({ label: '★ 15 k', price: true });
         expect(lit.every((l) => l.lit)).toBe(true);
     });
     test('an automation on order is not done: its lamp blinks', () => {
@@ -99,6 +133,14 @@ describe('the three lamps are Cryo I\'s own road', () => {
         const food = cryoLamps(cryoRoad(0, s)).find((l) => l.key === 'food');
         expect(food.lit).toBe(false);
         expect(food.ordered).toBe(true);
+    });
+    test('deep-fix2: the price lamp is dim until the stars are there, and with it dark there is no lever', () => {
+        const s = leverReady();
+        s.stars = 1000;
+        const lamps = cryoLamps(cryoRoad(0, s));
+        expect(lamps.slice(0, 3).every((l) => l.lit)).toBe(true);
+        expect(lamps[3].lit).toBe(false);
+        expect(canBuy(s, 'cryo-i', {}).ok).toBe(false);
     });
     test('lit lamps and the hall that can be bought agree', () => {
         const s = leverReady();
@@ -178,7 +220,7 @@ describe('the drawer: only what can be bought now, and the next thing', () => {
             expect(next.length).toBeLessThanOrEqual(1);
             for (const r of next) expect(r.need.length).toBeGreaterThan(0);
         }
-        expect(groups.find((g) => g.name === 'CRYO').rows[0]).toMatchObject({ id: 'cryo-i', status: 'next', need: 'Needs the three lamps lit.' });
+        expect(groups.find((g) => g.name === 'CRYO').rows[0]).toMatchObject({ id: 'cryo-i', status: 'next', need: 'Needs all four lamps lit.' });
     });
     test('asleep: only the night\'s things (no levels), the Watcher\'s steps once its branch is open', () => {
         const s = leverReady();
@@ -258,5 +300,61 @@ describe('an old save opens in the new panel', () => {
         expect(() => drawerGroups(back.state, {})).not.toThrow();
         claimChambers(back.state, back.layout);
         expect(back.state.minerals).toBe(s.minerals);
+    });
+});
+
+/* ---- deep-fix2 ----------------------------------------------------------------------------- */
+describe('deep-fix2: Surface speaks once', () => {
+    test('the card and its line are not gone while the fists shake and turn, only after the result has shown', () => {
+        // a throw made: the game is under way, not gone (before, the card vanished here and the line typed again)
+        expect(cardGone({ result: true, playing: true, doneAt: 0, now: 1000 })).toBe(false);
+        expect(cardGone({ result: true, playing: true, doneAt: 900, now: 1000 })).toBe(false);
+        // the result shown: the card stays its moment, then goes
+        expect(cardGone({ result: true, playing: false, doneAt: 1000, now: 1000 + RPS_GONE_MS - 1 })).toBe(false);
+        expect(cardGone({ result: true, playing: false, doneAt: 1000, now: 1000 + RPS_GONE_MS })).toBe(true);
+        // nothing played: never gone; played before a reload: gone at once
+        expect(cardGone({ result: false, playing: false, doneAt: 0, now: 5e6 })).toBe(false);
+        expect(cardGone({ result: true, playing: false, doneAt: 0, now: 5 })).toBe(true);
+    });
+    test('through a whole game the line is shown without a gap, so it is typed once', () => {
+        // the frames of a game: the throw at 0, the result at 1280 ms, the fists put away 600 ms later
+        const RESULT = 1280, AWAY = RESULT + 600;
+        let gaps = 0, was = true;
+        for (let t = 0; t < RESULT + RPS_GONE_MS - 10; t += 10) {
+            const shown = !cardGone({ result: true, playing: t < AWAY, doneAt: t >= RESULT ? RESULT : 0, now: t });
+            if (was && !shown) gaps++;
+            was = shown;
+        }
+        expect(gaps).toBe(0);
+    });
+});
+
+describe('deep-fix2: one sign for ore', () => {
+    test('every price with ore carries the pickaxe, and the HTML draws it as the glyph', () => {
+        expect(drawerPrice({ stars: 2e4, ore: 3e3 })).toBe(`★ 20 k + ${ORE_SIGN} 3 k`);
+        const html = signHtml(`${ORE_SIGN} 1.2 k <b>`);
+        expect(html).toBe(`${ORE_GLYPH} 1.2 k &lt;b&gt;`);
+    });
+});
+
+describe('deep-fix2: culture vats', () => {
+    test('a HABITAT node, bought awake once the hall stands, in stars, a few levels', () => {
+        const s = leverReady();
+        expect(NODE_BY_ID.vats).toMatchObject({ branch: 'HABITAT', kind: 'vats', max: VATS_MAX });
+        expect(canBuy(s, 'vats', {}).kind).toBe('prereq');           // no hall yet
+        s.cryo = 0; s.stars = 1e12;
+        expect(priceOf(s, 'vats').stars).toBe(VATS_COST[0]);
+        expect(canBuy(s, 'vats', { asleep: true }).ok).toBe(false);  // a day purchase
+        expect(treeBuy(s, 'vats', {})).toMatchObject({ kind: 'vats', level: 1 });
+        expect(s.vats).toBe(1);
+        expect(priceOf(s, 'vats').stars).toBe(VATS_COST[1]);
+    });
+    test('the drawer has it with its one line, and the panel says BUILD CULTURE VATS once the hall stands', () => {
+        const s = leverReady();
+        s.cryo = 0; s.stars = VATS_COST[0] + 10;
+        const row = drawerGroups(s, {}).find((g) => g.name === 'HABITAT').rows.find((r) => r.id === 'vats');
+        expect(row).toMatchObject({ status: 'buy', name: 'CULTURE VATS', does: 'Grows people while the colony sleeps.' });
+        expect(drawerDoes(s, 'vats')).toBe('Grows people while the colony sleeps.');
+        expect(Object.values(ADVICE)).toContain('BUILD CULTURE VATS');
     });
 });

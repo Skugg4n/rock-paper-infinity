@@ -170,7 +170,7 @@ describe('what the player sees', () => {
 
 describe('the save and the scripted player', () => {
     test('schema 8 keeps the feed; a schema 7 save is given the feed of its cryo tier', () => {
-        expect(SCHEMA_VERSION).toBe(8);
+        expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(8);
         const s = colony(); s.feed = 4;
         const back = deserializeDeep(serializeDeep(s, { slots: ['mine', 'farm', 'generator', 'dorm'] }));
         expect(back.state.feed).toBe(4);

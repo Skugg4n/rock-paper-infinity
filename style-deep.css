@@ -1678,10 +1678,12 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-dr-ring .arc { stroke: #f2d98a; transform: rotate(-90deg); transform-origin: 9px 9px; }
 .deep-drawer-tree { align-self: flex-start; background: none; border: 0; padding: 4px 0; font-size: 11px; color: #55637a; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(85, 99, 122, 0.4); text-underline-offset: 3px; }
 .deep-drawer-tree:hover { color: #8fa1b6; }
-#phase-deep.is-drawer-open #deep-hold { right: calc(max(25vw, 360px) + 32px); transition: right 260ms ease; }
-#phase-deep.is-drawer-open #deep-act { opacity: 0.25; }
-#phase-deep.is-drawer-open #deep-act .deep-act-col:nth-child(2) { opacity: 1; }
-#phase-deep.is-drawer-open #deep-act { right: calc(max(25vw, 360px) + 32px); opacity: 1; transition: right 260ms ease; }
+/* deep-fix2: the drawer OVERLAYS, nothing moves (Ola: "Very disturbing to chase those buttons").
+   DIG, the drawer button, the lever and the reset sit above it where they always are; the drawer's
+   list and its "whole tree" link end above them, so nothing in it hides behind a button. */
+#phase-deep #deep-act, #phase-deep #deep-reset-view { z-index: 42; }
+.deep-drawer-in { padding-bottom: 168px; }
+#phase-deep.has-lever .deep-drawer-in { padding-bottom: 292px; }
 
 /* ---- THE RING OF FOUR ROOMS over an empty chamber -------------------------------------------- */
 .deep-ring { position: absolute; width: 0; height: 0; z-index: 30; }
@@ -1784,3 +1786,66 @@ body.in-deep #version-info { z-index: 1400; }
 /* the count keeps inside its ring as the years grow */
 .deep-dive-years[data-size="m"] { font-size: 66px; }
 .deep-dive-years[data-size="s"] { font-size: 50px; }
+
+/* ---- deep-fix2 ------------------------------------------------------------------------------- */
+/* ONE SIGN FOR ORE: the pickaxe beside every amount of ore, in a line of text */
+.deep-sign { display: inline-block; width: 1em; height: 1em; vertical-align: -0.14em; flex: 0 0 auto; }
+#deep-ring .deep-ring-say .deep-sign { width: 0.95em; height: 0.95em; }
+/* ... and the word ORE once, on the gauge, beside the same pickaxe */
+.deep-gauge-label { display: inline-flex; align-items: center; gap: 6px; color: #c3cfdd; }
+.deep-gauge-label .deep-sign { width: 15px; height: 15px; vertical-align: 0; }
+/* stars: the ★ everywhere, the counter too */
+.deep-star-sign { font-size: 25px; line-height: 24px; width: 24px; text-align: center; color: #8fa1b6; }
+
+/* THE PRICE IS A LAMP: the fourth on the panel, its tape the stars Cryo I costs */
+.deep-cryo-lamps { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+#phase-deep .deep-cryo-lamp .dymo.is-small { max-width: 64px; }
+#phase-deep .deep-cryo-lamp.is-price .dymo.is-small { white-space: nowrap; color: #f2d98a; transform: rotate(-0.6deg); }
+#phase-deep .deep-cryo-lamp.is-price:not(.is-lit) .dymo.is-small { opacity: 0.55; }
+
+/* DIG FROM THE MAP: a "+" in the ring where the next chamber goes; a click digs, the hover shows the price */
+.deep-lbl-in .dig-plus {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 30px;
+    height: 30px;
+    margin: -15px 0 0 -15px;
+    border: 0;
+    border-radius: 50%;
+    padding: 0;
+    background: transparent;
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 150ms ease, background 150ms ease, transform 150ms ease;
+}
+.deep-lbl-in .dig-plus::before, .deep-lbl-in .dig-plus::after { content: ''; position: absolute; left: 50%; top: 50%; background: #4a5666; border-radius: 1.5px; }
+.deep-lbl-in .dig-plus::before { width: 16px; height: 3px; margin: -1.5px 0 0 -8px; }
+.deep-lbl-in .dig-plus::after { width: 3px; height: 16px; margin: -8px 0 0 -1.5px; }
+.deep-lbl-in.is-dig-ok .dig-plus { opacity: 0.9; }
+.deep-lbl-in .dig-plus:hover { opacity: 1; background: rgba(213, 219, 227, 0.92); transform: scale(1.08); }
+.deep-lbl-in .dig-plus:hover::before, .deep-lbl-in .dig-plus:hover::after { background: #0a0d12; }
+.deep-lbl-in .dig-price {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 2px);
+    transform: translateX(-50%);
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(12, 16, 21, 0.92);
+    color: #f2d98a;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+.deep-lbl-in:not(.is-dig-ok) .dig-price { color: #8fa1b6; }
+.deep-lbl-in .dig-plus:hover + .dig-price { opacity: 1; }
+.deep-lbl-in.is-dig-off .dig-plus, .deep-lbl-in.is-dig-off .dig-price { display: none; }
+.deep-lbl-in.is-no { animation: deep-shake 320ms ease; }
+#phase-deep.is-sleeping .deep-lbl-in .dig-plus { display: none; }
+/* the counters top right stay where they are under the open drawer; its own wallet says the same */
+#phase-deep #deep-hold { transition: opacity 200ms ease; }
+#phase-deep.is-drawer-open #deep-hold { opacity: 0; }

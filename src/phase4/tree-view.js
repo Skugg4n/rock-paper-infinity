@@ -35,7 +35,7 @@ import {
     effectLine, infoLines,
 } from './tree.js';
 import { sentenceShown } from './surface.js';
-import { short } from './readout.js';
+import { short, signHtml, ORE_SIGN, PICKAXE_PATHS } from './readout.js';
 import { buildProgress, isQueued } from './deep.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -82,6 +82,7 @@ const poly = (pts) => `M ${pts.map((p) => `${p[0]} ${p[1]}`).join(' L ')}`;
 export function createTreeView(host, { state, ctx, onBuy, onClose }) {
     const svg = host.querySelector('svg.deep-tree-board');
     let wallet = null;                      // deep-copy: the wallet's <text>, in the board's header band
+    let oreIcon = null;                     // deep-fix2: the pickaxe beside the ore in it
     let effect = { key: '', text: '' };      // the hovered node's effect line, worked out once a change
     const info = {
         box: host.querySelector('.deep-tree-info'),
@@ -131,10 +132,14 @@ export function createTreeView(host, { state, ctx, onBuy, onClose }) {
             h += `<circle cx="${c[0] + c[2] * 16}" cy="${c[1] + c[3] * 16}" r="5" fill="none" stroke="${op(0.16)}"/>`;
         }
         h += `<text class="tt-wallet" x="36" y="${top + 29}" font-size="18" letter-spacing="0.04em"></text>`;
+        // deep-fix2: ore carries the pickaxe here too, drawn beside its number
+        h += `<svg class="tt-ore" x="0" y="${top + 14}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${PL}" stroke-width="2.2" `
+            + `stroke-linecap="round" stroke-linejoin="round" style="display:none" pointer-events="none">${PICKAXE_PATHS}</svg>`;
         h += text(BOARD.w - 34, top + 27, 'IV · THE DEEP · THE TREE', { a: 'end', s: 8, c: op(0.22), ls: '0.2em' });
         h += '<g class="tt-traces"></g><g class="tt-lit"></g><g class="tt-tags"></g><g class="tt-threads"></g><g class="tt-nodes"></g><g class="tt-log"></g>';
         svg.innerHTML = h;
         wallet = svg.querySelector('.tt-wallet');
+        oreIcon = svg.querySelector('.tt-ore');
         logG = svg.querySelector('.tt-log');
         threadG = svg.querySelector('.tt-threads');
         const traces = svg.querySelector('.tt-traces');
@@ -329,19 +334,29 @@ export function createTreeView(host, { state, ctx, onBuy, onClose }) {
         setTimeout(() => g.classList.remove('is-flash'), 700);
     }
 
-    /** THE WALLET (deep-copy): "★ 1.1 M   ore 181 k", and asleep "capacity 84", in the header band. */
+    /** THE WALLET (deep-copy): "★ 1.1 M   ⛏ 181 k", and asleep "capacity 84", in the header band.
+     *  deep-fix2: the ore with the pickaxe, as everywhere else in IV. */
     let walletText = '';
     function drawWallet(s) {
+        if (!wallet) return;
         const stars = `★ ${short(s.stars || 0)}`;
-        const ore = `ore ${short(s.minerals || 0)}`;
+        const ore = short(s.minerals || 0);
         const w = s.watcher;
         const cap = s.asleep && w ? `capacity ${Math.floor(w.capacity || 0)}` : '';
-        const t = [stars, ore, cap].filter(Boolean).join('   ');
-        if (t === walletText || !wallet) return;
-        walletText = t;
-        wallet.innerHTML = `<tspan fill="${BR}" font-weight="700">${esc(stars)}</tspan>`
-            + `<tspan dx="26" fill="${PL}">${esc(ore)}</tspan>`
-            + (cap ? `<tspan dx="26" fill="${op(0.8)}">${esc(cap)}</tspan>` : '');
+        const t = [stars, `${ORE_SIGN} ${ore}`, cap].filter(Boolean).join('   ');
+        if (t !== walletText) {
+            walletText = t;
+            wallet.innerHTML = `<tspan class="tt-w-stars" fill="${BR}" font-weight="700">${esc(stars)}</tspan>`
+                + `<tspan dx="50" fill="${PL}">${esc(ore)}</tspan>`
+                + (cap ? `<tspan dx="26" fill="${op(0.8)}">${esc(cap)}</tspan>` : '');
+        }
+        // the pickaxe stands in the gap before the ore's number (measured once the board is drawn)
+        const st = wallet.querySelector('.tt-w-stars');
+        let at = 0;
+        try { at = st ? st.getComputedTextLength() : 0; } catch { at = 0; }
+        if (oreIcon) {
+            if (at > 0) { oreIcon.setAttribute('x', (36 + at + 22).toFixed(1)); oreIcon.style.display = ''; } else oreIcon.style.display = 'none';
+        }
     }
 
     /** THE NIGHT LOG: drawn again only when a line is added (or a node it ties to shows). */
@@ -417,7 +432,8 @@ export function createTreeView(host, { state, ctx, onBuy, onClose }) {
     function writeInfo(id) {
         const st = id ? last[id] : null;
         info.box.classList.toggle('is-empty', !st);
-        const set = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
+        // deep-fix2: ore in a price or a number carries the pickaxe (readout.js signHtml)
+        const set = (el, v) => { if (el && el.dataset.text !== v) { el.dataset.text = v; el.innerHTML = signHtml(v); } };
         if (!st) { for (const k of ['name', 'lvl', 'does', 'cost', 'eff', 'x', 'q']) set(info[k], ''); return; }
         const n = NODE_BY_ID[id];
         const s = state();

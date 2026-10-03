@@ -240,7 +240,7 @@ describe('the badge and the save', () => {
             watcher: { ...initialWatcher(), sleeps: 6, bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling'] },
         };
         const back = deserializeDeep(JSON.stringify({ schemaVersion: 5, state: old, layout: { slots: ['mine', 'farm', 'generator', 'dorm', 'cryo'] } }));
-        expect(SCHEMA_VERSION).toBe(8);
+        expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(8);
         expect(back.state.tree).toEqual({ opened: [], bought: [], unseen: false });
         const lv = treeLevels(back.state);
         expect([lv.seam, lv.yield, lv.output, lv.beds]).toEqual([7, 6, 8, 5]);

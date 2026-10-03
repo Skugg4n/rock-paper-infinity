@@ -141,7 +141,7 @@ export const CHECKPOINTS = [
             chambers: 26, rooms: { mine: 8, farm: 6, generator: 6, dorm: 4, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
-            cryo: 4, feed: impliedFeed(4),
+            cryo: 4, vats: 2, feed: impliedFeed(4),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1,
             probes: [{ sentDay: day, dueDay: day + probeDays(1), people: 45 }],
         });
@@ -163,7 +163,7 @@ export const CHECKPOINTS = [
             chambers: 26, rooms: { mine: 8, farm: 6, generator: 6, dorm: 4, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
-            cryo: 3, asleep: true, feed: impliedFeed(3),
+            cryo: 3, asleep: true, vats: 2, feed: impliedFeed(3),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             watcher: {
                 ...initialWatcher(), stage: 1, stability: 48, capacity: 100, sleptYears: slept, seed: 3, sleeps: 40,
@@ -192,7 +192,7 @@ export const CHECKPOINTS = [
             chambers: 29, rooms: { mine: 8, farm: 6, generator: 6, dorm: 6, cryo: 1 },
             level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
             auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
-            cryo: 3, asleep: true, feed: impliedFeed(3),
+            cryo: 3, asleep: true, vats: 2, feed: impliedFeed(3),
             est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
             taken: { mine: 0, farm: 0, generator: 0, dorm: 2 }, takenSlots: [25, 24],
             watcher: {
@@ -221,7 +221,7 @@ export const CHECKPOINTS = [
             chambers: 60, rooms: { mine: 16, farm: 12, generator: 12, dorm: 18, cryo: 1 },
             level: { mine: 12, farm: 12, generator: 12, dorm: 10 },
             auto: { mine: 4, farm: 4, generator: 4, dorm: 4 },
-            cryo: 4, asleep: true, feed: impliedFeed(4),
+            cryo: 4, asleep: true, vats: 2, feed: impliedFeed(4),
             est: { bias: -2, spread: 6 }, estRevealed: true, probesSent: 5, shaftOpen: true,
             taken: { mine: 0, farm: 0, generator: 0, dorm: 4 }, takenSlots: [57, 56, 55, 54],
             watcher: {

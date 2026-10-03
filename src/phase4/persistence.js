@@ -6,12 +6,12 @@
  */
 
 import { normalizeLayout } from './layout.js';
-import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START, impliedFeed, FEED_MAX } from './deep.js';
+import { initialDeepState, surface, DOOM_AT_BOOM, ESTIMATE_START, impliedFeed, FEED_MAX, VATS_MAX } from './deep.js';
 import { initialWatcher, normalizeWatcher } from './watcher.js';
 import { normalizeTree } from './tree.js';
 import { impliedNight, nightGift, NIGHTS, SENTENCE_LINE } from './surface.js';
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -105,6 +105,15 @@ const MIGRATIONS = {
         const st = p.state || {};
         if (!Number.isFinite(st.feed)) st.feed = impliedFeed(st.cryo ?? -1);
         st.feed = Math.max(0, Math.min(FEED_MAX, Math.floor(st.feed)));
+        p.state = st;
+        return p;
+    },
+    /* deep-fix2: CULTURE VATS. Asleep, only the vats grow people now. A colony that already had its
+       hall grew people in its sleep before; it is given the first level, so nothing it had is taken. */
+    8: (p) => {
+        const st = p.state || {};
+        if (!Number.isFinite(st.vats)) st.vats = (st.cryo ?? -1) >= 0 ? 1 : 0;
+        st.vats = Math.max(0, Math.min(VATS_MAX, Math.floor(st.vats)));
         p.state = st;
         return p;
     },

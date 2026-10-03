@@ -69,6 +69,20 @@ export const BIRTH_SHARE = 0.02;            // at most this much of the larder g
 export const GROWTH_PER_YEAR = 6.0;         // toward the beds while the larder holds: a bed left empty
                                             // for long is the colony's own fault, not the calendar's
 export const SLEEP_GROWTH = 0.3;            // the creches run slower while the colony sleeps
+/** deep-fix2: new beds fill a share of what is still empty each day, so the people grow INTO them
+ *  over weeks and the HANDS gauge rises without a jump (Ola: "Oh, now it jumps up"). */
+export const BED_FILL = 0.08;
+/* deep-fix2: CULTURE VATS (Ola: "Grow humans in vats, to excuse how there can be more humans although
+   we are in cryo"). Asleep nobody is born: only the vats grow people, at a share of the awake creches'
+   rate that rises with their level. Bought awake, in stars, once the hall stands. In movement III
+   these vats are the ones the body takes over. */
+export const VATS_MAX = 3;
+/** The vats' rate asleep at each level, as a share of the awake creches' (level 1 is the old sleep rate). */
+export const VAT_GROWTH = [0, SLEEP_GROWTH, 2 * SLEEP_GROWTH, 1];
+/** What each level of vats costs, in stars. */
+export const VATS_COST = [2e4, 1e6, 1e8];
+export const vatsLevel = (s) => Math.max(0, Math.min(VATS_MAX, Math.floor((s && s.vats) || 0)));
+export const vatsCost = (level) => (level < VATS_MAX ? VATS_COST[level] : Infinity);
 export const DAYS_PER_YEAR = 365;
 export const HUNGER_PER_DAY = 0.002;        // people lost per day with an empty larder
 /** The ice is not kind: this share of the sleepers is lost per sleeping year, and every
@@ -884,6 +898,7 @@ export function initialDeepState({ salvage = 1500, doom0 = DOOM_AT_BOOM, people 
         shaftOpen: false,                   // the rubble at the top of the shaft up, cleared by the first party
         cryo: -1, doom0,
         feed: 0,                            // deep-machine: levels of "The machine: feed" bought
+        vats: 0,                            // deep-fix2: levels of culture vats: people grown asleep
         // deep-voice: the tree's memory (tree.js normalizeTree): Surface's nodes opened and bought
         tree: { opened: [], bought: [], unseen: false },
     };
@@ -954,9 +969,13 @@ export function tickDay(s, asleep = false) {
         // wakes, and while there are beds to put people in. So the colony never grows itself into a
         // famine, and never quite eats its own food surplus either. Newcomers are grown from the
         // larder, never from the day's harvest, which keeps the F column readable as "grown minus eaten".
-        const rate = (asleep ? SLEEP_GROWTH : 1) * GROWTH_PER_YEAR / DAYS_PER_YEAR;
+        // deep-fix2: asleep, only the culture vats grow people; and new beds fill a share at a time
+        const rate = (asleep ? VAT_GROWTH[vatsLevel(s)] : 1) * GROWTH_PER_YEAR / DAYS_PER_YEAR;
         const mouthsToSpare = grown / FOOD_MARGIN - demand;
-        if (mouthsToSpare > 0 && !mourning(s)) born = Math.max(0, Math.min(s.humans * rate, capacity - s.humans, mouthsToSpare, s.food * BIRTH_SHARE / BIRTH_FOOD));
+        const room = capacity - s.humans;
+        if (rate > 0 && mouthsToSpare > 0 && !mourning(s)) {
+            born = Math.max(0, Math.min(s.humans * rate, room * BED_FILL, mouthsToSpare, s.food * BIRTH_SHARE / BIRTH_FOOD));
+        }
         s.food -= born * BIRTH_FOOD; s.humans += born;
     } else {
         s.food = 0; starving = true;
@@ -1051,9 +1070,13 @@ export function troubleIn(s, r) {
         const days = s.food / need;
         if (days < foodAlarmDays(s)) return { kind: 'food', days: Math.floor(days) };
     }
-    if (s.humans < MIN_SLEEPERS) return { kind: 'few' };
+    // deep-fix2: asleep without culture vats the ice is not refilled; the colony is woken when a
+    // whole sleeper is missing, not for the first fraction of one
+    if (s.humans < FEW_AT) return { kind: 'few' };
     return null;
 }
+/** Asleep, the colony wakes for too few people under this many (a whole sleeper short of MIN_SLEEPERS). */
+export const FEW_AT = MIN_SLEEPERS - 0.5;
 
 /**
  * Sleep up to `days` days in cryo: the same rules, nobody awake. Returns the summed report
@@ -1143,10 +1166,16 @@ export function sleep(s, days, opts = {}) {
                 }
             }
         }
-        const steady = Math.abs(s.humans - h0) <= 1e-9 * Math.max(1, h0) && s.food >= food0
+        // deep-fix2: without culture vats nobody is born asleep and the ice thins the sleepers a share
+        // a day: that is a steady sleep too, the people falling by the same share each day
+        const keep = 1 - cryoDeathRate(s);
+        const thinning = !(r.born > 0) && s.humans < h0 && Math.abs(s.humans - h0 * keep) <= 1e-9 * Math.max(1, h0);
+        const steady = (Math.abs(s.humans - h0) <= 1e-9 * Math.max(1, h0) || thinning) && s.food >= food0
             && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).some((j) => !isQueued(j));
         if (!steady) continue;
         let n = days - sum.days;
+        // thinning, stop the day before a whole sleeper is missing (the alarm is lived, not skipped)
+        if (thinning && keep < 1 && s.humans > FEW_AT) n = Math.min(n, Math.floor(Math.log(FEW_AT / s.humans) / Math.log(keep)) - 1);
         if (s.day < opens) n = Math.min(n, Math.ceil(opens - s.day));
         if (alarms && benign) {
             // stop the day before anything can happen, so the next lived day is the day it does
@@ -1160,6 +1189,12 @@ export function sleep(s, days, opts = {}) {
             s.minerals += n * r.parts.M; s.food += n * foodPerDay; s.stars += n * r.stars; s.day += n;
             sum.days += n;
             add(r, n);
+            if (thinning) {
+                // the people fall by the same share every day: the deaths summed exactly, not n of today's
+                const before = s.humans;
+                s.humans = before * Math.pow(keep, n);
+                sum.died += (before - s.humans) - n * r.died;
+            }
         }
         if (ringDue()) { surfaced(); break; }
     }

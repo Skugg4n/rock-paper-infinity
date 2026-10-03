@@ -16,6 +16,7 @@
  */
 
 import { ROOM_ICON } from './scene.js';
+import { signHtml } from './readout.js';
 
 const ROOM_ORDER = ['mine', 'farm', 'generator', 'dorm'];
 const ROOM_NAME = { mine: 'MINE', farm: 'FARM', generator: 'GENERATOR', dorm: 'DORMITORY' };
@@ -78,8 +79,8 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons }) {
                 b.dataset.room = t;
                 b.style.left = `${(RING_R * Math.cos(a)).toFixed(1)}px`;
                 b.style.top = `${(RING_R * Math.sin(a)).toFixed(1)}px`;
-                b.innerHTML = `<i data-lucide="${ROOM_ICON[t]}" class="w-6 h-6"></i><span class="deep-ring-price deep-mono">${r.price}</span>`;
-                b.addEventListener('pointerenter', () => { say.textContent = r.ok ? ROOM_NAME[t] : r.need; say.hidden = false; });
+                b.innerHTML = `<i data-lucide="${ROOM_ICON[t]}" class="w-6 h-6"></i><span class="deep-ring-price deep-mono">${signHtml(r.price)}</span>`;
+                b.addEventListener('pointerenter', () => { say.innerHTML = signHtml(r.ok ? ROOM_NAME[t] : r.need); say.hidden = false; });
                 b.addEventListener('pointerleave', () => { say.hidden = true; });
                 b.addEventListener('click', (e) => {
                     e.stopPropagation();

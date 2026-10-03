@@ -145,7 +145,7 @@ describe('the last wake-up', () => {
 
 describe('the ring wakes once', () => {
     test('the sensor wakes the colony at the ring, and a colony that stays down can sleep on', () => {
-        const s = { ...initialDeepState(), auto: { mine: 1, farm: 1, generator: 1, dorm: 1 }, food: 1e9, minerals: 1e9, humans: 50 };
+        const s = { ...initialDeepState(), auto: { mine: 1, farm: 1, generator: 1, dorm: 1 }, food: 1e9, minerals: 1e9, humans: 50, vats: 1 };
         s.day = Math.ceil(resurfaceDay(s.doom0)) - 3;
         const a = sleep(s, 100, { alarms: true });
         expect(a.alarm.kind).toBe('surface');

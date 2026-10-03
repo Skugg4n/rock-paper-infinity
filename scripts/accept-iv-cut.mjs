@@ -22,6 +22,14 @@
 //    figure on the crust); a real click on the base snaps them away.
 // S. Surface: a forced night types its line, the game comes, a throw; 7 s after the result the card
 //    is gone from the screen.
+// deep-fix2 (Ola's notes on v1.73.0), checked on the way:
+//  1. one ring per order: a room ordered shows its ring on its own plate only, never on the other
+//     plates of its kind; a level or an automation shows none on the plates (its ring is the drawer's row);
+//  2. the "+" where the next chamber goes: its hover shows the price with the pickaxe, a click digs;
+//  3. with the drawer open, DIG digs and the drawer stays open; only a press on the scene closes it;
+//  4. opening and closing the drawer moves nothing: DIG, the drawer button and the lever stay put;
+//  7. the price is the fourth lamp ("★ 15 k"), dim without the stars, and then there is no lever;
+//  8. the night's line is typed once, through the throw and the result.
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -186,15 +194,28 @@ try {
     const ordered = await evaluate(`({ ore: rpiDeep.state.minerals, job: (rpiDeep.state.builds || []).find((j) => j.kind === 'room'), ring: rpiDeep.ringSlot })`);
     check(ordered.ore < before.ore && ordered.job && ordered.job.type === 'farm' && ordered.job.slot === empties[0] && ordered.ring === -1,
         `the farm is ordered into that chamber (slot ${ordered.job?.slot}, ore ${Math.round(before.ore)} to ${Math.round(ordered.ore)}), the ring closed`);
+    await sleepMs(300);
+    const ringSlots = await evaluate(`[...document.querySelectorAll('#deep-labels .deep-lbl')].filter((w) => w.querySelector('.building.is-on')).map((w) => Number(w.dataset.slot))`);
+    check(ringSlots.length === 1 && ringSlots[0] === empties[0], `1. the ring spins on the one plate the farm is built into (${ringSlots.join(',') || 'none'}), not on the other farm`);
     let landed = false;
     for (let i = 0; i < 40 && !landed; i++) { await sleepMs(250); landed = await evaluate(`rpiDeep.layout.slots[${empties[0]}] === 'farm'`); }
     check(landed, 'and it lands in that chamber');
     // the drawer
     await evaluate('debug_deep("stars")');
     await sleepMs(1200);
+    // the buttons are measured with the mouse away from them (a hover lifts a button a little)
+    const away = async () => { await mouse('mouseMoved', 700, 300); await sleepMs(350); };
     const db = await centre('#deep-tree-btn');
+    await away();
+    const at0 = { dig: await centre('#deep-dig-btn'), tree: await centre('#deep-tree-btn') };
     await click(db.x, db.y);
     await sleepMs(500);
+    await away();
+    const at1 = { dig: await centre('#deep-dig-btn'), tree: await centre('#deep-tree-btn') };
+    const same = (a, b) => !!a && !!b && Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
+    check(same(at0.dig, at1.dig) && same(at0.tree, at1.tree), `4. opening the drawer moves nothing: DIG ${JSON.stringify(at0.dig)} to ${JSON.stringify(at1.dig)}, the drawer button ${JSON.stringify(at0.tree)} to ${JSON.stringify(at1.tree)}`);
+    const topAtDig = await evaluate(`(() => { const e = document.elementFromPoint(${at1.dig.x}, ${at1.dig.y}); return !!e && !!e.closest('#deep-dig-btn'); })()`);
+    check(topAtDig, '4. DIG is on top of the drawer, not under it');
     const dr = await evaluate(`(() => ({ open: rpiDeep.drawerOpen, rows: rpiDeep.drawerRows,
         dom: [...document.querySelectorAll('#deep-drawer .deep-dr-row')].map((r) => ({ id: r.dataset.id, buy: r.classList.contains('is-buy'),
             price: (r.querySelector('.deep-dr-price') || {}).textContent || '', color: getComputedStyle(r.querySelector('.deep-dr-name')).color })),
@@ -212,9 +233,51 @@ try {
     await click(firstRow.x, firstRow.y);
     await sleepMs(400);
     check((await D('state.stars')) < stars0, `a bright row buys (${bright[0].id})`);
+    await sleepMs(300);
+    const lvRings = await evaluate(`({ plates: [...document.querySelectorAll('#deep-labels .deep-lbl')].filter((w) => w.querySelector('.building.is-on')).length,
+        jobs: (rpiDeep.state.builds || []).map((j) => j.kind), row: !!document.querySelector('#deep-drawer .deep-dr-row.has-ring') })`);
+    const perPlate = lvRings.jobs.filter((k) => k === 'room').length;
+    check(lvRings.jobs.some((k) => k === 'level' || k === 'auto') && lvRings.plates === perPlate && lvRings.row,
+        `1. a level or an automation on order spins in its drawer row, on no plate (${lvRings.plates} plate rings for ${perPlate} rooms on order; orders ${lvRings.jobs.join(',')})`);
+    // 3. DIG with the drawer open digs, and the drawer stays
+    await evaluate('debug_deep("minerals")');
+    await sleepMs(1100);
+    const digs0 = await evaluate(`(rpiDeep.state.builds || []).filter((j) => j.kind === 'dig').length + rpiDeep.state.chambers`);
+    const ore0 = await D('state.minerals');
+    await click(at1.dig.x, at1.dig.y);
+    await sleepMs(400);
+    const digs1 = await evaluate(`(rpiDeep.state.builds || []).filter((j) => j.kind === 'dig').length + rpiDeep.state.chambers`);
+    check(digs1 === digs0 + 1 && (await D('state.minerals')) < ore0 && (await D('drawerOpen')), `3. DIG with the drawer open digs (${digs0} to ${digs1}) and the drawer stays open`);
+    await away();
+    const at2 = { dig: await centre('#deep-dig-btn'), tree: await centre('#deep-tree-btn') };
     await click(700, 160);
     await sleepMs(500);
-    check(!(await D('drawerOpen')), 'a press outside the drawer closes it');
+    check(!(await D('drawerOpen')), 'a press on the scene behind the drawer closes it');
+    await away();
+    const at3 = { dig: await centre('#deep-dig-btn'), tree: await centre('#deep-tree-btn') };
+    check(same(at2.dig, at3.dig) && same(at2.tree, at3.tree) && same(at0.dig, at3.dig), '4. closing it moves nothing either');
+
+    // 2. the "+" where the next chamber goes: the hover shows its price, a click digs
+    await sleepMs(600);
+    const plusAt = await evaluate('rpiDeep.scene.digPlusAt()');
+    let plusOk = false, plusPrice = '';
+    if (plusAt) {
+        await mouse('mouseMoved', plusAt.x, plusAt.y);
+        await sleepMs(300);
+        plusPrice = await evaluate(`(() => { const e = document.querySelector('#deep-labels .dig-price'); return e && getComputedStyle(e).opacity > 0.5 ? (e.querySelector('svg.deep-sign') ? 'pickaxe ' : '') + e.textContent.trim() : ''; })()`);
+        await shot('2b-dig-plus-hover');
+        const b0 = await evaluate(`(rpiDeep.state.builds || []).filter((j) => j.kind === 'dig').length + rpiDeep.state.chambers`);
+        await click(plusAt.x, plusAt.y);
+        await sleepMs(400);
+        const b1 = await evaluate(`(rpiDeep.state.builds || []).filter((j) => j.kind === 'dig').length + rpiDeep.state.chambers`);
+        plusOk = b1 === b0 + 1;
+    }
+    check(!!plusAt && /^pickaxe [\d.]+( k| M)?$/.test(plusPrice) && plusOk, `2. the "+" on the next chamber: hover "${plusPrice}", a click dug (${plusOk})`);
+    // 5. ore: the pickaxe, the same glyph on the DIG price, in the ring and in the drawer's wallet; the word only on the gauge
+    const signs = await evaluate(`(() => ({ dig: !!document.querySelector('#deep-dig-price svg.deep-sign') && !/ore/i.test(document.getElementById('deep-dig-price').textContent),
+        gauge: !!document.querySelector('#deep-gauges .deep-gauge-label svg.deep-sign'),
+        wallet: !!document.querySelector('#deep-drawer .deep-drawer-wallet svg.deep-sign') && !/ore/i.test(document.querySelector('#deep-drawer .deep-drawer-wallet').textContent) }))()`);
+    check(signs.dig && signs.gauge && signs.wallet, `5. one sign for ore: the DIG price ${signs.dig}, the gauge ${signs.gauge}, the wallet ${signs.wallet}`);
 
     // ================= L. THE LEVER, the dive, the wake lamp =========================================
     await jump('iv-cryo', { asleep: false });
@@ -222,8 +285,18 @@ try {
     const l0 = await evaluate(`(() => ({ lamps: [...document.querySelectorAll('#deep-lamps .deep-cryo-lamp')].map((l) => l.dataset.lamp + (l.classList.contains('is-lit') ? ':lit' : ':dark')),
         lever: !document.getElementById('deep-lever-wrap').hidden, price: document.getElementById('deep-lever-price').textContent,
         advice: rpiDeep.instruments.advice }))()`);
-    check(l0.lamps.length === 3 && l0.lamps.every((x) => x.endsWith(':lit')), `the three lamps are lit: ${l0.lamps.join(' ')}`);
-    check(l0.lever && /^★ /.test(l0.price) && l0.advice === 'SLEEP', `the lever is there with the price "${l0.price}", the panel says ${l0.advice}`);
+    const priceTape = await evaluate(`(() => { const e = document.querySelector('#deep-lamps .deep-cryo-lamp.is-price .dymo'); return e ? e.textContent : ''; })()`);
+    check(l0.lamps.length === 4 && l0.lamps.every((x) => x.endsWith(':lit')) && priceTape === '★ 15 k', `7. four lamps lit, the fourth the price "${priceTape}": ${l0.lamps.join(' ')}`);
+    check(l0.lever && l0.price === '' && l0.advice === 'SLEEP', `the lever is there, its price only on the lamp ("${l0.price}"), the panel says ${l0.advice}`);
+    // 7. without the stars the price lamp is dark and there is no lever
+    const keepStars = await D('state.stars');
+    await evaluate('rpiDeep.state.stars = 100');
+    await sleepMs(1600);
+    const poor = await evaluate(`(() => ({ lamp: document.querySelector('#deep-lamps .deep-cryo-lamp.is-price').classList.contains('is-lit'), lever: !document.getElementById('deep-lever-wrap').hidden }))()`);
+    check(!poor.lamp && !poor.lever, `7. short of the stars the price lamp is dim (${poor.lamp}) and there is no lever (${poor.lever})`);
+    await shot('4a-price-lamp-dim');
+    await evaluate(`rpiDeep.state.stars = ${keepStars}`);
+    await sleepMs(1600);
     await shot('4-the-lever');
     const lv = await centre('#deep-lever');
     await click(lv.x, lv.y);
@@ -285,13 +358,19 @@ try {
     check(ready, 'a forced night types its line and the game comes under it');
     check(tape > 0, `night 4: some of SURFACE's letters are on the Watcher's tape (${tape})`);
     await shot('8-surface');
+    const startsBefore = await D('typeStarts');
     const rock = await centre('#deep-surface .deep-rps-btn[data-throw="rock"]');
     await click(rock.x, rock.y);
+    await sleepMs(250);
+    const shaking = await evaluate(`({ card: rpiDeep.surfaceShown, line: !document.getElementById('deep-voice').hidden })`);
     let result = false;
     // the result is shown once the fists have shaken and turned (the 'line' stage)
     for (let i = 0; i < 30 && !result; i++) { await sleepMs(100); result = await evaluate(`!!(rpiDeep.rps && rpiDeep.rps.log.some((x) => x[0] === 'line'))`); }
     await sleepMs(3000);
     const mid = await D('surfaceShown');
+    const startsAfter = await D('typeStarts');
+    check(shaking.card && shaking.line && startsBefore === 1 && startsAfter === 1,
+        `8. the line is typed once (${startsBefore} then ${startsAfter}), and stays on through the throw (card ${shaking.card}, line ${shaking.line})`);
     await sleepMs(4000);
     const late = await evaluate(`(() => ({ card: rpiDeep.surfaceShown, voice: !document.getElementById('deep-voice').hidden,
         stage: getComputedStyle(document.getElementById('deep-night')).opacity }))()`);

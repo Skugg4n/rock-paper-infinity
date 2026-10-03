@@ -8,7 +8,7 @@ import {
     FOOD_ALARM_DAYS, ACT_WAKE_GAP_DAYS, startBuild, launchProbe, probeOdds, PROBE_OUTCOMES,
     estimateNow, estimateOpensDay, habitableYear, END_YEAR, RESURFACE_AT, surface, cryoDeathRate,
     CRYO_DEATH_PER_YEAR, CRYO_DEATH_DORM, SLEEP_FOOD, repairTick, REPAIR_DAYS, darkenChamber,
-    scoutParty, levelCost,
+    scoutParty, levelCost, BED_FILL,
 } from './deep.js';
 import {
     alarmLine, alarmGlyph, scoutLine, scoutSentLine, troubleClause, DESCENT_LINE,
@@ -23,6 +23,7 @@ const automated = () => {
     s.level = { mine: 1, farm: 1, generator: 1, dorm: 0 };
     s.auto = { mine: 1, farm: 1, generator: 1, dorm: 0 };
     s.chambers = 9; s.minerals = 26000; s.food = 9000; s.stars = 9e4; s.cryo = 0;
+    s.vats = 1;            // deep-fix2: the first culture vats, so the ice is refilled in the sleep
     return s;
 };
 const rollFor = (day, outcome) => {
@@ -228,7 +229,51 @@ describe('people: the ice takes some, the scouts take some, the awake mend', () 
         const people = s.humans;
         const sum = sleep(s, 10 * DAYS_PER_YEAR);
         expect(sum.died).toBeGreaterThan(0);
-        expect(s.humans).toBeCloseTo(people, 6);
+        // deep-fix2: the vats fill a share of the empty pods a day, so the count rests a hair under
+        expect(s.humans).toBeCloseTo(people, 2);
+    });
+
+    test('deep-fix2: without culture vats nobody is born asleep; the ice thins the sleepers and the sleep is still a handful of loops', () => {
+        const s = automated();
+        s.vats = 0;
+        s.humans = 40; s.food = 1e9;
+        const sum = sleep(s, 100 * DAYS_PER_YEAR, { alarms: true, benign: false, maxSteps: 400 });
+        expect(sum.days).toBe(100 * DAYS_PER_YEAR);
+        expect(sum.born).toBe(0);
+        const keep = Math.pow(1 - CRYO_DEATH_PER_YEAR / 365, 100 * DAYS_PER_YEAR);
+        expect(s.humans).toBeCloseTo(40 * keep, 3);
+        expect(sum.died).toBeCloseTo(40 * (1 - keep), 3);
+        // a longer sleep wakes them when a whole sleeper is missing under ten, not for a fraction
+        const t = automated();
+        t.vats = 0; t.humans = 12; t.food = 1e9;
+        const out = sleep(t, 1000 * DAYS_PER_YEAR, { alarms: true, benign: false, maxSteps: 400 });
+        expect(out.alarm && out.alarm.kind).toBe('few');
+        expect(t.humans).toBeLessThan(MIN_SLEEPERS - 0.5);
+        expect(t.humans).toBeGreaterThan(MIN_SLEEPERS - 0.6);
+    });
+
+    test('deep-fix2: with culture vats people are grown in the sleep, more at each level', () => {
+        const grown = (vats) => {
+            const s = automated();
+            s.vats = vats; s.humans = 12; s.rooms.dorm = 4; s.food = 1e9;
+            return sleep(s, DAYS_PER_YEAR).born;
+        };
+        expect(grown(0)).toBe(0);
+        expect(grown(1)).toBeGreaterThan(0);
+        expect(grown(2)).toBeGreaterThan(grown(1));
+        expect(grown(3)).toBeGreaterThan(grown(2));
+    });
+
+    test('deep-fix2: new beds fill a share at a time: the people grow into them over weeks, never in a day', () => {
+        const s = automated();
+        s.humans = 400; s.rooms.dorm = 60; s.food = 1e9; s.vats = 0;
+        const beds = tickDay(JSON.parse(JSON.stringify(s))).capacity;
+        expect(beds - s.humans).toBeGreaterThan(100);
+        const day1 = tickDay(s).born;
+        expect(day1).toBeLessThanOrEqual((beds - 400) * BED_FILL + 1e-9);
+        let d = 1;
+        while (s.humans < beds * 0.95 && d < 400) { tickDay(s); d++; }
+        expect(d).toBeGreaterThan(14);
     });
 
     test('a party is a share of the colony, never fewer than four', () => {

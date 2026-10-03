@@ -41,6 +41,29 @@ export function short(v) {
     }
     return `${sign}${Math.round(a)}`;
 }
+/**
+ * ONE SIGN FOR ORE (deep-fix2). Ola: "Sometimes it says Ore and sometimes there is a pickaxe symbol."
+ * Every amount of ore on screen carries the pickaxe, as every amount of stars carries ★. In the pure
+ * strings it is this mark; signHtml() draws it as the pickaxe glyph (lucide "pickaxe"), the same one
+ * the counter top right uses. Only the gauge's dymo tape says the word, ORE, beside the same glyph.
+ */
+export const ORE_SIGN = '⛏';
+/** The pickaxe's strokes (lucide "pickaxe", the glyph the page's lucide draws on the counter). */
+export const PICKAXE_PATHS = '<path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/>'
+    + '<path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/>'
+    + '<path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/>'
+    + '<path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/>';
+/** The pickaxe glyph in HTML, inline, so it needs no icon pass and sits in a line of text. */
+export const ORE_GLYPH = '<svg class="deep-sign" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+    + `stroke-linecap="round" stroke-linejoin="round" aria-label="ore" role="img">${PICKAXE_PATHS}</svg>`;
+/**
+ * A line of player text as HTML: escaped, and every ORE_SIGN drawn as the pickaxe glyph.
+ * @param {string} text
+ * @returns {string}
+ */
+export function signHtml(text) {
+    return String(text ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).split(ORE_SIGN).join(ORE_GLYPH);
+}
 /** Numbers in a sentence use the same short form: nobody reads 47.3182 spare energy. */
 const n = short;
 /** "mine, farm and dorm", the way a person would say it. */

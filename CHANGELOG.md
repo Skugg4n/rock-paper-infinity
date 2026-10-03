@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.74.0 - 2026-10-03 (chapter IV, Ola's notes on the rebuild)
+
+### Chapter IV: Ola's notes on v1.73.0 (B280 to B288)
+
+Ola on the rebuilt TEND and SLEEP: "SO much clearer and easier to understand, GOOD!" These are his notes from that playtest.
+
+- **One ring per order** (B280): a room ordered shows its ring on the one chamber it is built into, never on every plate of its kind. Levels and automation are not per chamber: their ring is in the drawer's row and the queue, not on the plates.
+- **Dig from the map** (B281): the circle where the next chamber goes has a "+"; a click there digs, the same as DIG and at the same price, and the hover shows the price.
+- **The drawer never eats a click** (B282): only a press on the empty scene behind it closes the drawer. DIG, the lever, the drawer button, the "+" and the menu do their job and leave it open. (The press closed the drawer, the buttons slid back, and the click landed on nothing.)
+- **The drawer never moves a button** (B283): it lies over the screen and nothing moves. DIG, the drawer button, the lever and the view reset stay where they are, above it; the drawer's list ends above them; the counters top right fade under it (its own wallet says the same).
+- **One sign for ore** (B284): every amount of ore carries the pickaxe, the same glyph as the counter (DIG's price, the ring of rooms, the "+", the drawer and its wallet, the whole tree's wallet and info box, the numbers before and after). The word ORE is only on the gauge's tape, beside the same pickaxe. Stars are ★ everywhere, the counter too.
+- **People grow in slowly** (B285): new beds fill a share of what is still empty each day, so the people grow into them over weeks. The HANDS gauge has one continuous scale (it no longer jumps from the red to the green when the last post is filled) and its needle eases on a slow spring.
+- **The price is a lamp** (B286): Cryo I's price is the fourth lamp on the panel, "★ 15 k" on dymo tape, dim until the stars are there, lit when it can be paid. The lever appears only when all four are lit, and no longer repeats the price.
+- **Surface speaks once** (B287): a throw marked the game played before its result was shown, so for the second the fists shook the card counted as gone, its line was cleared and then typed itself again. Now the card is never gone while a game is under way, and a line already typed in a visit is never typed again.
+- **Culture vats** (B288): a new HABITAT node in the drawer, "Grows people while the colony sleeps.", bought awake once the hall stands, three levels (★ 20 k, 1 M, 100 M). Asleep only the vats grow people (0.3, 0.6 and 1 times the awake rate); without them nobody is born in the sleep, the ice thins the sleepers, and the colony is woken when a whole sleeper under ten is missing. The panel says "INSTRUMENTS: BUILD CULTURE VATS" after the hall. A save that already has its hall is given the first level (save schema 9). In movement III these are the vats the body takes over.
+- Sims: plain run 26m01s → 26m58s to year 802 701 (vats 6m58s, 9m08s, 12m22s); --watcher 21m08s → 23m02s to the biological ending. A sleep that thins without vats is fast-forwarded like a steady one.
+- Acceptance (`node scripts/accept-iv-cut.mjs`) checks the ring on one plate, the "+" digging with its price, DIG with the drawer open, the buttons not moving, the pickaxe on DIG, the gauge and the wallet, the fourth lamp dim without the stars and no lever then, and the night's line typed once through a game.
+
 ## v1.73.0 - 2026-10-03 (chapter IV rebuilt: TEND and SLEEP)
 
 ### Chapter IV rebuilt, movements I · TEND and II · SLEEP (B260 to B269)
