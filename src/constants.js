@@ -6,8 +6,9 @@ export const PHASE1_CONSTANTS = {
     MAX_ENERGY: 100,
     MAX_RESERVE_ENERGY: 1500,
     // Foam fills by games played once the factory runs (~360 games/s at max):
-    // a collapse roughly every minute, worth FOAM_BONUS_SECONDS of production.
-    MAX_QUANTUM_FOAM: 20000,
+    // a collapse roughly every 14 s, worth FOAM_BONUS_SECONDS of production.
+    // Was 20000 (about a minute) until v1.81.1: too much waiting at the end.
+    MAX_QUANTUM_FOAM: 5000,
     FOAM_BONUS_SECONDS: 30,
     HYPER_SPEED_THRESHOLD: 10,
     // Bank (→ chapter II) opens after the foam has been collapsed this many times.

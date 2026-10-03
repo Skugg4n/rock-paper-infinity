@@ -3096,3 +3096,12 @@ items:
       plate's middle, so the first steps cross the plate like every walker's.
     status: open
     notes: "Decide with Ola whether the armory needs its own HP in war.js PLATE_HP (a balance change, sim first)."
+
+  - id: B360
+    added: 2026-10-03
+    source: "chat 2026-10-03 (trivial)"
+    request: |
+      The green end boost (the foam bar before the lightning) has to fill faster, 3 or 4 times. Too much waiting.
+    status: done
+    resolved_in: v1.81.1
+    notes: "MAX_QUANTUM_FOAM 20000 -> 5000 (about 14 s per collapse at full factory speed). TRIVIAL takes B360-B369."

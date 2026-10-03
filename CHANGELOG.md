@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.81.1 - 2026-10-03 (chapter I, the foam fills faster)
+
+### Chapter I · TRIVIAL: the foam bar before the lightning fills four times faster (B360)
+
+Ola: the green end boost takes too long to fill, too much waiting. The foam now fills at 5 000 games instead of 20 000: about 14 s per lightning at full factory speed instead of about a minute, so the two collapses that open the bank take about half a minute. Each collapse is still worth 30 s of production.
+
 ## v1.81.0 - 2026-10-03 (chapter III, an armory for our soldiers)
 
 ### Chapter III · WAR: our soldiers come out of an armory, not a store (B220)

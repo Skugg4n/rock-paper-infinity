@@ -18,7 +18,7 @@ const P = {
   luckCost: 50, luckUnlockGames: 100,
   battCost: 20, battAmount: 1500, battUnlockEps: 22, reserveMax: 1500,
   rechargeAmount: 25, rechargeUnlock: 15, clicksPerSecond: 1,
-  factoryCost: 10000, bankGate: 250000, foamMax: 20000, foamBonusSec: 30,
+  factoryCost: 10000, bankGate: 250000, foamMax: 5000, foamBonusSec: 30,
   cloverUptime: 0.8,
 };
 const roundTime = s => {
