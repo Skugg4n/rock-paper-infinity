@@ -128,7 +128,7 @@ describe('the last wake-up', () => {
         const s = late({ humans: 1234 });
         const w = s.watcher;
         w.bought = LADDER.map((u) => u.id);
-        expect(watcherName(w)).toBe('SYSTEM AWAKE');
+        expect(watcherName(w)).toBe('THE WATCHER');
         expect(lastWake(w, s)).toBe(1234);
         expect(s.humans).toBe(0);
         expect(w.gone).toBe(true);

@@ -64,13 +64,13 @@ import {
     sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, lookDue, sleepDaysAt, sleepPace,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS, NIGHTS } from './surface.js';
-import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, normalizeTree, canBuy } from './tree.js';
+import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, normalizeTree, canBuy, LEVEL_NODE, AUTO_NODE } from './tree.js';
 import { machineTempo, machineSays } from './machine.js';
 import { createTreeView } from './tree-view.js';
 import {
     gauges as readGauges, advise, cryoLamps, wakeWord, hallucinationsAt, SNAP_CLEAR_MS, healing,
     drawerGroups, drawerCount, surfaceTape, MERGE_MS, RPS_FADE_MS, cardGone,
-    adviseAsleep, adviceNote, RECALL_MS,
+    adviseAsleep, adviceNote, RECALL_MS, levelsReady, LEVELS_ROW, rowName,
 } from './instruments.js';
 import { createPanel } from './panel.js';
 import { createDrawer } from './drawer.js';
@@ -81,8 +81,9 @@ import {
     GROW_GAUGES, GROW_DAYS_PER_SECOND, GROW_END, RISE_LINES, setChamberPlace,
     takeTip, toggleMark, markThreads, dreamStart, dreamWake, dreamEnd, dreaming, dreamDaysAt,
     pump, beatPhase, onBeat, PUMP_COOLDOWN_MS, peoplePerSecond, organMultiplier,
-    takeOffer, startTake, taking, bodyRatios, pumpPath, ORGAN_NAME, HANDS_PULSE, handsGames,
+    takeOffer, startTake, taking, bodyRatios, pumpPath, ORGAN_NAME, HANDS_PULSE, handsGames, growNote, wantOrgan, GAUGE_ORGAN,
 } from './grow.js';
+import { surgeOf } from './organs.js';
 import { MASS_SIGN } from './readout.js';
 import { normalizeGraft, graftOwed, graftCandidates, graftWords, placeGraft, loneGrafts, GRAFT_MULT, graftEffect } from './graft.js';
 import { HANDS_SECONDS } from './view-hooks.js';
@@ -265,7 +266,7 @@ export function init() {
         // deep-grow2
         people: $('deep-people'), peopleRate: $('deep-people-rate'),
         mass: $('deep-mass'), massRate: $('deep-mass-rate'),
-        heart: $('deep-heart'), marks: $('deep-marks'), float: $('deep-float'), diveWord: $('deep-dive-word'),
+        heart: $('deep-heart'), heartSurge: document.querySelector('#deep-heart .deep-heart-surge'), marks: $('deep-marks'), float: $('deep-float'), diveWord: $('deep-dive-word'),
     };
     $('deep-crust').hidden = true;
 
@@ -374,7 +375,9 @@ export function init() {
         // under two years the count is in months, so the first sleep is seen to move
         const months = slept < 2 * DAYS_PER_YEAR;
         const text = stutter(group(Math.floor(months ? slept / 30 : slept / DAYS_PER_YEAR)));
-        const unit = months ? 'MONTHS' : 'YEARS';
+        // deep-tension: "1 MONTHS" read wrong
+        const n0 = Math.floor(months ? slept / 30 : slept / DAYS_PER_YEAR);
+        const unit = months ? (n0 === 1 ? 'MONTH' : 'MONTHS') : (n0 === 1 ? 'YEAR' : 'YEARS');
         if (ui.diveUnit.textContent !== unit) ui.diveUnit.textContent = unit;
         if (ui.diveYears.textContent !== text) {
             ui.diveYears.textContent = text;
@@ -503,7 +506,7 @@ export function init() {
         const leverReady = state.cryo >= 0 || canBuy(state, 'cryo-i', treeCtx()).ok;
         inst = {
             lever: leverReady,
-            lamps: state.cryo < 0 ? cryoLamps(roadNow) : null,
+            lamps: state.cryo < 0 ? cryoLamps(roadNow, undefined, state.stars || 0) : null,
             advice: advise(state, report, { road: roadNow, lever: leverReady }),
         };
     }
@@ -556,11 +559,14 @@ export function init() {
         panel.update({
             gauges: growing ? growGauges(state, report, layout) : readGauges(state, report),
             advice: word,
-            note: growing ? '' : adviceNote(state, word, { road: roadNow }),
+            note: growing ? growNote(state, layout) : adviceNote(state, word, { road: roadNow }),
             empty: asleep || growing ? 0 : emptyChambers(state, layout).length,
             lamps: growing ? (risen(state) ? null : inst.lamps) : (!asleep && state.cryo < 0 ? inst.lamps : null),
         });
         if (alarmUntil && performance.now() > alarmUntil) { alarmUntil = 0; panel.alarm(''); }
+        // deep-tension: the chamber the tape points at glows slowly, the drawer open or not
+        const empties = !asleep && !growing && /^BUILD /.test(word) ? emptyChambers(state, layout) : [];
+        hooks.callChamber?.(empties.length ? `s${empties[0]}` : null);
 
         // DIG: one button, its price under it
         const full = (state.builds || []).length >= QUEUE_MAX;
@@ -651,16 +657,38 @@ export function init() {
     /** What the drawer lists: the tree's rows, or in the body its four items (grow.js). */
     const drawerRows = () => (growOn(state) ? bodyGroups(state) : drawerGroups(state, treeCtx()));
     const drawer = createDrawer(ui.drawer, {
-        onBuy: (id) => (id.startsWith('body:') ? buyBodyItem(id.slice(5)) : buyNode(id)),
+        onBuy: (id) => (id.startsWith('body:') ? buyBodyItem(id.slice(5)) : id === LEVELS_ROW ? buyLevels() : buyNode(id)),
         onWholeTree: () => { closeDrawer(); openTree(); },
-        onClose: () => ui.root.classList.remove('is-drawer-open'),
+        onClose: () => { ui.root.classList.remove('is-drawer-open'); frameDrawer(false); },
     });
+    /** deep-tension: every level ready, in one click ("BUY 4 LEVELS"), cheapest first. */
+    function buyLevels() {
+        if (paused() || busy || state.asleep) return false;
+        const { ids } = levelsReady(state);
+        let n = 0;
+        for (const id of ids) {
+            const r = treeBuy(state, id, treeCtx());
+            if (!r) break;
+            if (r.kind === 'level' || r.kind === 'auto') mendType(r.type);
+            n++;
+        }
+        if (!n) return false;
+        bought();
+        afterChange();
+        return true;
+    }
+    /** deep-tension: the colony moves left of the open drawer, so nothing the panel points to is under it. */
+    function frameDrawer(open) {
+        const w = open && ui.drawer ? ui.drawer.getBoundingClientRect().width || 0 : 0;
+        scene?.setInsetRight?.(open ? Math.max(w, 360) : 0);
+    }
     function openDrawer() {
         if (drawer.isOpen()) return;
         hooks.closeRoomRing();
         if (state.tree) state.tree.unseen = false;
         drawer.open();
         ui.root.classList.add('is-drawer-open');
+        frameDrawer(true);
         drawer.refresh(state.watcher.gone ? [] : drawerRows(), wallet());
         updateChrome();
     }
@@ -1123,7 +1151,7 @@ export function init() {
     }
 
     // --- buying: the price now, the thing itself in a few days ---------------
-    function bought() { alarmUntil = 0; panel.alarm(''); sound?.event('buy'); }
+    function bought() { alarmUntil = 0; panel.alarm(''); panel.releaseHold?.(); sound?.event('buy'); }
     const queueFull = () => (state.builds || []).length >= QUEUE_MAX;
     function dig() {
         const price = nextPrice(state, 'dig');
@@ -1163,7 +1191,6 @@ export function init() {
         return out;
     }
     function openRing(slot, x, y) {
-        closeDrawer();
         hooks.openRoomRing(slot, x, y, {
             rooms: roomOffer(),
             onPick: (t) => { if (!busy && !state.asleep) buildRoom(t, slot); },
@@ -1171,9 +1198,10 @@ export function init() {
     }
 
     /* ---- THE QUEUE (v1.49.0): a strip along the bottom, each order with its ring; a click takes it back ---- */
-    const QUEUE_WORD = { mine: 'mine', farm: 'farm', generator: 'gen', dorm: 'dorm' };
-    const queueWord = (j) => (j.kind === 'dig' ? 'dig' : j.kind === 'room' ? QUEUE_WORD[j.type]
-        : `${j.kind === 'level' ? 'lv' : 'auto'} ${QUEUE_WORD[j.type]}`);
+    // deep-tension: plain words, the drawer's own names ("lv mine" read like a note to oneself)
+    const QUEUE_WORD = { mine: 'MINE', farm: 'FARM', generator: 'GENERATOR', dorm: 'DORMITORY' };
+    const queueWord = (j) => (j.kind === 'dig' ? 'DIG' : j.kind === 'room' ? QUEUE_WORD[j.type]
+        : rowName(NODE_BY_ID[(j.kind === 'level' ? LEVEL_NODE : AUTO_NODE)[j.type]] || { name: QUEUE_WORD[j.type] }));
     const Q_RING = 2 * Math.PI * 4.5;
     let queueKey = '';
     let queueRows = [];
@@ -1183,15 +1211,21 @@ export function init() {
         if (key !== queueKey) {
             queueKey = key;
             ui.queue.textContent = '';
-            queueRows = jobs.map((j) => {
+            // deep-tension: the same order in a row is one row, "SEAM ×6" (six of them read like a stutter)
+            const groupsQ = [];
+            for (const j of jobs) {
+                const g = groupsQ[groupsQ.length - 1];
+                if (g && g.job.kind === j.kind && g.job.type === j.type && j.kind !== 'dig') { g.n++; g.last = j; } else groupsQ.push({ job: j, last: j, n: 1 });
+            }
+            queueRows = groupsQ.map(({ job: j, last, n }) => {
                 const row = document.createElement('button');
                 row.className = 'deep-q-row';
                 row.type = 'button';
-                row.innerHTML = `<span class="deep-q-word">${queueWord(j)}</span>`
+                row.innerHTML = `<span class="deep-q-word">${queueWord(j)}${n > 1 ? ` ×${n}` : ''}</span>`
                     + '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">'
                     + '<circle class="track" cx="6" cy="6" r="4.5"></circle>'
                     + `<circle class="arc" cx="6" cy="6" r="4.5" stroke-dasharray="${Q_RING.toFixed(1)}" stroke-dashoffset="${Q_RING.toFixed(1)}"></circle></svg>`;
-                row.addEventListener('click', () => takeBack(j), { signal });
+                row.addEventListener('click', () => takeBack(last), { signal });
                 ui.queue.appendChild(row);
                 return { job: j, row, arc: row.querySelector('.arc') };
             });
@@ -1316,6 +1350,7 @@ export function init() {
     function tookIt(t) {
         if (!t) return;
         growLog.taken++;
+        panel.releaseHold?.();
         sound?.event('take');
         floatTake(t.id);
         if (t.cascade && t.cascade.length) {
@@ -1414,8 +1449,11 @@ export function init() {
         if (offer) {
             if (T) { nudgeTip(); return false; }
             showTip('', 0, 0);
+            // deep-tension: the organ the body is short of, marked in the ring, its gauge named in the middle
+            const want = wantOrgan(state, layout);
             hooks.openOrganRing(id, tipAt.x, tipAt.y, {
-                organs: offer.organs, have: state.grow.mass, regrow: offer.regrow,
+                organs: offer.organs, have: state.grow.mass, regrow: offer.regrow, want,
+                short: want ? `${GROW_GAUGES.find((g) => g.c === Object.keys(GAUGE_ORGAN).find((k) => GAUGE_ORGAN[k] === want))?.label} is short.` : '',
                 onPick: (organ) => chooseOrgan(id, organ),
             });
             sound?.event('ring');
@@ -1437,6 +1475,7 @@ export function init() {
         growLog.chosen = growLog.chosen || {};
         growLog.chosen[organ] = (growLog.chosen[organ] || 0) + 1;
         sound?.event('organ', { organ });
+        panel.releaseHold?.();
         organKey = '';
         afterChange();
         return true;
@@ -1457,6 +1496,8 @@ export function init() {
     let tipAt = { x: 0, y: 0 };
     function showTip(id, x, y) {
         tipAt = { x, y };
+        // deep-tension: the ring of organs speaks for itself; no tip over it
+        if (hooks.organRingAt) id = '';
         const t = !id ? { text: '', red: false }
             : growOn(state) ? (dreaming(state) ? { text: '', red: false } : takeTip(state, layout, id))
                 : { text: !state.asleep ? (graftWords(state, layout, id) || graftedWords(id)) : '', red: false };
@@ -1513,7 +1554,9 @@ export function init() {
         growLog.pumps++;
         if (beat) growLog.onBeat++;
         sound?.event('pump', { beat });
-        hooks.floatText('h0', beat ? '×2' : '×½', beat ? 'is-beat' : 'is-small');
+        // deep-tension: the drum. On the beat ×3 (and the surge), off it nothing: MISS
+        hooks.floatText('h0', beat ? `×${String(Math.round(30 * r.surge) / 10)}` : 'MISS', beat ? 'is-beat' : 'is-small is-miss');
+        if (!beat) sound?.event('miss');
         if (before) heldK = k0;
         const targets = r.to.slice(0, 3);
         targets.forEach((to, i) => {
@@ -1527,7 +1570,7 @@ export function init() {
                     if (r.done) tookIt(r.done);
                     else if (r.take) { const T = taking(state); if (T) hooks.floatText(T.id, `${Math.round(100 * T.done / T.work)} %`, 'is-small is-fill'); }
                     if (r.revived) hooks.floatText(r.revived, 'BACK', 'is-small');
-                    if (r.mass > 0) hooks.floatText(to, `+${MASS_SIGN} ${formatCount(Math.round(r.mass * 10) / 10)}`, 'is-small is-mass');
+                    if (r.mass > 0) hooks.floatText(to, `+${MASS_SIGN} ${r.mass < 10 ? (Math.round(r.mass * 10) / 10).toFixed(1) : formatCount(Math.round(r.mass))}`, 'is-small is-mass');
                     afterChange({ save: false });
                 },
             });
@@ -1553,6 +1596,19 @@ export function init() {
         hooks.setBeat?.(ph);
         el.style.setProperty('--beat', (1 + 0.22 * Math.exp(-ph * 9)).toFixed(3));
         el.classList.toggle('is-cool', performance.now() - lastPumpAt < PUMP_COOLDOWN_MS);
+        // deep-tension: the beat's window: a ring closes in and meets the heart on the beat
+        const u = ((ph + 0.5) % 1) - 0.5;
+        el.style.setProperty('--approach', (u < 0 ? 1 + 1.5 * (-u / 0.5) : 1).toFixed(3));
+        el.style.setProperty('--approach-o', (u < 0 ? 0.2 + 0.8 * (1 - (-u / 0.5)) : Math.max(0, 1 - u / 0.15)).toFixed(3));
+        el.classList.toggle('is-window', onBeat(ph));
+        const streak = state.grow.streak || 0;
+        const sEl = ui.heartSurge;
+        if (sEl) {
+            const txt = streak > 0 ? `SURGE ×${surgeOf(streak).toFixed(2).replace(/0$/, '')}` : '';
+            if (sEl.textContent !== txt) sEl.textContent = txt;
+            sEl.hidden = !txt;
+            sEl.classList.toggle('is-full', streak >= 5);
+        }
     }
     ui.heart?.addEventListener('click', (e) => { e.stopPropagation(); pumpHeart(); }, { signal });
 
@@ -2027,7 +2083,11 @@ export function init() {
     document.addEventListener('pointerdown', (e) => {
         if (hooks.ringSlot >= 0 && !ui.ring.contains(e.target)) hooks.closeRoomRing();
         if (hooks.organRingAt && !ui.ring.contains(e.target)) hooks.closeOrganRing();
-        if (drawer.isOpen() && ui.sceneHost.contains(e.target)) closeDrawer();
+        // deep-tension: a press on a chamber is not a press on the empty scene: the colony stands left of
+        // the drawer now, so a room can be built with the drawer open (closing it moved the colony
+        // under the ring that had just opened)
+        const onChamber = !!scene && ((scene.slotAt?.(e.clientX, e.clientY) ?? -1) >= 0 || !!scene.chamberAt?.(e.clientX, e.clientY));
+        if (drawer.isOpen() && ui.sceneHost.contains(e.target) && !onChamber) closeDrawer();
     }, { signal, capture: true });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;

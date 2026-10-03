@@ -3084,3 +3084,93 @@ items:
     status: done
     resolved_in: deep-organs (version at merge)
     notes: "src/checkpoints.js growColony organs/mass; scripts/accept-iv-cut.mjs O P W N D A."
+
+  - id: B350
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      GROW pulls against itself: mass short at times (guts the only source, vats eat mass, prices with the body), the weakest gauge red and named, the cheap organ a temptation; the sim's balanced player hits 3+ shortages and recovers each with the right organ, a naive cheapest-organ player stalls.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "organs.js (GUT_MASS, VAT_MASS, HEART_K, LID_MASS, CHEAP), grow.js (vatsFed, wantOrgan, spareOrgans, growNote, organPrice), policy.js pickTake style, sim --naive."
+
+  - id: B351
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      Pumping is a drum: 3 to 5 pumps a take, on the beat x3 and off x0, the beat window visible on the heart, a surge from a streak that carries into the next take; dreaming still progresses.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "organs.js PUMP_ON_BEAT/OFF, SURGE_*, grow.js pump streak, DREAM_MASS; index.js placeHeart approach ring and SURGE label."
+
+  - id: B352
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      TEND has an uphill: food or power red within the first 3 minutes if the player only digs, fixed by the right room; the tape never says WAIT while a decision exists; the star lamp shows the gap.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "deep.js START_PEOPLE/START_FOOD, generator 21, HAND_DIG; instruments.js SAVE FOR ... AUTOMATION / CRYO I, cryoLamps gap."
+
+  - id: B353
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      The long sleep wakes only for something meaningful; level-ups queue as one bundle bought in one click; awake income not 400 000 times poorer; FAULT wakes show their cause.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "instruments.js isNewKind, levelsReady, LEVELS_ROW, adviseAsleep, wakeWord FAULT: cause; deep.js AWAKE_SHARE, no act wake after the hall."
+
+  - id: B354
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      The drawer never hides the colony: the strata view frames left of the open drawer; the chamber the tape points at pulses even with the drawer open.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "strata-view.js setInsetRight, view-hooks.js callChamber, index.js frameDrawer and the pointerdown rule."
+
+  - id: B355
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      Bugs: floating labels pile up; the drawer price line cut off; an item's description changes after purchase; the tape suggests what cannot be done.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "view-hooks.js floatText reuse, instruments.js drawerPrice ' · ', AUTO_WORDS, buildOrDig affordability, panel.js releaseHold."
+
+  - id: B356
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      Bugs: DEEPEST FLOOR 0 / 12 must count; 1 MONTHS; SYSTEM AWAKE while asleep; lv mine; three year numbers in GROW.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "grow.js riseLamps FLOORS n / N, index.js drawDive singular, watcher.js WATCHER_NAMES, queue words, strata-view.js ruler labels hidden in GROW."
+
+  - id: B357
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      Bug: jumping to a checkpoint deleted rpi-audio (muted players got music back); keep rpi-audio, rpi-debug, rpi-deep-view.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "src/checkpoints.js KEEP_KEYS."
+
+  - id: B358
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      Sim: report act length and each movement, longest without a decision, shortages in GROW for a balanced and a naive player.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "scripts/sim-phase4.mjs movements, shortages, --naive."
+
+  - id: B359
+    added: 2026-10-03
+    source: "docs/playtests/2026-10-03-chapter-iv-human-pass.md (deep-tension brief)"
+    request: |
+      Human-eyed play pass, muted: TEND 4 min, SLEEP 4 min, GROW 8 min, a line every 30 s; fix and replay until nothing says bored.
+    status: done
+    resolved_in: deep-tension (version at merge)
+    notes: "docs/playtests/2026-10-03-tension-play.md, rebuild-shots/tension-*.png; accept-iv-cut.mjs runs Chrome with --mute-audio and reads FLOORS."

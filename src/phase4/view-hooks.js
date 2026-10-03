@@ -163,7 +163,7 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
          * @param {{organs:{organ:string, mass:number, ok:boolean, cheap:boolean, need:string}[], have:number,
          *          regrow?:string|null, onPick:(organ:string)=>void}} o
          */
-        openOrganRing(id, x, y, { organs, have = 0, regrow = null, onPick }) {
+        openOrganRing(id, x, y, { organs, have = 0, regrow = null, want = null, short: shortWord = '', onPick }) {
             closeRoomRing();
             closeOrganRing();
             oring = { id };
@@ -175,7 +175,8 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
             ringHost.style.top = `${my}px`;
             ringHost.innerHTML = '<span class="deep-ring-hub is-organs"><span class="dymo is-small deep-ring-say"></span></span>';
             const say = ringHost.querySelector('.deep-ring-say');
-            const wallet = `${regrow ? `${ORGAN_NAME[regrow]} now. ` : ''}You have ${MASS_SIGN} ${short(Math.floor(have))}.`;
+            // deep-tension: the gauge that is short is said in the middle, its organ marked in the ring
+            const wallet = `${regrow ? `${ORGAN_NAME[regrow]} now. ` : ''}You have ${MASS_SIGN} ${short(Math.floor(have))}.${shortWord ? ` ${shortWord}` : ''}`;
             const rest = () => { say.innerHTML = signHtml(wallet); say.classList.add('is-rest'); };
             rest();
             const n = organs.length;
@@ -183,7 +184,7 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
                 const a = n === 1 ? -Math.PI / 2 : -Math.PI / 2 + i * (2 * Math.PI / n) - (n === 4 ? Math.PI / 4 : 0);
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = `deep-ring-room deep-ring-organ${r.ok ? ' is-ok' : ''}${r.cheap ? ' is-cheap' : ''}`;
+                b.className = `deep-ring-room deep-ring-organ${r.ok ? ' is-ok' : ''}${r.cheap ? ' is-cheap' : ''}${want === r.organ ? ' is-want' : ''}`;
                 b.dataset.organ = r.organ;
                 b.style.left = `${(RING_R * Math.cos(a)).toFixed(1)}px`;
                 b.style.top = `${(RING_R * Math.sin(a)).toFixed(1)}px`;
@@ -241,6 +242,7 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
         markChamber: (id, on, from) => over.markChamber(id, on, from),
         clearMarks: () => over.clearMarks(),
         floatText: (id, text, cls) => over.floatText(id, text, cls),
+        callChamber: (id) => over.callChamber(id),
         stepOverlay: () => over.step(),
         get marks() { return over.marks; },
         get bodyStats() { return body.stats; },
@@ -282,6 +284,7 @@ function createOverlay(scene, { marksHost, floatHost }) {
     const floats = [];              // { id, el, t0 }
     const waves = [];               // deep-organs: { ids, path, glow, t0, ms, onArrive, arrived }
     let fill = null;                // deep-organs: { id, k, shown, g, back, arc, pulse }
+    let call = null;                // deep-tension: { id, ring } the chamber the tape points at
     const at = (id) => (scene && typeof scene.screenOfNode === 'function' ? scene.screenOfNode(id) : null);
     const origin = () => {
         const r = marksHost ? marksHost.getBoundingClientRect() : { left: 0, top: 0 };
@@ -328,6 +331,16 @@ function createOverlay(scene, { marksHost, floatHost }) {
             if (!floatHost || !text) return false;
             const p = at(id);
             if (!p) return false;
+            // deep-tension: ONE word per spot: a new one takes over the old one's place (they piled up,
+            // "42 % 60 % 79 %" over one chamber)
+            const old = floats.find((f) => f.id === id);
+            if (old) {
+                old.el.className = `deep-float ${cls}`.trim();
+                old.el.textContent = text;
+                old.t0 = performance.now();
+                this.step();
+                return true;
+            }
             const el = document.createElement('span');
             el.className = `deep-float ${cls}`.trim();
             el.textContent = text;
@@ -336,10 +349,29 @@ function createOverlay(scene, { marksHost, floatHost }) {
             this.step();
             return true;
         },
+        /** deep-tension: a slow ring on the chamber the tape points at (BUILD MINE with an empty one), so it
+         *  is found even with the drawer open. null: none. */
+        callChamber(id) {
+            if (!marksHost) return;
+            if (!id) { if (call) { call.ring.remove(); call = null; } return; }
+            if (call && call.id === id) return;
+            if (call) call.ring.remove();
+            const ring = document.createElementNS(SVGNS, 'circle');
+            ring.setAttribute('class', 'deep-call-ring');
+            ring.setAttribute('r', '22');
+            marksHost.appendChild(ring);
+            call = { id, ring };
+            this.step();
+        },
         step() {
             for (const [id, m] of marks) drawMark(m, id);
             const now = performance.now();
             const o0 = origin();
+            if (call) {
+                const p = at(call.id);
+                call.ring.setAttribute('visibility', p ? 'visible' : 'hidden');
+                if (p) { call.ring.setAttribute('cx', (p.x - o0.x).toFixed(1)); call.ring.setAttribute('cy', (p.y - o0.y).toFixed(1)); }
+            }
             // the fill ring follows its chamber, its arc easing to the new share
             if (fill) {
                 const p = at(fill.id);

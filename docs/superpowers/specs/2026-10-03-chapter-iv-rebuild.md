@@ -615,3 +615,50 @@ docs/playtests/rebuild-shots/organs-ring, organs-wave, organs-four, organs-starv
 **Not done here.** A keyboard pump (the space is the pause); the new sounds heard by a human ear; the people counter
 grows very large late in GROW (the vats make many more than the organs eat once FEED is green); the organ art in the 3D
 view lies flat on the plates and is a lighter pass than the strata's.
+
+## Built: the tension pass (deep-tension)
+
+The human pass of v1.80.0 (docs/playtests/2026-10-03-chapter-iv-human-pass.md): "No, not yet." Built on the branch
+`deep-tension` (B350 to B359); the play log docs/playtests/2026-10-03-tension-play.md.
+
+**GROW pulls against itself** (organs.js, grow.js). The guts are the only real mass (`GUT_MASS` 0.19 a second, the
+lid 0.1 so a body that spent its mass is slow, never stuck); every living vat eats `VAT_MASS` 0.12 a second, and with no
+mass in hand the vats grow only what the guts cover (`vatsFed`). A heart reaches `HEART_K` 2.5 organs, a nerve speeds 4,
+the lid 5 and 4; `PACE_MIN` 0.2. A take costs 12 x 1.05 per take x 1.6 a floor; the room's own organ half (`CHEAP` 0.5).
+The tape names the red gauge's organ (or PUMP with "A NERVE: ⧫ 12 to go." when the mass cannot pay), the ring marks that
+organ in red and says "FLESH is short."; a spare organ (`REGROW_SPARE`: its gauge 1.5 or more and still green without it)
+can be grown again into the one that is short. Starting mass 40 for a new body.
+
+**The drum.** `TAKE_WORK` 13; a pump fills 1 x 3 on the beat (`PUMP_ON_BEAT`), nothing off it, times the hearts (to 1.8),
+the pace and the surge: 1 + 0.12 a pump on the beat in a row, at most 5, ended by a miss or three seconds alone. The
+heart's ring has an approach ring that meets it on the beat and burns in the window. With no take the blood goes to the
+guts (0.35 s of their mass a pump on the beat). Dreaming, the guts make `DREAM_MASS` 3 times the mass.
+
+**TEND starts uphill** (deep.js). `START_PEOPLE` 16, `START_FOOD` 200, a generator makes 21, a manual mine without power
+digs `HAND_DIG` 0.25 by hand. A player who only digs has FOOD in the red after about 75 s.
+
+**The sleep wakes for what matters** (instruments.js). `isNewKind`: a tier, a gift, The question, a first level. Asleep
+WAKE only for those; the next levels wait for `levelsReady` (cheapest first, the same price to the one bought fewer
+times), the drawer's first row awake ("2 LEVELS"), the tape "BUY 2 LEVELS". The 'act' alarm (an order done) is gone
+after the hall. Awake after the hall the machine plays at least `AWAKE_SHARE` 0.08 of a second of sleep a day.
+
+**Decisions taken where the brief left room.** Shortages are counted in the sim as a gauge under 1 for 3 s or more (MASS
+6 s), recovered by the right organ when that organ was chosen while it was short. The naive player rose in some tunings
+(it brute-forced with mass); the stall comes from the hearts: a body whose hearts come only from its generators runs out
+of reach on floor 2 and the dead edge blocks the front. The chamber the tape points at gets a slow gold ring (a pulse is
+against "never pulse on a loop", but the brief asked for it while the drawer is open).
+
+**Numbers** (sim, a drummer: a pump a second, four in five on the beat)
+
+| run | before (v1.80.0) | after |
+|---|---|---|
+| strata | 31m11s: TEND 5m11s, SLEEP 12m56s, GROW 13m04s | 30m18s: TEND 4m45s, SLEEP 12m37s, GROW 12m56s |
+| 3D | 31m06s | 32m05s (GROW 14m43s) |
+| --watcher | 32m52s (GROW 12m57s) | 35m57s (SLEEP 14m20s, GROW 16m52s) |
+| longest without a decision | TEND 43, SLEEP 45 (58 --watcher), GROW 25 s | TEND 34, SLEEP 41 (55), GROW 40 s |
+| shortages in GROW, balanced | none (necrosis 0, the cheap organ always fine) | 17 FEED/PULSE/FLESH, 12 recovered by the right organ; 39 mass dips pumped out |
+| naive (cheapest organ always) | not measured | no rise in 42 min, pace 0.28, 33 min with dead flesh |
+
+**Not done here.** accept-iv-cut.mjs was updated (FLOORS, `--mute-audio`) but not run: the machine was slow and the brief
+asked to keep it light. The big numbers (1e17) the human pass named are untouched. The machine's hover in SLEEP runs off
+the right edge.

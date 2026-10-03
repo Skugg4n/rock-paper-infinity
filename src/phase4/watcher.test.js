@@ -43,7 +43,7 @@ describe('the drift', () => {
 
     test('the label changes once, quietly, on Surface\'s first night (deep-voice), never with the years', () => {
         const w = { ...initialWatcher(), sleeps: 2 };
-        expect(watcherName(w)).toBe('SYSTEM AWAKE');
+        expect(watcherName(w)).toBe('THE WATCHER');
         expect(watchSleep(w, { days: 1e6 * DAYS_PER_YEAR, tier: 6 }).named).toBe(false);
         expect(watcherName(w)).toBe(WATCHER_NAMES[0]);
         const s = { ...initialDeepState(), cryo: 0, watcher: w };

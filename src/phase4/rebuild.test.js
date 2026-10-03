@@ -37,9 +37,12 @@ function leverReady() {
 
 describe('the gauges', () => {
     test('a store that does not fall rests in the green; one that falls points at its days of cover', () => {
-        const s = start();
+        // deep-tension: the colony starts with its larder falling (sixteen people, a farm for fourteen); fed, it rests
+        const s = start({ humans: 10 });
         const g = gauges(s, dry(s));
         for (const c of ['M', 'F', 'E']) expect(g[c].k).toBeGreaterThanOrEqual(GREEN_FROM);
+        const u = start();
+        expect(gauges(u, dry(u)).F.falling).toBe(true);
         // deep-fix2: HANDS, fully crewed, stands on its own continuous scale out of the red
         expect(g.H.red).toBe(false);
         expect(g.H.k).toBeGreaterThanOrEqual(RED_K);
@@ -102,6 +105,9 @@ describe('the one stamped word', () => {
     test('the road to the hall, in order: AUTOMATE the rooms a crew runs', () => {
         // ore to burn, but not enough for a chamber
         const s = start({ minerals: 300, stars: 0 });
+        // deep-tension: the stars cannot pay it yet: the tape saves for it, never asks for what cannot be done
+        expect(advise(s, dry(s), { road: cryoRoad(0, s), lever: false })).toBe('SAVE FOR GENERATOR AUTOMATION');
+        s.stars = 1e5;
         expect(advise(s, dry(s), { road: cryoRoad(0, s), lever: false })).toBe('AUTOMATE GENERATORS');
     });
     test('the lamps lit and Cryo I paid for: SLEEP', () => {
@@ -151,11 +157,12 @@ describe('the three lamps are Cryo I\'s own road', () => {
 describe('the wake lamp says one word', () => {
     test.each([
         [{ kind: 'food', days: 3 }, 'FOOD'], [{ kind: 'energy', pct: 50 }, 'POWER'], [{ kind: 'stall', type: 'generator', why: 'fuel' }, 'POWER'],
-        [{ kind: 'stall', type: 'mine', why: 'hands' }, 'FAULT'], [{ kind: 'reboot' }, 'FAULT'], [{ kind: 'reboot', voice: true }, 'VOICE'],
+        [{ kind: 'stall', type: 'mine', why: 'hands' }, 'FAULT: MINE'], [{ kind: 'reboot' }, 'FAULT: THE MIND RESTARTED'], [{ kind: 'reboot', voice: true }, 'VOICE'],
         [{ kind: 'manual' }, 'AWAKE'], [{ kind: 'act' }, 'AWAKE'], [{ kind: 'first' }, 'AWAKE'],
     ])('%j: %s', (alarm, word) => {
         expect(wakeWord(alarm)).toBe(word);
-        expect(WAKE_WORDS).toContain(word);
+        // deep-tension: a FAULT says its cause after the word
+        expect(WAKE_WORDS).toContain(word.split(':')[0]);
     });
 });
 
@@ -331,7 +338,7 @@ describe('deep-fix2: Surface speaks once', () => {
 
 describe('deep-fix2: one sign for ore', () => {
     test('every price with ore carries the pickaxe, and the HTML draws it as the glyph', () => {
-        expect(drawerPrice({ stars: 2e4, ore: 3e3 })).toBe(`★ 20 k + ${ORE_SIGN} 3 k`);
+        expect(drawerPrice({ stars: 2e4, ore: 3e3 })).toBe(`★ 20 k · ${ORE_SIGN} 3 k`);
         const html = signHtml(`${ORE_SIGN} 1.2 k <b>`);
         expect(html).toBe(`${ORE_GLYPH} 1.2 k &lt;b&gt;`);
     });

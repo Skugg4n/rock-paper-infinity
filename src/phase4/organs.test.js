@@ -2,8 +2,8 @@
 import {
     ORGANS, CHEAP, cheapOrgans, takeMass, regrowMass, takeWork, pumpFill, trickleFill, bodySums, pulseRatio,
     nerveRatio, massRate, paceOf, weakestOf, heartPump, beyondReach, fitsReach, migrateOrgans, organOf, fullFloors,
-    neededOrgan, PUMP_STEP, TAKE_FLOOR, WORK_FLOOR, PUMP_ON_BEAT, PUMP_OFF_BEAT, DEMAND_FLOOR, SUPPLY_FLOOR, FULL_FLOOR, PACE_MIN,
-    TRICKLE, DREAM_TRICKLE, LID_REACH, ORGAN_K,
+    neededOrgan, PUMP_STEP, TAKE_FLOOR, WORK_FLOOR, PUMP_ON_BEAT, DEMAND_FLOOR, SUPPLY_FLOOR, FULL_FLOOR, PACE_MIN,
+    TRICKLE, DREAM_TRICKLE, LID_REACH, ORGAN_K, surgeOf, SURGE_MAX,
 } from './organs.js';
 import { graphFromSlots, distances, HEART, MACHINE } from './growth.js';
 
@@ -36,10 +36,13 @@ describe('the four organs and the ring', () => {
 });
 
 describe('the pump', () => {
-    test('on the beat double, off it half; hearts make it stronger; the pace slows it', () => {
+    test('deep-tension: on the beat three times, off it nothing; the surge, hearts make it stronger; the pace slows it', () => {
         expect(pumpFill({ beat: true })).toBe(PUMP_STEP * PUMP_ON_BEAT);
-        expect(pumpFill({ beat: false })).toBe(PUMP_STEP * PUMP_OFF_BEAT);
-        expect(pumpFill({ beat: true }) / pumpFill({ beat: false })).toBe(4);
+        expect(PUMP_ON_BEAT).toBe(3);
+        expect(pumpFill({ beat: false })).toBe(0);
+        expect(pumpFill({ beat: true, surge: surgeOf(5) })).toBeCloseTo(PUMP_STEP * PUMP_ON_BEAT * surgeOf(5));
+        expect(surgeOf(0)).toBe(1);
+        expect(surgeOf(99)).toBe(surgeOf(SURGE_MAX));
         expect(pumpFill({ beat: true, hearts: 1.5 })).toBeCloseTo(PUMP_STEP * PUMP_ON_BEAT * 1.5);
         expect(pumpFill({ beat: true, pace: 0.5 })).toBeCloseTo(PUMP_STEP * PUMP_ON_BEAT * 0.5);
         const s = bodySums(graph, st(['s0', 's3'], { s0: 'heart', s3: 'heart' }));
@@ -49,12 +52,12 @@ describe('the pump', () => {
         expect(trickleFill({})).toBe(TRICKLE);
         expect(trickleFill({ dreaming: true })).toBe(DREAM_TRICKLE);
         expect(trickleFill({ spread: 2 })).toBe(2 * TRICKLE);
-        // one pump every 1.5 s, on the beat half the time, with the trickle under it
-        const human = (pumpFill({ beat: true }) + pumpFill({ beat: false })) / 2 / 1.5 + TRICKLE;
+        // deep-tension: a pump a second, four in five on the beat, with the trickle under it
+        const human = (4 * pumpFill({ beat: true }) + pumpFill({ beat: false })) / 5 + TRICKLE;
         expect(human).toBeGreaterThan(1.8 * DREAM_TRICKLE);
         expect(human).toBeGreaterThan(4 * TRICKLE);
         // a player who keeps the beat, a pump a second on it
-        expect(pumpFill({ beat: true }) + TRICKLE).toBeGreaterThan(3.5 * DREAM_TRICKLE);
+        expect(pumpFill({ beat: true, surge: surgeOf(SURGE_MAX) }) + TRICKLE).toBeGreaterThan(3.5 * DREAM_TRICKLE);
     });
 });
 

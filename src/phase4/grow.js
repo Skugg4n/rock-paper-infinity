@@ -36,7 +36,7 @@ import {
     graphFromSlots, reachableFrom, take, tick, hunger, outputMultiplier, floorFull, distances, mass as bodyMass,
     riseReady as bodyReady, isNecrotic, slotOf, MACHINE, HEART, hubId,
 } from './growth.js';
-import { gift, MIN_SLEEPERS, ROOMS, vatsLevel } from './deep.js';
+import { gift, MIN_SLEEPERS, ROOMS, vatsLevel, tickDay } from './deep.js';
 import { LADDER } from './watcher.js';
 import { short, ORE_SIGN, PEOPLE_SIGN, MASS_SIGN } from './readout.js';
 import { fallK, GREEN_FROM, GREEN_SPAN, RED_K } from './instruments.js';
@@ -44,7 +44,8 @@ import { graftOrgans, normalizeGraft } from './graft.js';
 import {
     ORGANS, ORGAN_NAME, ORGAN_DOES, GAUGE_ORGAN, cheapOrgans, organOf, bodySums, pulseRatio, nerveRatio, massRate,
     paceOf, nerveSpeed, weakestOf, heartPump, beyondReach, fitsReach, takeMass, regrowMass, takeWork, pumpFill, trickleFill,
-    migrateOrgans, fullFloors, nodeOf as organNode, PUMP_ON_BEAT, PUMP_OFF_BEAT, PUMP_MASS_S,
+    migrateOrgans, fullFloors, nodeOf as organNode, PUMP_ON_BEAT, PUMP_OFF_BEAT, PUMP_MASS_S, gutRate, vatMass, surgeOf,
+    SURGE_MAX, SURGE_IDLE_S, LID_MASS, PUMP_MASS_FLAT,
 } from './organs.js';
 
 /* ------------------------------------------------------------------ the numbers */
@@ -115,11 +116,13 @@ export const REVIVE_S = 3;
 /** A pump with no take and a dead room: this share of a revival (on the beat double). */
 export const PUMP_REVIVE = 0.35;
 /** The body starts with this much mass: a few takes. */
-export const START_MASS = 28;
+export const START_MASS = 40;
 /** MASS counts the mass in hand plus this many seconds of the guts against the next price. */
 export const MASS_SECONDS = 12;
 /** The tape says DREAM when the next take is further off than this many seconds of mass. */
 export const DREAM_ADVISE_S = 25;
+/** deep-tension: dreaming, the guts make this many times the mass. */
+export const DREAM_MASS = 3;
 /** A dream lasts this many body seconds, times FLESH (between DREAM_NERVE). */
 export const DREAM_S = 30;
 export const DREAM_NERVE = [0.6, 1.6];
@@ -143,7 +146,7 @@ export const RISE_LINES = ['Humans are so small.', 'So fragile.'];
  * stars. `after`: when the item first comes into the drawer (unlockBody).
  */
 export const BODY_ITEMS = [
-    { id: 'vats', name: 'VATS', max: VATS_TOP, pile: 0.05, secs: 4, growth: 1.2, pay: 'ore', after: 'FEED falls' },
+    { id: 'vats', name: 'VATS', max: VATS_TOP, pile: 0.05, secs: 12, growth: 1.6, pay: 'ore', after: 'FEED falls' },
     { id: 'appetite', name: 'APPETITE', max: 4, pile: 0.5, secs: 80, growth: 2, pay: 'stars', after: 'the first necrosis' },
     { id: 'spread', name: 'SPREAD', max: SPREAD_TOP, pile: 0.35, secs: 70, growth: 2, pay: 'stars', after: `${SPREAD_AFTER} taken by hand` },
     { id: 'muscle', name: 'MUSCLE', max: 4, pile: 0.3, secs: 60, growth: 2, pay: 'stars', after: 'a floor full' },
@@ -198,7 +201,10 @@ const muscleOf = (G) => Math.pow(MUSCLE_STEP, (G.lv && G.lv.muscle) || 0);
  * @returns {object} s.grow
  */
 export function startGrow(s, report = null) {
-    const r = report || {};
+    // deep-tension: the body's prices read the machine's own stars, not the awake floor (deep.js
+    // AWAKE_SHARE), which ends with the question
+    let r = report || {};
+    if (s.income && (s.cryo ?? -1) >= 0) { const dry = JSON.parse(JSON.stringify(s)); dry.grow = {}; r = { ...r, stars: tickDay(dry, false).stars }; }
     const starsDay = Math.max(100, Number.isFinite(r.stars) ? r.stars : 0);
     const oreDay = Math.max(50, Number.isFinite(r.minerals) ? r.minerals : 0);
     const vats = Math.max(QUESTION_VATS, vatsLevel(s));
@@ -342,9 +348,21 @@ export function growOpts(s, layout = null) {
     return {
         levels: {},
         eat: Math.pow(APPETITE_STEP, lv.appetite) * size,
-        grow: VAT_SCALE * (1 + VATS_STEP * lv.vats) * muscleOf(s.grow),
+        grow: VAT_SCALE * (1 + VATS_STEP * lv.vats) * muscleOf(s.grow) * (layout ? vatsFed(s, layout) : 1),
         extra: CULTURE_UNITS * lv.vats,
     };
+}
+/**
+ * deep-tension: THE VATS EAT MASS. With mass in hand they are fed; with none, they grow only as much as
+ * the guts' mass covers of what they eat (a body of vats and no guts grows nobody).
+ */
+export function vatsFed(s, layout) {
+    const G = s.grow;
+    if (!G || (G.mass || 0) > 1e-6) return 1;
+    const graph = graphOf(layout);
+    const sums = bodySums(graph, bodyState(G));
+    const ask = vatMass(sums);
+    return ask > 0 ? Math.max(0, Math.min(1, gutRate(sums, muscleOf(G)) / ask)) : 1;
 }
 /** What the body eats and grows a year, in people. */
 export function hungerNow(s, layout) {
@@ -745,10 +763,15 @@ export function stepGrow(s, layout, secs = 1) {
         out.revived.push(...r.revived);
     }
     const R = bodyRatios(s, layout);
-    // the guts make mass
-    const made = R.massRate * secs;
-    G.mass += made;
+    // the guts make mass, the vats eat some of it (deep-tension); never below none
+    // deep-tension: a dreaming body digests: the guts make DREAM_MASS times as much (a dream wakes to a
+    // pile of mass to spend: the idle player's payoff)
+    const made = (G.mass > 0 ? R.massRate : Math.max(LID_MASS, R.massRate)) * secs * (G.dreaming ? DREAM_MASS : 1);
+    G.mass = Math.max(0, G.mass + made);
     out.mass = made;
+    // deep-tension: the surge fades when the heart is left alone
+    G.idle = (G.idle || 0) + secs;
+    if (G.idle >= SURGE_IDLE_S) G.streak = 0;
     // the edge beyond the hearts' reach starves, one at a time
     const far = beyondReach(graph, bodyState(G), R.sums, distances(graph, bodyState(G)));
     if (far.length) {
@@ -860,10 +883,15 @@ export function pump(s, layout, { beat = false } = {}) {
     const G = s.grow;
     const R = bodyRatios(s, layout);
     const k = beat ? PUMP_ON_BEAT : PUMP_OFF_BEAT;
-    const out = { k, to: [], fill: 0, take: null, done: null, revived: null, mass: 0 };
+    // deep-tension: THE DRUM. On the beat the streak grows (the surge), off it the streak breaks and the
+    // pump does nothing
+    G.streak = beat ? Math.min(SURGE_MAX, (G.streak || 0) + 1) : 0;
+    G.idle = 0;
+    const surge = surgeOf(G.streak);
+    const out = { k, surge, streak: G.streak, to: [], fill: 0, take: null, done: null, revived: null, mass: 0, miss: !beat };
     if (G.take) {
         const T = G.take;
-        out.fill = pumpFill({ beat, hearts: heartPump(R.sums), pace: R.speed });
+        out.fill = pumpFill({ beat, hearts: heartPump(R.sums), pace: R.speed, surge });
         out.to = [T.id];
         out.take = { id: T.id, organ: T.organ };
         out.done = fillTake(s, layout, out.fill);
@@ -873,12 +901,12 @@ export function pump(s, layout, { beat = false } = {}) {
         const graph = graphOf(layout);
         const d = distances(graph, bodyState(G));
         out.to = [G.necrotic.slice().sort((a, b) => (d.get(a) ?? 1e9) - (d.get(b) ?? 1e9))[0]];
-        G.revive = (G.revive || 0) + PUMP_REVIVE * k;
+        G.revive = (G.revive || 0) + PUMP_REVIVE * k * surge;
         if (G.revive >= 1) { G.revive = 0; out.revived = reviveOne(s, layout); }
         return out;
     }
     const guts = G.body.filter((id) => G.organs[id] === 'gut' && !G.necrotic.includes(id));
-    out.mass = R.massRate * PUMP_MASS_S * k;
+    out.mass = (gutRate(R.sums, muscleOf(G)) * PUMP_MASS_S * k + (beat ? PUMP_MASS_FLAT : 0)) * surge;
     G.mass += out.mass;
     out.to = guts.length ? guts : [HEART];
     return out;
@@ -1005,14 +1033,59 @@ export function adviseGrow(s, layout) {
     const R = bodyRatios(s, layout);
     // dead flesh that cannot come back blocks the front: the hearts' reach (or the people) first
     const fix = deadFix(s, layout);
-    if (fix && canGrow(s, layout, fix)) return growWord(fix);
+    if (fix) return canGrow(s, layout, fix) ? growWord(fix) : GROW_ADVICE.pump;
     const want = GAUGE_ORGAN[R.weakest];
-    // the weakest short: grow its organ, in a chamber in reach or by growing a living organ again
-    if (R.ratios[R.weakest] < 1 && canGrow(s, layout, want)) return growWord(want);
+    // deep-tension: the weakest short is THE answer: grow its organ, or pump the mass for it (the pump
+    // sends the blood to the guts). The tape never names a take the mass cannot pay.
+    if (R.ratios[R.weakest] < 1) return canGrow(s, layout, want) ? growWord(want) : GROW_ADVICE.pump;
     if (inReach(s, layout).some((id) => canAfford(s, layout, id))) return GROW_ADVICE.take;
     if (G.necrotic.length && feedOf(s) > 0) return GROW_ADVICE.pump;
     const wait = Number.isFinite(R.price) ? (R.price - G.mass) / Math.max(1e-9, R.massRate) : Infinity;
     return wait > DREAM_ADVISE_S ? GROW_ADVICE.dream : GROW_ADVICE.pump;
+}
+/** deep-tension: the organ the body is short of now (dead flesh's fix, else the red gauge's), or null. */
+export function wantOrgan(s, layout) {
+    if (!growOn(s) || risen(s)) return null;
+    const fix = deadFix(s, layout);
+    if (fix) return fix;
+    const R = bodyRatios(s, layout);
+    return R.ratios[R.weakest] < 1 ? GAUGE_ORGAN[R.weakest] : null;
+}
+/** deep-tension: the cheapest mass this organ can be had for now (a take in reach, or a living organ
+ *  grown again), or Infinity. */
+export function organPrice(s, layout, organ) {
+    let best = Infinity;
+    const ids = [...inReach(s, layout), ...spareOrgans(s, layout, organ)];
+    for (const id of ids) {
+        const o = takeOffer(s, layout, id, { dream: true });
+        const r = o && o.organs.find((x) => x.organ === organ);
+        if (r) best = Math.min(best, r.mass);
+    }
+    return best;
+}
+/**
+ * deep-tension: the small line under the tape in GROW: what the pump is for ("A HEART: ⧫ 7 TO GO"), or
+ * which gauge is short, so the tape is never a bare PUMP or WAIT.
+ */
+export function growNote(s, layout) {
+    if (!growOn(s) || risen(s) || s.grow.dreaming) return '';
+    const G = s.grow;
+    const word = adviseGrow(s, layout);
+    if (word !== GROW_ADVICE.pump) {
+        const organ = Object.keys(ORGAN_NAME).find((o) => word === growWord(o));
+        if (!organ) return '';
+        const c = Object.keys(GAUGE_ORGAN).find((k) => GAUGE_ORGAN[k] === organ);
+        const label = GROW_GAUGES.find((x) => x.c === c)?.label || '';
+        return `${label} is short.`;
+    }
+    if (G.take) return 'On the beat.';
+    const R = bodyRatios(s, layout);
+    const fix = deadFix(s, layout);
+    const want = fix || (R.ratios[R.weakest] < 1 ? GAUGE_ORGAN[R.weakest] : null);
+    const price = want ? organPrice(s, layout, want) : R.price;
+    const gap = Math.ceil(price - G.mass);
+    if (!Number.isFinite(gap) || gap <= 0) return '';
+    return want ? `A ${ORGAN_NAME[want]}: ${MASS_SIGN} ${short(gap)} to go.` : `${MASS_SIGN} ${short(gap)} to go.`;
 }
 /**
  * deep-organs: the organ that brings the dead back, or null: a VAT when there are no people to eat, a
@@ -1041,21 +1114,40 @@ export function regrowGlow(s, layout) {
     const G = s.grow;
     const graph = graphOf(layout);
     const d = distances(graph, bodyState(G));
-    return Object.keys(G.organs)
-        .filter((id) => G.organs[id] !== organ && !G.necrotic.includes(id) && takeOffer(s, layout, id)?.organs.some((r) => r.organ === organ && r.ok))
+    return spareOrgans(s, layout, organ)
+        .filter((id) => takeOffer(s, layout, id)?.organs.some((r) => r.organ === organ && r.ok))
         .sort((a, b) => (d.get(b) ?? 0) - (d.get(a) ?? 0))
         .slice(0, 6);
 }
-/** Can the body grow this organ now: a take in reach, or a living organ grown again into it? */
+/** Can the body grow this organ now: a take in reach, or a spare living organ grown again into it? */
 export function canGrow(s, layout, organ) {
     const G = s.grow;
     if (G.take) return false;
     for (const id of inReach(s, layout)) if (takeOffer(s, layout, id)?.organs.some((r) => r.organ === organ && r.ok)) return true;
-    for (const id of Object.keys(G.organs)) {
-        if (G.organs[id] === organ || G.necrotic.includes(id)) continue;
+    for (const id of spareOrgans(s, layout, organ)) {
         if (takeOffer(s, layout, id)?.organs.some((r) => r.organ === organ && r.ok)) return true;
     }
     return false;
+}
+/** deep-tension: a living organ is SPARE when its own gauge stands at REGROW_SPARE or more: growing it
+ *  into another does not make a new shortage (it made the tape swing between two organs for ever). */
+export const REGROW_SPARE = 1.5;
+export function spareOrgans(s, layout, organ = null) {
+    const G = s.grow;
+    const R = bodyRatios(s, layout);
+    const key = { gut: 'M', vat: 'F', heart: 'E', nerve: 'H' };
+    const ids = Object.keys(G.organs).filter((id) => G.organs[id] !== organ && !G.necrotic.includes(id) && (R.ratios[key[G.organs[id]]] ?? 0) >= REGROW_SPARE);
+    // and its gauge still green without it (one kind checked once: the farthest of that kind first)
+    const ok = {};
+    return ids.filter((id) => {
+        const o = G.organs[id];
+        if (ok[o] === undefined) {
+            const organs = { ...G.organs, [id]: organ || 'gone' };
+            const r = bodyRatios({ ...s, grow: { ...G, organs } }, layout).ratios[key[o]];
+            ok[o] = r >= 1.05;
+        }
+        return ok[o];
+    });
 }
 /** Ready to rise: the deepest floor full and the machine house body (growth.js). */
 export function riseReady(s, layout) {
@@ -1066,11 +1158,12 @@ export function riseReady(s, layout) {
 export function riseLamps(s, layout) {
     const r = riseReady(s, layout);
     const graph = graphOf(layout);
-    const floor = graph.nodes.filter((n) => n.floor === r.deepest);
-    const body = new Set(growOn(s) ? s.grow.body : []);
-    const have = floor.filter((n) => body.has(n.id)).length;
+    // deep-tension: the floors full, counted (it read "DEEPEST FLOOR 0 / 12" with floor 1 full)
+    const floors = [...new Set(graph.nodes.filter((n) => n.floor >= 0).map((n) => n.floor))];
+    const st = growOn(s) ? bodyState(s.grow) : { body: [], necrotic: [] };
+    const full = floors.filter((f) => floorFull(graph, st, f)).length;
     return [
-        { key: 'floor', label: `DEEPEST FLOOR ${have} / ${floor.length}`, lit: r.deepestFull, ordered: false },
+        { key: 'floor', label: `FLOORS ${full} / ${floors.length}`, lit: r.deepestFull, ordered: false },
         { key: 'machine', label: `MACHINE ${r.machine ? 1 : 0} / 1`, lit: r.machine, ordered: false },
     ];
 }
@@ -1101,7 +1194,7 @@ export function bodyDoes(s, id) {
     case 'vats': return 'The vats grow more people.';
     case 'spread': return 'A take fills by itself, twice as fast.';
     case 'appetite': return 'Each chamber eats less.';
-    case 'muscle': return 'Every organ gives twice as much.';
+    case 'muscle': return 'Guts and vats make half again.';
     default: return '';
     }
 }

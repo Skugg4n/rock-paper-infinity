@@ -49,7 +49,10 @@ import { buy as treeBuy, canBuy as treeCanBuy, priceOf as treePriceOf, LEVEL_NOD
 // decideGrow) buys the drawer's body items, takes reachable chambers it can afford without starving,
 // and pulls RISE when the deepest floor is full and the machine is body. The act ends at the rise.
 import { normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, setChamberPlace, dreamDaysAt, dreamWake, dreamEnd, pump, bodyRatios } from '../src/phase4/grow.js';
-import { decideGrow, pressGrow, TAKES_PER_SECOND, PUMP_EVERY_S, PUMP_ON_SHARE } from '../src/phase4/policy.js';
+import { decideGrow, pressGrow, TAKES_PER_SECOND, PUMP_EVERY_S, onBeatTurn } from '../src/phase4/policy.js';
+import { GAUGE_ORGAN } from '../src/phase4/organs.js';
+// deep-tension: --naive, the GROW player who always takes the cheapest (green) organ and never reads a gauge
+const STYLE = process.argv.includes('--naive') ? 'naive' : 'balanced';
 // deep-econ: after the hall the player follows the instruments' named goal (SAVE FOR ..., BUY ...)
 import { goalOf } from '../src/phase4/instruments.js';
 import { cryoRoad } from '../src/phase4/readout.js';
@@ -164,7 +167,7 @@ function buyFeed(asleep) {
    the moment it can be paid, and its price is kept back from everything else until then (`reserve`). */
 const priceOfNode = (id) => treePriceOf(s, id)?.stars ?? Infinity;
 let goalRoad = null, goalRoadKey = '', simAsleep = false;
-function simGoal() {
+function simGoal(extra = {}) {
   if (s.cryo < 0 || answered()) return null;
   // the road to the next tier, worked out once a purchase changes the colony (dry runs are dear)
   const key = `${s.cryo}|${JSON.stringify(s.level)}|${JSON.stringify(s.auto)}|${JSON.stringify(s.rooms)}|${(s.builds || []).length}|${Math.floor(s.day / 30)}`;
@@ -172,7 +175,7 @@ function simGoal() {
   // the tape reads Surface's schedule off the Watcher; the plain run keeps it off the state otherwise
   const had = s.watcher;
   s.watcher = had || w;
-  try { return goalOf(s, { road: nextCryo(s) ? goalRoad : null }); } finally { s.watcher = had; }
+  try { return goalOf(s, { road: nextCryo(s) ? goalRoad : null, ...extra }); } finally { s.watcher = had; }
 }
 let reserve = 0;
 function buyGoal() {
@@ -231,6 +234,7 @@ const events = [], log = [], buysPerWake = [], pressesPerTier = CRYO.map(() => 0
 const idle = { last: 0, move: 'TEND', TEND: [0, 0], SLEEP: [0, 0], GROW: [0, 0] };
 const movement = () => (answered() ? 'GROW' : s.cryo < 0 ? 'TEND' : 'SLEEP');
 // deep-organs: a stretch belongs to the movement it began in (the wait for the question is SLEEP's)
+let hallAt = null;
 function decided() {
   const k = real - idle.last, m = idle.move;
   if (k > idle[m][0]) idle[m] = [k, real];
@@ -335,7 +339,8 @@ function waitDays(report) {
 function wantsToWake() {
   // deep-econ: after the hall the player wakes when the tape says WAKE: the goal can be paid
   // (the store full is checked by the caller). Ore waits for the wake.
-  const g = simGoal();
+  // deep-tension: the tape says WAKE only for something new (a tier, a gift, a first level)
+  const g = simGoal({ onlyNew: true });
   if (g) return g.gap <= 0;
   const r = tickDay(JSON.parse(JSON.stringify(s)), false);
   if (waitDays(r) <= 0) return true;
@@ -396,6 +401,25 @@ const seenAt = {};
 // deep-organs: the organs chosen, the pumps, the cascades, the starving edge, the time each floor took
 const organsChosen = { vat: 0, gut: 0, heart: 0, nerve: 0, hands: 0 };
 const pumpLog = { n: 0, on: 0, fill: 0 };
+/* deep-tension: SHORTAGES in GROW. A gauge under 1 (red on the screen) for SHORT_MIN_S seconds or more is
+   a shortage; it is RECOVERED BY THE RIGHT ORGAN when that gauge's organ was chosen while it was short and
+   the gauge came back to 1. MASS is a shortage only from MASS_SHORT_S seconds (it dips after every take). */
+const SHORT_MIN_S = 3, MASS_SHORT_S = 6;
+const shortOpen = {};              // c -> { t0, chose }
+const shortages = [];              // { c, t0, dur, chose }
+function noteShortages() {
+  const R = bodyRatios(s, growLayout);
+  for (const c of ['M', 'F', 'E', 'H']) {
+    const red = R.ratios[c] < 1;
+    if (red && !shortOpen[c]) shortOpen[c] = { t0: real, chose: false };
+    else if (!red && shortOpen[c]) {
+      const e = shortOpen[c]; delete shortOpen[c];
+      const dur = real - e.t0;
+      if (dur >= (c === 'M' ? MASS_SHORT_S : SHORT_MIN_S)) shortages.push({ c, t0: e.t0, dur, chose: e.chose });
+    }
+  }
+}
+function choseOrgan(organ) { for (const c of Object.keys(shortOpen)) if (GAUGE_ORGAN[c] === organ) shortOpen[c].chose = true; }
 const cascadeAt = [];
 let pumpClock = 0, pumpTurn = 0, takeStartAt = null;
 const takeSecs = [];               // real seconds from a take's start to its end, by hand
@@ -440,6 +464,7 @@ function afterGrowSecond(r) {
   grown.lowFeed = Math.min(grown.lowFeed, s.humans);
   earnedAt.push([real, earned]);
   const R = bodyRatios(s, growLayout);
+  noteShortages();
   weakSecs[R.weakest]++;
   paceSum += R.pace; paceN++;
   if (s.grow.necrotic.length) starveSecs++;
@@ -456,7 +481,7 @@ function growSecond() {
   pumpClock += 1;
   while (pumpClock >= PUMP_EVERY_S && !risen(s)) {
     pumpClock -= PUMP_EVERY_S;
-    const beat = (pumpTurn++ % Math.round(1 / PUMP_ON_SHARE)) === 0;
+    const beat = onBeatTurn(pumpTurn++);
     const p = pump(s, growLayout, { beat });
     if (!p) break;
     pumpLog.n++; if (beat) pumpLog.on++; pumpLog.fill += p.fill;
@@ -466,12 +491,12 @@ function growSecond() {
   let takes = 0, boughtNow = false;
   for (let round = 0; round < TAKES_PER_SECOND + 4 && !s.grow.dreaming && !risen(s); round++) {
     let did = false;
-    for (const a of decideGrow(s, growLayout)) {
+    for (const a of decideGrow(s, growLayout, STYLE)) {
       if (a.kind === 'take' && takes >= TAKES_PER_SECOND) break;
       if (a.kind === 'body' && boughtNow) continue;
       if (!pressGrow(s, growLayout, a, r.stars, r.minerals)) continue;
       did = true;
-      if (a.kind === 'take') { takes++; takeStartAt = real; progressed(); decided(); }
+      if (a.kind === 'take') { takes++; takeStartAt = real; progressed(); decided(); choseOrgan(a.organ); }
       if (a.kind === 'body') { boughtNow = true; progressed(); grown.items.push(`${a.id} ${s.grow.lv[a.id]} ${fmt(real)}`); events.push({ real, day: s.day, e: `body ${a.id} ${s.grow.lv[a.id]}` }); }
       if (a.kind === 'rise') { progressed(); events.push({ real, day: s.day, e: 'RISE' }); }
       if (a.kind === 'dream') { dreams++; dreamInto = 0; real += DREAM_DOWN_SECONDS; events.push({ real, day: s.day, e: `dream toward ${s.grow.marks.join(', ')}` }); }
@@ -495,6 +520,7 @@ function dreamSecond() {
 }
 while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
   if (ringAt === null && canAscend(s)) ringAt = real;
+  if (hallAt === null && s.cryo >= 0) hallAt = real;
   if (answered()) { beginGrow(); growSecond(); continue; }
   completeBuilds(s);                    // nothing is instant: orders land on their day
   const r = tickDay(s, false);
@@ -687,7 +713,17 @@ if (growAt !== null) {
   console.log(`  organs ${Object.entries(organsChosen).map(([k, v]) => `${k} ${v}`).join(', ')}  pumps ${pumpLog.n} (on the beat ${pumpLog.on})  a take by hand ${q(0.5)} s (median; ${q(0.1)} to ${q(0.9)})  pace ${(paceSum / Math.max(1, paceN)).toFixed(2)} on average  weakest ${Object.entries(weakSecs).map(([k, v]) => `${k} ${Math.round(100 * v / Math.max(1, paceN))} %`).join(' ')}`);
   console.log(`  dreams ${dreams} (${fmt(dreamReal)} dreaming; woke ${Object.entries(dreamWoke).map(([k, v]) => `${k} ${v}`).join(', ') || 'never'})  longest stuck ${Math.round(longestStuck)} s (ending at ${fmt(stuckAt)})  cascades ${cascadeAt.map((c) => `${c.f + 1}:${fmt(c.real)}`).join(' ') || 'none'}  the drawer: ${['vats', 'appetite', 'spread', 'muscle'].map((id) => `${id} ${seenAt[id] === undefined ? 'never' : fmt(seenAt[id])}`).join('  ')}`);
   console.log(`  body items  ${grown.items.join('  ') || 'none'}`);
-} else console.log('GROW (deep-grow)  the question never answered');
+  const real3 = shortages.filter((x) => x.c !== 'M');
+  const rec = real3.filter((x) => x.chose);
+  const mass = shortages.filter((x) => x.c === 'M');
+  const per = (list) => ['F', 'E', 'H'].map((c) => `${c} ${list.filter((x) => x.c === c).length}`).join(' ');
+  console.log(`  shortages (${STYLE} player; FEED, PULSE or FLESH red ${SHORT_MIN_S} s or more)  ${real3.length} (${per(real3)}), recovered by choosing the right organ ${rec.length} (${per(rec)}), longest ${Math.round(Math.max(0, ...real3.map((x) => x.dur)))} s  |  MASS short ${MASS_SHORT_S} s or more ${mass.length} times (a gut chosen in ${mass.filter((x) => x.chose).length}, the rest pumped out), longest ${Math.round(Math.max(0, ...mass.map((x) => x.dur)))} s  |  still short at the end: ${Object.keys(shortOpen).join(' ') || 'none'}`);
+}
+{
+  const tEnd = real;
+  const hall = hallAt ?? tEnd, q = growAt ?? tEnd;
+  console.log(`movements (deep-tension)  TEND ${fmt(hall)}  SLEEP ${fmt(q - hall)}  GROW ${fmt(tEnd - q)}  act ${fmt(tEnd)}${risen(s) ? '' : ' (no rise)'}  [${STYLE}]`);
+}
 console.log(`longest without a decision (deep-econ, target 60 s)  TEND ${Math.round(idle.TEND[0])} s (ending ${fmt(idle.TEND[1])})  SLEEP ${Math.round(idle.SLEEP[0])} s (ending ${fmt(idle.SLEEP[1])})  GROW ${Math.round(idle.GROW[0])} s (ending ${fmt(idle.GROW[1])})`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);

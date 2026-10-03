@@ -31,7 +31,7 @@ import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
 import {
     growOn, risen, riseReady, hungry, bodyPrice, buyBody, viewOf, graphOf, rise, bodySeen, bodyPays, toggleMark, dreamStart,
-    taking, takeOffer, startTake, bodyRatios, adviseGrow,
+    taking, takeOffer, startTake, bodyRatios, adviseGrow, deadFix, spareOrgans,
 } from './grow.js';
 import { neededOrgan } from './organs.js';
 
@@ -146,14 +146,16 @@ export const TAKES_PER_SECOND = 1;
 /** Marks the player sets before a dream. */
 export const DREAM_MARKS = 6;
 /** A human pumps once every this many seconds, on the beat this share of the time. */
-export const PUMP_EVERY_S = 1.5;
-export const PUMP_ON_SHARE = 0.5;
+export const PUMP_EVERY_S = 1;
+export const PUMP_ON_SHARE = 0.8;
+/** deep-tension: which pumps of a drummer land on the beat: four in five, the fifth breaks the streak. */
+export const onBeatTurn = (n) => (n % 5) !== 4;
 /**
  * @param {object} state
  * @param {object} layout
  * @returns {{kind:'rise'|'body'|'take'|'mark'|'dream', id?:string, organ?:string, ids?:string[]}[]} in the order pressed
  */
-export function decideGrow(state, layout) {
+export function decideGrow(state, layout, style = 'balanced') {
     if (!growOn(state) || risen(state) || state.grow.dreaming) return [];
     if (riseReady(state, layout).ready) return [{ kind: 'rise' }];
     const out = [];
@@ -169,7 +171,7 @@ export function decideGrow(state, layout) {
         if (Number.isFinite(price) && purse[pay] >= price) { out.push({ kind: 'body', id }); purse[pay] -= price; break; }
     }
     if (taking(state)) return out;
-    const pick = pickTake(state, layout);
+    const pick = pickTake(state, layout, style);
     if (pick) { out.push({ kind: 'take', ...pick }); return out; }
     if (out.length) return out;
     // nothing to take: dream when the tape says so (the next take is far off), else wait and pump
@@ -179,33 +181,55 @@ export function decideGrow(state, layout) {
     }
     return out;
 }
-/** The take the gauges ask for: the weakest gauge's organ, where it is cheap; the machine first. */
-export function pickTake(state, layout) {
+/**
+ * deep-tension: THE TAKE, two players. `style`:
+ *   'balanced' (the sim's player, the default) reads the gauges like a human who has learnt them: while
+ *     every gauge is green it takes what is cheap here, unless the gauge that organ feeds is already
+ *     high (the price weighed by that gauge); a gauge in the red, or dead flesh, and it grows THAT organ
+ *     (in reach, or a living organ grown again), or pumps for the mass for it;
+ *   'naive' always takes the cheapest organ it can pay (the green one), and never reads a gauge.
+ * The machine house first, as soon as it can be paid.
+ */
+export function pickTake(state, layout, style = 'balanced') {
     const reach = viewOf(state, layout).reachable;
     if (reach.includes('machine')) {
         const o = takeOffer(state, layout, 'machine');
         if (o && o.organs[0].ok) return { id: 'machine', organ: 'hands' };
-        // saving for the hands: a cheap take in the meantime only while it leaves the price in hand
     }
-    const R = bodyRatios(state, layout);
-    const want = neededOrgan(R.ratios);
-    let best = null;
+    const opts = [];
     for (const id of reach) {
         if (id === 'machine') continue;
         const o = takeOffer(state, layout, id);
         if (!o) continue;
-        for (const r of o.organs) {
-            if (!r.ok) continue;
-            // the organ the gauges want, cheap where it can be; another organ only when it is cheap here
-            const score = (r.organ === want ? 0 : 2) + (r.cheap ? 0 : 1) + r.mass / 1e6;
-            if (r.organ !== want && !r.cheap) continue;
-            if (!best || score < best.score) best = { id, organ: r.organ, score };
+        for (const r of o.organs) if (r.ok) opts.push({ id, organ: r.organ, mass: r.mass, cheap: r.cheap });
+    }
+    let best = null;
+    if (style === 'naive') {
+        for (const x of opts) if (!best || x.mass < best.mass) best = x;
+    } else {
+        const R = bodyRatios(state, layout);
+        const want = deadFix(state, layout) || (R.ratios[R.weakest] < 1 ? neededOrgan(R.ratios) : null);
+        if (want) {
+            for (const x of opts) if (x.organ === want && (!best || x.mass < best.mass)) best = x;
+            if (!best) {
+                // grow a living organ again into it (the front may be blocked)
+                for (const id of spareOrgans(state, layout, want)) {
+                    const o = takeOffer(state, layout, id);
+                    const r = o && o.organs.find((y) => y.organ === want && y.ok);
+                    if (r && (!best || r.mass < best.mass)) best = { id, organ: want, mass: r.mass };
+                }
+            }
+            if (!best) return null;
+        } else {
+            const gauge = { gut: R.ratios.M, vat: R.ratios.F, heart: R.ratios.E, nerve: R.ratios.H };
+            const w = (o) => Math.max(0.6, Math.min(3, Number.isFinite(gauge[o]) ? gauge[o] : 3));
+            for (const x of opts) if (!best || x.mass * w(x.organ) < best.mass * w(best.organ)) best = x;
         }
     }
-    if (reach.includes('machine') && best) {
+    if (best && reach.includes('machine')) {
+        // saving for the hands: a take in the meantime only while it leaves half the price in hand
         const m = takeOffer(state, layout, 'machine').organs[0];
-        const after = state.grow.mass - (takeOffer(state, layout, best.id).organs.find((r) => r.organ === best.organ) || { mass: 0 }).mass;
-        if (after < m.mass * 0.5) return null;
+        if (state.grow.mass - best.mass < m.mass * 0.5) return null;
     }
     return best ? { id: best.id, organ: best.organ } : null;
 }

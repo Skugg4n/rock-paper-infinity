@@ -112,10 +112,12 @@ describe('the tape always names the next goal (B332)', () => {
         const goal = goalOf(s);
         expect(word).toBe(`SAVE FOR ${goal.name}`);
         expect(adviceNote(s, word)).toMatch(/^★ \S+( \w)? to go$/);
-        // the stars come in: the tape says WAKE, and why
+        // the stars come in: deep-tension: a next level of the same is no reason to wake: it waits, ready,
+        // for the wake; something new is (the tape says WAKE, and why)
         s.stars = goal.price;
-        expect(adviseAsleep(s)).toBe('WAKE');
-        expect(adviceNote(s, 'WAKE')).toMatch(/can be bought\.$/);
+        const fresh = goalOf(s, { onlyNew: true });
+        if (!fresh) expect(adviseAsleep(s)).toMatch(/^(A LEVEL|\d+ LEVELS) READY$/);
+        else { s.stars = Math.max(s.stars, fresh.price); expect(adviseAsleep(s)).toBe('WAKE'); expect(adviceNote(s, 'WAKE')).toMatch(/can be bought\.$/); }
     });
     test('an opened gift is the goal before the levels; The question before everything', () => {
         const s = olas();

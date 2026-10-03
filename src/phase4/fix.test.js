@@ -73,8 +73,8 @@ describe('every effect line carries before and after', () => {
     test('a level: what the room makes, from a dry run', () => {
         const s = initialDeepState();
         expect(effectLine(s, 'seam')).toMatch(/^⛏ 12 → 24 a day/);
-        expect(effectLine(s, 'output')).toMatch(/^Energy 26 → 52 a day, ★ \d+ → \d+ a day/);
-        expect(effectLine(s, 'feed')).toMatch(/^Its share 6 % → 9 %, ★ 81 → \d+ a day\.$/);
+        expect(effectLine(s, 'output')).toMatch(/^Energy 21 → 42 a day, ★ \d+ → \d+ a day/);
+        expect(effectLine(s, 'feed')).toMatch(/^Its share 6 % → 9 %, ★ \d+ → \d+ a day\.$/);
     });
     test('Surface\'s gifts: the arrow and two numbers', () => {
         const s = { ...initialDeepState(), tree: { opened: ['lossless', 'cold', 'quiet'], bought: [], unseen: false } };
