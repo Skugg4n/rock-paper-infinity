@@ -2116,3 +2116,84 @@ body.in-deep #version-info { z-index: 1400; }
 #phase-deep[data-view="strata"] .strata-dig .deep-lbl-in { width: 48px; height: 48px; }
 /* the last lines over the hands, not on them: the strata camera looks up at the body through the crust */
 #phase-deep[data-view="strata"] .deep-rise-lines { top: 11%; }
+
+/* ---- deep-grow2: THE PEOPLE, a third counter beside ore and stars; the FEED gauge carries the count ---- */
+#phase-deep .deep-sign.is-people { width: 0.95em; height: 0.95em; vertical-align: -0.12em; margin-right: 0.12em; }
+.deep-gauge-num {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--bone, #e8dcd0);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+}
+.deep-gauge-num[hidden] { display: none; }
+.deep-gauge.is-red .deep-gauge-num { color: #ff8f8f; }
+/* the take that would starve the body: its price red */
+#deep-take-tip.is-red { color: #ff9a9a; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(220, 60, 60, 0.75); }
+/* a graft's offer, before the body: the same tip, a little less red */
+#phase-deep:not(.is-grow) #deep-take-tip { background: linear-gradient(100deg, rgba(30, 20, 24, 0.96), rgba(14, 10, 12, 0.96)); }
+/* an empty drawer (the body's first moments: one verb, take a chamber) shows no drawer button */
+#phase-deep.is-grow.has-no-drawer #deep-tree-btn { visibility: hidden; }
+
+/* ---- the marks of a dream: a ring on the chamber, a faint red thread from the body ---- */
+#deep-marks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 13; overflow: visible; }
+#deep-marks .deep-mark-thread { fill: none; stroke: rgba(214, 58, 74, 0.55); stroke-width: 1.6; stroke-dasharray: 5 4; animation: deep-thread 1.6s linear infinite; }
+#deep-marks .deep-mark-ring { fill: rgba(168, 19, 44, 0.12); stroke: rgba(240, 96, 110, 0.85); stroke-width: 1.6; }
+@keyframes deep-thread { to { stroke-dashoffset: -18; } }
+#phase-deep.is-dreaming #deep-marks .deep-mark-thread { stroke: rgba(240, 96, 110, 0.8); }
+
+/* ---- the words that float over a plate: "×5", "×20" ---- */
+#deep-float { position: absolute; inset: 0; pointer-events: none; z-index: 14; overflow: hidden; }
+.deep-float {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 40px;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    color: #ffd2c8;
+    text-shadow: 0 0 10px rgba(214, 40, 60, 0.85), 0 2px 3px rgba(0, 0, 0, 0.9);
+    white-space: nowrap;
+    will-change: transform, opacity;
+}
+.deep-float.is-small { font-size: 18px; color: #e8b9b0; }
+.deep-float.is-beat { font-size: 26px; color: #ffefe8; }
+
+/* ---- THE HEART: awake in GROW the lid is a button; it pulses on the beat; a pump is a squeeze ---- */
+#deep-heart {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58px;
+    height: 58px;
+    margin: -29px 0 0 -29px;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 15;
+}
+#deep-heart[hidden] { display: none; }
+#deep-heart .deep-heart-ring {
+    position: absolute;
+    inset: 6px;
+    border-radius: 48% 52% 50% 46%;
+    border: 2px solid rgba(240, 96, 110, 0.55);
+    box-shadow: 0 0 14px 2px rgba(168, 19, 44, 0.35), inset 0 0 12px rgba(168, 19, 44, 0.35);
+    transform: scale(var(--beat, 1));
+    transition: border-color 200ms ease;
+}
+#deep-heart:hover .deep-heart-ring { border-color: rgba(255, 150, 160, 0.95); }
+#deep-heart.is-pumped .deep-heart-ring { animation: deep-squeeze 260ms ease-out; }
+#deep-heart.is-cool { cursor: default; }
+@keyframes deep-squeeze { 0% { transform: scale(0.82); } 100% { transform: scale(var(--beat, 1)); } }
+
+/* ---- THE BODY DREAMS: the panel dims, the counter of years in the middle reads THE BODY DREAMS ---- */
+#phase-deep.is-dreaming #deep-gauges, #phase-deep.is-dreaming .deep-advice-row { opacity: 0.45; transition: opacity 900ms ease; }
+#phase-deep.is-dreaming #deep-heart { display: none; }

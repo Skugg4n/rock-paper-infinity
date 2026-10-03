@@ -2814,3 +2814,93 @@ items:
       A playtest of the whole act in the strata view by Ola. Open questions from the swap: twelve chambers a floor keep a chamber about 55 px wide at 1440 (the fit; only the hands get a closer look); with the row the plain sim's GROW is 40 % of the act (the dormitories, which become vats, come late in a row). Decide whether to zoom closer with sideways scrolling, or retune GROW.
     status: open
     notes: "The zoom-and-pan machinery is in strata.js/strata-view.js (FOCUS_PPU, panLimit, panToShow, the side fade); it is only used for the hands' look now."
+
+  - id: B320
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      Ola on v1.76.0: "It costs people but it doesn't say how many you have." A people counter beside ore and stars from TEND on; the FEED gauge carries the count; every price in people beside it.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "index.html #deep-people-row, readout.js PEOPLE_SIGN, panel.js gauge num, grow.js takeTip."
+
+  - id: B321
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      A taste of flesh before the question: Surface's night-4 gift becomes GRAFT (one room turns to flesh, x5, eats a few people), night 5 a second.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "src/phase4/graft.js; Quiet hands folded into Lossless relay (deep.js upkeepFor)."
+
+  - id: B322
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      The question as an informed choice: three lines in its drawer row; never has to be bought.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "instruments.js DOES.question, drawer.js line breaks."
+
+  - id: B323
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      A feeding loop the player controls: two vats at once, cheap first takes, hunger by size, a starving take refused (red, GROW VATS), necrosis a slope, revive by itself, the multiplier over each take, the lamps as counts.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "grow.js TAKE_FIRST, sizeAppetite, canAfford, takeTip, REVIVE_DAYS, riseLamps; growth.js VAT_FLOOR_GROWTH, REVIVE_COVER 1."
+
+  - id: B324
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      One choice at a time: VATS, APPETITE, SPREAD, MUSCLE come into the drawer at their moments; the drawer opens empty.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "grow.js unlockBody, grow.seen; index.js has-no-drawer."
+
+  - id: B325
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      The body dreams: DREAM lever, marks with a red thread, the dream dives time and grows along the marks, wakes HUNGER / REACHED / AWAKE; awake GROW a day a second.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "grow.js dreamStart/dreamWake/markPick/dreamDaysAt; view-hooks.js markChamber/clearMarks/floatText; index.js startDream."
+
+  - id: B326
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      The heart is pumped: awake a click on the lid pumps; on the beat double, off it half; cooldown.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "grow.js pump/beatPhase/onBeat; sound.js beat() and the pump word; index.js #deep-heart."
+
+  - id: B327
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      Sim: the scripted player plays the new GROW to the rise; "longest stuck" at most 10 s; act 25 to 35 min.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "scripts/sim-phase4.mjs; policy.js decideGrow/nextMarks. GROW is about a fifth of the act, not a third: longer settings broke the 10 s rule. Ola to decide."
+
+  - id: B328
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      Checkpoints iv-graft (new), iv-grow, iv-body, iv-rise; acceptance P F Q E D H N in both views; grow2 shots.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "src/checkpoints.js, scripts/accept-iv-cut.mjs, docs/playtests/rebuild-shots/grow2-*.png."
+
+  - id: B329
+    added: 2026-10-03
+    source: "Ola on v1.76.0, deep-grow2"
+    request: |
+      Saves: schema 11 gives grafts to a save past night 4; a body mid-GROW loads into the second pass.
+    status: done
+    resolved_in: deep-grow2 (version at merge)
+    notes: "persistence.js migration 10, grow.js normalizeGrow; grow2.test.js."

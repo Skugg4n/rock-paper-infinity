@@ -208,11 +208,40 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-graft', label: 'IV · the graft', apply: () => {
+        clearAll();
+        // deep-grow2: THE TASTE. Surface has said its fourth line ("Your humans. What use are they?") and
+        // given a graft; the colony is awake, the panel says GRAFT A ROOM and every built room glows.
+        // A click on one turns it to flesh: "×5" floats over it and its needle moves.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        const day = 6000 * DAYS_PER_YEAR;
+        const slept = 5800;
+        Object.assign(deep, {
+            day, minerals: 3.0e8, food: 2.0e6, stars: 8.0e15, humans: 400,
+            chambers: 29, rooms: { mine: 8, farm: 6, generator: 6, dorm: 6, cryo: 1 },
+            level: { mine: 4, farm: 4, generator: 4, dorm: 3 },
+            auto: { mine: 2, farm: 2, generator: 2, dorm: 1 },
+            cryo: 3, asleep: false, vats: 2, feed: impliedFeed(3),
+            est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
+            watcher: {
+                ...initialWatcher(), stage: 1, stability: 80, capacity: 160, sleptYears: slept, seed: 5, sleeps: 42,
+                nextPuzzleYears: slept + puzzleGapYears(3), saidSpace: true,
+                bought: ['watchdog', 'scheduler', 'deepread', 'nightvision'],
+                surface: { ...initialSurface(), visits: 8, words: 4, lastSleep: 42, wins: 4, losses: 1, lastYou: 'rock', night: 4, toLine: 1 },
+            },
+            tree: { opened: ['lossless', 'cold'], bought: ['lossless', 'cold'], unseen: false },
+            graft: { owed: 1, slots: [] },
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
     { id: 'iv-grow', label: 'IV · the question answered', apply: () => {
         clearAll();
         // deep-grow: MOVEMENT III begins. Surface has said its six lines, the question is answered
         // (bought): on load the body begins on the lid and the panel overgrows over ten seconds. The
-        // arms of the first floor glow; a click on one takes it.
+        // arms of the first floor glow; a click on one takes it. deep-grow2: the two grafts of nights 4
+        // and 5 are lone organs in a mine and a farm; the drawer opens empty (one verb: take a chamber)
+        // and VATS comes into it when FEED first falls; the lever reads DREAM.
         const { deep, layout } = growColony();
         set(P4, serializeDeep(deep, layout));
         set(PHASE_KEY, 'DEEP');
@@ -221,7 +250,8 @@ export const CHECKPOINTS = [
         clearAll();
         // deep-grow: a third of the first floor is body (the four arms off the lid), the dormitory
         // among them a vat that grows people, and the people have run out: the generator's arm is
-        // dead flesh at the edge, FEED is red. Feeding it (people, or VATS in the drawer) revives it.
+        // dead flesh at the edge, FEED is red. deep-grow2: the panel says GROW VATS (VATS and APPETITE
+        // are in the drawer); with people to spare it revives by itself, the heart's pumps hurry it.
         const { deep, layout } = growColony({ body: ['h0', 's0', 's1', 's2', 's3'], necrotic: ['s3'], humans: 14 });
         // the culture vats are not yet grown on: only the one vat in the body feeds it
         deep.vats = 0;
@@ -239,7 +269,7 @@ export const CHECKPOINTS = [
     } },
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
-export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
+export const CHECKPOINT_CRYO = { 'iv-graft': CRYO[3], 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
 
 /**
  * deep-grow: a late colony at The question, laid out the way one built as it went is (every kind
@@ -266,7 +296,9 @@ function growColony({ body = null, necrotic = [], humans = 2400 } = {}) {
             saidSpace: true, bought: LADDER.filter((u) => u.rung < 2).map((u) => u.id),
             surface: { ...initialSurface(), visits: 30, words: 8, lastSleep: 69, wins: 10, losses: 9, lastYou: 'paper', night: 6, toLine: 0 },
         },
-        tree: { opened: ['lossless', 'cold', 'quiet', 'longcount', 'question'], bought: ['lossless', 'cold', 'quiet', 'question'], unseen: false },
+        tree: { opened: ['lossless', 'cold', 'longcount', 'question'], bought: ['lossless', 'cold', 'question'], unseen: false },
+        // deep-grow2: the grafts of nights 4 and 5, a mine and a farm
+        graft: { owed: 0, slots: ['s4', 's6'] },
     });
     const layout = { slots };
     if (body) {
@@ -276,6 +308,7 @@ function growColony({ body = null, necrotic = [], humans = 2400 } = {}) {
         deep.grow.body = body === 'all' ? all : body.slice();
         deep.grow.necrotic = necrotic.slice();
         deep.grow.taken = deep.grow.body.length - 1;
+        deep.grow.hand = deep.grow.taken;
         deep.grow.overgrown = true;
         deep.grow.hands = deep.grow.body.includes('machine');
         deep.organs = organsOf(deep, layout);

@@ -14,7 +14,7 @@
  */
 
 import { CRYO, DAYS_PER_YEAR, BAD_ALARMS, MIN_SLEEPERS, bodyTakes } from './deep.js';
-import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS, nightGift } from './surface.js';
+import { initialSurface, normalizeSurface, visitDue, openVisit, closeVisit, play as playRps, SENTENCE, VISIT_AFTER_SECONDS, nightGift, NIGHTS } from './surface.js';
 import { sectorOf, SECTORS } from './layout.js';
 
 export const STABILITY_MAX = 100;
@@ -870,6 +870,11 @@ export function openSurface(w, s = null, { force = false } = {}) {
     if (v.night === 1 && (w.stage | 0) === 0) w.stage = 1;
     const g = v.night ? nightGift(v.night) : null;
     if (g && s) openGift(s, g);
+    // deep-grow2: nights 4 and 5 give a graft to place (graft.js); the drawer button carries a mark
+    if (v.night && s && NIGHTS[v.night - 1]?.graft && !s.grow) {
+        const had = s.graft && typeof s.graft === 'object' ? s.graft : {};
+        s.graft = { slots: Array.isArray(had.slots) ? had.slots : [], owed: Math.max(0, Math.floor(Number(had.owed) || 0)) + 1 };
+    }
     return v;
 }
 /** Surface has opened a node of the tree: it is buyable from now on (tree.js), and the tree

@@ -924,6 +924,7 @@ export function createStrataView(container, opts = {}) {
     let hyN = 0, hyShown = 0;
     const hyBatches = [];             // { from, to, root } segments revealed with their root
     let body = new Set(), necrotic = new Set(), reachSet = [];
+    let lone = new Set();             // deep-grow2: the grafts, flesh joined to nothing
     let hoverId = '';
     const handsArms = { on: false, arms: [], anchors: [], hands: null, grow: -1, cracks: null };
     let rising = null;
@@ -1661,7 +1662,7 @@ export function createStrataView(container, opts = {}) {
             for (let i = 0; i + 1 < nodes.length; i++) {
                 const a = nodes[i], b = nodes[i + 1];
                 if (b.col - a.col !== 1) continue;
-                if (!(body.has(a.id) && body.has(b.id))) continue;
+                if (!(body.has(a.id) && body.has(b.id)) || lone.has(a.id) || lone.has(b.id)) continue;
                 const k = corridorKey(f, a.col, b.col);
                 if (corridorSegs.has(k)) continue;
                 const x0 = a.col === 0 ? S.SHAFT_W / 2 : a.x + S.CH_W / 2 - 0.05;
@@ -1703,7 +1704,7 @@ export function createStrataView(container, opts = {}) {
     /* roots: up from the body through every layer the years laid down */
     function rootAnchors() {
         const out = [];
-        const ids = [...body].filter((id) => !necrotic.has(id));
+        const ids = [...body].filter((id) => !necrotic.has(id) && !lone.has(id));
         ids.sort((a, b) => idPos(a, { x: 0, y: 0 }).y < idPos(b, { x: 0, y: 0 }).y ? 1 : -1);
         for (const id of ids) {
             const q = idPos(id, { x: 0, y: 0 });
@@ -1714,7 +1715,7 @@ export function createStrataView(container, opts = {}) {
     }
     function growRoots() {
         const anchors = rootAnchors();
-        const want = Math.min(MAX_ROOTS, Math.floor(body.size * 0.75));
+        const want = Math.min(MAX_ROOTS, Math.floor((body.size - lone.size) * 0.75));
         while (roots.length < want && anchors.length) {
             const i = roots.length;
             const r = mulberry32(7700 + i * 131);
@@ -1780,7 +1781,8 @@ export function createStrataView(container, opts = {}) {
         floorVats.length = floors;
         floorOrgans.length = floors;
     }
-    function setBody(bodyIds, necroticIds, reachableIds) {
+    function setBody(bodyIds, necroticIds, reachableIds, loneIds) {
+        lone = new Set(loneIds || []);
         const next = new Set(bodyIds || []);
         const dead2 = new Set(necroticIds || []);
         for (const id of next) {
@@ -2473,10 +2475,15 @@ export function extendHooks(base, view) {
         screenOfSlot: (slot) => view.screenOfSlot(slot),
         setBody: (...a) => view.setBody(...a),
         onChamberClick: (cb) => view.onChamberClick(cb),
+        // deep-grow2: the marks and the floating words live on the overlay over the view (view-hooks.js)
+        markChamber: (id, on, from) => base.markChamber(id, on, from),
+        clearMarks: () => base.clearMarks(),
+        floatText: (id, text, cls) => base.floatText(id, text, cls),
+        get marks() { return base.marks; },
         // deep-swap (B294): the rest of the body's contract. The view steps its own flesh in its own
         // step(); the hooks' step hands it the machine's throws, so the hands keep its rhythm
         onChamberHover: (cb) => view.onChamberHover(cb),
-        step: (dt, throws) => view.setThrows(throws),
+        step: (dt, throws) => { view.setThrows(throws); base.stepOverlay(); },
         setHands: (on, o) => view.setHands(on, o),
         rise: (cb) => view.rise(cb),
         get bodyStats() { return view.bodyStats; },

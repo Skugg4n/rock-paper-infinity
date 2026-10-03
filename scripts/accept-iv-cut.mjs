@@ -49,6 +49,19 @@
 //    3D view's perspective).
 // K. From "IV · the Watcher" (asleep, an old save without layers): the layers are rebuilt from the
 //    years slept and the sleeps (one per sleep); after a reload the same layers are laid again.
+// deep-grow2 (a taste of flesh, the question as a choice, the feeding loop, one choice at a time, the
+// people counter, the body dreams, the heart is pumped):
+// P. From "IV · the deep": the people counter stands top right beside ore and stars, with its glyph.
+// F. From "IV · the graft": the panel says GRAFT A ROOM; a built room's hover offers the graft; a click
+//    turns it to flesh and "×5" floats over it.
+// Q. The question's drawer row reads its three lines.
+// E. From "IV · the question answered": the drawer opens empty (no drawer button, one verb: take a
+//    chamber); taking chambers until FEED falls brings VATS into the drawer; the lamps read as counts.
+// N. From "IV · the body": a starving edge greys; fed, it revives by itself.
+// D. A chamber out of reach is marked (a red thread); the lever reads DREAM; pulled, the body dreams,
+//    grows to the mark and wakes on REACHED.
+// H. The heart: a click on the lid pumps.
+// --shots DIR also writes grow2-*.png of these moments in the strata view.
 // Exit code 0 when every check holds.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -130,8 +143,8 @@ try {
     ws.onmessage = (m) => {
         const msg = JSON.parse(m.data);
         if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
-        if (msg.method === 'Runtime.exceptionThrown') errors.push(msg.params.exceptionDetails?.exception?.description || msg.params.exceptionDetails?.text);
-        if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') errors.push(msg.params.args.map((a) => a.value ?? a.description).join(' '));
+        if (msg.method === "Runtime.exceptionThrown") { const d = msg.params.exceptionDetails; errors.push(`${d?.exception?.description || d?.text} @ ${d?.url || ""}:${d?.lineNumber}:${d?.columnNumber} ${(d?.stackTrace?.callFrames || []).slice(0, 4).map((f) => `${f.functionName}@${f.url.split("/").pop()}:${f.lineNumber}`).join(" < ")}`); }
+        if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') errors.push(msg.params.args.map((a) => a.value ?? a.description).join(' ') + (process.env.ACCEPT_STACK ? ` ${(msg.params.stackTrace?.callFrames || []).slice(0, 5).map((f) => `${f.functionName}@${f.url.split('/').pop()}:${f.lineNumber}`).join(' < ')}` : ''));
     };
     const send = (method, params = {}) => new Promise((r) => { const n = ++id; pending.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
     const evaluate = async (expr) => {
@@ -146,6 +159,13 @@ try {
         fs.mkdirSync(SHOTS, { recursive: true });
         const out = await send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(path.join(SHOTS, `${VIEW === 'strata' ? 'swap-' : ''}${name}.png`), Buffer.from(out.result.data, 'base64'));
+    };
+    // deep-grow2: the second pass's shots, in the strata view only
+    const shot2 = async (name) => {
+        if (!SHOTS || VIEW !== 'strata') return;
+        fs.mkdirSync(SHOTS, { recursive: true });
+        const out = await send('Page.captureScreenshot', { format: 'png' });
+        fs.writeFileSync(path.join(SHOTS, `grow2-${name}.png`), Buffer.from(out.result.data, 'base64'));
     };
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: 27 }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: 27 }); };
     await send('Runtime.enable');
@@ -191,6 +211,12 @@ try {
         item: (document.getElementById('deep-view-toggle') || {}).textContent || '' })`);
     check(vw.view === VIEW && vw.dom === VIEW && vw.item === `View · ${VIEW === '3d' ? '3D' : 'strata'}`,
         `V. ${VIEW === 'strata' ? 'with no view in the URL' : 'with ?view=3d'} the ${vw.view} view draws the colony; the menu reads "${vw.item}"`);
+
+    // ================= P. THE PEOPLE, beside ore and stars ==========================================
+    const pc = await evaluate(`(() => { const r = document.getElementById('deep-people-row'); const b = r && r.getBoundingClientRect();
+        const ore = document.getElementById('deep-ore-row').getBoundingClientRect();
+        return { shown: !!b && b.width > 0, count: document.getElementById('deep-people').textContent, glyph: !!r.querySelector('svg, i'), right: Math.abs(b.right - ore.right) < 4 }; })()`);
+    check(pc.shown && /^[\d.]+( k| M| B)?$/.test(pc.count) && pc.glyph && pc.right, `P. the people counter stands beside ore and stars: "${pc.count}" with its glyph`);
 
     // ================= T. TEND: the panel, the empty chamber and its ring, the drawer ================
     await shot('0-iv-start');
@@ -445,12 +471,45 @@ try {
         `night 6: the label reads ${m1.text} before the question, then ${m2.text} on the tape as "${m2.typed}" types`);
     await shot('9-night-six');
 
+    // ================= F. THE GRAFT, a taste of flesh before the question =========================
+    await jump('iv-graft', { asleep: false });
+    await sleepMs(4800);
+    const f0 = await evaluate(`({ advice: rpiDeep.instruments.advice, offer: rpiDeep.graftOffer, owed: rpiDeep.graft.owed })`);
+    check(f0.owed === 1 && f0.advice === 'GRAFT A ROOM' && f0.offer.length > 0, `F. a graft to place: the panel says ${f0.advice}, ${f0.offer.length} rooms glow`);
+    const gp = await evaluate(`(() => { for (const id of rpiDeep.graftOffer) { const p = rpiDeep.screenOfNode(id);
+        if (p && rpiDeep.chamberAt(p.x, p.y) === id && rpiDeep.layout.slots[Number(id.slice(1))] === 'mine') return { id, x: p.x, y: p.y }; } return null; })()`);
+    let graftOk = false, gtip = '', floatTxt = '';
+    if (gp) {
+        await mouse('mouseMoved', gp.x, gp.y);
+        await sleepMs(350);
+        gtip = await evaluate(`document.getElementById('deep-take-tip').textContent`);
+        await click(gp.x, gp.y);
+        await mouse('mouseMoved', 700, 300);
+        await sleepMs(500);
+        floatTxt = await evaluate(`[...document.querySelectorAll('#deep-float .deep-float')].map((e) => e.textContent).join(' ')`);
+        await sleepMs(1100);
+        await shot2('graft');
+        const g1 = await D('graft');
+        graftOk = g1.slots.includes(gp.id) && g1.owed === 0;
+    }
+    check(/^Five times the output\. Takes [\d.]+( k)? of your [\d.]+( k)?\.$/.test(gtip.replace(/\s+/g, ' ').trim()), `F. its hover offers the graft: "${gtip}"`);
+    check(graftOk && floatTxt.includes('×5'), `F. a click grafts ${gp && gp.id}: it is flesh and "${floatTxt}" floats over it`);
+    await sleepMs(2200);
+    const fl = await evaluate('rpiDeep.bodyStats');
+    check(fl.body >= 1, `F. the graft is drawn as flesh (${fl.body} organ)`);
+    // Q. the question in the drawer: three lines
+    await evaluate(`(() => { const t = rpiDeep.state.tree; if (!t.opened.includes('question')) t.opened.push('question'); rpiDeep.state.stars = 1e18; rpiDeep.openDrawer(); })()`);
+    await sleepMs(1200);
+    const qrow = await evaluate(`(() => { const r = document.querySelector('#deep-drawer .deep-dr-row[data-id="question"] .deep-dr-sub'); return r ? r.innerText : ''; })()`);
+    check(qrow.split('\n').map((x) => x.trim()).join('|') === 'The body takes the colony, room by room.|It eats people. It grows them in vats.|It is the only way up.', `Q. the question's row reads its three lines: "${qrow.replace(/\n/g, ' / ')}"`);
+    await shot2('question');
+
     // ================= G. GROW: the question answered, the panel overgrows, a chamber is taken =====
     await jump('iv-grow', { asleep: false });
-    await sleepMs(5600);
+    await sleepMs(3600);
     await shot('grow-1-overgrowing');
     const og0 = await D('overgrown');
-    await sleepMs(5200);
+    await sleepMs(7200);
     const og1 = await evaluate(`(() => ({ og: rpiDeep.overgrown, labels: rpiDeep.gaugeLabels,
         dom: [...document.querySelectorAll('#deep-gauges .flesh-tape')].filter((e) => getComputedStyle(e).opacity > 0.5).map((e) => e.textContent),
         advice: document.getElementById('deep-advice').textContent, drawerFlesh: document.getElementById('deep-drawer').classList.contains('is-flesh') }))()`);
@@ -469,15 +528,82 @@ try {
         await sleepMs(120);
         const h1 = await D('state.humans');
         await sleepMs(2300);
-        took = await evaluate(`({ body: rpiDeep.bodyView.body, humans: rpiDeep.state.humans, stats: rpiDeep.bodyStats })`);
+        took = await evaluate(`({ body: rpiDeep.bodyView.body, humans: rpiDeep.state.humans, stats: rpiDeep.bodyStats,
+            lone: rpiDeep.graft.slots.filter((id) => !rpiDeep.bodyView.body.includes(id)).length })`);
         took.h0 = h0;
         took.humans = h1;
     }
-    check(!!reach0 && /^Costs [\d.]+( k| M| B)? people and [\d.]+( k| M| B| T|e\d+)?\.$/.test(tip.replace(/\s+/g, ' ').trim()), `G. hovering a reachable chamber (${reach0 && reach0.id}) says its price: "${tip}"`);
-    check(!!took && took.body.includes(reach0.id) && took.humans < took.h0 && took.stats.body === took.body.length,
+    check(!!reach0 && /^Takes [\d.]+( k| M| B)? of your [\d.]+( k| M| B)? and [\d.]+( k| M| B| T|e\d+)?\.$/.test(tip.replace(/\s+/g, ' ').trim()), `G. hovering a reachable chamber (${reach0 && reach0.id}) says its price beside the people: "${tip}"`);
+    // deep-grow2: the view draws the lone grafts as flesh too
+    check(!!took && took.body.includes(reach0.id) && took.humans < took.h0 && took.stats.body === took.body.length + took.lone,
         `G. a click takes it: ${reach0 && reach0.id} is body (${took && took.body.join(',')}), its people walked in (${took && Math.round(took.h0)} to ${took && Math.round(took.humans)})`);
 
-    // ================= N. HUNGER: starved, an edge dies back; fed, it revives =====================
+    // ================= E. ONE CHOICE AT A TIME, the lamps as counts ===============================
+    await jump('iv-grow', { asleep: false });
+    await sleepMs(1500);
+    const e0 = await evaluate(`({ rows: rpiDeep.drawerRows.length, groups: (rpiDeep.grow && rpiDeep.grow.seen) || null,
+        btn: getComputedStyle(document.getElementById('deep-tree-btn')).visibility,
+        lamps: [...document.querySelectorAll('#deep-lamps .deep-cryo-lamp .dymo')].map((e) => e.textContent),
+        tape: document.getElementById('deep-lever-tape').textContent, lever: !document.getElementById('deep-lever-wrap').hidden,
+        people: rpiDeep.people, feedNum: (document.querySelector('#deep-gauges .deep-gauge[data-col="F"] .deep-gauge-num') || {}).textContent || '' })`);
+    check(e0.groups && !Object.values(e0.groups).some(Boolean) && e0.btn === 'hidden', `E. the body opens with one verb: the drawer is empty and its button gone (${e0.btn})`);
+    check(e0.lamps.length === 2 && /^DEEPEST FLOOR \d+ \/ \d+$/.test(e0.lamps[0]) && e0.lamps[1] === 'MACHINE 0 / 1', `E. the lamps read as counts: ${e0.lamps.join(', ')}`);
+    check(e0.lever && e0.tape === 'DREAM', `D. the lever is back, and reads ${e0.tape}`);
+    check(e0.people.shown && e0.feedNum.trim() === e0.people.count, `P. the FEED gauge carries the people: "${e0.feedNum.trim()}" (the counter "${e0.people.count}")`);
+    await sleepMs(9000);
+    await shot2('early');
+    await shot2('lamps');
+    let vatsIn = false, takes = 0;
+    for (let i = 0; i < 40 && !vatsIn; i++) {
+        const id = await evaluate(`rpiDeep.bodyView.reachable.find((x) => /^Takes .* and /.test(rpiDeep.takeWords(x))) || ''`);
+        if (id && (await evaluate(`rpiDeep.take(${JSON.stringify(id)})`))) takes++;
+        else await evaluate('debug_deep("people", 3000)');
+        await sleepMs(300);
+        vatsIn = await evaluate(`rpiDeep.grow.seen.vats`);
+    }
+    await evaluate('rpiDeep.openDrawer()');
+    await sleepMs(400);
+    const e1 = await evaluate(`({ rows: rpiDeep.drawerRows.map((r) => r.id), btn: getComputedStyle(document.getElementById('deep-tree-btn')).visibility, seen: rpiDeep.grow.seen })`);
+    check(vatsIn && e1.rows.length === 1 && e1.rows[0] === 'body:vats' && e1.btn === 'visible', `E. after ${takes} takes FEED falls and VATS comes into the drawer, alone (${e1.rows.join(', ')})`);
+    await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))');
+
+    // ================= H. THE HEART ==================================================================
+    await sleepMs(600);
+    const hp = await centre('#deep-heart');
+    const pumps0 = await D('growLog.pumps');
+    if (hp) { await click(hp.x, hp.y); await sleepMs(500); await click(hp.x, hp.y); }
+    const pumps1 = await D('growLog.pumps');
+    check(!!hp && pumps1 >= pumps0 + 2, `H. a click on the heart pumps (${pumps0} to ${pumps1})`);
+
+    // ================= D. THE BODY DREAMS ===========================================================
+    const far = await evaluate(`(() => { const v = rpiDeep.bodyView; const g = rpiDeep.graph;
+        const node = g.nodes.filter((n) => n.kind === 'room' && n.floor <= 1 && !v.body.includes(n.id) && !v.reachable.includes(n.id))
+            .sort((a, b) => a.floor - b.floor)
+            .map((n) => ({ id: n.id, p: rpiDeep.screenOfNode(n.id) })).find((x) => x.p && rpiDeep.chamberAt(x.p.x, x.p.y) === x.id);
+        return node ? { id: node.id, x: node.p.x, y: node.p.y } : null; })()`);
+    let markOk = false;
+    if (far) {
+        await mouse('mouseMoved', far.x, far.y);
+        await sleepMs(300);
+        const markTip = await evaluate(`document.getElementById('deep-take-tip').textContent`);
+        await click(far.x, far.y);
+        await sleepMs(400);
+        const m = await evaluate(`({ marks: rpiDeep.marks, thread: document.querySelectorAll('#deep-marks .deep-mark-thread').length })`);
+        markOk = m.marks.includes(far.id) && m.thread >= 1 && /^Mark it\./.test(markTip);
+    }
+    check(markOk, `D. a chamber out of reach (${far && far.id}) is marked with a red thread from the body`);
+    await evaluate('debug_deep("people", 1e7)');
+    const lvr = await centre('#deep-lever');
+    await click(lvr.x, lvr.y);
+    await sleepMs(2600);
+    const dr0 = await evaluate(`({ dreaming: rpiDeep.dreaming, tape: document.getElementById('deep-lever-tape').textContent, dive: !document.getElementById('deep-dive').hidden, word: document.getElementById('deep-dive-word').textContent })`);
+    check(dr0.dreaming && dr0.tape === 'WAKE' && dr0.dive && dr0.word === 'THE BODY DREAMS', `D. pulled, the body dreams: "${dr0.word}", the lever reads ${dr0.tape}`);
+    await shot2('dream');
+    let dr1 = null;
+    for (let i = 0; i < 480; i++) { await sleepMs(250); dr1 = await evaluate(`({ dreaming: rpiDeep.dreaming, alarm: rpiDeep.instruments.alarm, body: rpiDeep.bodyView.body })`); if (!dr1.dreaming) break; }
+    check(!!dr1 && !dr1.dreaming && dr1.alarm === 'REACHED' && far && dr1.body.includes(far.id), `D. it grew to the mark and woke: the lamp reads ${dr1 && dr1.alarm}`);
+
+    // ================= N. HUNGER: a starving edge greys; fed, it revives by itself =================
     await jump('iv-body', { asleep: false });
     await sleepMs(1200);
     await shot('grow-2-body');
@@ -494,19 +620,18 @@ try {
     const slack = VIEW === '3d' ? 1.6 : 1.3;
     check(!!adj && adj.rows.length > 0 && adj.rows.every((r) => r.d !== null && r.d <= adj.pitch * slack),
         `A. every glowing chamber lies beside the body on the screen (pitch ${adj && adj.pitch} px): ${adj ? adj.rows.map((r) => `${r.id} ${r.d} px`).join(', ') : 'nothing on screen'}`);
-    const n0 = await evaluate('rpiDeep.bodyView.necrotic.length');
-    // more mouths than its one vat feeds: two more chambers, then nobody left to eat
-    await evaluate(`(() => { const v = rpiDeep.bodyView; debug_deep('people', 1e7);
-        const fed = v.reachable.filter((id) => rpiDeep.layout.slots[Number(id.slice(1))] !== 'dorm').slice(0, 2);
-        for (const id of fed) rpiDeep.take(id); debug_deep('starve'); })()`);
-    let n1 = n0;
-    for (let i = 0; i < 30 && n1 <= n0; i++) { await sleepMs(250); await evaluate('debug_deep("starve")'); n1 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
-    check(n1 > n0, `N. starved, another edge dies back (${n0} to ${n1} necrotic)`);
+    const n1 = await evaluate('rpiDeep.bodyView.necrotic.length');
+    const nAdvice = await evaluate('rpiDeep.instruments.advice');
+    check(n1 > 0 && ['FEED', 'GROW VATS', 'DREAM'].includes(nAdvice), `N. an edge is starving (${n1} dead) and the panel names a thing to do: ${nAdvice}`);
+    const dead = await evaluate('rpiDeep.bodyView.necrotic[0]');
+    const dp = await evaluate(`rpiDeep.screenOfNode(${JSON.stringify(dead)})`);
+    if (dp) { await mouse('mouseMoved', dp.x, dp.y); await sleepMs(300); }
     await shot('grow-2b-starving');
+    await shot2('starving');
     await evaluate('debug_deep("people", 1e9)');
     let n2 = n1;
-    for (let i = 0; i < 40 && n2 >= n1; i++) { await sleepMs(250); n2 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
-    check(n2 < n1, `N. fed, it revives (${n1} to ${n2} necrotic)`);
+    for (let i = 0; i < 80 && n2 >= n1; i++) { await sleepMs(250); n2 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
+    check(n2 < n1, `N. fed, it revives by itself (${n1} to ${n2} dead)`);
 
     // ================= R. THE HANDS, AND THE RISE ================================================
     await jump('iv-rise', { asleep: false });

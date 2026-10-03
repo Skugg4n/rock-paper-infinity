@@ -3,7 +3,7 @@ import {
     normalizeGrow, growOn, risen, graphOf, takePrice, takeChamber, takeWords, bodyYear, stepGrow,
     organsOf, growGauges, adviseGrow, riseLamps, riseReady, bodyGroups, buyBody, bodyPrice, rise, viewOf,
     feedOf, hungerNow, fleshShare, MIGRATE_PER_STEP, GROW_DAYS_PER_SECOND, BODY_YEAR_DAYS, BODY_ITEMS, GROW_END,
-    RISE_LINES, SPREAD_SECONDS,
+    RISE_LINES, SPREAD_SECONDS, takeTip, TAKE_DAYS, dreamWake, dreamEnd,
 } from './grow.js';
 import { initialDeepState, tickDay, MIN_SLEEPERS } from './deep.js';
 import { initialWatcher, LADDER } from './watcher.js';
@@ -74,7 +74,7 @@ describe('the question opens the body', () => {
         s.tree.bought = [];
         const g = drawerGroups(s, {});
         expect(g[0].name).toBe('THE QUESTION');
-        expect(g[0].rows[0]).toMatchObject({ id: 'question', status: 'buy', does: 'The body begins.' });
+        expect(g[0].rows[0]).toMatchObject({ id: 'question', status: 'buy', does: 'The body takes the colony, room by room.\nIt eats people. It grows them in vats.\nIt is the only way up.' });
     });
 });
 
@@ -84,14 +84,14 @@ describe('the front', () => {
         normalizeGrow(s, layout, report(s));
         const p = takePrice(s, layout, 's0');
         expect(p.reachable && p.ok).toBe(true);
-        expect(takeWords(s, layout, 's0')).toMatch(/^Costs .+ people and .+\.$/);
+        expect(takeWords(s, layout, 's0')).toMatch(/^Takes ⚇ .+ of your ⚇ .+ and ⛏ .+\.$/);
         const h = s.humans, ore = s.minerals;
         expect(takeChamber(s, layout, 's0')).toMatchObject({ id: 's0', from: HEART });
         expect(s.humans).toBe(h - p.people);
         expect(s.minerals).toBe(ore - p.ore);
         expect(s.grow.body).toContain('s0');
         expect(takeChamber(s, layout, 's16')).toBe(null);           // the floor below: not yet
-        expect(takeWords(s, layout, 's16')).toBe('');
+        expect(takeWords(s, layout, 's16')).toBe('Mark it. The body grows here as it dreams.');
     });
     test('each chamber costs more than the one before it, and too few people say so', () => {
         const { s, layout } = colony();
@@ -101,7 +101,8 @@ describe('the front', () => {
         expect(takePrice(s, layout, 's1').people).toBeGreaterThan(a);
         s.humans = MIN_SLEEPERS + 1;
         expect(takeChamber(s, layout, 's1')).toBe(null);
-        expect(takeWords(s, layout, 's1')).toMatch(/^Needs .+ more people\.$/);
+        expect(takeTip(s, layout, 's1')).toMatchObject({ red: true });
+        expect(takeWords(s, layout, 's1')).toMatch(/^Takes ⚇ .+\. You have ⚇ .+\.$/);
     });
 });
 
@@ -145,6 +146,8 @@ describe('the organs', () => {
         normalizeGrow(s, layout, report(s));
         const r0 = report({ ...s, organs: organsOf(s, layout) });
         takeChamber(s, layout, 's0');                                // a mine
+        expect(organsOf(s, layout).mine).toBe(0);                    // still growing into an organ (TAKE_DAYS)
+        stepGrow(s, layout, TAKE_DAYS);
         const o = organsOf(s, layout);
         expect(o.mine).toBeCloseTo(BODY_OUTPUT - 1);
         expect(o.births).toBe(0);
@@ -172,14 +175,17 @@ describe('the instruments, overgrown', () => {
         expect(adviseGrow(s, layout)).toBe('SPREAD');
         s.grow.necrotic = ['s0'];
         s.grow.body.push('s0');
-        expect(['GROW VATS', 'FEED IT']).toContain(adviseGrow(s, layout));
-        expect(riseLamps(s, layout).map((l) => l.label)).toEqual(['DEEPEST FLOOR FULL', 'MACHINE REACHED']);
+        expect(['GROW VATS', 'FEED']).toContain(adviseGrow(s, layout));
+        expect(riseLamps(s, layout).map((l) => l.label)).toEqual(['DEEPEST FLOOR 0 / 9', 'MACHINE 0 / 1']);
     });
     test('the drawer\'s body: four items, priced, each level dearer than the last paid', () => {
         const { s, layout } = colony();
         normalizeGrow(s, layout, report(s));
+        expect(bodyGroups(s)).toEqual([]);                           // one choice at a time: the drawer opens empty
+        for (const x of BODY_ITEMS) s.grow.seen[x.id] = true;
         const rows = bodyGroups(s)[0].rows;
-        expect(rows.map((r) => r.name)).toEqual(['VATS', 'SPREAD', 'APPETITE', 'MUSCLE']);
+        expect(rows.map((r) => r.name)).toEqual(['VATS', 'APPETITE', 'SPREAD', 'MUSCLE']);
+        expect(rows[0].price).toMatch(/^⛏ /);                         // the vats are grown with ore
         s.stars = 1e30;
         const p = bodyPrice(s, 'muscle');
         expect(buyBody(s, 'muscle', report(s).stars)).toMatchObject({ id: 'muscle', level: 1, price: p });
@@ -199,12 +205,12 @@ describe('the rise', () => {
         expect(GROW_END).toEqual({ roman: 'V', title: 'UNITY' });
         expect(RISE_LINES).toEqual(['Humans are so small.', 'So fragile.']);
     });
-    test('the save keeps the body (schema 10)', () => {
+    test('the save keeps the body (schema 11)', () => {
         const { s, layout } = colony();
         normalizeGrow(s, layout, report(s));
         takeChamber(s, layout, 's0');
         const back = deserializeDeep(serializeDeep(s, layout));
-        expect(SCHEMA_VERSION).toBe(10);
+        expect(SCHEMA_VERSION).toBe(11);
         expect(back.state.grow.body).toEqual(s.grow.body);
         normalizeGrow(back.state, back.layout);
         expect(back.state.grow.body).toEqual(s.grow.body);
@@ -212,17 +218,21 @@ describe('the rise', () => {
 });
 
 describe('a player who does what the panel says', () => {
-    test('takes chambers, buys the body, and rises', () => {
+    test('takes chambers, buys the body, marks and dreams, and rises', () => {
         const { s, layout } = colony({ slots: 12, humans: 20000 });
         normalizeGrow(s, layout, report(s));
         let rose = false;
-        for (let sec = 0; sec < 1200 && !rose; sec++) {
-            for (let d = 0; d < GROW_DAYS_PER_SECOND; d++) {
+        for (let sec = 0; sec < 3000 && !rose; sec++) {
+            const days = s.grow.dreaming ? 120 : GROW_DAYS_PER_SECOND;
+            let r = null;
+            for (let d = 0; d < days; d++) {
                 s.organs = organsOf(s, layout);
-                const r = tickDay(s, false);
-                stepGrow(s, layout, 1);
-                if (d === 0) for (const a of decideGrow(s, layout)) { pressGrow(s, layout, a, r.stars); if (a.kind === 'rise') rose = true; }
+                r = tickDay(s, false);
+                const y = stepGrow(s, layout, 1);
+                if (dreamWake(s, layout, y)) { dreamEnd(s); break; }
             }
+            if (s.grow.dreaming && sec % 20 === 19) dreamEnd(s);
+            if (!s.grow.dreaming) for (const a of decideGrow(s, layout)) { pressGrow(s, layout, a, r.stars, r.minerals); if (a.kind === 'rise') rose = true; }
         }
         expect(rose).toBe(true);
         expect(feedOf(s)).toBeGreaterThanOrEqual(0);

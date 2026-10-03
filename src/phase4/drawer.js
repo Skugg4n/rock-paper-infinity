@@ -47,6 +47,7 @@ export function createDrawer(host, { onBuy, onWholeTree, onClose }) {
 
     function draw(groups) {
         const k = JSON.stringify(groups.map((g) => [g.name, g.rows.map((r) => [r.id, r.status, r.price, r.does, r.need, r.progress >= 0])]));
+        host.classList.toggle('is-empty', !groups.length);
         if (k !== key) {
             key = k;
             list.textContent = '';
@@ -62,7 +63,8 @@ export function createDrawer(host, { onBuy, onWholeTree, onClose }) {
                     el.dataset.id = r.id;
                     // deep-fix2: ore in a price or a need carries the pickaxe (readout.js signHtml)
                     const right = r.status === 'next' ? '' : `<span class="deep-dr-price deep-mono">${signHtml(r.price)}</span>`;
-                    const sub = signHtml(r.status === 'next' ? r.need : r.does);
+                    // deep-grow2: a line break in what a row does is a line of its own (the question's three)
+                    const sub = String(r.status === 'next' ? r.need : r.does).split('\n').map((x) => signHtml(x)).join('<br>');
                     el.innerHTML = `<span class="deep-dr-top"><span class="deep-dr-name deep-mono">${signHtml(r.name)}</span>${right}`
                         + '<svg class="deep-dr-ring" viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><circle class="track" cx="9" cy="9" r="7"></circle>'
                         + `<circle class="arc" cx="9" cy="9" r="7" stroke-dasharray="${RING.toFixed(1)}" stroke-dashoffset="${RING.toFixed(1)}"></circle></svg></span>`

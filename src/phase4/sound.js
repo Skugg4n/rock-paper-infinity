@@ -157,6 +157,7 @@ export function createDeepSound(audio, opts = {}) {
     const H = { e: S.energy, a: 0, bpm: bpmFor(S.energy), at: 0 };                  // what is heard, gliding toward S
     const T = { next: Infinity, step: 0, drip: Infinity, roll: Infinity, lamps: [], talk: [] };
     let G = null, ctx = null, built = false;
+    let lastBeat = null;            // deep-grow2: the last heartbeat scheduled { t, period } (audio seconds)
     let wanted = false, running = false, open = false, timer = null, disposeTimer = null;
     let endAt = Infinity, streak = 0, streakAt = -10, arm = 0, snapHold = 0;
     let pendingDescent = false, typing = null;
@@ -397,7 +398,10 @@ export function createDeepSound(audio, opts = {}) {
             else { const k = ramp(e, 0.7, 0.95) * mech; if (k > 0.05) clack(t, 0.3 * k, pf); }
         }
         // the heart beats on the machine's pounds, awake or asleep: it becomes the pulse
-        if (open && s16 % 8 === 0 && H.a > 0.03 && (!S.ending || S.ending === 'unity')) heart(t, H.a, beatLen);
+        if (open && s16 % 8 === 0 && H.a > 0.03 && (!S.ending || S.ending === 'unity')) {
+            heart(t, H.a, beatLen);
+            lastBeat = { t, period: 2 * beatLen };      // deep-grow2: the heart on screen beats with this one
+        }
     }
 
     // ---------------------------------------------------------------- drips, murmur, the night
@@ -793,6 +797,7 @@ export function createDeepSound(audio, opts = {}) {
         case 'seal': thunk(t, 1); break;
         case 'gift': rise(t); break;                 // Surface opens a node (was 'rise' before deep-grow)
         case 'take': take(t); break;
+        case 'pump': heart(t, Math.max(0.5, data && data.beat ? 1 : 0.6), 0.6, inp.blood, true); break;   // deep-grow2: a pump of the heart
         case 'necrosis': necrosis(t); break;
         case 'hands': handThrow(t); break;
         case 'knock': knock(t); break;
@@ -871,6 +876,15 @@ export function createDeepSound(audio, opts = {}) {
         start, stop, setState, event,
         state: () => ({ ...S }),
         heard: () => ({ ...H }),
+        /** deep-grow2: where the heard heartbeat is, { phase: 0 on the thump .. 1, period: s }, or null
+         *  when no heart is heard (the sound off, not started, or no beat for a while). */
+        beat() {
+            if (!ctx || !lastBeat || !running) return null;
+            const now = ctx.currentTime;
+            if (now - lastBeat.t > 2.5 * lastBeat.period) return null;
+            const x = (now - lastBeat.t) / lastBeat.period;
+            return { phase: ((x % 1) + 1) % 1, period: lastBeat.period };
+        },
         isOpen: () => open,
         isRunning: () => running,
     };

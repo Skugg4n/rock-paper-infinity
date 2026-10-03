@@ -414,6 +414,11 @@
         <!-- the model fills the window; nothing is framed -->
         <div id="deep-scene"></div>
         <div id="deep-labels"></div>
+        <!-- deep-grow2: over the view, whichever it is: the marks of a dream, the words that float over a
+             plate ("×5"), and the heart's hit area that pulses on the beat (view-hooks.js, index.js) -->
+        <svg id="deep-marks" aria-hidden="true"></svg>
+        <div id="deep-float" aria-hidden="true"></div>
+        <button id="deep-heart" type="button" aria-label="Pump the heart" hidden><span class="deep-heart-ring"></span></button>
         <div id="deep-fallback" class="deep-mono">this view needs WebGL</div>
 
         <!-- the goal: the chance of survival up there, as the colony believes it. Since v1.45.0
@@ -452,6 +457,14 @@
                     <span class="deep-mono deep-rate" id="deep-stars-rate"></span>
                 </span>
                 <span class="deep-star-sign" aria-label="stars">★</span>
+            </div>
+            <!-- deep-grow2: the people, from TEND on (Ola: "It costs people but it doesn't say how many you have") -->
+            <div class="deep-hold-row" id="deep-people-row">
+                <span class="deep-hold-num">
+                    <span class="deep-mono deep-amount" id="deep-people">0</span>
+                    <span class="deep-mono deep-rate" id="deep-people-rate"></span>
+                </span>
+                <i data-lucide="users" class="w-6 h-6"></i>
             </div>
         </div>
 
@@ -536,7 +549,7 @@
                 <circle class="arc" id="deep-dive-arc" cx="100" cy="100" r="96" stroke-dasharray="603.2" stroke-dashoffset="603.2"></circle>
             </svg>
             <div class="deep-dive-in">
-                <span class="deep-dive-word">THE COLONY HAS SLEPT</span>
+                <span class="deep-dive-word" id="deep-dive-word">THE COLONY HAS SLEPT</span>
                 <span class="deep-dive-years deep-mono" id="deep-dive-years">0</span>
                 <span class="deep-dive-word is-unit" id="deep-dive-unit">YEARS</span>
             </div>

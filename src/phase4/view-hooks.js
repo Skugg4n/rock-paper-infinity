@@ -26,6 +26,14 @@
  * and two the phase uses besides: onChamberHover(cb) (cb(chamberId or '', x, y), for the price
  * under the cursor) and step(dt, throws) once a frame (the flesh's own clock, the hands' throws).
  *
+ * deep-grow2. setBody takes a fourth argument, `lone`: ids among the body that are LONE organs (the
+ * grafts, graft.js): flesh like the rest, but joined to nothing (no sinew, no roots). Three calls on
+ * an overlay over whatever view is below (screen positions through the view's screenOfNode):
+ *   markChamber(id, on, fromId)    a mark on a chamber the body should dream toward, with a faint red
+ *                                  thread from the body node `fromId` to it
+ *   clearMarks()
+ *   floatText(id, text, cls)       a word that floats up over a chamber and fades ("×5", "×20")
+ *
  * The room ring itself is drawn here, in the DOM, over whatever view is below it. The 3D
  * implementation calls into scene.js, flesh.js and hands.js.
  *
@@ -61,10 +69,11 @@ export const RING_R = 58;
  * @param {()=>void} [opts.onIcons] - draw the ring's glyphs
  * @returns {object}
  */
-export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () => null }) {
+export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () => null, marksHost = null, floatHost = null }) {
     let ring = null;            // { slot, pick }
     const shown = { lamp: false, figure: false, breathe: false };
     const body = createBody(scene, graph);
+    const over = createOverlay(scene, { marksHost, floatHost });
 
     function closeRoomRing() {
         if (!ring) return;
@@ -144,12 +153,18 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
         /** What shows now. */
         get showing() { return { ...shown }; },
         /* ---- deep-grow: the body ---- */
-        setBody: (ids, necrotic, reachable) => body.setBody(ids, necrotic, reachable),
+        setBody: (ids, necrotic, reachable, lone) => body.setBody(ids, necrotic, reachable, lone),
         onChamberClick: (cb) => body.onClick(cb),
         onChamberHover: (cb) => body.onHover(cb),
         setHands: (on, o) => body.setHands(on, o),
         rise: (onDone) => body.rise(onDone),
-        step: (dt, throws) => body.step(dt, throws),
+        step: (dt, throws) => { body.step(dt, throws); over.step(); },
+        /* ---- deep-grow2: the marks of a dream, and the words that float over a plate ---- */
+        markChamber: (id, on, from) => over.markChamber(id, on, from),
+        clearMarks: () => over.clearMarks(),
+        floatText: (id, text, cls) => over.floatText(id, text, cls),
+        stepOverlay: () => over.step(),
+        get marks() { return over.marks; },
         get bodyStats() { return body.stats; },
         /**
          * The snap: a short flicker, and every false thing goes.
@@ -172,6 +187,89 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
 }
 
 /* =============================================================================================
+   deep-grow2: THE OVERLAY over either view. Marks (a ring on the chamber, a faint red thread from
+   the body to it) and the words that float up over a plate. Screen positions come from the view's
+   own screenOfNode, a frame at a time, so they follow the camera in both views.
+   ============================================================================================= */
+const SVGNS = 'http://www.w3.org/2000/svg';
+/** A floating word rises this far (px) and is gone after this long (ms). */
+export const FLOAT_PX = 40, FLOAT_MS = 2600;
+function createOverlay(scene, { marksHost, floatHost }) {
+    const marks = new Map();        // id -> { from, path, ring }
+    const floats = [];              // { id, el, t0 }
+    const at = (id) => (scene && typeof scene.screenOfNode === 'function' ? scene.screenOfNode(id) : null);
+    const origin = () => {
+        const r = marksHost ? marksHost.getBoundingClientRect() : { left: 0, top: 0 };
+        return { x: r.left, y: r.top };
+    };
+    function drawMark(m, id) {
+        const p = at(id), q = at(m.from);
+        const o = origin();
+        const on = !!p;
+        m.ring.setAttribute('visibility', on ? 'visible' : 'hidden');
+        m.path.setAttribute('visibility', on && q ? 'visible' : 'hidden');
+        if (!p) return;
+        m.ring.setAttribute('cx', (p.x - o.x).toFixed(1));
+        m.ring.setAttribute('cy', (p.y - o.y).toFixed(1));
+        if (!q) return;
+        // a thread that sags a little, never a ruler line
+        const x0 = q.x - o.x, y0 = q.y - o.y, x1 = p.x - o.x, y1 = p.y - o.y;
+        const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + Math.min(40, Math.hypot(x1 - x0, y1 - y0) * 0.18);
+        m.path.setAttribute('d', `M ${x0.toFixed(1)} ${y0.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}`);
+    }
+    return {
+        markChamber(id, on, from = 'h0') {
+            if (!marksHost) return false;
+            const had = marks.get(id);
+            if (!on) {
+                if (had) { had.path.remove(); had.ring.remove(); marks.delete(id); }
+                return false;
+            }
+            if (had) { had.from = from || 'h0'; drawMark(had, id); return true; }
+            const path = document.createElementNS(SVGNS, 'path');
+            path.setAttribute('class', 'deep-mark-thread');
+            const ring = document.createElementNS(SVGNS, 'circle');
+            ring.setAttribute('class', 'deep-mark-ring');
+            ring.setAttribute('r', '11');
+            marksHost.appendChild(path);
+            marksHost.appendChild(ring);
+            const m = { from: from || 'h0', path, ring };
+            marks.set(id, m);
+            drawMark(m, id);
+            return true;
+        },
+        clearMarks() { for (const id of [...marks.keys()]) this.markChamber(id, false); },
+        floatText(id, text, cls = '') {
+            if (!floatHost || !text) return false;
+            const p = at(id);
+            if (!p) return false;
+            const el = document.createElement('span');
+            el.className = `deep-float ${cls}`.trim();
+            el.textContent = text;
+            floatHost.appendChild(el);
+            floats.push({ id, el, t0: performance.now() });
+            this.step();
+            return true;
+        },
+        step() {
+            for (const [id, m] of marks) drawMark(m, id);
+            const now = performance.now();
+            const o = floatHost ? floatHost.getBoundingClientRect() : { left: 0, top: 0 };
+            for (let i = floats.length - 1; i >= 0; i--) {
+                const f = floats[i];
+                const k = (now - f.t0) / FLOAT_MS;
+                const p = at(f.id);
+                if (k >= 1 || !p) { f.el.remove(); floats.splice(i, 1); continue; }
+                f.el.style.transform = `translate(${(p.x - o.left).toFixed(1)}px, ${(p.y - o.top - FLOAT_PX * k).toFixed(1)}px) translate(-50%, -100%)`;
+                f.el.style.opacity = String(k < 0.15 ? k / 0.15 : 1 - Math.max(0, (k - 0.6) / 0.4));
+            }
+        },
+        get marks() { return [...marks.keys()]; },
+        get floats() { return floats.map((f) => f.el.textContent); },
+    };
+}
+
+/* =============================================================================================
    deep-grow: THE BODY IN THE 3D VIEW. flesh.js on scene.js's plates, bridges, shaft and the machine
    house; hands.js on the machine's arm heads. See docs/mockups/deep-flesh-proto.html.
    ============================================================================================= */
@@ -180,7 +278,7 @@ function createBody(scene, graphOf) {
         build: -1, body: new Set(), necrotic: new Set(), reach: new Set(), hover: '',
         meshes: new Set(), tendrils: new Map(), spine: false, vertebrae: new Set(), env: null,
         hands: null, handsOn: false, clickCb: null, hoverCb: null, rising: null, later: [], clock: 0,
-        bone: null, listening: false,
+        bone: null, listening: false, lone: new Set(),
     };
     const later = (sec, fn) => fl.later.push({ at: fl.clock + sec, fn });
     const parts = () => scene.fleshParts();
@@ -220,7 +318,8 @@ function createBody(scene, graphOf) {
     }
     /** The body neighbour a chamber grew from: over a bridge first, then up the spine. */
     function grewFrom(id) {
-        const ns = neighbours(id).filter((x) => fl.body.has(x.to));
+        if (fl.lone.has(id)) return null;
+        const ns = neighbours(id).filter((x) => fl.body.has(x.to) && !fl.lone.has(x.to));
         return (ns.find((x) => x.kind === 'bridge') || ns[0] || {}).to || null;
     }
     function turn(mesh, opts) {
@@ -283,8 +382,9 @@ function createBody(scene, graphOf) {
         }
         turn(plate, { from: from ? edgePoint(P, id, from) : top, duration: dur, swallow: P.cuts.get(id) || [], bulge: 0.06, seed });
         // every bridge to the body turns, the one it grew over first, with sinew across it
+        if (fl.lone.has(id)) return;           // deep-grow2: a graft is joined to nothing
         for (const { to, kind } of neighbours(id)) {
-            if (kind !== 'bridge' || !fl.body.has(to)) continue;
+            if (kind !== 'bridge' || !fl.body.has(to) || fl.lone.has(to)) continue;
             const b = P.bridges.get(edgeKey(id, to));
             if (!b) continue;
             const first = to === from;
@@ -344,8 +444,9 @@ function createBody(scene, graphOf) {
         el.addEventListener('pointerleave', () => { fl.hover = ''; fl.hoverCb?.('', 0, 0); if (fl.reach.size) hint(parts()); });
     }
     return {
-        setBody(ids, necrotic, reachable) {
+        setBody(ids, necrotic, reachable, lone) {
             if (!scene) return;
+            fl.lone = new Set(lone || []);
             const P = parts();
             env(P);
             listen(P);

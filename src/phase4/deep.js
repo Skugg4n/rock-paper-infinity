@@ -90,6 +90,8 @@ export const HUNGER_PER_DAY = 0.002;        // people lost per day with an empty
  *  refill a fed colony, so the cost is food and the count on the wake-up strip. */
 export const CRYO_DEATH_PER_YEAR = 0.003;
 export const CRYO_DEATH_DORM = 0.75;
+/** deep-grow2: the share of the people lost a day: the ice asleep, and what the lone grafts eat. */
+export const deathRate = (s, asleep) => (asleep ? cryoDeathRate(s) : 0) + Math.max(0, (s.organs && Number.isFinite(s.organs.eat)) ? s.organs.eat : 0);
 export const cryoDeathRate = (s) => CRYO_DEATH_PER_YEAR * Math.pow(CRYO_DEATH_DORM, (s.level && s.level.dorm) || 0) / 365;
 
 /** Costs. Minerals dig and build; stars buy levels, automation and cryo. */
@@ -151,9 +153,11 @@ export function outputMultiplier(s, t, level = s.level[t] || 0, auto = s.auto[t]
     return roomMultiplier(level, auto) * (auto > 0 && gift(s, 'lossless') ? LOSSLESS : 1);
 }
 /** What a room of type `t` costs to run, times its base upkeep: Quiet hands keeps an automated
- *  room's at its level-0 draw. */
+ *  room's at its level-0 draw. deep-grow2: night 4 gives a graft now, and Quiet hands' effect is
+ *  folded into Lossless relay (night 2), so a colony that bought the relay has it; an old save that
+ *  bought Quiet hands keeps it. */
 export function upkeepFor(s, t, level = s.level[t] || 0, auto = s.auto[t] || 0) {
-    return upkeepMultiplier(auto > 0 && gift(s, 'quiet') ? 0 : level, auto);
+    return upkeepMultiplier(auto > 0 && (gift(s, 'quiet') || gift(s, 'lossless')) ? 0 : level, auto);
 }
 /** The share of a ration a sleeper eats: none with Cold storage. */
 export const sleepFood = (s) => (gift(s, 'cold') ? 0 : SLEEP_FOOD);
@@ -962,7 +966,8 @@ export function tickDay(s, asleep = false) {
     // deep-fix: the beds the body took with its people stay the body's (bodyTakes below)
     const capacity = beds * bodyKeep(s);
     // the ice takes its share first, and the creches then fill the beds it emptied
-    const died = asleep ? s.humans * cryoDeathRate(s) : 0;
+    // deep-grow2: a lone graft eats a few people a year, awake or asleep (grow.js organsOf `eat`)
+    const died = s.humans * deathRate(s, asleep);
     s.humans -= died;
     const demand = s.humans * FOOD_PER_HUMAN;        // what the colony eats, or will eat when it wakes
     const eat = asleep ? demand * sleepFood(s) : demand;
@@ -1176,7 +1181,7 @@ export function sleep(s, days, opts = {}) {
         }
         // deep-fix2: without culture vats nobody is born asleep and the ice thins the sleepers a share
         // a day: that is a steady sleep too, the people falling by the same share each day
-        const keep = 1 - cryoDeathRate(s);
+        const keep = 1 - deathRate(s, true);
         const thinning = !(r.born > 0) && s.humans < h0 && Math.abs(s.humans - h0 * keep) <= 1e-9 * Math.max(1, h0);
         const steady = (Math.abs(s.humans - h0) <= 1e-9 * Math.max(1, h0) || thinning) && s.food >= food0
             && !r.starving && r.fuel === r.fuelWanted && r.parts.M >= 0 && !(s.builds || []).some((j) => !isQueued(j));
