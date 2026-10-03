@@ -2590,3 +2590,93 @@ items:
     status: done
     resolved_in: deep-fix2 (version at merge)
     notes: "deep.js VAT_GROWTH/VATS_COST/FEW_AT, the thinning fast-forward in sleep(); tree.js node 'vats'; the panel says BUILD CULTURE VATS. Sims: plain 26m01s to 26m58s, --watcher 21m08s to 23m02s. In GROW these are the vats the body takes over."
+
+  - id: B300
+    added: 2026-10-03
+    source: "Ola: 'When does Body begin?' (year 202 million, after Surface's sixth night); docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md III · GROW"
+    request: |
+      The question opens the body. Buying The question begins movement III (it is now the drawer's first row once Surface has opened it, and the panel says INSTRUMENTS: THE QUESTION when it can be paid; it was only in the whole tree). The old biological steps (brain tissue, nervous system, spinal fluid, skin receptors, the sector choice) are retired from play; a save that owns some of them is given a body of three chambers a step it owned, so nothing is lost.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "src/phase4/grow.js startGrow/normalizeGrow/bioOwned; tree.js retires 'bio' (canBuy, nodeVisible, nextWatcherNode); instruments.js drawerGroups and advise; save schema 10."
+
+  - id: B301
+    added: 2026-10-03
+    source: "spec III · GROW"
+    request: |
+      The panel overgrows over ten seconds: a vein crosses each gauge's glass, the dymo tapes peel and the organ names come in a warmer hand (MASS, FEED, PULSE, FLESH), the needles sink into fluid levels; the advice keeps its dymo and speaks the body's verbs (SPREAD, FEED IT, GROW VATS, RISE); the lamp row becomes the rise's two conditions (DEEPEST FLOOR FULL, MACHINE REACHED).
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "panel.js overgrow (OVERGROW_MS, OG_STAGES), veins and fluid in the gauge SVG; grow.js growGauges, adviseGrow, riseLamps; style-deep.css deep-grow section."
+
+  - id: B302
+    added: 2026-10-03
+    source: "spec III · GROW"
+    request: |
+      The drawer becomes tissue (same behaviour) with the body's four items: VATS (continues the culture vats), SPREAD (the flesh takes a chamber by itself), APPETITE (a chamber eats less), MUSCLE (the flesh makes twice as much). Each level priced off the machine's stars as they come in when it becomes the next, the first off the stars in hand at the question.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "grow.js BODY_ITEMS, bodyGroups, buyBody, setPrice; drawer.js setFlesh."
+
+  - id: B303
+    added: 2026-10-03
+    source: "spec III · GROW"
+    request: |
+      The front: reachable chambers glow; hovered they say their price in plain words ("Costs 1.6 k people and ⛏ 597 M."); a click takes one: its people walk in and do not come out, the slab turns to flesh from the edge that touches the body over two seconds, sinew across the bridge. Only into neighbours on the same floor; a full floor turns the shaft into a spine (vertebrae) and opens the floor below; floor 1 full opens the machine house. The camera follows the front down a floor at a time.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "growth.js (the rules); grow.js takePrice/takeChamber/takeWords; view-hooks.js setBody/onChamberClick; scene.js fleshParts, setFleshCells (closeCell), chamberAt, focusFloor."
+
+  - id: B304
+    added: 2026-10-03
+    source: "spec III · GROW"
+    request: |
+      Hunger and vats: the body eats people every one of its years (three real seconds); short, the outermost organ goes necrotic one a year until fed; a dormitory taken becomes a vat that grows people; from the question on the creches stop (only vats grow people). Living organs make twenty times what the room did and more a floor down.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "grow.js bodyYear/stepGrow/organsOf (state.organs, read by deep.js tickDay); growth.js hunger takes eat/grow/extra factors."
+
+  - id: B305
+    added: 2026-10-03
+    source: "spec III · GROW"
+    request: |
+      The machine becomes hands: when the body reaches the machine house the tubes are overgrown into a fist, a flat hand and two fingers that throw on the machine's own game clock; stars stay the machine's wins (three times the games with hands). The camera goes to look.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "view-hooks.js setHands; hands.js on machine-model.js armHeads and gc; scene.js focusMachine; grow.js HANDS_GAMES."
+
+  - id: B306
+    added: 2026-10-03
+    source: "spec III · GROW"
+    request: |
+      The rise: when the deepest floor is full and the machine is body, the lever returns overgrown, RISE. Pulling it, sinew climbs out of the lid past the machine and breaks the crust; "Humans are so small." then "So fragile." type on the Watcher's tape; then V · UNITY (to come). The end is saved: a reload shows the wall.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "grow.js rise, GROW_END, RISE_LINES; view-hooks.js rise; index.js riseUp/typeLines."
+
+  - id: B307
+    added: 2026-10-03
+    source: "spec III · GROW, Sound"
+    request: |
+      Sound in the body: the blood rush and the heartbeat follow the body's share (FLESH) instead of the old steps; a wet knock for a take, a dull drop for necrosis, a slap and a closing fist for the first throw by hand, and the rise: a low surge up the shaft into the low D in unison (Unity). Surface opening a node is the word 'gift' now.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "sound.js fromSnapshot flesh, take/necrosis/handThrow/surge; prefs, pause and hidden respected as every word."
+
+  - id: B308
+    added: 2026-10-03
+    source: "spec III · GROW, sims"
+    request: |
+      The sims play GROW to the rise (policy.js decideGrow: the machine first, then a dormitory, then the cheapest chamber it can afford without starving; the body's items as the drawer lights them). Plain run 30m02s (GROW 10m51s, 36 %), --watcher 26m29s (GROW 6m09s, 23 %).
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "scripts/sim-phase4.mjs growSecond (GROW_DAYS_PER_SECOND days a real second), mixedLayout; GROW_DEBUG=1."
+
+  - id: B309
+    added: 2026-10-03
+    source: "deep-grow, for the strata view"
+    request: |
+      The view contract for the body, so the strata view can replace the 3D one: setBody(bodyIds, necroticIds, reachableIds), onChamberClick(cb), setHands(on), rise(onDone), plus onChamberHover(cb) and step(dt, throws). Checkpoints iv-grow, iv-body (now the new body), iv-rise; acceptance G, N, R.
+    status: done
+    resolved_in: deep-grow (version at merge)
+    notes: "src/phase4/view-hooks.js; src/checkpoints.js growColony; scripts/accept-iv-cut.mjs."

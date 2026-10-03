@@ -127,7 +127,8 @@ export function typeSchedule(text, t0 = 0, letterS = LETTER_S) {
  * What index.js knows, as the sound's own numbers. Only the keys present are returned, so a caller
  * may hand a part of a snapshot.
  * @param {{asleep?:boolean, tempo?:object, games?:number, humans?:number, cryo?:number, stability?:number,
- *          gone?:boolean, lamps?:number, bought?:string[]}} snap - stability is the meter, 0..100
+ *          gone?:boolean, lamps?:number, bought?:string[], flesh?:number|null}} snap - stability is the meter,
+ *          0..100; flesh (deep-grow) the body's share, 0..1, which then sets how far the question is answered
  */
 export function fromSnapshot(snap = {}) {
     const p = {};
@@ -139,6 +140,8 @@ export function fromSnapshot(snap = {}) {
     if ('gone' in snap) p.gone = !!snap.gone;
     if ('lamps' in snap) p.lamps = lampCount(snap.lamps);
     if ('bought' in snap) p.answered = answeredFor(snap.bought);
+    // deep-grow: in the body the blood and the heartbeat follow its share of the colony (FLESH)
+    if (Number.isFinite(snap.flesh)) p.answered = clamp(snap.flesh);
     return p;
 }
 
@@ -517,6 +520,40 @@ export function createDeepSound(audio, opts = {}) {
             });
         });
     }
+    /* ---- deep-grow: the body's words ---- */
+    /** take: the flesh takes a chamber. A wet knock, low, and a short wet slide after it. */
+    function take(t) {
+        thunk(t, 1);
+        const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.35);
+        const o = osc('sine', 64, t + 0.05, t + 0.7, env(t + 0.05, 0.42, 0.01, 0.5, g)); o.frequency.exponentialRampToValueAtTime(38, t + 0.5);
+        const bp = filter('bandpass', 420, 2.2); bp.frequency.setValueAtTime(420, t + 0.12); bp.frequency.exponentialRampToValueAtTime(120, t + 0.9);
+        bp.connect(env(t + 0.12, 0.22, 0.05, 0.6, g)); noise(t + 0.12, 0.9, bp);
+    }
+    /** necrosis: an edge dies back. A dull drop: a low thud that sinks and goes dry, no ring. */
+    function necrosis(t) {
+        const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.15);
+        const o = osc('sine', 96, t, t + 0.9, env(t, 0.38, 0.004, 0.55, g)); o.frequency.exponentialRampToValueAtTime(30, t + 0.6);
+        const lp = filter('lowpass', 500, 0.7); lp.frequency.setValueAtTime(500, t); lp.frequency.exponentialRampToValueAtTime(80, t + 0.4);
+        lp.connect(env(t, 0.18, 0.003, 0.3, g)); noise(t, 0.4, lp);
+    }
+    /** hands: the first throw by hand. Skin on skin, a slap and the fist closing on it. */
+    function handThrow(t) {
+        const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.5);
+        const bp = filter('bandpass', 1700, 1.1); bp.connect(env(t, 0.5, 0.001, 0.05, g)); noise(t, 0.08, bp);
+        const hp = filter('highpass', 3000); hp.connect(env(t + 0.004, 0.18, 0.001, 0.03, g)); noise(t + 0.004, 0.05, hp);
+        const o = osc('sine', 140, t, t + 0.25, env(t, 0.3, 0.002, 0.14, g)); o.frequency.exponentialRampToValueAtTime(70, t + 0.12);
+        thunk(t + 0.32, 1);
+    }
+    /** The rise begins: a long low surge up the shaft, the crust's crack at its top. */
+    function surge(t) {
+        const len = 3.4;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + len * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.6);
+        g.connect(wordsOut); sendW(g, 0.7);
+        const lp = filter('lowpass', 90, 0.9, g); lp.frequency.setValueAtTime(90, t); lp.frequency.exponentialRampToValueAtTime(900, t + len);
+        noise(t, len + 0.7, lp);
+        const o = osc('sine', mtof(26), t, t + len + 0.6, env(t, 0.3, len * 0.7, 0.6, wordsOut)); o.frequency.exponentialRampToValueAtTime(mtof(38), t + len);
+        boom(t + len * 0.78);
+    }
     /** knock: the alarm. Chapter I's two muted knocks, twice, on a pipe, up the shaft. */
     function knock(t) {
         const out = ctx.createGain(); out.connect(wordsOut); out.connect(echoIn); sendW(out, 0.9);
@@ -754,7 +791,10 @@ export function createDeepSound(audio, opts = {}) {
         switch (name) {
         case 'buy': thunk(t, S.answered); break;
         case 'seal': thunk(t, 1); break;
-        case 'rise': rise(t); break;
+        case 'gift': rise(t); break;                 // Surface opens a node (was 'rise' before deep-grow)
+        case 'take': take(t); break;
+        case 'necrosis': necrosis(t); break;
+        case 'hands': handThrow(t); break;
         case 'knock': knock(t); break;
         case 'boom': boom(t); break;
         case 'swell': swell(t); break;
@@ -802,7 +842,8 @@ export function createDeepSound(audio, opts = {}) {
         }
         apply();
     }
-    /** Something happened in the game. See `word` for the names; plus 'sleep', 'wake', 'type', 'descent', 'goUp', 'unity', 'fade'. */
+    /** Something happened in the game. See `word` for the names; plus 'sleep', 'wake', 'type', 'descent', 'goUp', 'unity', 'fade',
+     *  and since deep-grow 'rise' (the body breaks the crust; Surface opening a node is 'gift'). */
     function event(name, data) {
         switch (name) {
         case 'sleep': setState({ asleep: true }); break;
@@ -820,6 +861,8 @@ export function createDeepSound(audio, opts = {}) {
         case 'goUp': if (graphNow()) goUp(ctx.currentTime); break;
         case 'fade': if (graphNow()) goUp(ctx.currentTime, false); break;
         case 'unity': if (graphNow()) unity(ctx.currentTime); break;
+        // deep-grow: the body rises: a low surge, then the low D in unison (the score sheet's Unity)
+        case 'rise': if (graphNow() && prefs().sfx && !isPaused() && !isHidden()) { surge(ctx.currentTime); unity(ctx.currentTime + 1.2); } break;
         default: word(name, data);
         }
     }

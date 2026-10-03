@@ -29,6 +29,9 @@ import {
 } from './deep.js';
 import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js';
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
+import {
+    growOn, risen, riseReady, hungry, bodyPrice, buyBody, viewOf, graphOf, canAfford, takePrice, takeChamber, rise,
+} from './grow.js';
 
 /** "Affordable in N days": a player waits for the goal when N is under this, a minute of play. */
 export const SAVE_DAYS = 60;
@@ -125,5 +128,44 @@ export function press(state, a, view = null) {
         startBuild(state, 'dig');
         return true;
     }
+    return false;
+}
+
+/* ---- deep-grow: MOVEMENT III, the body, as a player who does what the panel says ---------------
+   Once The question is answered: every body item the drawer lights is bought (the vats first while
+   the body is hungry); a reachable chamber is taken when it can be paid and the body would not
+   starve for it (grow.js canAfford), a dormitory first (it becomes a vat), then the cheapest; the
+   lever is pulled the moment it reads RISE. */
+/**
+ * @param {object} state
+ * @param {object} layout
+ * @returns {{kind:'rise'|'body'|'take', id?:string}[]} in the order pressed
+ */
+export function decideGrow(state, layout) {
+    if (!growOn(state) || risen(state)) return [];
+    if (riseReady(state, layout).ready) return [{ kind: 'rise' }];
+    const out = [];
+    const order = hungry(state, layout) ? ['vats', 'appetite', 'muscle', 'spread'] : ['vats', 'spread', 'muscle', 'appetite'];
+    let stars = state.stars || 0;
+    for (const id of order) {
+        const price = bodyPrice(state, id);
+        if (Number.isFinite(price) && stars >= price) { out.push({ kind: 'body', id }); stars -= price; }
+    }
+    const reach = viewOf(state, layout).reachable;
+    const graph = graphOf(layout);
+    const typeOf = (id) => graph.nodes.find((n) => n.id === id)?.type;
+    // the machine the moment it can be had (the hands), then a dormitory (a vat), then the cheapest
+    const rank = (id) => (id === 'machine' ? 0 : typeOf(id) === 'dorm' ? 1 : 2);
+    const pick = reach
+        .filter((id) => canAfford(state, layout, id))
+        .sort((a, b) => (rank(a) - rank(b)) || (takePrice(state, layout, a).people - takePrice(state, layout, b).people))[0];
+    if (pick) out.push({ kind: 'take', id: pick });
+    return out;
+}
+/** Do what decideGrow chose. `starsPerDay` (the day's report) prices the next level of an item. */
+export function pressGrow(state, layout, a, starsPerDay = 0) {
+    if (a.kind === 'rise') return rise(state, layout);
+    if (a.kind === 'body') return !!buyBody(state, a.id, starsPerDay);
+    if (a.kind === 'take') return !!takeChamber(state, layout, a.id);
     return false;
 }

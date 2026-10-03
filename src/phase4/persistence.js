@@ -11,7 +11,7 @@ import { initialWatcher, normalizeWatcher } from './watcher.js';
 import { normalizeTree } from './tree.js';
 import { impliedNight, nightGift, NIGHTS, SENTENCE_LINE } from './surface.js';
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -114,6 +114,17 @@ const MIGRATIONS = {
         const st = p.state || {};
         if (!Number.isFinite(st.vats)) st.vats = (st.cryo ?? -1) >= 0 ? 1 : 0;
         st.vats = Math.max(0, Math.min(VATS_MAX, Math.floor(st.vats)));
+        p.state = st;
+        return p;
+    },
+    /* deep-grow: MOVEMENT III, THE BODY. The body lives in `state.grow` (grow.js). A save that has
+       answered The question, or owns any of the old biological steps (now retired), is given its body
+       when the chapter opens (index.js, grow.js normalizeGrow: it needs the day's report for the
+       body's prices): a body of three chambers a biological step it owned (one paid for and waiting for
+       its sector counts too), so nothing is lost. Its sealed sectors stay in the save, unused. */
+    9: (p) => {
+        const st = p.state || {};
+        if (st.grow !== undefined && (st.grow === null || typeof st.grow !== 'object')) delete st.grow;
         p.state = st;
         return p;
     },

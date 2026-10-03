@@ -8,11 +8,13 @@
  */
 
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
-import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays, impliedFeed } from './phase4/deep.js';
+import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays, impliedFeed, tickDay } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
-import { initialWatcher, puzzleGapYears, BODY_GROW_SECONDS } from './phase4/watcher.js';
+import { initialWatcher, puzzleGapYears } from './phase4/watcher.js';
 import { initialSurface } from './phase4/surface.js';
+import { startGrow, graphOf, organsOf } from './phase4/grow.js';
+import { LADDER } from './phase4/watcher.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
 const P4 = PHASE4_CONSTANTS.SAVE_KEY;
@@ -206,38 +208,80 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-grow', label: 'IV · the question answered', apply: () => {
+        clearAll();
+        // deep-grow: MOVEMENT III begins. Surface has said its six lines, the question is answered
+        // (bought): on load the body begins on the lid and the panel overgrows over ten seconds. The
+        // arms of the first floor glow; a click on one takes it.
+        const { deep, layout } = growColony();
+        set(P4, serializeDeep(deep, layout));
+        set(PHASE_KEY, 'DEEP');
+    } },
     { id: 'iv-body', label: 'IV · the body', apply: () => {
         clearAll();
-        // Late (v1.50.0): asleep at a thousand years a second, SYSTEM and HARDWARE bought (four
-        // dormitories taken), the pool full, stars and people enough for the whole BIOLOGICAL
-        // rung. Buy it, watch the sectors seal, wake: nobody comes out. Then go up alone.
-        // deep-voice: Surface has said all six lines; its gifts are bought but Long count, which
-        // waits for Cryo VII. The question is answered, so BIOLOGICAL is open.
-        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
-        const day = 300000 * DAYS_PER_YEAR;
-        const slept = 290000;
-        Object.assign(deep, {
-            day, minerals: 5.0e14, food: 5.0e12, stars: 3.0e15, humans: 1800,
-            chambers: 60, rooms: { mine: 16, farm: 12, generator: 12, dorm: 18, cryo: 1 },
-            level: { mine: 12, farm: 12, generator: 12, dorm: 10 },
-            auto: { mine: 4, farm: 4, generator: 4, dorm: 4 },
-            cryo: 4, asleep: true, vats: 2, feed: impliedFeed(4),
-            est: { bias: -2, spread: 6 }, estRevealed: true, probesSent: 5, shaftOpen: true,
-            taken: { mine: 0, farm: 0, generator: 0, dorm: 4 }, takenSlots: [57, 56, 55, 54],
-            watcher: {
-                ...initialWatcher(), stage: 1, stability: 60, capacity: 200, sleptYears: slept, seed: 11, sleeps: 70, grown: BODY_GROW_SECONDS,
-                nextPuzzleYears: slept + puzzleGapYears(4), saidSpace: true,
-                bought: ['watchdog', 'scheduler', 'deepread', 'nightvision', 'cooling', 'secondcore', 'mast', 'reactor'],
-                surface: { ...initialSurface(), visits: 30, words: 8, lastSleep: 69, wins: 10, losses: 9, lastYou: 'paper', night: 6, toLine: 0 },
-            },
-            tree: { opened: ['lossless', 'cold', 'quiet', 'longcount', 'question'], bought: ['lossless', 'cold', 'quiet', 'question'], unseen: false },
-        });
-        set(P4, serializeDeep(deep, initialLayout(deep)));
+        // deep-grow: a third of the first floor is body (the four arms off the lid), the dormitory
+        // among them a vat that grows people, and the people have run out: the generator's arm is
+        // dead flesh at the edge, FEED is red. Feeding it (people, or VATS in the drawer) revives it.
+        const { deep, layout } = growColony({ body: ['h0', 's0', 's1', 's2', 's3'], necrotic: ['s3'], humans: 14 });
+        // the culture vats are not yet grown on: only the one vat in the body feeds it
+        deep.vats = 0;
+        deep.grow.lv.vats = 0;
+        set(P4, serializeDeep(deep, layout));
+        set(PHASE_KEY, 'DEEP');
+    } },
+    { id: 'iv-rise', label: 'IV · ready to rise', apply: () => {
+        clearAll();
+        // deep-grow: every chamber is body, the machine house too (the hands): the lever is back,
+        // overgrown, and reads RISE. Pulling it ends the act on V · UNITY.
+        const { deep, layout } = growColony({ body: 'all' });
+        set(P4, serializeDeep(deep, layout));
         set(PHASE_KEY, 'DEEP');
     } },
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
-export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-body': CRYO[4] };
+export const CHECKPOINT_CRYO = { 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
+
+/**
+ * deep-grow: a late colony at The question, laid out the way one built as it went is (every kind
+ * of room on every floor), three floors deep. With `body` the movement is under way: 'all' is
+ * every chamber and the machine; a list is those node ids (growth.js), `necrotic` among them dead.
+ */
+function growColony({ body = null, necrotic = [], humans = 2400 } = {}) {
+    const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+    const pattern = ['mine', 'dorm', 'farm', 'generator'];
+    const slots = [];
+    for (let i = 0; i < 34; i++) slots.push(pattern[i % 4]);
+    slots.splice(7, 0, 'cryo');
+    const count = (t) => slots.filter((x) => x === t).length;
+    const day = 25000 * DAYS_PER_YEAR;
+    Object.assign(deep, {
+        day, minerals: 4.0e15, food: 4.0e12, stars: 1.0e17, humans,
+        chambers: slots.length, rooms: { mine: count('mine'), farm: count('farm'), generator: count('generator'), dorm: count('dorm'), cryo: 1 },
+        level: { mine: 10, farm: 10, generator: 10, dorm: 8 },
+        auto: { mine: 4, farm: 4, generator: 4, dorm: 4 },
+        cryo: 5, vats: 3, feed: impliedFeed(5),
+        est: { bias: -2, spread: 6 }, estRevealed: true, probesSent: 5, shaftOpen: true,
+        watcher: {
+            ...initialWatcher(), stage: 1, stability: 90, capacity: 200, sleptYears: 24000, seed: 11, sleeps: 70,
+            saidSpace: true, bought: LADDER.filter((u) => u.rung < 2).map((u) => u.id),
+            surface: { ...initialSurface(), visits: 30, words: 8, lastSleep: 69, wins: 10, losses: 9, lastYou: 'paper', night: 6, toLine: 0 },
+        },
+        tree: { opened: ['lossless', 'cold', 'quiet', 'longcount', 'question'], bought: ['lossless', 'cold', 'quiet', 'question'], unseen: false },
+    });
+    const layout = { slots };
+    if (body) {
+        const report = tickDay(JSON.parse(JSON.stringify({ ...deep, humans: 2400 })), false);
+        startGrow(deep, report);
+        const all = graphOf(layout).nodes.map((n) => n.id);
+        deep.grow.body = body === 'all' ? all : body.slice();
+        deep.grow.necrotic = necrotic.slice();
+        deep.grow.taken = deep.grow.body.length - 1;
+        deep.grow.overgrown = true;
+        deep.grow.hands = deep.grow.body.includes('machine');
+        deep.organs = organsOf(deep, layout);
+    }
+    return { deep, layout };
+}
 
 const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 

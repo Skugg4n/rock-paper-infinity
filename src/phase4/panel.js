@@ -33,6 +33,9 @@ export const SPRING = { k: 60, damp: 9 };
 /** deep-fix2: HANDS rides a slow, critically damped spring: people come into new beds over days, and
  *  the needle eases up with them, never a jump (Ola: "Nice if it rose more slowly"). */
 export const SPRING_SLOW = { k: 5, damp: 2 * Math.sqrt(5) };
+/** deep-grow: the panel overgrows over this long, in stages (ms): veins, the tapes peel, the names, the fluid. */
+export const OVERGROW_MS = 10000;
+export const OG_STAGES = [0, 3200, 5200, 6800];
 /** One step of a damped spring toward `target`. Pure. */
 export function springStep(x, v, target, dt, spring = SPRING) {
     const a = spring.k * (target - x) - spring.damp * v;
@@ -72,14 +75,55 @@ function gaugeSvg(id) {
         <circle cx="${CX}" cy="${CY}" r="${R + 9}" class="bezel"/>
         <circle cx="${CX}" cy="${CY}" r="${R + 4}" class="bezel-in"/>
         <circle cx="${CX}" cy="${CY}" r="${R + 2}" fill="url(#face-${id})" class="face"/>
+        <clipPath id="glass-clip-${id}"><circle cx="${CX}" cy="${CY}" r="${R + 1.5}"/></clipPath>
+        <g class="fluid" clip-path="url(#glass-clip-${id})"><path class="fluid-body" d=""/><path class="fluid-top" d=""/></g>
         <path d="${arc(0, RED_K, R - 4)}" class="arc-red"/>
         <path d="${arc(GREEN_FROM, GREEN_FROM + GREEN_SPAN + 0.02, R - 4)}" class="arc-green"/>
         ${ticks}
         <g class="needle"><path d="M ${CX - 1.6} ${CY + 9} L ${CX - 0.7} ${CY - R + 6} L ${CX + 0.7} ${CY - R + 6} L ${CX + 1.6} ${CY + 9} Z" class="needle-body"/></g>
         <circle cx="${CX}" cy="${CY}" r="5" class="cap"/>
         <circle cx="${CX}" cy="${CY}" r="1.6" class="cap-dot"/>
-        <ellipse cx="${CX}" cy="${CY - 16}" rx="${R - 6}" ry="${R - 22}" fill="url(#glass-${id})" class="glass"/>`;
+        <ellipse cx="${CX}" cy="${CY - 16}" rx="${R - 6}" ry="${R - 22}" fill="url(#glass-${id})" class="glass"/>
+        <g class="veins" clip-path="url(#glass-clip-${id})">${veinPaths(id)}</g>`;
     return svg;
+}
+
+/* deep-grow: THE PANEL OVERGROWS. A vein crosses each gauge's glass (drawn once, hidden until the
+   question is answered), branching, never mirrored: a seeded walk from the bezel inward. */
+function veinPaths(id) {
+    let seed = [...String(id)].reduce((a, c) => a * 31 + c.charCodeAt(0), 11) >>> 0;
+    const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const out = [];
+    const walk = (x, y, a, len, w, depth) => {
+        let d = `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+        const n = 6;
+        for (let i = 0; i < n; i++) {
+            a += (r() - 0.5) * 0.9;
+            const step = len / n;
+            const cx = x + Math.cos(a) * step * 0.6 + (r() - 0.5) * 4, cy = y + Math.sin(a) * step * 0.6 + (r() - 0.5) * 4;
+            x += Math.cos(a) * step; y += Math.sin(a) * step;
+            d += ` Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`;
+            if (depth < 2 && r() < 0.35) walk(x, y, a + (r() < 0.5 ? 0.9 : -0.9), len * 0.45, w * 0.55, depth + 1);
+        }
+        out.push(`<path class="vein is-d${depth}" d="${d}" style="stroke-width:${w.toFixed(2)}"/>`);
+    };
+    const a0 = r() * Math.PI * 2;
+    walk(CX + Math.cos(a0) * (R + 6), CY + Math.sin(a0) * (R + 6), a0 + Math.PI + (r() - 0.5) * 0.7, R * 2.1, 2.6, 0);
+    const a1 = a0 + 2 + r() * 1.5;
+    walk(CX + Math.cos(a1) * (R + 6), CY + Math.sin(a1) * (R + 6), a1 + Math.PI + (r() - 0.5) * 0.9, R * 1.3, 1.6, 1);
+    return out.join('');
+}
+/** The fluid in a gauge's glass at level k (0 to 1), its surface a slow wave. */
+function fluidPaths(k, t, phase) {
+    const top = CY + R + 1.5 - 2 * (R + 1.5) * Math.max(0, Math.min(1, k));
+    const x0 = CX - R - 4, x1 = CX + R + 4;
+    let wave = `M ${x0} ${top.toFixed(2)}`;
+    for (let i = 1; i <= 8; i++) {
+        const x = x0 + (x1 - x0) * i / 8;
+        const y = top + Math.sin(t * 1.3 + phase + i * 0.9) * 1.4;
+        wave += ` L ${x.toFixed(1)} ${y.toFixed(2)}`;
+    }
+    return { body: `${wave} L ${x1} ${CY + R + 6} L ${x0} ${CY + R + 6} Z`, top: wave };
 }
 
 /**
@@ -98,15 +142,25 @@ export function createPanel(els) {
         cell.appendChild(svg);
         const tape = dymo(label, 'is-gauge');
         // deep-fix2: the word ORE stands beside the pickaxe that every amount of ore carries
+        const holder = document.createElement('span');
+        holder.className = 'deep-gauge-tapes';
         if (c === 'M') {
             const row = document.createElement('span');
             row.className = 'deep-gauge-label';
             row.innerHTML = ORE_GLYPH;
             row.appendChild(tape);
-            cell.appendChild(row);
-        } else cell.appendChild(tape);
+            holder.appendChild(row);
+        } else holder.appendChild(tape);
+        // deep-grow: the organ's name, in a warmer hand, waits under the tape until it peels
+        const flesh = document.createElement('span');
+        flesh.className = 'flesh-tape';
+        holder.appendChild(flesh);
+        cell.appendChild(holder);
         els.gauges.appendChild(cell);
-        g[c] = { cell, needle: svg.querySelector('.needle'), x: 0, v: 0, target: 0, red: false, twitch: 0, spring: c === 'H' ? SPRING_SLOW : SPRING };
+        g[c] = {
+            cell, needle: svg.querySelector('.needle'), x: 0, v: 0, target: 0, red: false, twitch: 0, spring: c === 'H' ? SPRING_SLOW : SPRING,
+            flesh, fluidBody: svg.querySelector('.fluid-body'), fluidTop: svg.querySelector('.fluid-top'), phase: Math.random() * 6,
+        };
     }
     // the three lamps of cryo, built once; their words are fixed
     let lampEls = [];
@@ -127,6 +181,10 @@ export function createPanel(els) {
     }
     const advice = { word: '', at: 0, want: '' };
     let alarmOn = false;
+    let fleshK = 0;                 // deep-grow: 0 needles, 1 fluid (the gauges overgrown)
+    let clock = 0;
+    let ogTimers = [];
+    let og = 'off';                 // 'off' | 'growing' | 'done'
 
     return {
         /**
@@ -183,8 +241,56 @@ export function createPanel(els) {
                 const s = springStep(n.x, n.v, target, d, n.twitch > 0 ? SPRING : n.spring);
                 n.x = s.x; n.v = s.v;
                 n.needle.setAttribute('transform', `rotate(${angleOf(n.x).toFixed(2)} ${CX} ${CY})`);
+                // deep-grow: overgrown, the needle's reading is a fluid level in the glass
+                if (fleshK > 0) {
+                    // the level never fills the whole glass: an empty store sits at the bottom, a full one under the cap
+                    const f = fluidPaths((0.08 + 0.72 * Math.max(0, Math.min(1, n.x))) * fleshK, clock, n.phase);
+                    n.fluidBody.setAttribute('d', f.body);
+                    n.fluidTop.setAttribute('d', f.top);
+                }
             }
+            clock += d;
+            if (og === 'growing' && fleshK < 1 && els.root.classList.contains('og-4')) fleshK = Math.min(1, fleshK + d / 2.5);
         },
+        /**
+         * deep-grow: THE PANEL OVERGROWS over OVERGROW_MS: a vein crosses each gauge's glass, the dymo
+         * labels peel and the organ names come in a warmer hand, the needles sink into fluid levels.
+         * @param {Object<string,string>} labels - the organ names by column ({ M: 'MASS', ... })
+         * @param {{instant?:boolean}} [o] - a reload: overgrown already
+         * @returns {Promise<void>} when it is done
+         */
+        overgrow(labels, { instant = false } = {}) {
+            for (const { c } of GAUGES) g[c].flesh.textContent = labels[c] || '';
+            for (const t of ogTimers) clearTimeout(t);
+            ogTimers = [];
+            const root = els.root;
+            if (instant) {
+                root.classList.add('is-flesh', 'og-1', 'og-2', 'og-3', 'og-4');
+                og = 'done';
+                fleshK = 1;
+                return Promise.resolve();
+            }
+            og = 'growing';
+            root.classList.add('is-overgrowing');
+            const at = (ms, fn) => ogTimers.push(setTimeout(fn, ms));
+            at(30, () => root.classList.add('og-1'));                   // the veins cross the glass
+            at(OG_STAGES[1], () => root.classList.add('og-2'));         // the tapes peel
+            at(OG_STAGES[2], () => root.classList.add('og-3'));         // the organ names come
+            at(OG_STAGES[3], () => root.classList.add('og-4'));         // the needles sink, the fluid rises
+            return new Promise((resolve) => at(OVERGROW_MS, () => {
+                root.classList.remove('is-overgrowing');
+                root.classList.add('is-flesh');
+                og = 'done';
+                fleshK = 1;
+                resolve();
+            }));
+        },
+        /** The labels the gauges show now (tests): the organ names once they have come. */
+        get labels() {
+            const flesh = els.root.classList.contains('og-3');
+            return GAUGES.map(({ c }) => (flesh ? g[c].flesh.textContent : g[c].cell.querySelector('.dymo').textContent));
+        },
+        get overgrown() { return og; },
         /** Where a needle points now (0 to 1), for the tests. */
         needle(c) { return g[c] ? g[c].x : null; },
         /** The madness: one needle swings to a wrong value for a moment. */

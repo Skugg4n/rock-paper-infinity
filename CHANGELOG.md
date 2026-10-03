@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased (deep-grow)
+
+### Chapter IV, movement III · GROW: the body (B300 to B309)
+
+Ola reached year 202 million asking "When does Body begin?": after Surface's sixth night nothing happened. Now the act plays to its end. docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md, "III · GROW" and its new "Built" section.
+
+- **The question opens the body** (B300). The question is the drawer's first row once Surface has opened it (it was only in the whole tree) and the panel says INSTRUMENTS: THE QUESTION when it can be paid. Buying it begins movement III: the colony does not sleep any more, the lid is the first organ. The old biological steps (brain tissue to skin receptors, the sector choice) are retired; a save that owns some is given a body of three chambers a step, nothing lost (save schema 10).
+- **The panel overgrows** (B301) over ten seconds: a vein crosses each gauge's glass, the dymo tapes peel, MASS, FEED, PULSE and FLESH come in a warmer hand, the needles sink into fluid levels. The advice keeps its dymo: INSTRUMENTS: SPREAD, FEED IT, GROW VATS, RISE. The lamps are the rise's two conditions: DEEPEST FLOOR FULL, MACHINE REACHED.
+- **The drawer becomes tissue** (B302) with the body's items: VATS (the culture vats go on), SPREAD (the flesh takes a chamber by itself), APPETITE (each chamber eats less), MUSCLE (the flesh makes twice as much).
+- **The front** (B303): the chambers the body touches glow; hovered, "Costs 1.6 k people and ⛏ 597 M."; a click takes one: its people walk in and do not come out, the slab turns to flesh from the touching edge over two seconds, sinew across the bridge. A full floor turns the shaft into a spine and opens the floor below. The camera follows the front down.
+- **Hunger and vats** (B304): the body eats people every year of its own (three real seconds; the calendar runs a third of a year a second); short, its edge goes necrotic one a year until fed. A dormitory taken is a vat; from the question on only vats grow people. Living organs make twenty times what the rooms did, more a floor down.
+- **The hands** (B305): the machine house taken, the tubes become a fist, a flat hand and two fingers that throw on the machine's rhythm; the camera goes to look.
+- **The rise** (B306): the lever comes back overgrown, RISE. The body climbs out of the lid and breaks the crust; "Humans are so small." "So fragile." on the Watcher's tape; V · UNITY. A reload shows the wall.
+- **Sound** (B307): the blood and the heartbeat follow FLESH; a wet knock for a take, a dull drop for necrosis, the first throw by hand, a surge into the low D in unison for the rise.
+- **Sims** (B308): both runs play GROW to the rise. Plain 26m58s to year 802 701 → 30m02s to the rise (the question at 19m11s, GROW 10m51s, 36 %); --watcher 23m02s to the old biological ending → 26m29s to the rise (GROW 6m09s, 23 %).
+- **For the strata view** (B309): src/phase4/view-hooks.js adds setBody, onChamberClick, setHands and rise (plus onChamberHover and step). Checkpoints iv-grow, iv-body (the new body) and iv-rise; `node scripts/accept-iv-cut.mjs` checks G (the panel overgrows, a click takes a chamber), N (starved, an edge dies; fed, it revives) and R (RISE, the lines, UNITY, the wall after a reload). Shots: docs/playtests/rebuild-shots/grow-*.png.
+
 ## v1.74.0 - 2026-10-03 (chapter IV, Ola's notes on the rebuild)
 
 ### Chapter IV: Ola's notes on v1.73.0 (B280 to B288)

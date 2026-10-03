@@ -392,6 +392,27 @@ export function unflesh(mesh) {
     live.splice(i, 1);
 }
 
+/**
+ * deep-grow: lets go of a mesh that is gone from the scene (the world was rebuilt): its flesh
+ * material is disposed and it is no longer stepped. Nothing is restored.
+ */
+export function forget(mesh) {
+    const i = live.findIndex((r) => r.mesh === mesh);
+    if (i < 0) return;
+    live[i].mat.dispose();
+    live.splice(i, 1);
+}
+/** deep-grow: lets go of a group of tendrils that is gone from the scene. */
+export function forgetTendrils(group) {
+    for (let i = tendrils.length - 1; i >= 0; i--) {
+        if (!group || tendrils[i].mesh.parent === group) {
+            tendrils[i].mesh.geometry.dispose();
+            tendrils[i].mesh.material.dispose();
+            tendrils.splice(i, 1);
+        }
+    }
+}
+
 /** Necrosis on (greys, stills, dries) or off (it comes back), over NECRO_SECONDS. */
 export function setNecrotic(mesh, on, opts = {}) {
     const r = recOf(mesh);
@@ -489,6 +510,7 @@ export function setTendrilsNecrotic(group, on) {
 
 /** One frame: the clock, the fronts, necrosis, the hint, the breath, the tendrils. */
 export function stepFlesh(dt) {
+    dt = Math.max(0, Number(dt) || 0);         // deep-grow: a negative first frame threw the fronts back
     clock += dt;
     fleshShared.uTime.value = clock;
     for (let i = 0; i < live.length; i++) {

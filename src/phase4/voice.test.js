@@ -134,7 +134,7 @@ describe('the gifts are rules', () => {
         expect(nodeStatus(s, 'cryo-vii').status).toBe('bought');
     });
 
-    test('The question: BIOLOGICAL is hidden until it is bought; a save that owns a biological step keeps it', () => {
+    test('The question (deep-grow): the old biological steps are retired, hidden and never for sale', () => {
         const s = colony(4);
         s.watcher.bought = LADDER.filter((u) => u.rung < 2).map((u) => u.id);
         s.watcher.capacity = capacityMax(s.watcher);
@@ -146,11 +146,12 @@ describe('the gifts are rules', () => {
         expect(canBuy(s, 'brain').ok).toBe(false);
         s.tree = { opened: ['question'], bought: [] };
         buy(s, 'question');
-        expect(nodeVisible(s, 'brain')).toBe(true);
-        expect(canBuy(s, 'brain').ok).toBe(true);
+        // buying The question begins movement III (grow.js); the old steps stay out of play
+        expect(nodeVisible(s, 'brain')).toBe(false);
+        expect(canBuy(s, 'brain').ok).toBe(false);
         const old = colony(4);
         old.watcher.bought = [...LADDER.filter((u) => u.rung < 2).map((u) => u.id), 'brain'];
-        expect(nodeVisible(old, 'nervous')).toBe(true);
+        expect(nodeVisible(old, 'nervous')).toBe(false);
     });
 });
 

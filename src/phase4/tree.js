@@ -119,7 +119,7 @@ export const NODES = [
 
     // the question, straight off the root
     { id: 'question', branch: null, x: 610, y: 540, kind: 'surface', name: 'THE QUESTION', max: 1,
-        parent: 'root', path: [[515, 370], [515, 540], [610, 540]], does: 'Opens the BIOLOGICAL branch.' },
+        parent: 'root', path: [[515, 370], [515, 540], [610, 540]], does: 'The body begins.' },
 
     // WATCHER: the ladder as it is bought, SYSTEM along the lower row, HARDWARE back along the upper
     { id: 'watchdog', branch: 'WATCHER', x: 620, y: 250, kind: 'watcher', step: 'watchdog', name: 'WATCHDOG', max: 1,
@@ -314,8 +314,8 @@ export function nodeVisible(state, id) {
     const n = NODE_BY_ID[id];
     if (!n) return false;
     if (n.branch === 'WATCHER') return watcherBranchOpen(state);
-    // deep-voice: BIOLOGICAL grows out of The question
-    if (n.branch === 'BIOLOGICAL') return watcherBranchOpen(state) && bioOpen(state);
+    // deep-grow: the old biological steps are retired; The question opens movement III (grow.js)
+    if (n.kind === 'bio') return false;
     return true;
 }
 
@@ -404,6 +404,8 @@ export function canBuy(state, id, ctx = {}) {
     if (!n || n.kind === 'root') return no('bought', '');
     if (n.kind === 'surface' && !opened(state, id)) return no('surface', 'Not ours to open.');
     if (n.kind === 'teaser') return no('teaser', 'Not open yet.');
+    // deep-grow: the old biological steps are retired; the body grows chamber by chamber (grow.js)
+    if (n.kind === 'bio') return no('teaser', 'Not open yet.');
     const asleep = ctx.asleep ?? !!state.asleep;
     const lvl = levelOf(state, id) + orderedOf(state, id);
     if (lvl >= n.max) return no('bought', '');
@@ -859,7 +861,8 @@ export function buyMany(state, id, ctx = {}, limit = 50) {
 /** The node the next Watcher step is bought on, or null at the top of the ladder. */
 export function nextWatcherNode(state) {
     const step = nextStep(state.watcher);
-    return step ? STEP_NODE[step.id] || null : null;
+    // deep-grow: the ladder ends with HARDWARE; the biological steps are retired
+    return step && step.rung < 2 ? STEP_NODE[step.id] || null : null;
 }
 
 /** A plain sentence for the reason, with its first letter up. */

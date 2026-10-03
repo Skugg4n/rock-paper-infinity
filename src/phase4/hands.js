@@ -27,7 +27,7 @@ export const THROWS = ['rock', 'paper', 'scissors'];
 /** Seconds the tubes take to be overgrown and the hands to grow out of them. */
 export const OVERGROW_SECONDS = 3.2;
 /** How big a hand is: it has to read against the dark at the home view. */
-export const HAND_SCALE = 2.4;
+export const HAND_SCALE = 3.2;
 /** When in a game the throw lands (machine-model.js poseAt / land). */
 const LAND = 0.48;
 

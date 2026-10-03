@@ -90,6 +90,7 @@ export const ADVICE = {
     automate: (t) => `AUTOMATE ${ROOMS_UP[t]}`,
     dig: 'DIG',
     vats: 'BUILD CULTURE VATS',
+    question: 'THE QUESTION',
     feed: 'FEED THE MACHINE',
     longer: 'LONGER SLEEP',
     sleep: 'SLEEP',
@@ -148,6 +149,8 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
             if (item.key === 'ore') { const w = buildOrDig(state, 'mine'); if (w) return w; }
         }
     }
+    // deep-grow: The question is open and can be paid: answering it begins the body
+    if (opened(state, 'question') && levelOf(state, 'question') < 1 && canBuy(state, 'question', { asleep: false }).ok) return ADVICE.question;
     // 5. after the hall, the first culture vats, when they can be paid: asleep nobody else is born
     if (state.cryo >= 0 && vatsLevel(state) < 1 && (state.stars || 0) >= vatsCost(0)) return ADVICE.vats;
     // 6. the machine, when a level of feed can be paid
@@ -237,9 +240,9 @@ export function healing(state) {
    Only what can be bought NOW, bright, one line each, and per branch the NEXT thing, dim, with
    what it needs. Awake the day's things, asleep the night's. */
 export const DRAWER_GROUPS = ['EXTRACTION', 'CULTURE', 'POWER', 'HABITAT', 'CRYO', 'WATCHER'];
-/** Not in the drawer: the body's steps and the question that opens them (movement III), and the
- *  nodes with no rule behind them. */
-const LEFT_OUT = new Set(['question']);
+/** Not in the drawer: nothing by name. deep-grow: The question is in the drawer once Surface has
+ *  opened it (buying it begins movement III); the old biological steps are retired (tree.js). */
+const LEFT_OUT = new Set([]);
 
 const AUTO_WORDS = {
     mine: ['Mines run without people.', 'Mines make three times more.', 'Mines make a hundredfold more.'],
@@ -257,6 +260,7 @@ const DOES = {
     quiet: 'Automated rooms cost almost nothing.',
     cold: 'Sleepers eat nothing at all.',
     longcount: 'A second sleeps a million years.',
+    question: 'The body begins.',
     watchdog: 'The mind drifts more slowly.',
     scheduler: 'Building goes on in sleep.',
     deepread: 'A click steadies it more.',
@@ -337,6 +341,16 @@ export function drawerGroups(state, ctx = {}) {
         }
         if (next) rows.push(next);
         if (rows.length) groups.push({ name: g, rows });
+    }
+    // deep-grow: The question stands off the root on no branch; once Surface has opened it, it is the
+    // drawer's first row (it was only in the whole tree, and Ola asked "When does Body begin?")
+    if (opened(state, 'question') && levelOf(state, 'question') < 1) {
+        const can = canBuy(state, 'question', { ...ctx, asleep });
+        const row = {
+            id: 'question', name: 'THE QUESTION', does: drawerDoes(state, 'question'),
+            price: drawerPrice(priceOf(state, 'question')), status: can.ok ? 'buy' : 'next', need: can.ok ? '' : drawerNeed(state, 'question', { ...ctx, asleep }), progress: -1,
+        };
+        groups.unshift({ name: 'THE QUESTION', rows: [row] });
     }
     return groups;
 }

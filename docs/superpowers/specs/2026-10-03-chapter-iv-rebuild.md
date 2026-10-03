@@ -222,3 +222,54 @@ Ola: "SO much clearer and easier to understand, GOOD!" His nine notes, and what 
 - Surface's line typed twice: the card counted as gone while the fists shook (a throw sets the result before it is shown). Fixed in instruments.js cardGone; a line typed in a visit is never retyped.
 - **Culture vats** (HABITAT, three levels, a day purchase after the hall): asleep only the vats grow people. Without them the ice thins the sleepers until a whole one under ten is missing. **In GROW these vats are the ones the body takes over**: movement III's "dormitories that the body takes become VATS" should take these vats first, so the body grows its own people from the vats the colony built to survive the sleep.
 - Sims: plain 26m01s → 26m58s, --watcher 21m08s → 23m02s.
+
+## Built: movement III (deep-grow)
+
+Built on the branch `deep-grow` (2026-10-03). The act plays from the descent to the rise.
+
+**Where it lives.** `src/phase4/grow.js` (pure: the body on the colony: `state.grow`, the prices, the body's
+year, what the organs make, the gauges, the word, the lamps, the drawer's items, the rise), on top of
+`growth.js` (the rules on the graph of chambers). `deep.js tickDay` reads `state.organs` (what the body adds
+to each room type, the hands' games, no births). The 3D body is `view-hooks.js` (setBody, onChamberClick,
+setHands, rise, plus onChamberHover and step) on `flesh.js`, `hands.js` and accessors in `scene.js`
+(`fleshParts`, `setFleshCells`, `chamberAt`, `focusFloor`, `focusMachine`, `focusRise`) and
+`machine-model.js` (`armHeads`, `gc`). `panel.js overgrow`, `drawer.js setFlesh`. index.js wires it.
+
+**Decisions taken where the plan left room.**
+- The question is the drawer's first row once opened (it had no branch and so was only in the whole
+  tree: that is why nothing happened for Ola), and the panel says THE QUESTION when it can be paid.
+- Movement III is awake: no more sleeps (the lever is gone until RISE). The calendar runs
+  `GROW_DAYS_PER_SECOND` = 120 days a real second, the body's year every 365 of them (three seconds).
+- People in units: a hundredth of the colony (beds or people, the more) on the day of the question, so a
+  colony of five thousand and one of five million play the same. A chamber costs 20 units of people
+  times 1.25 a floor down and 1.04 for every chamber taken before it (the machine house twice), and two
+  days of the mines' ore. The body never eats the last ten. From the question on the creches stop: only
+  vats grow people (a dormitory taken: 10 units a year, more with VATS; the culture vats 2 a level).
+- The drawer's items are priced level by level: at least their seconds of the machine's stars as they come
+  in when the level becomes the next (VATS 45 s, SPREAD 70, APPETITE 80, MUSCLE 60, twice that a level
+  bought), the first at least a share of the stars in hand at the question (the sleeps leave a pile the
+  awake machine would take hours to earn). Without that the body, which makes the machine hundreds of
+  times richer, bought everything at once.
+- SPREAD is "how fast the flesh takes a chamber": a chamber by itself every 8, 4, 2 seconds, only one it
+  can afford without starving. APPETITE x0.7 a level, MUSCLE x2 a level on what a living organ makes.
+- The hands play three times the games on the same energy. The hover tip says the price, or "Needs 40
+  more people.", or "It is starving." over dead flesh.
+- The camera eases to the floor of the front when it moves down, to the machine when the hands come (and
+  stays there seven seconds), and up to the crust at the rise; never once the player has turned it.
+- The sound's "question answered" is the body's share (FLESH). Surface opening a node is now the word
+  'gift'; 'rise' is the body's.
+
+**Numbers.** Plain sim 26m58s to year 802 701 → 30m02s to the rise: the question at 19m11s, floors full at
+19m33s, 21m04s, 23m09s, 25m23s, 28m28s, 30m02s, the hands at 19m51s, 55 chambers taken by hand and 13 by
+the flesh itself; GROW 10m51s (36 %). --watcher 23m02s to the old ending → 26m29s to the rise, GROW 6m09s
+(23 %). The sim's player never lets the body starve; a player who clicks faster than the vats feed sees
+the edge die back.
+
+**Acceptance.** `node scripts/accept-iv-cut.mjs`: G (from iv-grow the labels read MASS FEED PULSE FLESH
+after ten seconds, a hovered chamber says its price, a click takes it), N (from iv-body, starved an edge
+dies, fed it revives), R (from iv-rise the hands, the lever reads RISE, the crust breaks, the two lines,
+V · UNITY, the wall after a reload). Shots: docs/playtests/rebuild-shots/grow-*.png.
+
+**Not done here.** The strata view (another agent, `strata-view.js`) implements the same hooks. A playtest
+of the whole act. The crust's pieces are plain boxes in the crust's colour; the machine's deck stays
+machinery under the hands.
