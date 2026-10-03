@@ -9,7 +9,7 @@
  * words: "survival 15 % · need 85 %". What the colony believes is a reading with a
  * band of doubt: a lighter sector round the reading, labelled "15 ± 40 %" with the
  * caption "survival if we go up now", and hovering it says what the band is. Under
- * it the year the colony believes it gets there: "survival 85 % ~ year 802 701".
+ * it the year the colony believes it gets there: "survival 85 % around year 802 701" (deep-copy: a word, not "~").
  *
  * Since v1.45.0 the ring sits on the crust slab IN the scene (scene.crustHost); the
  * flat band at the top of the window is only the fallback for a browser without
@@ -20,7 +20,7 @@ import { ESTIMATE_START, SURVIVAL_AT, survival } from './deep.js';
 
 const RING_LEN = 113;               // the circumference of the r=18 ring, as in chapters II and III
 const TICK_LEN = 2.2;               // the mark at the line, along the ring
-export const SPREAD_TIP = 'What the scouts believe. More parties, smaller doubt.';
+export const SPREAD_TIP = 'What the scouts believe. More scouts, less doubt.';
 
 /** "survival 15 % · need 85 %": the words beside the ring. */
 export const crustLabel = (pct) => `survival ${Math.round(pct)} % · need ${SURVIVAL_AT} %`;
@@ -96,7 +96,7 @@ export function createCrust(host, _opts = {}) {
             if (read.textContent !== label) read.textContent = label;
             const sp = `${Math.round(pct)} ± ${Math.round(spread)} %`;
             if (spreadEl.textContent !== sp) spreadEl.textContent = sp;
-            const yl = year ? `survival ${SURVIVAL_AT} % ~ year ${year}` : '';
+            const yl = year ? `survival ${SURVIVAL_AT} % around year ${year}` : '';
             if (yearEl.textContent !== yl) yearEl.textContent = yl;
         },
         /** The one time the crust is not dark: the colony came back up and the sky is there. */

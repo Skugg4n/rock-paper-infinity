@@ -89,27 +89,27 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         const s = automated();
         s.humans = 40;
         const p = launchProbe(s);
-        expect(scoutSentLine(p.people)).toBe(`Scout party sent (${p.people} people).`);
+        expect(scoutSentLine(p.people)).toBe(`${p.people} people went up the shaft.`);
         const due = p.dueDay;
         const sum = sleep(s, CRYO[3].days, { alarms: true, slots: ['mine', 'farm'], rng: feed(rollFor(due, 'reading'), 0.5) });
         expect(s.day).toBe(due);
         expect(sum.alarm.kind).toBe('scouts');
         const l = sum.alarm.landed[0];
         expect(l.outcome).toBe('reading');
-        expect(alarmLine(sum.alarm)).toBe(`Woke: scout party returned, survival ${Math.round(100 - l.reading)} %. Not yet.`);
+        expect(alarmLine(sum.alarm)).toBe(`Woke: the scouts are back. Survival ${Math.round(100 - l.reading)} %. Not yet.`);
         expect(s.humans).toBeCloseTo(40, 0);     // they came home: a few may have died in the ice meanwhile
     });
 
     test('every way a party can come home has its own plain line', () => {
         // the rules count doomsday; the line says survival, and what it means (v1.45.0)
-        expect(scoutLine({ outcome: 'reading', reading: 93 })).toBe('Scout party returned: survival 7 %. Not yet.');
-        expect(scoutLine({ outcome: 'reading', reading: 38 })).toBe('Scout party returned: survival 62 %. Getting there.');
-        expect(scoutLine({ outcome: 'reading', reading: 14 })).toBe('Scout party returned: survival 86 %. We could go up.');
-        expect(scoutLine({ outcome: 'lost' })).toBe('Scout party lost.');
-        expect(scoutLine({ outcome: 'wrong', reading: 3 })).toBe('Scout party returned raving: reading unreliable.');
-        expect(scoutLine({ outcome: 'monster', slot: 6 })).toBe('Something came back with the scouts: chamber 7 dark.');
-        expect(alarmLine({ kind: 'scouts', landed: [{ outcome: 'monster', slot: 6 }] })).toBe('Woke: something came back with the scouts. Chamber 7 dark.');
-        expect(alarmLine({ kind: 'scouts', landed: [{ outcome: 'lost' }] })).toBe('Woke: scout party lost.');
+        expect(scoutLine({ outcome: 'reading', reading: 93 })).toBe('The scouts are back. Survival 7 %. Not yet.');
+        expect(scoutLine({ outcome: 'reading', reading: 38 })).toBe('The scouts are back. Survival 62 %. Getting there.');
+        expect(scoutLine({ outcome: 'reading', reading: 14 })).toBe('The scouts are back. Survival 86 %. We could go up.');
+        expect(scoutLine({ outcome: 'lost' })).toBe('The scouts did not come back.');
+        expect(scoutLine({ outcome: 'wrong', reading: 3 })).toBe('The scouts came back raving. Their reading is no use.');
+        expect(scoutLine({ outcome: 'monster', slot: 6 })).toBe('Something came back with the scouts. Chamber 7 is dark.');
+        expect(alarmLine({ kind: 'scouts', landed: [{ outcome: 'monster', slot: 6 }] })).toBe('Woke: something came back with the scouts. Chamber 7 is dark.');
+        expect(alarmLine({ kind: 'scouts', landed: [{ outcome: 'lost' }] })).toBe('Woke: the scouts did not come back.');
         expect(alarmLine({ kind: 'manual' })).toBe('Woke: the hall was opened by hand.');
     });
 
@@ -139,7 +139,7 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         expect(sum.alarm.kind).toBe('estimate');
         expect(s.day).toBe(Math.ceil(opens));
         expect(estimateNow(s).mean).toBeLessThanOrEqual(RESURFACE_AT);
-        expect(alarmLine(sum.alarm)).toMatch(/^Woke: we may survive up there\. Survival 8[56] ± 3 %, need 85 %\.$/);
+        expect(alarmLine(sum.alarm)).toMatch(/^Woke: we may survive up there\. About 8[56] %, and we need 85 %\.$/);
     });
 
     test('the sensor on the shaft is the truth: it wakes the colony and sets the belief straight', () => {
@@ -165,7 +165,7 @@ describe('alarms: what wakes a sleeping colony, and the sentence it says', () =>
         const r = tickDay(cloneState(s), true);
         expect(troubleIn(s, r)).toBeNull();
         expect(troubleIn({ ...s, humans: MIN_SLEEPERS - 1 }, r)).toEqual({ kind: 'few' });
-        expect(troubleClause({ kind: 'stall', type: 'mine', why: 'hands' })).toBe('the mine stalls, no hands');
+        expect(troubleClause({ kind: 'stall', type: 'mine', why: 'hands' })).toBe('the mine stops for lack of hands');
     });
 });
 
@@ -278,9 +278,9 @@ describe('the goal on screen, and the stores behind the bars', () => {
         expect(affordText({ price: 100, have: 40, perDay: 6 })).toBe('Affordable in 10 days.');
         expect(affordText({ price: 1e6, have: 0, perDay: 1000 })).toBe('Affordable in 3 years.');
         expect(affordText({ price: 100, have: 40, perDay: 0 })).toBe("Not affordable at today's flow.");
-        expect(affordText({ price: 1e16, have: 0, perDay: 3e4 })).toBe("More than a thousand years away at today's flow; asleep, the stars come faster.");
+        expect(affordText({ price: 1e16, have: 0, perDay: 3e4 })).toBe("More than a thousand years away at today's flow.");
         expect(affordText({ price: 100, have: 400, perDay: 6 })).toBe('');
-        expect(affordText({ price: 100, have: 400, blocked: 'chamber' })).toBe('Needs a free chamber: dig one first.');
+        expect(affordText({ price: 100, have: 400, blocked: 'chamber' })).toBe('Dig a chamber first.');
         expect(span(1)).toBe('1 day');
         expect(span(3650000)).toBe('10 000 years');
     });

@@ -22,7 +22,7 @@ import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_
 import {
     initialDeepState, tickDay, sleep,
     COLUMN, ROOMS, DAYS_PER_YEAR, CRYO, CHAPTER_V,
-    cryoLabel, cryoName, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
+    cryoName, group, probeCost, PROBE_ENERGY, launchProbe, resolveDueProbes,
     clearChamber, clearDarkType, stalledRooms, attemptAscent, canTryAscent, ascentOdds, SURVIVAL_AT,
     completeBuilds, buildProgress, estimateNow, habitableYear,
     sleepTrouble, repairTick, scoutOdds, scoutsOut, MIN_SLEEPERS, RESURFACE_AT,
@@ -52,7 +52,7 @@ import {
     playSurface, SPACE_LINE, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, GO_UP_ALONE, sealLine, BODY_GROW_SECONDS,
     lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, rungOpenLine,
-    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, LOOK_EVERY_S, LOOK_TIERS, lookDue,
+    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, lookDue,
 } from './watcher.js';
 import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS } from './surface.js';
 import {
@@ -323,7 +323,6 @@ export function init() {
     const cost = (n, icon) => `<span class="deep-mono">${formatCount(n)}</span><i data-lucide="${icon}" class="w-4 h-4"></i>`;
     const mineralCost = (n) => cost(n, 'pickaxe');
     const starCost = (n) => cost(n, 'star');
-    const roomMark = (type) => `<i data-lucide="${ROOM_ICON[type]}" class="w-4 h-4"></i>`;
     const priceRow = (html) => `<span class="deep-price">${html}</span>`;
     const perDayText = (v) => `${v >= 0 ? '+' : '-'}${formatCount(Math.abs(v))}/d`;
 
@@ -405,8 +404,6 @@ export function init() {
         }
     }
 
-    /** What a tier sleeps, per second, for the badge: "1 y/s". */
-    const rateLabel = (tier) => `${cryoLabel(CRYO[tier].days)}/s`;
     /** What the stars are for next, named, for "toward Cryo II". */
     function starGoal() {
         const next = nextCryo(state);
@@ -435,6 +432,8 @@ export function init() {
     /** deep-fix: the whole road to the next cryo tier (readout.js cryoRoad), kept once a colony day
      *  with the gates; the tree's node and the sleep pill's caption both read it. */
     let roadNow = null;
+    /** deep-copy: Sleep comes with a fade the moment Cryo I is bought (once the tree is closed). */
+    let hadHall = null, arriveDue = false;
 
     /**
      * The tooltip of a purchase: the price, what it does, and then either what is still
@@ -481,7 +480,6 @@ export function init() {
         const fl = flows(state, report);
         // v1.48.0: the dot marks what runs LOW (days of cover), never a full bar
         const low = lowPoint(state, report, st);
-        const need = needFor();
         const ahead = hovering ? preview(state, hovering.kind, hovering.type, report) : null;
         const ghost = hovering ? previewStocks(state, hovering.kind, hovering.type, hovering.price || 0, hovering.currency || 'minerals', orePrice) : null;
         for (const c of COLUMN) {
@@ -541,9 +539,9 @@ export function init() {
         }
         // each bar says where its number came from, in one sentence (B062)
         for (const c of COLUMN) setTooltip(ui.bars[c], escapeText(ledger(c, state, report)));
-        setTooltip(ui.starsRow, says('Wins. The machine on top plays on the spare energy it is fed.')
-            + note(`${formatCount(report.stars)} a day: one game in three is a win, each win a star.`));
-        setTooltip(ui.oreRow, says(`Ore in store. ${perDayText(report.parts.M)} after the generators have burned theirs.`));
+        // deep-copy: the rate beside each counter is its number; the hover only says what it is
+        setTooltip(ui.starsRow, says('Stars. The machine on top wins them, game by game.'));
+        setTooltip(ui.oreRow, says('Ore in store. The rate beside it is what is left after the generators burn theirs.'));
 
         // after the last wake-up there is nobody to build anything: the buttons stand as if asleep
         const gone = !!state.watcher.gone;
@@ -575,47 +573,46 @@ export function init() {
         if (treeView?.isOpen() && state.tree?.unseen) state.tree.unseen = false;    // opened while looking at it
         const night = !!(state.tree && state.tree.unseen);
         ui.treeBtn.classList.toggle('has-night', night);
-        setTooltip(ui.treeBtn, says('The tree: levels, automation, cryo, and what stays awake.')
-            + note(night ? 'Something was opened in the night.' : '')
-            + note(canNow ? `${canNow} can be bought now.` : 'Nothing can be bought just now.'));
+        // deep-copy: the badge is the count; the hover only says what the tree is
+        setTooltip(ui.treeBtn, says('Everything the colony can grow into.')
+            + note(night ? 'Something opened in the night.' : ''));
         treeView?.refresh();
 
         // ---- cryo: the hall, then the sleep; asleep, the sun that wakes the colony ----
         const tier = state.cryo;
         const owns = tier >= 0;
-        ui.cryoBtn.classList.toggle('hidden', asleep);
+        // deep-copy: Sleep is not on screen until Cryo I is bought; then it comes with a short fade
+        const sleepOn = owns && !asleep;
+        if (hadHall === false && owns) arriveDue = true;
+        if (arriveDue && sleepOn && !treeView?.isOpen()) {
+            arriveDue = false;
+            ui.cryoBtn.classList.remove('is-arriving');
+            void ui.cryoBtn.offsetWidth;
+            ui.cryoBtn.classList.add('is-arriving');
+        }
+        hadHall = owns;
+        ui.cryoBtn.classList.toggle('hidden', !sleepOn);
         ui.wakeBtn.classList.toggle('hidden', !state.asleep);
         // v1.51.0: an action is a pill with a word, "Sleep · 1 y/s". deep-tree: the hall is Cryo I in
         // the tree; until it is bought the pill says so, and a click opens the tree
-        const cryoWord = owns ? `Sleep · ${rateLabel(tier)}` : 'Sleep';
+        // deep-copy: just "Sleep"; "1 m/s" read as metres a second. The hover says it in words
+        const cryoWord = 'Sleep';
         if (ui.cryoText.textContent !== cryoWord) ui.cryoText.textContent = cryoWord;
-        if (owns) setCaption(ui.cryoCaption, state.humans < MIN_SLEEPERS ? `needs ${MIN_SLEEPERS} people` : '');
         if (state.asleep) {
             ui.wakeBtn.classList.toggle('is-locked', busy);
-            setTooltip(ui.wakeBtn, says('Wake the colony.') + note(`${cryoName(tier)}: ${rateWords(CRYO[tier].days)} a second.`)
-                + note(tier < LOOK_TIERS && !firstSleep(state.watcher)
-                    ? `If nothing wakes them first, they wake for a look in ${Math.max(1, Math.ceil(LOOK_EVERY_S - lookClock))} s.` : ''));
+            setTooltip(ui.wakeBtn, says('Wake the colony.'));
         } else if (gone) {
             // nobody is left to sleep
         } else if (owns) {
             const few = state.humans < MIN_SLEEPERS;
             ui.cryoBtn.classList.toggle('is-locked', busy || few);
             const warn = few
-                ? `A colony under ${MIN_SLEEPERS} people cannot sleep.`
-                : (gates.current ? `It would wake on day ${Math.max(1, gates.current.day)}: ${troubleClause(gates.current)}.` : '');
-            setTooltip(ui.cryoBtn, priceRow(roomMark('cryo') + `<span class="deep-mono">${rateLabel(tier)}</span>`)
-                + says(`Sleep: ${rateWords(CRYO[tier].days)} a second. The colony runs until something wakes it.`)
+                ? `Too few people to sleep. It takes ${MIN_SLEEPERS}.`
+                : (gates.current ? `They would wake after ${span(Math.max(1, gates.current.day))}, when ${troubleClause(gates.current)}.` : '');
+            setTooltip(ui.cryoBtn, says(`Each second of sleep is ${rateWords(CRYO[tier].days)}. They sleep until something wakes them.`)
                 + note(warn, 'is-missing'));
-        } else {
-            // deep-tree: the hall is bought in the tree (Cryo I); the reason it cannot be yet is the
-            // node's, and the same words
-            // deep-fix: the whole road at once, a tick on each part done
-            const road = roadNow;
-            setCaption(ui.cryoCaption, road && !road.open ? `${cryoName(0)} ${road.text}` : `needs ${cryoName(0)}`);
-            ui.cryoBtn.classList.add('is-locked');
-            setTooltip(ui.cryoBtn, says(`Sleep needs a cryo hall: ${cryoName(0)}, in the tree.`)
-                + note(road && !road.open ? `${cryoName(0)} ${road.text}.` : (need ? need.long : ''), 'is-missing'));
         }
+        // deep-copy: before Cryo I there is no Sleep pill at all; what Cryo I needs is on its node in the tree
         // ---- scout parties: people up the shaft, for a reading of the sky ----
         // Everything about a party is on the button before it goes (v1.45.0): who, how long, the
         // odds of each way it can end, and how far a good reading may be off.
@@ -633,20 +630,19 @@ export function init() {
             const mark = ui.probeBtn.querySelector('.deep-build');
             mark.classList.toggle('is-on', !!trip);
             if (trip) mark.style.setProperty('--p', `${Math.round(100 * Math.min(1, (state.day - trip.sentDay) / Math.max(1, trip.dueDay - trip.sentDay)))}%`);
+            // deep-copy: hover text only, three plain lines; no odds (the ring's ± says the doubt)
             if (trip) {
-                setTooltip(ui.probeBtn, says(`Party out, back in ${backIn(trip.dueDay - state.day)}.`)
-                    + note(`${Math.round(trip.people)} people went up. One party at a time.`));
+                setTooltip(ui.probeBtn, says(`${formatCount(Math.round(trip.people))} people are up there.`)
+                    + says(`They are due back in ${span(trip.dueDay - state.day)}.`));
             } else {
-                const p = odds.pct;
-                const missing = !people ? affordText({ blocked: 'people' })
-                    : (!power ? `Needs ${PROBE_ENERGY} spare energy a day to open the hatch: ${formatCount(report.parts.E)} today.`
-                        : affordText({ price: odds.price, have: state.minerals, perDay: report.parts.M, blocked: asleep ? 'asleep' : '' }));
-                setTooltip(ui.probeBtn, priceRow(mineralCost(odds.price) + cost(odds.people, 'users'))
-                    + says(`Scout party: ${odds.people} people, out ${span(odds.days)}. `
-                        + `Return ${p.reading} %, lost ${p.lost} %, back wrong ${p.wrong} %, followed home by something ${p.monster} %. `
-                        + `Reading ± ${odds.scatter} %.`)
-                    + note(missing, 'is-missing')
-                    + note('A good reading narrows the doubt on the ring.', 'is-goal'));
+                const missing = !people ? 'Too few people to spare.'
+                    : (!power ? 'Not enough power to open the hatch.'
+                        : (asleep ? 'Only while the colony is awake.'
+                            : (state.minerals < odds.price ? `You need ${formatCount(odds.price - state.minerals)} more ore.` : '')));
+                setTooltip(ui.probeBtn, says(`Send ${odds.people} people up for ${span(odds.days)}.`)
+                    + says(`Costs ${formatCount(odds.price)} ore.`)
+                    + says('Some may not come back.')
+                    + note(missing, 'is-missing'));
             }
         }
 
@@ -657,21 +653,18 @@ export function init() {
         const canTry = canTryAscent(state);
         if (gone) {
             // v1.50.0: the Watcher alone. No odds: there is nothing left to lose
-            setCaption(ui.ascendCaption, '');
+            setCaption(ui.ascendCaption, GO_UP_ALONE);
             ui.ascendBtn.classList.toggle('is-locked', busy || !!state.ascended);
             ui.ascendBtn.setAttribute('aria-label', 'Go up');
-            setTooltip(ui.ascendBtn, says(GO_UP_ALONE));
+            setTooltip(ui.ascendBtn, '');
         } else {
+            // deep-copy: ONE text, the caption beside the pill, with live numbers and no ±; no hover
             const ready = ascentReady();
-            setCaption(ui.ascendCaption, ready ? '' : `survival ${SURVIVAL_AT} % needed`);
+            setCaption(ui.ascendCaption, !ready ? `Opens at ${SURVIVAL_AT} % survival. Now about ${Math.round(ao.survival)} %.`
+                : asleep ? 'Wake the colony to go up.'
+                    : (!canTry ? `It takes at least ${ASCENT_MIN_PEOPLE} people.` : ''));
             ui.ascendBtn.classList.toggle('is-locked', busy || asleep || !canTry || !ready);
-            setTooltip(ui.ascendBtn, (ready
-                ? says(`Resurface: everyone goes up. The colony believes survival up there is ${Math.round(ao.survival)} % `
-                    + `(± ${Math.round(ao.spread)}). If it is wrong, the first ${formatCount(ao.party)} die and the rest wait.`)
-                : says(`The way up opens when the colony believes survival up there is ${SURVIVAL_AT} %: `
-                    + `${Math.round(ao.survival)} % (± ${Math.round(ao.spread)}) today.`))
-                + note(!ready ? '' : asleep ? 'The colony is asleep: wake it to go.'
-                    : (!canTry ? `Too few of us: at least ${ASCENT_MIN_PEOPLE} people to send anyone up.` : ''), 'is-missing'));
+            setTooltip(ui.ascendBtn, '');
         }
 
         const est = estimateNow(state);
@@ -722,7 +715,7 @@ export function init() {
        shift-click as many as can be paid; a level or an automation is still an order in the build
        queue with its ring. The game keeps ticking underneath. */
     const sealedThisSleep = [];     // sectors the body took in this sleep, for the wake-up strip
-    const treeView = ui.tree ? createTreeView(ui.tree, { state: () => state, ctx: treeCtx, onBuy: (id, many) => buyNode(id, many) }) : null;
+    const treeView = ui.tree ? createTreeView(ui.tree, { state: () => state, ctx: treeCtx, onBuy: (id, many) => buyNode(id, many), onClose: () => closeTree() }) : null;
     function openTree() {
         if (!treeView || treeView.isOpen()) return;
         hovering = null;
@@ -1283,7 +1276,7 @@ export function init() {
             r.row.classList.toggle('is-stuck', stuck);
             r.arc.setAttribute('stroke-dashoffset', (Q_RING * (1 - buildProgress(state, r.job))).toFixed(1));
             const left = Math.max(0, Math.ceil((eta.get(r.job) ?? state.day) - state.day));
-            const when = waiting && held ? 'Waits for the colony to wake.' : `Ready in ${backIn(left)}.`;
+            const when = waiting && held ? 'Waits for the colony to wake.' : `Ready in ${span(Math.max(1, left))}.`;
             const title = `${when} ${stuck ? 'A room waits for this chamber.' : 'Click to take it back.'}`;
             if (r.row.title !== title) r.row.title = title;
         }
@@ -1606,7 +1599,7 @@ export function init() {
         if (!out.success) {
             scene?.scoutsUp(out.lost);
             const line = ascentFailLine(out, formatCount);
-            advisorLine = `Year ${group(calendar(state.day).year)}: ${line}`;
+            advisorLine = `Year ${group(calendar(state.day).year)}. ${line}`;
             advisorUntil = 0;
             feed = pushFeed(feed, [line]);
             report = dryRun();

@@ -563,3 +563,51 @@ node and the caption), M (the new hover), V (Quiet hands' arrow), F (TREE 0.5 s 
 drift and the base soft at 20), 1 (capacity on the balances asleep; the feed does not repeat the advisor),
 D (Surface visiting, a step bought: no second demand while choosing, the meter holds), 2 (people and beds
 still lower 10 s after the seal). All checks hold, no console errors.
+
+## Built: deep-copy, chapter IV in plain words
+
+Opus, 2026-10-03, after Ola played v1.67: "I can't tell how many stars I have to buy with", "'85 %: 15'?
+Who writes like that?", "'Next 20 cap something something', what?". No rule and no balance constant
+moved; only what is said, and where.
+
+**The copy rules.** Short sentences read in one glance; no colon chains, no "A: B", no bare symbols as
+words, no internal names ("cap", "next:", "SYSTEM:"); ONE place per piece of information, a caption or a
+hover, never both; no outcome odds; the short number format.
+
+**The wallet** (`tree-view.js drawWallet`). The board's frame has a header band (HEAD, 44 units) over the
+nodes; in it, in the board's mono at 18 units (labels are 10), "★ 1.1 M   ore 181 k", asleep "capacity
+84". The strip above the board is gone. Node prices are white when they can be paid (stars, and a step's
+capacity and ore), dim when not.
+
+**The info box** (`tree.js infoLines`, `stateLine`, `costLine`). Name and level ("2 / 20", only for nodes
+with levels); what it does (`doesOf`, plain, no rung name; the Watcher's steps from `LADDER.does`,
+rewritten); the price in words ("Costs ★ 500 M, 60 capacity, 1 M ore and a dormitory."); where it stands
+("You can buy it.", "You need ★ 12 k more.", "You need 5 more capacity.", "Only while the colony sleeps.",
+"Being built: 3 days left.", "Opens after Cryo II.", Cryo's road "Needs generators automated ✓, farms
+automated and ★ 15 k."). The numbers (`effectLine`, now numbers only, capitalised) are a quiet fifth line.
+Until the first Watcher step is bought its nodes end with `CAPACITY_WORDS`. `canBuy`'s reasons are kept for
+the rules and the tests; the box no longer prints them.
+
+**The queue in the tree.** A node with orders has a thin ring at 6.5 units round it, filling with the
+order under way (`buildProgress`), and "+N" by its pips; level + orders going up flashes the node once.
+**The backdrop closes** the panel (`createTreeView` `onClose`): a click outside the board's frame (`tt-hit`),
+the info box and the nodes.
+
+**The column.** Sleep is hidden until Cryo I (`hadHall`, `arriveDue`: a fade once the tree is closed), reads
+"Sleep", and its hover says the rate in words. Go up: no hover; one caption, "Opens at 85 % survival. Now
+about 15 %.", or why it cannot go ("Wake the colony to go up."). The scout party: no caption; a hover of
+three lines and no odds. A tooltip with words hides the column's other captions (`:has()` in
+style-deep.css); an empty tooltip is not drawn.
+
+**The audit.** The bars' hovers say what the numbers over and under the bar are (no numbers twice); the
+stars and ore counters' hovers say what they are; the machine "plays 243 games a day on 1 energy and wins
+81"; the advisor, the feed and the scouts' lines without "A: B"; the night log's last line ("Surface waits
+for Cryo II.", "Surface speaks again in 3 sleeps."); Surface's game result ("You threw rock, Surface threw
+paper."); the ring "survival 85 % around year 802 701". Surface's own lines untouched; the alarm lines keep
+their meaning (the estimate wake: "About 85 %, and we need 85 %.").
+
+**Acceptance** (`scripts/accept-iv-cut.mjs`): section 0 (the wallet inside the board and the window,
+larger than a label; the info box on Seam and Cryo I; white and dim prices; the ring, "+1" and the flash;
+a click inside the board keeps it open, the backdrop closes it; no Sleep before Cryo I; Go up's one text),
+F (Sleep from "IV · cryo I"; the scout hover has no "%" and lies on no caption), 1 (asleep the wallet adds
+the capacity). All checks hold, no console errors.

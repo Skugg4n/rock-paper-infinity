@@ -2191,3 +2191,76 @@ items:
       downbeat (the departure); (4) the ◆ reveal calls arrive() once per plate: the war plays one rise,
       the city's own rise word would still stack outside the war.
     status: open
+
+  - id: B250
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      I can't tell how many stars I have to buy with. Put the wallet in the tree: inside the board, at its
+      top, larger than the labels, "★ 1.1 M   ore 181 k" (asleep "capacity 84"); prices white when they
+      can be paid, dim when not.
+    status: done
+    resolved_in: deep-copy (version at merge)
+    notes: "tree-view.js drawWallet in a header band inside the board's frame (HEAD); the HTML strip #deep-tree-bal is gone."
+
+  - id: B251
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      "Next 20 cap something something", what? The info box as four plain lines: name and level; what it
+      does; the price in words; where it stands. The before and after numbers as a quiet fifth line.
+    status: done
+    resolved_in: deep-copy (version at merge)
+    notes: "tree.js infoLines, stateLine, costLine, doesOf (plain), effectLine (numbers only); CAPACITY_WORDS until the first Watcher step."
+
+  - id: B252
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      Buying an upgrade builds it in some queue, but you don't notice: mark it in the tree. And a click
+      outside the skill tree should close it.
+    status: done
+    resolved_in: deep-copy (version at merge)
+    notes: "A ring filling round the node and '+1' by its pips; a flash on purchase; 'Being built: N days left.' A click on the backdrop closes the panel (tree-view.js onClose)."
+
+  - id: B253
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      Remove Sleep until it exists. Cryo I's requirements live only on its node in the tree.
+    status: done
+    resolved_in: deep-copy (version at merge)
+    notes: "The pill is hidden until Cryo I is bought and arrives with a fade (once the tree is closed); its caption is gone; the pill reads 'Sleep'."
+
+  - id: B254
+    added: 2026-10-03
+    source: "chat 2026-10-03 (Ola, after playing v1.67.0)"
+    request: |
+      We don't need a describing text next to it AND a mouse-over. Go up: '85 %: 15'? Scout party: texts
+      lie on top of each other, and the player need not know exactly what can happen ("followed by
+      something").
+    status: done
+    resolved_in: deep-copy (version at merge)
+    notes: "Go up: caption only. Scout party: hover only, three lines, no odds; open tooltips hide the column's other captions."
+
+  - id: B255
+    added: 2026-10-03
+    source: "deep-copy (the audit)"
+    request: |
+      Every caption, tooltip, info-box line, advisor and alarm line in IV against the copy rules: short
+      sentences, no colon chains, no internal names, one place per piece of information, no odds, the
+      short number format.
+    status: done
+    resolved_in: deep-copy (version at merge)
+    notes: "advisor.js, readout.js (ledger, affordText, consequence, buySentence), surface.js resultText, machine.js machineSays, crust.js, watcher.js LADDER.does, tree.js nightNext."
+
+  - id: B256
+    added: 2026-10-03
+    source: "deep-copy (for Ola's eye)"
+    request: |
+      Decisions taken in deep-copy, to overrule: (1) the capacity sentence shows on every Watcher node
+      until the first step is bought; (2) a multi-level node says "Shift-click buys all you can." after
+      "You can buy it."; (3) the bars' hovers say what the numbers over and under them are instead of
+      repeating them; (4) the wake pill's hover no longer counts down to the look wake; (5) numbers past
+      a thousand trillion still read "8e15" (readout.js short), as before.
+    status: open

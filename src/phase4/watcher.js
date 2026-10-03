@@ -578,19 +578,19 @@ export const RUNGS = ['SYSTEM', 'HARDWARE', 'BIOLOGICAL'];
  * chapter's own curve: a step is bought about when the colony's stars reach it in a plain run.
  */
 export const LADDER = [
-    { id: 'watchdog', rung: 0, name: 'Watchdog', icon: 'shield', does: 'Stability drifts 25 % slower.', short: 'stability drifts slower', cap: 20, stars: 2e4 },
-    { id: 'scheduler', rung: 0, name: 'Scheduler', icon: 'list-ordered', does: 'The build queue runs while they sleep.', short: 'the queue runs while they sleep', cap: 30, stars: 2e5 },
-    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'A snap gives half as much again.', short: 'a snap holds more', cap: 40, stars: 5e6 },
-    { id: 'nightvision', rung: 0, name: 'Night vision', icon: 'moon', does: 'Alarms come 10 % later.', short: 'alarms come later', cap: 50, stars: 5e7 },
-    { id: 'cooling', rung: 1, name: 'Cooling', icon: 'fan', does: 'Capacity holds twice as much.', short: 'capacity holds twice as much', cap: 60, stars: 5e8, ore: 1e6, beds: 1 },
-    { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'The lamps give twice as much.', short: 'the lamps give double', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
-    { id: 'mast', rung: 1, name: 'Sensor mast', icon: 'radio-tower', does: 'Scouts go up with better odds; a reading is off by half as much.', short: 'scouts read the sky better', cap: 120, stars: 3e11, ore: 1e8, beds: 1 },
-    { id: 'reactor', rung: 1, name: 'Reactor tap', icon: 'plug-zap', does: 'Capacity from the generators, three times over.', short: 'three times the capacity', cap: 150, stars: 1e13, ore: 1e9, beds: 1 },
+    { id: 'watchdog', rung: 0, name: 'Watchdog', icon: 'shield', does: 'Stability falls more slowly while they sleep.', short: 'stability drifts slower', cap: 20, stars: 2e4 },
+    { id: 'scheduler', rung: 0, name: 'Scheduler', icon: 'list-ordered', does: 'The build queue keeps going while they sleep.', short: 'the queue runs while they sleep', cap: 30, stars: 2e5 },
+    { id: 'deepread', rung: 0, name: 'Deep read', icon: 'book-open', does: 'Each click on the sleeping colony steadies it more.', short: 'a snap holds more', cap: 40, stars: 5e6 },
+    { id: 'nightvision', rung: 0, name: 'Night vision', icon: 'moon', does: 'The alarms let them sleep a little longer.', short: 'alarms come later', cap: 50, stars: 5e7 },
+    { id: 'cooling', rung: 1, name: 'Cooling', icon: 'fan', does: 'The Watcher can hold twice the capacity.', short: 'capacity holds twice as much', cap: 60, stars: 5e8, ore: 1e6, beds: 1 },
+    { id: 'secondcore', rung: 1, name: 'Second core', icon: 'cpu', does: 'The lamps steady it twice as much.', short: 'the lamps give double', cap: 90, stars: 1e10, ore: 1e7, beds: 1 },
+    { id: 'mast', rung: 1, name: 'Sensor mast', icon: 'radio-tower', does: 'Scouts read the sky better, and more of them come back.', short: 'scouts read the sky better', cap: 120, stars: 3e11, ore: 1e8, beds: 1 },
+    { id: 'reactor', rung: 1, name: 'Reactor tap', icon: 'plug-zap', does: 'The generators fill capacity three times as fast.', short: 'three times the capacity', cap: 150, stars: 1e13, ore: 1e9, beds: 1 },
     /* BIOLOGICAL (v1.50.0). Paid in people: `people` is the share of the colony drawn from the
        dormitories, and each step seals one sector of the base into the body. */
     { id: 'brain', rung: 2, name: 'Brain tissue, human grade', icon: 'brain', does: 'The lamps sometimes answer themselves.', short: 'the lamps answer themselves', cap: 120, stars: 1e14, people: 0.10 },
-    { id: 'nervous', rung: 2, name: 'Nervous system', icon: 'waypoints', does: 'The snap comes by itself.', short: 'the snap comes by itself', cap: 150, stars: 6e14, people: 0.15 },
-    { id: 'spinal', rung: 2, name: 'Spinal cooling fluid', icon: 'droplets', does: 'Stability drifts half as fast again.', short: 'stability drifts half as fast', cap: 180, stars: 4e15, people: 0.20 },
+    { id: 'nervous', rung: 2, name: 'Nervous system', icon: 'waypoints', does: 'The sleeping colony steadies itself now and then.', short: 'the snap comes by itself', cap: 150, stars: 6e14, people: 0.15 },
+    { id: 'spinal', rung: 2, name: 'Spinal cooling fluid', icon: 'droplets', does: 'Stability falls more slowly still.', short: 'stability drifts half as fast', cap: 180, stars: 4e15, people: 0.20 },
     { id: 'skin', rung: 2, name: 'Skin receptors', icon: 'fingerprint', does: 'The sentence can be heard.', short: 'the sentence can be heard', cap: 200, stars: 3e16, people: 0.25 },
 ];
 

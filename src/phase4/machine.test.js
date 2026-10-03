@@ -4,7 +4,7 @@ import {
     machineFed, WIN_ODDS, GAMES_EXP, impliedFeed,
 } from './deep.js';
 import { machineTempo, machineSays, lampLevel, MAX_THROWS, SLEEP_PACE, LAMP_PERIOD } from './machine.js';
-import { nodeStatus, buy, buyMany, canBuy, levelOf, priceOf, doesOf } from './tree.js';
+import { nodeStatus, buy, buyMany, canBuy, levelOf, priceOf, doesOf, effectLine } from './tree.js';
 import { deserializeDeep, serializeDeep, SCHEMA_VERSION } from './persistence.js';
 import { decide, press, screen } from './policy.js';
 
@@ -117,9 +117,9 @@ describe('the tree: "The machine: feed" has its rule', () => {
 
     test('its info box says how much of the spare energy the machine draws now and next', () => {
         const s = colony();
-        expect(doesOf(s, 'feed')).toMatch(/^The machine draws 6 % of the spare energy; the next level, 9 %\./);
-        s.feed = FEED_MAX;
-        expect(doesOf(s, 'feed')).toMatch(/^The machine draws 99 % of the spare energy\.$/);
+        // deep-copy: the sentence in words; the share before and after is the info box's quiet numbers line
+        expect(doesOf(s, 'feed')).toBe('The machine gets a bigger share of the spare energy, and plays more.');
+        expect(effectLine(s, 'feed')).toMatch(/^Its share 6 % → 9 %/);
     });
 });
 
@@ -153,10 +153,10 @@ describe('what the player sees', () => {
 
     test('its hover reads what it plays on, live, in the readouts\' short form (deep-fix)', () => {
         // the playtest of v1.66.0: "1 energy a day" next to "+81/d" stars; the games say how
-        expect(machineSays({ fed: 1.0, games: 243, stars: 81 })).toBe('The machine plays 243 games a day on 1 energy. Each win is a star: +81/d.');
-        expect(machineSays({ fed: 2.3e9, games: 6.1e10, stars: 2.03e10 })).toBe('The machine plays 61 B games a day on 2.3 B energy. Each win is a star: +20 B/d.');
-        expect(machineSays({ fed: 0.3, games: 81, stars: 27 })).toBe('The machine plays 81 games a day on less than 1 energy. Each win is a star: +27/d.');
-        expect(machineSays(0)).toBe('The machine plays 0 games a day on 0 energy. Each win is a star: +0/d.');
+        expect(machineSays({ fed: 1.0, games: 243, stars: 81 })).toBe('The machine plays 243 games a day on 1 energy and wins 81. Each win is a star.');
+        expect(machineSays({ fed: 2.3e9, games: 6.1e10, stars: 2.03e10 })).toBe('The machine plays 61 B games a day on 2.3 B energy and wins 20 B. Each win is a star.');
+        expect(machineSays({ fed: 0.3, games: 81, stars: 27 })).toBe('The machine plays 81 games a day on less than 1 energy and wins 27. Each win is a star.');
+        expect(machineSays(0)).toBe('The machine plays 0 games a day on 0 energy and wins 0. Each win is a star.');
         // a bare number is the energy fed; the games and the stars are the rule's
         expect(machineSays(1)).toBe(machineSays({ fed: 1, games: gamesFor(1), stars: starsFor(1) }));
     });

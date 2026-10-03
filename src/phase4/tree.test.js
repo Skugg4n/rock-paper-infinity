@@ -105,7 +105,7 @@ describe('buying a level or an automation is the order the button placed', () =>
         expect(canBuy(s, 'seam').reason).toBe('The colony is asleep: wake it to buy.');
         s.asleep = false;
         for (let i = 0; i < QUEUE_MAX; i++) startBuild(s, 'dig');
-        expect(canBuy(s, 'seam').reason).toBe('Eight orders are on the books: wait for one to land.');
+        expect(canBuy(s, 'seam').reason).toBe('The build queue is full.');
         expect(canBuy(s, 'seam', { queueMax: Infinity }).ok).toBe(true);
     });
 

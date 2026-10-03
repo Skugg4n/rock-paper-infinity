@@ -575,10 +575,10 @@
             </div>
             <div class="deep-group is-act" id="deep-group-act">
                 <span class="deep-group-word deep-mono">ACT</span>
-                <button class="btn deep-pill is-locked has-caption" id="deep-cryo-btn" aria-label="Sleep">
+                <!-- deep-copy: Sleep is not there until Cryo I is bought in the tree; it comes with a fade -->
+                <button class="btn deep-pill hidden" id="deep-cryo-btn" aria-label="Sleep">
                     <i data-lucide="snowflake" class="w-5 h-5"></i>
                     <span class="deep-pill-text deep-mono" id="deep-cryo-text">Sleep</span>
-                    <span class="deep-caption deep-mono" id="deep-cryo-caption"></span>
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
                 <button class="btn deep-pill hidden" id="deep-wake-btn" aria-label="Wake the colony">
@@ -592,6 +592,7 @@
                     <span class="deep-build"></span>
                     <div class="tooltip deep-tip-wide"></div>
                 </button>
+                <!-- deep-copy: one text only, the caption beside it ("Opens at 85 % survival. Now about 15 %.") -->
                 <button class="btn deep-pill is-locked has-caption" id="deep-ascend-btn" aria-label="Go up">
                     <i data-lucide="arrow-up-from-line" class="w-5 h-5"></i>
                     <span class="deep-pill-text deep-mono">Go up</span>
@@ -611,12 +612,9 @@
 
         <!-- deep-tree: THE SKILL TREE, a full-screen dark panel over the dimmed colony. The board is
              drawn by src/phase4/tree-view.js; one fixed info box under it says what the hovered
-             node is (no floating tooltips). Escape or the tree button closes it; the game ticks on -->
+             node is (no floating tooltips). Escape, the tree button or a click on the backdrop closes
+             it; the game ticks on. deep-copy: the wallet is drawn inside the board, at its top -->
         <div class="deep-tree" id="deep-tree" hidden>
-            <!-- deep-fix: the money while shopping, live at the panel's top edge -->
-            <div class="deep-tree-bal deep-mono" id="deep-tree-bal">
-                <span class="tb-ore"></span><span class="tb-stars"></span><span class="tb-cap" hidden></span>
-            </div>
             <div class="deep-tree-stage">
                 <svg class="deep-tree-board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The tree"></svg>
                 <div class="deep-tree-foot">
@@ -628,9 +626,10 @@
                     </div>
                     <div class="deep-tree-info deep-mono is-empty" id="deep-tree-info">
                         <div class="ib-row"><span class="ib-name"></span><span class="ib-lvl"></span></div>
+                        <div class="ib-does"></div>
                         <div class="ib-cost"></div>
-                        <div class="ib-eff"></div>
                         <div class="ib-x"></div>
+                        <div class="ib-eff"></div>
                         <div class="ib-q"></div>
                         <div class="ib-empty">› <span class="ib-caret"></span></div>
                     </div>
@@ -660,7 +659,7 @@
             </div>
             <!-- deep-tree: the Watcher's steps are bought in the tree. A biological step paid for and
                  waiting for its sector says so here; a click asks again -->
-            <button class="deep-watcher-ask deep-mono" id="deep-watcher-ask" hidden>BIOLOGICAL · Choose a sector to seal</button>
+            <button class="deep-watcher-ask deep-mono" id="deep-watcher-ask" hidden>Choose a sector to seal.</button>
         </div>
 
         <!-- deep-night (step 3b): SURFACE'S VISIT IS A SEQUENCE. One stage over the Watcher holds

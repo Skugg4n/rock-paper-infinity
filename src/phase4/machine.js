@@ -65,7 +65,8 @@ export function machineSays(r) {
     const games = Number.isFinite(o.games) ? Math.max(0, o.games) : gamesFor(fed);
     const stars = Number.isFinite(o.stars) ? Math.max(0, o.stars) : starsFor(fed);
     const energy = fed > 0 && Math.round(fed) < 1 ? 'less than 1' : short(fed);
-    return `The machine plays ${short(games)} ${Math.round(games) === 1 ? 'game' : 'games'} a day on ${energy} energy. Each win is a star: +${short(stars)}/d.`;
+    // deep-copy: in words, no "+81/d"
+    return `The machine plays ${short(games)} ${Math.round(games) === 1 ? 'game' : 'games'} a day on ${energy} energy and wins ${short(stars)}. Each win is a star.`;
 }
 
 /**

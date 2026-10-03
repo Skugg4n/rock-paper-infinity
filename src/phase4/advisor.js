@@ -70,17 +70,17 @@ export function advisorLines(was, now) {
     const out = [];
     const first = !was;
     if (now.hungry && (first || !was.hungry)) {
-        out.push('People are hungry; the colony is shrinking.');
+        out.push('People are hungry. The colony is shrinking.');
     } else if (now.foodWarn >= 0 && (first || was.foodWarn !== now.foodWarn)) {
-        out.push(`We are running low on food: ${Math.round(now.foodWarn)} days left.`);
+        out.push(`Food is running low. ${Math.round(now.foodWarn)} days left.`);
     }
     if (now.powerShort >= 0 && (first || was.powerShort !== now.powerShort)) {
-        out.push(`Energy is short: rooms run at ${Math.round(now.powerShort)} %.`);
+        out.push(`Energy is short. Rooms run at ${Math.round(now.powerShort)} %.`);
     }
     if (now.shortRoom && (first || was.shortRoom !== now.shortRoom || was.shortHands !== now.shortHands)) {
         const idle = ROOMS.filter((t) => t !== now.shortRoom);
         out.push(`The ${ROOM_WORD[now.shortRoom]} needs ${now.shortHands} more `
-            + `${now.shortHands === 1 ? 'hand' : 'hands'}; the ${ROOM_WORD[idle[idle.length - 1]]} is idle.`);
+            + `${now.shortHands === 1 ? 'hand' : 'hands'}. The ${ROOM_WORD[idle[idle.length - 1]]} is idle.`);
     }
     // v1.48.0: no line when the dot moves. The advisor's own line says where it stands and why
     // ("Food runs out in 21 days."), and five "the bottleneck moved" lines in a row pushed out
@@ -145,13 +145,15 @@ export function readingText(doomPct) {
  * @returns {string}
  */
 export function scoutLine(l) {
-    if (l.outcome === 'reading') return `Scout party returned: ${readingText(l.reading)}`;
-    if (l.outcome === 'wrong') return 'Scout party returned raving: reading unreliable.';
-    if (l.outcome === 'monster') return `Something came back with the scouts: ${chamberNo(l.slot)} dark.`;
-    return 'Scout party lost.';
+    // deep-copy: plain sentences, no "A: B"
+    if (l.outcome === 'reading') return `The scouts are back. ${cap(readingText(l.reading))}`;
+    if (l.outcome === 'wrong') return 'The scouts came back raving. Their reading is no use.';
+    if (l.outcome === 'monster') return `Something came back with the scouts. ${cap(chamberNo(l.slot))} is dark.`;
+    return 'The scouts did not come back.';
 }
 /** The line the feed gets the day a party leaves. */
-export const scoutSentLine = (people) => `Scout party sent (${Math.round(people)} ${Math.round(people) === 1 ? 'person' : 'people'}).`;
+export const scoutSentLine = (people) => `${Math.round(people)} ${Math.round(people) === 1 ? 'person' : 'people'} went up the shaft.`;
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 const JOB_DONE = {
     dig: () => 'the new chamber is dug',
@@ -182,13 +184,13 @@ export function alarmLine(alarm) {
     case 'scouts': {
         const l = (a.landed || [])[0];
         if (!l) return 'Woke: a scout party is home.';
-        if (l.outcome === 'reading') return `Woke: scout party returned, ${readingText(l.reading)}`;
-        if (l.outcome === 'wrong') return 'Woke: scout party returned raving. Reading unreliable.';
-        if (l.outcome === 'monster') return `Woke: something came back with the scouts. ${chamberNo(l.slot).replace(/^c/, 'C')} dark.`;
-        return 'Woke: scout party lost.';
+        if (l.outcome === 'reading') return `Woke: the scouts are back. ${cap(readingText(l.reading))}`;
+        if (l.outcome === 'wrong') return 'Woke: the scouts came back raving. Their reading is no use.';
+        if (l.outcome === 'monster') return `Woke: something came back with the scouts. ${cap(chamberNo(l.slot))} is dark.`;
+        return 'Woke: the scouts did not come back.';
     }
     case 'estimate':
-        return `Woke: we may survive up there. Survival ${Math.round(survival(a.est.mean))} ± ${Math.round(a.est.spread)} %, need ${SURVIVAL_AT} %.`;
+        return `Woke: we may survive up there. About ${Math.round(survival(a.est.mean))} %, and we need ${SURVIVAL_AT} %.`;
     case 'surface':
         return `Woke: the sensor on the shaft reads survival ${Math.round(survival(a.reading ?? 15))} %. The surface has healed.`;
     case 'act': {
@@ -217,9 +219,9 @@ export function alarmLine(alarm) {
 /** The same trouble as a clause, for a tooltip that warns before the sleep: "the mine stalls, no hands". */
 export function troubleClause(t) {
     if (!t) return '';
-    if (t.kind === 'stall') return t.why === 'fuel' ? 'the generators run out of ore' : `the ${ROOM_WORD[t.type] || t.type} stalls, no hands`;
-    if (t.kind === 'energy') return `energy runs short, rooms at ${t.pct} %`;
-    if (t.kind === 'food') return `food runs out in ${t.days} ${t.days === 1 ? 'day' : 'days'}`;
+    if (t.kind === 'stall') return t.why === 'fuel' ? 'the generators run out of ore' : `the ${ROOM_WORD[t.type] || t.type} stops for lack of hands`;
+    if (t.kind === 'energy') return 'energy runs short';
+    if (t.kind === 'food') return 'food runs out';
     if (t.kind === 'few') return 'too few of us are left';
     return 'something wakes it';
 }
@@ -230,5 +232,5 @@ export function troubleClause(t) {
  * @param {Function} [fmt] - number formatter
  */
 export function ascentFailLine(out, fmt = (v) => String(Math.round(v))) {
-    return `${fmt(Math.round(out.lost))} went up and did not come back. Survival up there is ${Math.round(out.survival)} %; we need ${SURVIVAL_AT}.`;
+    return `${fmt(Math.round(out.lost))} went up and did not come back. Survival up there is ${Math.round(out.survival)} %. We need ${SURVIVAL_AT} %.`;
 }

@@ -18,28 +18,37 @@
  * deep-night (step 3b): under the lines, the sentence as far as it is known (it is no longer on
  * screen between visits), and a last line that says what the next night waits for.
  *
- * deep-fix: the balances live at the top edge of the panel (ore, stars, and asleep the capacity), so
- * nothing is bought blind, and the info box's effect line carries its before and after numbers
- * (tree.js effectLine, a dry run on a copy), worked out only for the node under the cursor.
+ * deep-fix: the balances, so nothing is bought blind, and the info box's effect line carries its
+ * before and after numbers (tree.js effectLine, a dry run on a copy), worked out only for the node
+ * under the cursor.
+ *
+ * deep-copy (Ola on v1.67: "I can't tell how many stars I have to buy with"): THE WALLET is drawn
+ * inside the board, in a header band at its top, larger than any label: "★ 1.1 M   ore 181 k" (and
+ * asleep "capacity 84"). A price on a node is white when it can be paid and dim when not. The info
+ * box is four plain lines (tree.js infoLines) and a quiet fifth with the numbers. A node with an
+ * order under way has a thin ring filling round it and "+1" by its pips; a purchase flashes the node.
+ * A click on the backdrop outside the board closes the panel.
  */
 
 import {
     NODES, NODE_BY_ID, BOARD, NODE, ROOT_SIZE, TAGS, BRANCHES, tracePath, chainTo, nodeStatus, nightLog, nightNext,
-    effectLine,
+    effectLine, infoLines,
 } from './tree.js';
-import { capacityMax } from './watcher.js';
 import { sentenceShown } from './surface.js';
 import { short } from './readout.js';
+import { buildProgress, isQueued } from './deep.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const PL = '#d5dbe3', RK = '#0a0d12', BR = '#ffffff', BIO = '#e6b9a1', WARM = '#cfc9bb';
 const op = (a) => `rgba(213,219,227,${a})`;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** deep-copy: the board's header band, inside its frame, where the wallet is. */
+const HEAD = 44;
 /** The board in its own units, with room round it for the labels that hang off the edge nodes. */
-const VIEW = { x: -70, y: -20, w: BOARD.w + 100, h: BOARD.h + 40 };
+const VIEW = { x: -70, y: -20 - HEAD, w: BOARD.w + 100, h: BOARD.h + 40 + HEAD };
 /** deep-voice: once Surface has spoken, the view opens to the left for the night log, and above
  *  and below the board for the threads that run round it. */
-const VIEW_LOG = { x: -380, y: -34, w: BOARD.w + 410, h: BOARD.h + 70 };
+const VIEW_LOG = { x: -380, y: -34 - HEAD, w: BOARD.w + 410, h: BOARD.h + 70 + HEAD };
 /** The night log: where its lines start, how wide they may run, the mono's width per point. */
 const LOG = { x: -350, y: 18, w: 262, fs: 15, lh: 20, gap: 26, cw: 0.6 };
 /** How each night's thread runs from the log to its node: straight across, or round the board's
@@ -68,20 +77,17 @@ const poly = (pts) => `M ${pts.map((p) => `${p[0]} ${p[1]}`).join(' L ')}`;
  * @param {() => object} o.state - the colony now
  * @param {() => object} o.ctx - tree.js's context (the cryo reason, stars a day, asleep)
  * @param {(id:string, many:boolean) => void} o.onBuy
+ * @param {() => void} [o.onClose] - a click on the backdrop outside the board
  */
-export function createTreeView(host, { state, ctx, onBuy }) {
+export function createTreeView(host, { state, ctx, onBuy, onClose }) {
     const svg = host.querySelector('svg.deep-tree-board');
-    // deep-fix: the balances at the top edge
-    const bal = {
-        ore: host.querySelector('.deep-tree-bal .tb-ore'),
-        stars: host.querySelector('.deep-tree-bal .tb-stars'),
-        cap: host.querySelector('.deep-tree-bal .tb-cap'),
-    };
+    let wallet = null;                      // deep-copy: the wallet's <text>, in the board's header band
     let effect = { key: '', text: '' };      // the hovered node's effect line, worked out once a change
     const info = {
         box: host.querySelector('.deep-tree-info'),
         name: host.querySelector('.deep-tree-info .ib-name'),
         lvl: host.querySelector('.deep-tree-info .ib-lvl'),
+        does: host.querySelector('.deep-tree-info .ib-does'),
         cost: host.querySelector('.deep-tree-info .ib-cost'),
         eff: host.querySelector('.deep-tree-info .ib-eff'),
         x: host.querySelector('.deep-tree-info .ib-x'),
@@ -89,6 +95,14 @@ export function createTreeView(host, { state, ctx, onBuy }) {
     };
     const ac = new AbortController();
     const signal = ac.signal;
+    // deep-copy: a click on the backdrop outside the board closes the panel (as Escape and the button
+    // do). Inside the board's frame, on the info box or on a node, nothing closes.
+    host.addEventListener('click', (ev) => {
+        if (!isOpen || !onClose) return;
+        const t = ev.target;
+        if (t.closest && (t.closest('.tn') || t.closest('.deep-tree-info') || t.closest('.tt-hit'))) return;
+        onClose();
+    }, { signal });
     let built = false;
     let isOpen = false;
     let hoverId = null;
@@ -105,15 +119,22 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         svg.setAttribute('viewBox', `${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`);
         let h = `<defs><pattern id="deep-tree-dots" width="20" height="20" patternUnits="userSpaceOnUse">`
             + `<rect x="9.5" y="9.5" width="1" height="1" fill="${op(0.10)}"/></pattern></defs>`;
-        h += `<rect x="0" y="0" width="${BOARD.w}" height="${BOARD.h}" fill="url(#deep-tree-dots)"/>`;
-        h += `<rect x="0.5" y="0.5" width="${BOARD.w - 1}" height="${BOARD.h - 1}" fill="none" stroke="${op(0.16)}"/>`;
-        for (const c of [[0, 0, 1, 1], [BOARD.w, 0, -1, 1], [0, BOARD.h, 1, -1], [BOARD.w, BOARD.h, -1, -1]]) {
+        // deep-copy: the frame holds a header band over the nodes, for the wallet; a click anywhere
+        // inside the frame (tt-hit) does not close the panel
+        const top = -HEAD, tall = BOARD.h + HEAD;
+        h += `<rect class="tt-hit" x="-30" y="${top - 10}" width="${BOARD.w + 60}" height="${tall + 50}" fill="transparent"/>`;
+        h += `<rect x="0" y="${top}" width="${BOARD.w}" height="${tall}" fill="url(#deep-tree-dots)" pointer-events="none"/>`;
+        h += `<rect x="0.5" y="${top + 0.5}" width="${BOARD.w - 1}" height="${tall - 1}" fill="none" stroke="${op(0.16)}" pointer-events="none"/>`;
+        h += `<path d="M 0.5 -0.5 L ${BOARD.w - 0.5} -0.5" stroke="${op(0.08)}" pointer-events="none"/>`;
+        for (const c of [[0, top, 1, 1], [BOARD.w, top, -1, 1], [0, BOARD.h, 1, -1], [BOARD.w, BOARD.h, -1, -1]]) {
             h += `<path d="M ${c[0] + c[2] * 22} ${c[1]} L ${c[0]} ${c[1]} L ${c[0]} ${c[1] + c[3] * 22}" fill="none" stroke="${op(0.42)}" stroke-width="1.5"/>`;
             h += `<circle cx="${c[0] + c[2] * 16}" cy="${c[1] + c[3] * 16}" r="5" fill="none" stroke="${op(0.16)}"/>`;
         }
-        h += text(30, 30, 'IV · THE DEEP · THE TREE', { s: 8, c: op(0.22), ls: '0.2em' });
+        h += `<text class="tt-wallet" x="36" y="${top + 29}" font-size="18" letter-spacing="0.04em"></text>`;
+        h += text(BOARD.w - 34, top + 27, 'IV · THE DEEP · THE TREE', { a: 'end', s: 8, c: op(0.22), ls: '0.2em' });
         h += '<g class="tt-traces"></g><g class="tt-lit"></g><g class="tt-tags"></g><g class="tt-threads"></g><g class="tt-nodes"></g><g class="tt-log"></g>';
         svg.innerHTML = h;
+        wallet = svg.querySelector('.tt-wallet');
         logG = svg.querySelector('.tt-log');
         threadG = svg.querySelector('.tt-threads');
         const traces = svg.querySelector('.tt-traces');
@@ -170,8 +191,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         return { c: op(0.17), w: 1.5 };
     }
 
-    /** One node's inner drawing, from its status. */
-    function nodeSvg(n, st) {
+    /** One node's inner drawing, from its status. `afford`: its price can be paid now. */
+    function nodeSvg(n, st, afford) {
         const big = n.kind === 'root';
         const s = big ? ROOT_SIZE : NODE;
         const x0 = n.x - s / 2, y0 = n.y - s / 2;
@@ -199,6 +220,12 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         }
         // an opened gift keeps Surface's ring, filled in its tone
         if (gift) h += `<circle class="gift-ring" cx="${x0 + s - 7}" cy="${y0 + 7}" r="3.6" fill="${WARM}" stroke="${has ? RK : WARM}" stroke-width="1.1"/>`;
+        // deep-copy: an order under way is a thin ring round the node, filling as it is built
+        if (st.ordered > 0 && !big) {
+            const r = { x: x0 - 6.5, y: y0 - 6.5, w: s + 13 };
+            h += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.w}" fill="none" stroke="${op(0.18)}" stroke-width="1.5"/>`;
+            h += `<rect class="ord-ring" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.w}" fill="none" stroke="${bio ? BIO : BR}" stroke-width="1.5" pathLength="1" stroke-dasharray="0 1"/>`;
+        }
         if (big) {
             h += text(n.x, n.y - 2, 'THE', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
             h += text(n.x, n.y + 12, 'COLONY', { a: 'middle', c: RK, s: 11, w: 700, ls: '0.16em' });
@@ -214,6 +241,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
                 else if (i < st.level + st.ordered) h += `<rect class="pip is-ordered" style="--i:${i}" x="${px + 0.5}" y="${py + 0.5}" width="4" height="4" fill="none" stroke="${BR}"/>`;
                 else h += `<rect class="pip" style="--i:${i}" x="${px + 0.5}" y="${py + 0.5}" width="4" height="4" fill="none" stroke="${op(0.32)}"/>`;
             }
+            // deep-copy: and "+1" beside the pips while it is being built
+            if (st.ordered > 0) h += text(x0 + s + 6 + cols * 7, y0 + 7, `+${st.ordered}`, { s: 8, c: BR, cls: 'ord-plus' });
         }
         const label = surface ? op(0.26) : bio ? (has ? BIO : buyable ? BIO : 'rgba(230,185,161,0.42)')
             : has ? op(0.9) : buyable ? BR : op(0.36);
@@ -222,7 +251,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         // on the board only the stars; the whole price is in the info box
         const price = st.price && st.price.stars ? `★ ${short(st.price.stars)}` : '';
         if (price) all.push(price);
-        const priceC = buyable ? hot : op(0.36);
+        // deep-copy: white when it can be paid now, dim when not
+        const priceC = afford ? BR : op(0.36);
         const isP = (i) => price && i === all.length - 1;
         if (n.lab === 'l') {
             const top = n.y - (all.length - 1) * 6 + 3.5;
@@ -247,12 +277,18 @@ export function createTreeView(host, { state, ctx, onBuy }) {
             last[n.id] = st;
             const e = els[n.id];
             if (st.visible && n.branch) shownBranch[n.branch] = true;
-            const key = `${st.visible}|${st.status}|${st.level}|${st.ordered}|${st.price ? st.price.stars : ''}|${st.opened ? 1 : 0}`;
+            const afford = canPay(s, st.price);
+            const key = `${st.visible}|${st.status}|${st.level}|${st.ordered}|${st.price ? st.price.stars : ''}|${st.opened ? 1 : 0}|${afford ? 1 : 0}`;
+            // deep-copy: a purchase (more levels bought or on order than last time) flashes the node once
+            const sum = st.level + st.ordered;
+            if (e.sum !== undefined && sum > e.sum && st.visible) flash(e.g);
+            e.sum = sum;
             if (key !== e.key) {
                 e.key = key;
                 e.g.style.display = st.visible ? '' : 'none';
                 e.g.classList.toggle('is-buyable', st.status === 'buyable');
-                e.g.innerHTML = st.visible ? nodeSvg(n, st) : '';
+                e.g.innerHTML = st.visible ? nodeSvg(n, st, afford) : '';
+                e.ring = e.g.querySelector('.ord-ring');
                 if (e.trace) {
                     const sty = traceStyle(st);
                     e.trace.style.display = st.visible ? '' : 'none';
@@ -266,27 +302,46 @@ export function createTreeView(host, { state, ctx, onBuy }) {
                     }
                 }
             }
+            // the ring of an order under way fills as it is built
+            if (e.ring) {
+                const job = (s.builds || []).find((j) => j.kind === n.kind && j.type === n.type && !isQueued(j));
+                const p = job ? buildProgress(s, job) : 0;
+                const dash = `${p.toFixed(3)} 1`;
+                if (e.ring.getAttribute('stroke-dasharray') !== dash) e.ring.setAttribute('stroke-dasharray', dash);
+            }
         }
         for (const b of BRANCHES) tagEls[b].style.display = shownBranch[b] ? '' : 'none';
-        drawBalances(s, c);
+        drawWallet(s);
         drawLog(s);
         writeInfo(hoverId);
     }
 
-    /** The money while shopping: ore and stars with their day's flow, and asleep the capacity. */
-    const rate = (v) => (Number.isFinite(v) && Math.abs(v) >= 0.5 ? ` ${v >= 0 ? '+' : '-'}${short(Math.abs(v))}/d` : '');
-    let balText = '';
-    function drawBalances(s, c) {
-        const set = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
-        const ore = `ORE ${short(s.minerals || 0)}${rate(c.orePerDay)}`;
-        const stars = `★ ${short(s.stars || 0)}${rate(c.starsPerDay)}`;
+    /** Can this price be paid now: the stars, and the capacity and ore a Watcher step also asks. */
+    function canPay(s, price) {
+        if (!price) return false;
+        const w = s.watcher || {};
+        return (s.stars || 0) >= (price.stars || 0) && (w.capacity || 0) >= (price.cap || 0) && (s.minerals || 0) >= (price.ore || 0);
+    }
+    function flash(g) {
+        g.classList.remove('is-flash');
+        void g.getBoundingClientRect();
+        g.classList.add('is-flash');
+        setTimeout(() => g.classList.remove('is-flash'), 700);
+    }
+
+    /** THE WALLET (deep-copy): "★ 1.1 M   ore 181 k", and asleep "capacity 84", in the header band. */
+    let walletText = '';
+    function drawWallet(s) {
+        const stars = `★ ${short(s.stars || 0)}`;
+        const ore = `ore ${short(s.minerals || 0)}`;
         const w = s.watcher;
-        const cap = s.asleep && w ? `CAPACITY ${Math.floor(w.capacity || 0)} / ${capacityMax(w)}` : '';
-        set(bal.ore, ore);
-        set(bal.stars, stars);
-        set(bal.cap, cap);
-        if (bal.cap) bal.cap.hidden = !cap;
-        balText = [ore, stars, cap].filter(Boolean).join(' · ');
+        const cap = s.asleep && w ? `capacity ${Math.floor(w.capacity || 0)}` : '';
+        const t = [stars, ore, cap].filter(Boolean).join('   ');
+        if (t === walletText || !wallet) return;
+        walletText = t;
+        wallet.innerHTML = `<tspan fill="${BR}" font-weight="700">${esc(stars)}</tspan>`
+            + `<tspan dx="26" fill="${PL}">${esc(ore)}</tspan>`
+            + (cap ? `<tspan dx="26" fill="${op(0.8)}">${esc(cap)}</tspan>` : '');
     }
 
     /** THE NIGHT LOG: drawn again only when a line is added (or a node it ties to shows). */
@@ -326,7 +381,7 @@ export function createTreeView(host, { state, ctx, onBuy }) {
                     const yy = l.to === 'question' ? n.y + 10 : n.y;
                     pts.push([cx, yy], [n.x - half, yy]);
                 } else if (how === 'top') {
-                    const yt = -12 - 5 * nTop++;
+                    const yt = -HEAD - 12 - 5 * nTop++;
                     const vx = n.x - half - 30;
                     pts.push([cx, yt], [vx, yt], [vx, n.y + 8], [n.x - half, n.y + 8]);
                 } else {
@@ -358,38 +413,27 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         threadG.innerHTML = th;
     }
 
-    /** The info box: name in capitals, level, price, what it does, and why not (or how long). */
+    /** The info box (deep-copy): four plain lines (tree.js infoLines) and the numbers, quiet, last. */
     function writeInfo(id) {
         const st = id ? last[id] : null;
         info.box.classList.toggle('is-empty', !st);
-        const set = (el, v) => { if (el.textContent !== v) el.textContent = v; };
-        if (!st) { for (const k of ['name', 'lvl', 'cost', 'eff', 'x', 'q']) if (info[k]) set(info[k], ''); return; }
+        const set = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
+        if (!st) { for (const k of ['name', 'lvl', 'does', 'cost', 'eff', 'x', 'q']) set(info[k], ''); return; }
         const n = NODE_BY_ID[id];
-        set(info.name, st.name);
-        const lvl = n.kind === 'root' ? '' : `${Math.min(st.level, st.max)} / ${st.max}${st.ordered ? ` · ${st.ordered} ordered` : ''}`;
-        set(info.lvl, lvl);
-        let cost = '';
-        if (st.status === 'surface') cost = '';
-        else if (n.kind === 'root') cost = '';
-        else if (st.price) cost = `next ${st.priceText}`;
-        else if (st.level >= st.max || st.level + st.ordered >= st.max) cost = st.ordered ? 'on order' : 'bought';
-        set(info.cost, cost);
-        // deep-fix: the effect line with its numbers, from a dry run on a copy (the hovered node only)
         const s = state();
+        const L = infoLines(s, id, ctx(), st);
+        set(info.name, L.name);
+        set(info.lvl, L.lvl);
+        set(info.does, L.does);
+        set(info.cost, L.cost);
+        set(info.x, L.state);
+        info.x.className = `ib-x${L.tone ? ` is-${L.tone}` : ''}`;
+        // deep-fix: the numbers from a dry run on a copy (the hovered node only)
         const key = `${id}|${Math.floor(s.day || 0)}|${st.level}|${st.ordered}|${s.asleep ? 1 : 0}|${st.opened ? 1 : 0}|${Math.round(s.humans || 0)}`;
         if (effect.key !== key) effect = { key, text: effectLine(s, id) };
-        set(info.eff, effect.text || st.does);
-        let x = '';
-        let cls = '';
-        if (st.status === 'surface') { x = st.reason; }        // "Not ours to open."
-        else if (st.status === 'buyable') {
-            x = st.kind === 'choose' ? st.reason : (n.max > 1 ? 'click: one level · shift-click: as many as can be paid' : 'click to buy');
-            cls = 'is-go';
-        } else if (st.reason) { x = st.reason; cls = 'is-why'; }
-        set(info.x, x);
-        info.x.className = `ib-x ${cls}`;
+        set(info.eff, effect.text);
         // deep-voice: a gift quotes the line that opened it
-        if (info.q) set(info.q, st.quote ? `\u201c${st.quote}\u201d` : '');
+        set(info.q, L.quote);
         info.box.classList.toggle('is-bio', n.kind === 'bio');
     }
 
@@ -443,8 +487,8 @@ export function createTreeView(host, { state, ctx, onBuy }) {
         get log() { return logged.slice(); },
         /** For the tests: the log's last line, what the next night waits for ('' when there is none). */
         get logNext() { return loggedNext; },
-        /** For the tests: the balances at the top edge, as drawn. */
-        get balances() { return balText; },
+        /** For the tests: the wallet in the board's header band, as drawn. */
+        get balances() { return walletText; },
         get hovered() { return hoverId; },
         destroy() { ac.abort(); },
     };
