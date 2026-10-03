@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.78.0 - 2026-10-03 (chapter IV, GROW second pass: graft, the question as a choice, feeding, the dream, the heart)
+
+### Chapter IV, movement III · GROW, second pass: a taste of flesh, the question as a choice, a feeding loop, one choice at a time, the people counter, the body dreams, the heart is pumped (B320 to B329)
+
+Ola on v1.76.0: "You don't understand what the flesh does... Almost at once you're out of people, the body starves and there are no choices left. A dead end on Body." and "Now you have to sit and wait and watch and can't do anything." docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md, "Built: GROW second pass (deep-grow2)".
+
+- **The people counter** (B320). A third counter top right beside ore and stars (lucide "users", the count, "+N a day" or "-N a day"), from TEND on. In GROW the FEED gauge carries the count. Every price in people is written beside it in the same glyph: "Takes ⚇ 192 of your ⚇ 2.4 k and ⛏ 863 M." (readout.js PEOPLE_SIGN).
+- **The graft, a taste before the question** (B321). Night 4 gives a GRAFT (src/phase4/graft.js), night 5 a second. The panel says GRAFT A ROOM, every built room glows; a click turns one to flesh (both views, lone organ, no sinew): it makes five times what it made, "×5" floats over it, its people walk in (4 %) and it eats 1 % of the colony a year. Quiet hands' effect is folded into Lossless relay.
+- **The question as a choice** (B322). Its drawer row reads three lines; it never has to be bought.
+- **The feeding loop** (B323). The question gives the body at least two vats. The first takes cost a fifth (TAKE_FIRST, ramping over twelve), priced off the people the colony has; a small body eats a quarter (hunger grows with its size); a take that would starve the body is refused, its price red, the word GROW VATS (VATS are paid in ore now); a dead room revives by itself over ten days while there are people to spare. Each take floats its multiplier ("×20", VAT, HANDS) and the MASS needle is the body's weight. The lamps are counts: "DEEPEST FLOOR 3 / 12", "MACHINE 0 / 1".
+- **One choice at a time** (B324). The drawer opens empty (its button hidden): VATS when FEED first falls, APPETITE after the first necrosis, SPREAD after ten chosen by hand, MUSCLE once the first floor is full.
+- **The body dreams** (B325). Awake GROW runs a day a second as TEND does. The lever reads DREAM; a click on a chamber out of reach marks it (a faint red thread from the body, view-hooks markChamber / clearMarks); pulled, the dream dives time (grow.js dreamDaysAt) and the body grows along the marks; it wakes on HUNGER, REACHED or the lever (WAKE). The counter reads THE BODY DREAMS.
+- **The heart** (B326). Awake, the lid is a button that swells on the heartbeat (sound.js beat()); a click pumps: an organ still growing grows, a dead room revives a fifth, ore comes in; on the beat ×2, off it ×½, a 380 ms rhythm.
+- **Sim** (B327). The scripted player places the grafts, takes, marks and dreams to the rise and reports "longest stuck". Strata: 31m56s to 26m15s, GROW 12m45s (40 %) to 5m10s (20 %), stuck 8 s; 3D 30m16s to 25m57s, GROW 4m53s (19 %), stuck 10 s; --watcher 27m43s to 29m16s (18 %), stuck 10 s. GROW is a fifth, not a third: every longer setting tried pushed "longest stuck" past 10 s.
+- **Checkpoints and acceptance** (B328). New "IV · the graft"; "IV · the question answered" has the two grafts. accept-iv-cut.mjs checks P, F, Q, E, D, H, N in both views; shots docs/playtests/rebuild-shots/grow2-*.png. The 3D walkers no longer break when a dream closes a whole floor.
+- **Save** (B329). Schema 11: a save past night 4 is given its grafts; a body in the middle of GROW loads with its drawer items seen as their moments have come, never mid-dream.
+
 ## v1.77.0 - 2026-10-03 (chapter IV in the strata view; 3D stays selectable)
 
 ### Chapter IV: the strata view is the default; 3D stays selectable (B310 to B319)

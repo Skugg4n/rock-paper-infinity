@@ -31,6 +31,7 @@ import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
 import {
     growOn, risen, riseReady, hungry, bodyPrice, buyBody, viewOf, graphOf, canAfford, takePrice, takeChamber, rise,
+    wouldStarve, bodySeen, bodyPays, toggleMark, dreamStart,
 } from './grow.js';
 
 /** "Affordable in N days": a player waits for the goal when N is under this, a minute of play. */
@@ -132,44 +133,75 @@ export function press(state, a, view = null) {
 }
 
 /* ---- deep-grow: MOVEMENT III, the body, as a player who does what the panel says ---------------
-   Once The question is answered: every body item the drawer lights is bought (the vats first while
-   the body is hungry); a reachable chamber is taken when it can be paid and the body would not
-   starve for it (grow.js canAfford), a dormitory first (it becomes a vat), then the cheapest; the
-   lever is pulled the moment it reads RISE. */
+   Once The question is answered: every body item the drawer shows is bought when it can be paid (the
+   vats first while the body is hungry or a take would starve it); reachable chambers are taken while
+   they can be paid and the body would not starve for them (grow.js canAfford), the machine house
+   first, a dormitory next (it becomes a vat), then the cheapest; the lever is pulled the moment it
+   reads RISE. deep-grow2: when nothing can be taken, the player marks the next chambers the body
+   should reach and pulls DREAM; the heart is never pumped (the sim leaves it out). */
+/** A human clicks this many chambers a second at most. */
+export const TAKES_PER_SECOND = 1;
+/** Marks the player sets before a dream. */
+export const DREAM_MARKS = 6;
 /**
  * @param {object} state
  * @param {object} layout
- * @returns {{kind:'rise'|'body'|'take', id?:string}[]} in the order pressed
+ * @returns {{kind:'rise'|'body'|'take'|'mark'|'dream', id?:string, ids?:string[]}[]} in the order pressed
  */
 export function decideGrow(state, layout) {
-    if (!growOn(state) || risen(state)) return [];
+    if (!growOn(state) || risen(state) || state.grow.dreaming) return [];
     if (riseReady(state, layout).ready) return [{ kind: 'rise' }];
     const out = [];
-    const order = hungry(state, layout) ? ['vats', 'appetite', 'muscle', 'spread'] : ['vats', 'spread', 'muscle', 'appetite'];
-    let stars = state.stars || 0;
-    for (const id of order) {
-        const price = bodyPrice(state, id);
-        if (Number.isFinite(price) && stars >= price) { out.push({ kind: 'body', id }); stars -= price; }
-    }
     const reach = viewOf(state, layout).reachable;
+    const blocked = reach.some((id) => wouldStarve(state, layout, id));
+    const canTake = reach.some((id) => canAfford(state, layout, id));
+    const short = hungry(state, layout) || blocked || !canTake;
+    const order = short ? ['vats', 'appetite', 'muscle', 'spread'] : ['spread', 'muscle', 'appetite', 'vats'];
+    const purse = { stars: state.stars || 0, ore: state.minerals || 0 };
+    for (const id of order) {
+        if (!bodySeen(state, id)) continue;
+        if (id === 'vats' && !short) continue;
+        const price = bodyPrice(state, id);
+        const pay = bodyPays(id);
+        // one item a moment, as a hand in the drawer buys
+        if (Number.isFinite(price) && purse[pay] >= price) { out.push({ kind: 'body', id }); purse[pay] -= price; break; }
+    }
     const graph = graphOf(layout);
     const typeOf = (id) => graph.nodes.find((n) => n.id === id)?.type;
     // the machine the moment it can be had (the hands), then a dormitory (a vat), then the cheapest
     const rank = (id) => (id === 'machine' ? 0 : typeOf(id) === 'dorm' ? 1 : 2);
     // deep-swap: with the machine house in reach, the player saves the people for it rather than
-    // spending them on cheaper chambers (in the strata row the dormitories come late and the machine
-    // waited minutes behind floor 1)
-    if (reach.includes('machine') && !canAfford(state, layout, 'machine')) return out;
-    const pick = reach
+    // spending them on cheaper chambers (in the strata row the dormitories come late)
+    const saving = reach.includes('machine') && !canAfford(state, layout, 'machine');
+    const picks = saving ? [] : reach
         .filter((id) => canAfford(state, layout, id))
-        .sort((a, b) => (rank(a) - rank(b)) || (takePrice(state, layout, a).people - takePrice(state, layout, b).people))[0];
-    if (pick) out.push({ kind: 'take', id: pick });
+        .sort((a, b) => (rank(a) - rank(b)) || (takePrice(state, layout, a).people - takePrice(state, layout, b).people));
+    if (picks.length) { out.push({ kind: 'take', id: picks[0] }); return out; }
+    if (out.length) return out;
+    // nothing to take: mark where the body should go, and dream
+    out.push({ kind: 'mark', ids: nextMarks(state, layout, DREAM_MARKS) });
+    out.push({ kind: 'dream' });
     return out;
 }
-/** Do what decideGrow chose. `starsPerDay` (the day's report) prices the next level of an item. */
-export function pressGrow(state, layout, a, starsPerDay = 0) {
+/** The chambers the body should reach next: the machine house once in reach, else the nearest. */
+export function nextMarks(state, layout, n = DREAM_MARKS) {
+    const graph = graphOf(layout);
+    const body = new Set(state.grow.body);
+    const reach = viewOf(state, layout).reachable;
+    if (reach.includes('machine')) return ['machine'];
+    const near = (id) => { const x = graph.nodes.find((m) => m.id === id); return x.floor * 100 + Math.abs(x.x) + Math.abs(x.z); };
+    return graph.nodes.filter((x) => !body.has(x.id) && x.id !== 'machine').map((x) => x.id).sort((a, b) => near(a) - near(b)).slice(0, n);
+}
+/** Do what decideGrow chose. `starsPerDay`, `orePerDay` (the day's report) price the next level of an item. */
+export function pressGrow(state, layout, a, starsPerDay = 0, orePerDay = 0) {
     if (a.kind === 'rise') return rise(state, layout);
-    if (a.kind === 'body') return !!buyBody(state, a.id, starsPerDay);
+    if (a.kind === 'body') return !!buyBody(state, a.id, starsPerDay, orePerDay);
     if (a.kind === 'take') return !!takeChamber(state, layout, a.id);
+    if (a.kind === 'mark') {
+        for (const id of state.grow.marks.slice()) toggleMark(state, layout, id);
+        for (const id of a.ids || []) toggleMark(state, layout, id);
+        return true;
+    }
+    if (a.kind === 'dream') return dreamStart(state, layout);
     return false;
 }

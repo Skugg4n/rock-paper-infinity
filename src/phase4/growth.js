@@ -43,7 +43,10 @@ export const HUNGER_FLOOR_GROWTH = 1.6;
 /** People a year the machine house eats once it is body. */
 export const EAT_MACHINE = 12;
 /** People a year one vat (a dormitory the body took) grows at dormitory level 0. */
-export const VAT_GROWTH = 10;
+export const VAT_GROWTH = 14;
+/** deep-grow2: a vat deeper down grows more, by this factor a floor (as the organs there eat more):
+ *  a floor's vats feed that floor. */
+export const VAT_FLOOR_GROWTH = 1.6;
 /** Each dormitory level adds this share to a vat's growth. */
 export const VAT_PER_LEVEL = 0.15;
 /** A living organ makes this many times what the room made as machinery... */
@@ -55,8 +58,9 @@ export const NECROSIS_PER_YEAR = 1;
 /** Organs that revive per fed year. */
 export const REVIVE_PER_YEAR = 1;
 /** A necrotic organ revives only when the people left after the year's meal cover this many years
- *  of what it will eat: so the body does not flicker in and out at the edge of hunger. */
-export const REVIVE_COVER = 2;
+ *  of what it will eat: so the body does not flicker in and out at the edge of hunger. deep-grow2:
+ *  one year ("a necrotic room revives by itself once FEED is above zero"). */
+export const REVIVE_COVER = 1;
 /** The mass of one living organ on floor 0; deeper organs weigh more by MASS_FLOOR_GROWTH a floor. */
 export const MASS_PER_ORGAN = 1;
 export const MASS_FLOOR_GROWTH = 1.5;
@@ -243,7 +247,7 @@ export function hunger(graph, state, levels = {}, opts = {}) {
     for (const id of state.body) {
         eat += eatOf(graph, state, id, levels, ek);
         const n = byId.get(id);
-        if (isVat(n) && !isNecrotic(state, id)) grow += gk * VAT_GROWTH * (1 + VAT_PER_LEVEL * (levels.dorm || 0));
+        if (isVat(n) && !isNecrotic(state, id)) grow += gk * VAT_GROWTH * (1 + VAT_PER_LEVEL * (levels.dorm || 0)) * Math.pow(VAT_FLOOR_GROWTH, Math.max(0, n.floor));
     }
     return { eat, grow, net: grow - eat };
 }

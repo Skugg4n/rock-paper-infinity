@@ -937,10 +937,12 @@ export function createScene(container, opts = {}) {
         nodes.forEach((nd) => { nd.adj = nd.adj.filter((i) => !cut.has(i)); });
         // anyone left standing on a node that has gone nowhere walks on from the nearest open one
         standable();
-        for (const p of folk) {
-            if (nodes[p.at].adj.length && nodes[p.to].adj.length) continue;
+        for (let i = folk.length - 1; i >= 0; i--) {
+            const p = folk[i];
+            if (nodes[p.at] && nodes[p.to] && nodes[p.at].adj.length && nodes[p.to].adj.length) continue;
             const f = floors[p.floor];
-            if (!f || !f.nodes.length) continue;
+            // deep-grow2: a floor the flesh has closed whole (a dream takes many at once) has nowhere to stand
+            if (!f || !f.nodes.length) { folk.splice(i, 1); continue; }
             p.at = p.prev = p.to = f.nodes[Math.floor(rnd() * f.nodes.length)];
             p.state = 'walk'; p.t = 1; p.len = 1;
         }
@@ -1174,6 +1176,7 @@ export function createScene(container, opts = {}) {
     }
 
     function chooseNext(p) {
+        if (!nodes[p.at]) return;
         const adj = nodes[p.at].adj;
         if (!adj.length) return;
         let n = adj[Math.floor(rnd() * adj.length)];
@@ -1219,8 +1222,12 @@ export function createScene(container, opts = {}) {
                 p.to3.set(0, floors[p.next].y - 0.2, 0);
                 p.dur = p.from3.distanceTo(p.to3) / p.speed;
             } else if (p.state === 'stairs') {
+                // deep-grow2: the flesh closed every door on that floor while they were on the stairs (a
+                // dream takes many chambers at once): they come back out where they went in
+                const open = floors[p.next] && floors[p.next].doors.filter((i) => nodes[i] && nodes[i].adj.length);
+                if (!open || !open.length) { p.state = 'walk'; p.t = 1; p.len = 1; p.to = p.at; chooseNext(p); return; }
                 p.floor = p.next;
-                const doors = floors[p.floor].doors;
+                const doors = open;
                 p.at = doors[Math.floor(rnd() * doors.length)];
                 p.prev = p.at;
                 p.state = 'exit'; p.clock = 0;

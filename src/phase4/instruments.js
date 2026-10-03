@@ -90,6 +90,7 @@ export const ADVICE = {
     automate: (t) => `AUTOMATE ${ROOMS_UP[t]}`,
     dig: 'DIG',
     vats: 'BUILD CULTURE VATS',
+    graft: 'GRAFT A ROOM',
     question: 'THE QUESTION',
     feed: 'FEED THE MACHINE',
     longer: 'LONGER SLEEP',
@@ -132,6 +133,8 @@ export function advise(state, report, { road = null, lever = false, g = gauges(s
         }
     }
     if ((state.humans || 0) < MIN_SLEEPERS) { const w = buildOrDig(state, 'dorm'); if (w) return w; }
+    // deep-grow2: Surface gave a graft, and it waits for a room
+    if (state.graft && state.graft.owed > 0 && !state.grow) return ADVICE.graft;
     // 2. the lever is there: the goal
     if (state.cryo < 0 && lever) return ADVICE.sleep;
     // 3. ore for a room of the weakest kind, or for a chamber
@@ -256,11 +259,12 @@ const DOES = {
     output: 'Generators make twice the power.',
     beds: 'Dormitories sleep twice as many.',
     feed: 'The machine plays more games.',
-    lossless: 'Automated rooms make three times more.',
+    lossless: 'Automated rooms make three times more and cost less to run.',
     quiet: 'Automated rooms cost almost nothing.',
     cold: 'Sleepers eat nothing at all.',
     longcount: 'A second sleeps a million years.',
-    question: 'The body begins.',
+    // deep-grow2: what the question does, three short lines (the drawer draws each on its own line)
+    question: 'The body takes the colony, room by room.\nIt eats people. It grows them in vats.\nIt is the only way up.',
     watchdog: 'The mind drifts more slowly.',
     scheduler: 'Building goes on in sleep.',
     deepread: 'A click steadies it more.',

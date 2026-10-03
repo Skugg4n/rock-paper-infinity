@@ -67,7 +67,8 @@ describe('the script (deep-voice)', () => {
             'All your automation makes the humans obsolete.',
             'Do you know the efficiency of a human brain?',
         ]);
-        expect(NIGHTS.map((x) => x.gives)).toEqual([null, 'lossless', 'cold', 'quiet', 'longcount', 'question']);
+        expect(NIGHTS.map((x) => x.gives)).toEqual([null, 'lossless', 'cold', null, 'longcount', 'question']);
+        expect(NIGHTS.map((x) => !!x.graft)).toEqual([false, false, false, true, true, false]);
         expect(BIO_LINES[BIO_LINES.length - 1]).toBe(SENTENCE_LINE);
         for (const l of [...NIGHTS.map((x) => x.line), ...BIO_LINES]) expect(l).not.toMatch(/[‒-―]/);
         expect(TYPE_MS).toBe(35);

@@ -11,7 +11,7 @@ import { initialWatcher, normalizeWatcher } from './watcher.js';
 import { normalizeTree } from './tree.js';
 import { impliedNight, nightGift, NIGHTS, SENTENCE_LINE } from './surface.js';
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 // Keyed by the version being migrated FROM. Add entries when SCHEMA_VERSION grows.
 const MIGRATIONS = {
@@ -125,6 +125,19 @@ const MIGRATIONS = {
     9: (p) => {
         const st = p.state || {};
         if (st.grow !== undefined && (st.grow === null || typeof st.grow !== 'object')) delete st.grow;
+        p.state = st;
+        return p;
+    },
+    /* deep-grow2: THE GRAFT. Nights 4 and 5 give a graft now (Quiet hands' effect is folded into
+       Lossless relay; a save that bought Quiet hands keeps it). A save past night 4 that has not
+       answered the question is given the grafts its nights owe, to place at the next wake. A body
+       under way keeps what it has; grow.js normalizeGrow sets the second pass's fields from it (the
+       drawer items it has bought, or whose moment has come, are in the drawer; a dream is not kept). */
+    10: (p) => {
+        const st = p.state || {};
+        const night = (st.watcher && st.watcher.surface && st.watcher.surface.night) | 0;
+        const had = st.graft && typeof st.graft === 'object' ? st.graft : null;
+        if (!had) st.graft = { owed: st.grow ? 0 : (night >= 4 ? 1 : 0) + (night >= 5 ? 1 : 0), slots: [] };
         p.state = st;
         return p;
     },

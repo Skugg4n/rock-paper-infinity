@@ -11,7 +11,7 @@
  */
 
 import { GAUGES, RED_K, GREEN_FROM, GREEN_SPAN, ADVICE_PREFIX, ADVICE_HOLD_MS } from './instruments.js';
-import { ORE_GLYPH } from './readout.js';
+import { ORE_GLYPH, signHtml } from './readout.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const CX = 60, CY = 62, R = 46;
@@ -155,11 +155,16 @@ export function createPanel(els) {
         const flesh = document.createElement('span');
         flesh.className = 'flesh-tape';
         holder.appendChild(flesh);
+        // deep-grow2: a count the gauge carries (FEED: the people), in the counter's own format
+        const num = document.createElement('span');
+        num.className = 'deep-gauge-num deep-mono';
+        num.hidden = true;
+        holder.appendChild(num);
         cell.appendChild(holder);
         els.gauges.appendChild(cell);
         g[c] = {
             cell, needle: svg.querySelector('.needle'), x: 0, v: 0, target: 0, red: false, twitch: 0, spring: c === 'H' ? SPRING_SLOW : SPRING,
-            flesh, fluidBody: svg.querySelector('.fluid-body'), fluidTop: svg.querySelector('.fluid-top'), phase: Math.random() * 6,
+            flesh, num, fluidBody: svg.querySelector('.fluid-body'), fluidTop: svg.querySelector('.fluid-top'), phase: Math.random() * 6,
         };
     }
     // the three lamps of cryo, built once; their words are fixed
@@ -200,6 +205,8 @@ export function createPanel(els) {
                 if (!x) continue;
                 g[c].target = x.k;
                 if (g[c].red !== x.red) { g[c].red = x.red; g[c].cell.classList.toggle('is-red', x.red); }
+                const num = x.num || '';
+                if (g[c].num.dataset.text !== num) { g[c].num.dataset.text = num; g[c].num.innerHTML = signHtml(num); g[c].num.hidden = !num; }
             }
             // the stamped word changes rarely: it holds ADVICE_HOLD_MS before the next may replace it
             const now = performance.now();

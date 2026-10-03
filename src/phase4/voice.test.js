@@ -43,7 +43,9 @@ describe('a night opens a node', () => {
             expect(s.tree.opened).toEqual(opened);
         }
         expect(s.tree.unseen).toBe(true);
-        expect(nightLog(s).map((l) => [l.n, l.to])).toEqual([[1, 'watchdog'], [2, 'lossless'], [3, 'cold'], [4, 'quiet'], [5, 'longcount'], [6, 'question']]);
+        // deep-grow2: night 4 gives a graft (no node), night 5 a second graft beside Long count
+        expect(nightLog(s).map((l) => [l.n, l.to])).toEqual([[1, 'watchdog'], [2, 'lossless'], [3, 'cold'], [4, null], [5, 'longcount'], [6, 'question']]);
+        expect(s.graft).toEqual({ owed: 2, slots: [] });
     });
 
     test('not opened: "Not ours to open."; opened: buyable at its price, quoting the line', () => {

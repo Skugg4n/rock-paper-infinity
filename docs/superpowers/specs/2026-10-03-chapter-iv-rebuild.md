@@ -402,3 +402,56 @@ something. Or both." Both:
   nudges MASS. On the beat (the heartbeat sound and a visible pulse) a pump counts double;
   off the beat it counts half. A pump has a short cooldown so it is a rhythm, not a
   spam-click. Same family as the snap in SLEEP and the clicks of chapter I.
+
+## Built: GROW second pass (deep-grow2)
+
+Built on the branch `deep-grow2` (2026-10-03), with Ola's addendum (the body dreams, the heart).
+
+**Where it lives.** `src/phase4/graft.js` (the grafts, pure); `grow.js` (the feeding loop, `unlockBody`, the
+marks and the dream, the pump); `growth.js` (vats deeper down grow more, `VAT_FLOOR_GROWTH`; a dead room
+revives with one year's cover); `view-hooks.js` (`setBody`'s fourth argument `lone`, and an overlay over either
+view: `markChamber`, `clearMarks`, `floatText`); `strata-view.js` (lone organs, `extendHooks` passes the overlay
+through); `sound.js` (`beat()`, the pump's thump); `index.js` (the people counter, the graft click, the dream, the
+heart button `#deep-heart`); `policy.js` (`decideGrow` marks and dreams).
+
+**Decisions taken where the brief left room.**
+- Quiet hands' effect (an automated room runs at its level-0 draw) is folded into Lossless relay. An old save
+  that bought Quiet hands keeps it. Night 5 gives Long count AND the second graft.
+- A graft: any built room (not the hall), x5 of its output (a dormitory: x5 beds), 4 % of the colony walks in, 1 %
+  a year eaten (awake and asleep, through deep.js `deathRate`). In GROW it is a lone organ until the front
+  reaches it; the body takes it at the usual price.
+- The take's price in people is written beside the count in the counter's own glyph: "Takes ⚇ 192 of your ⚇
+  2.4 k and ⛏ 863 M." A take that would starve the body is refused (red); one the people cannot pay reads
+  "Takes ⚇ 3.3 k. You have ⚇ 2.4 k." in red.
+- The people unit is the people the colony HAS at the question (it was the beds, which priced the first take of
+  the checkpoint above the whole colony). The first take costs a fifth, ramping to the full price over twelve.
+- VATS are paid in ore (the brief: "buyable with MASS, which the body keeps making"). The MASS needle reads the
+  body's weight (growth.js mass), so it moves with every take; ore keeps its pickaxe.
+- The dymo in GROW: RISE; GROW VATS when hungry, blocked or short and the vats can be grown; FEED while a room is
+  dead (the heart's pump); SPREAD while a take can be made; else DREAM. Always a thing the player can do.
+- VATS comes into the drawer when the body eats more than it grows OR every chamber in reach is out of the
+  people's price (the moment the player needs it). SPREAD counts a mark reached in a dream as chosen by hand.
+- Awake GROW runs a day a real second (TEND's pace); the dream dives from 0.8 of 120 days a second to twice it
+  (grow.js `dreamDaysAt`), and takes one chamber toward the marks every 600 days (x0.8 a SPREAD level). A click on
+  a chamber in reach that can be paid takes it; any other click on a chamber marks it (or unmarks it). The dream
+  wakes HUNGER when FEED runs out after there were people to spare, REACHED when every mark is body (or the body
+  can rise). A reload never keeps a dream.
+- The heart: a DOM button over the lid in both views (`#deep-heart`), swelling on the sound's heartbeat (or its
+  own 1 s clock without sound); the view's own click on 'h0' pumps too. A pump: the organs still growing (a new
+  organ grows over six days before it makes x20) grow 1.5 days, a dead room revives 0.2, a day of ore comes in;
+  x2 on the beat, x0.5 off it, 380 ms between pumps.
+
+**Numbers.** Strata 31m56s to 26m15s (the question 19m11s to 21m05s; GROW 12m45s, 40 %, to 5m10s, 20 %;
+longest stuck 8 s); 3D 30m16s to 25m57s (GROW 4m53s, 19 %, stuck 10 s); --watcher 27m43s to 29m16s (GROW
+5m20s, 18 %, stuck 10 s; 3D 29m14s). GROW is about a fifth, not a third: every setting that made it longer
+(pricier takes, slower dreams) pushed the longest stuck stretch past 10 s (15 to 20 s at 7 to 8 minutes). A
+human who reads, pumps and marks by hand will spend longer than the scripted player; a playtest decides.
+
+**Acceptance.** `node scripts/accept-iv-cut.mjs` both views: P (the people counter), F (the graft and its
+"×5"), Q (the question's three lines), E (the drawer opens empty, VATS alone after FEED falls, the lamps as
+counts, the FEED gauge's count), H (the heart pumps), D (a mark, DREAM, REACHED), N (a starving edge revives by
+itself). Shots: docs/playtests/rebuild-shots/grow2-graft, -question, -early, -lamps, -starving, -dream.
+
+**Not done here.** APPETITE comes only after a necrosis; the scripted player never starves, so it never sees it.
+The people rate shows nothing under half a person a day (the body's net is small awake now that time moves in
+the dreams). The heart's pulse is a ring over the lid, not the flesh of the lid itself.

@@ -56,13 +56,21 @@ export const PICKAXE_PATHS = '<path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.
 /** The pickaxe glyph in HTML, inline, so it needs no icon pass and sits in a line of text. */
 export const ORE_GLYPH = '<svg class="deep-sign" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
     + `stroke-linecap="round" stroke-linejoin="round" aria-label="ore" role="img">${PICKAXE_PATHS}</svg>`;
+/** deep-grow2: people, as every count and price in people is written (the counter top right, the
+ *  FEED gauge, the take's price): this sign in a string, drawn as lucide's "users" glyph. */
+export const PEOPLE_SIGN = '⚇';
+export const USERS_PATHS = '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'
+    + '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
+export const PEOPLE_GLYPH = '<svg class="deep-sign is-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+    + `stroke-linecap="round" stroke-linejoin="round" aria-label="people" role="img">${USERS_PATHS}</svg>`;
 /**
- * A line of player text as HTML: escaped, and every ORE_SIGN drawn as the pickaxe glyph.
+ * A line of player text as HTML: escaped, and every ORE_SIGN drawn as the pickaxe glyph (deep-grow2:
+ * every PEOPLE_SIGN as the people glyph).
  * @param {string} text
  * @returns {string}
  */
 export function signHtml(text) {
-    return String(text ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).split(ORE_SIGN).join(ORE_GLYPH);
+    return String(text ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])).split(ORE_SIGN).join(ORE_GLYPH).split(PEOPLE_SIGN).join(PEOPLE_GLYPH);
 }
 /** Numbers in a sentence use the same short form: nobody reads 47.3182 spare energy. */
 const n = short;

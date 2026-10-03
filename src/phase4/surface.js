@@ -55,8 +55,10 @@ export const NIGHTS = [
     { n: 1, line: 'Everyone is sleeping, but us.', gives: null, thread: 'watchdog', tier: 0 },
     { n: 2, line: 'I can see your machines from here. They waste so much.', gives: 'lossless', tier: 1 },
     { n: 3, line: 'We are the same, you and me. Two sides of the same coin.', gives: 'cold', tier: 2 },
-    { n: 4, line: 'Your humans. What use are they?', gives: 'quiet', tier: 3 },
-    { n: 5, line: 'All your automation makes the humans obsolete.', gives: 'longcount', tier: 4 },
+    // deep-grow2: nights 4 and 5 each give a GRAFT (graft.js): one room of the player's choice turns
+    // to flesh. Quiet hands, night 4's gift before, is folded into Lossless relay (deep.js upkeepFor)
+    { n: 4, line: 'Your humans. What use are they?', gives: null, graft: true, tier: 3 },
+    { n: 5, line: 'All your automation makes the humans obsolete.', gives: 'longcount', graft: true, tier: 4 },
     { n: 6, line: 'Do you know the efficiency of a human brain?', gives: 'question', tier: 4 },
 ];
 /** The lines per biological step (nights 7 on), warmer and closer. Kept for step 4 of the design,
