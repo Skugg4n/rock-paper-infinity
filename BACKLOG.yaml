@@ -2189,6 +2189,8 @@ items:
       2.8 s strokes; (3) a landing is heard at the impact, which comes 10 to 20 s after the drum's
       downbeat (the departure); (4) the ◆ reveal calls arrive() once per plate: the war plays one rise,
       the city's own rise word would still stack outside the war.
+    status: open
+    resolved_in: null
 
   - id: B238
     added: 2026-10-03
