@@ -38,7 +38,7 @@ export const UPKEEP_SHARE_PER_UNIT = 0.0004;
 /** Food eaten per unit per second (troops eat like people). */
 export const FOOD_PER_UNIT = 1;
 /** HP of plates by building type. Fortification adds FORT_HP per level. */
-export const PLATE_HP = { home: 10, apartment: 20, skyscraper: 40, district: 90, store: 15, superStore: 30, factory: 60, bank: 30 };
+export const PLATE_HP = { home: 10, apartment: 20, skyscraper: 40, district: 90, store: 15, superStore: 30, greenhouse: 35, factory: 60, bank: 30 };
 export const FORT_HP = 12;
 export const FORT_COST = (level) => Math.round(40 * Math.pow(1.6, level));
 /** Enemy tiles: HP per tile (in units of an equal strike). */
@@ -253,7 +253,7 @@ export function pickTarget(plates, rand) {
     const alive = plates.filter(p => !p.razed && p.type !== 'factory' && p.type !== 'bank');
     if (!alive.length) return null;
     const maxRow = Math.max(...alive.map(p => p.row));
-    const value = { home: 1, apartment: 2, skyscraper: 3, district: 5, store: 1.5, superStore: 2 };
+    const value = { home: 1, apartment: 2, skyscraper: 3, district: 5, store: 1.5, superStore: 2, greenhouse: 2.5 };
     const weights = alive.map(p => {
         const weak = 1 / (1 + (p.fort || 0));            // weak fortification
         const worth = value[p.type] || 1;                 // valuable

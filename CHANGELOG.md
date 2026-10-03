@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.82.1 - 2026-10-04 (the war knows the greenhouse)
+
+- **Greenhouses in the war.** A greenhouse plate takes 35 before it falls (between a super store's 30 and a skyscraper's 40), and landings aim for it a little more often than a super store (value 2.5 against 2), since it feeds the most people. Until now the war treated it as the weakest, least interesting plate.
+
 ## v1.82.0 - 2026-10-03 (chapter II, the greenhouse)
 
 ### A third level of food

@@ -215,6 +215,20 @@ describe('war rules', () => {
         expect(r.forceLeft).toBe(85);
     });
 
+    test('a greenhouse is a sturdy, valuable food plate', () => {
+        expect(plateMaxHp('greenhouse')).toBe(35);
+        expect(plateMaxHp('greenhouse')).toBeGreaterThan(plateMaxHp('superStore'));
+        expect(plateMaxHp('greenhouse')).toBeLessThan(plateMaxHp('skyscraper'));
+        const plates = [
+            { id: 1, type: 'greenhouse', fort: 0, row: 3, razed: false },
+            { id: 2, type: 'store', fort: 0, row: 3, razed: false },
+        ];
+        const rand = rng(11);
+        const counts = { 1: 0, 2: 0 };
+        for (let i = 0; i < 600; i++) counts[pickTarget(plates, rand).id]++;
+        expect(counts[1]).toBeGreaterThan(counts[2]);
+    });
+
     test('plateMaxHp adds fortification', () => {
         expect(plateMaxHp('home')).toBe(10);
         expect(plateMaxHp('home', 2)).toBe(34);
