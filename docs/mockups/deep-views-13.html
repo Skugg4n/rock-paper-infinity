@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>IV · THE DEEP · views 13</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto+Condensed:wght@700&family=Cormorant+Garamond:ital,wght@1,600&display=swap">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js"
+  }
+}
+</script>
+<style>
+/* Views 13 of chapter IV, THE DEEP: the mockup sheet for the rebuild
+   (docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md). Ola: "We don't have to keep the
+   view, the angle and the graphics as we built them. The feeling in colour and the
+   stripped-down look is maybe good."
+
+   Three directions, each in the same three states (TEND, SLEEP, GROW), so they compare:
+     A  THE WATCHER'S SCREEN  the colony as a flat plan on the Watcher's monitor (SVG)
+     B  STRATA                a cross-section through the earth; time lays down rock (SVG)
+     C  STRIPPED 3D           the floors as bare slabs, one light, a close slow camera (three.js)
+
+   ONE PALETTE for all three:
+     rock   #0a0d12   the dark, the background, everything cut into a plate
+     plate  #d5dbe3   light concrete: slabs, plates, the plan's lit rooms
+     flesh  cold and dark (#170d11 with muscle #4a3039..#6a4652, hyphae #b9c4ca, tendon
+            #a9b2b9), the locked look of deep-tree-12; ONE red, arterial (#a8132c / #ff4a60),
+            for the pulse and for the red arc on a gauge
+   The HUD is the same in every direction: four round gauges, dymo labels, three lamps.
+   ?s=a-tend (a|b|c - tend|sleep|grow) shows one state alone at window size, for screenshots.
+   Every number is by hand. No game logic. */
+
+* { box-sizing: border-box; }
+:root { --pulse: #a8132c; --pulse-hi: #ff4a60; }
+html, body { margin: 0; padding: 0; background: #0a0d12; color: #8fa1b6; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+header { padding: 26px 40px 0; }
+.title { font-family: 'Bebas Neue', system-ui, sans-serif; font-size: 30px; letter-spacing: 0.06em; color: #d5dbe3; }
+.title span { color: #394453; }
+.sub { font: 12px ui-monospace, Menlo, monospace; color: #55637a; margin-top: 2px; }
+.tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid #1a212b; flex-wrap: wrap; }
+.tab {
+    background: none; border: 0; cursor: pointer; padding: 10px 14px 9px;
+    font: 600 11px ui-monospace, Menlo, monospace; letter-spacing: 0.16em;
+    color: #55637a; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { color: #aab8c9; }
+.tab.on { color: #ffffff; border-bottom-color: #ffffff; }
+
+.dir { padding: 18px 40px 34px; }
+.dir + .dir { border-top: 1px solid #141a22; }
+.dir h2 { margin: 0; font-family: 'Bebas Neue', system-ui, sans-serif; font-weight: 400; font-size: 24px; letter-spacing: 0.06em; color: #d5dbe3; }
+.caption { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: #aab8c9; max-width: 1120px; }
+.caption div::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 3px; background: #3c4a5c; margin: 0 10px 2px 0; }
+.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.cell .lab { font: 11px ui-monospace, Menlo, monospace; letter-spacing: 0.24em; color: #55637a; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.cell .lab b { color: #aab8c9; font-weight: 600; }
+.frame { position: relative; width: 100%; aspect-ratio: 1440 / 900; overflow: hidden; border-radius: 6px; background: #05070a; cursor: zoom-in; }
+.stage { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
+.stage > svg, .stage > canvas { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; display: block; }
+.hidden { display: none !important; }
+
+body.single header, body.single .dir > h2, body.single .caption, body.single .lab { display: none; }
+body.single .dir { padding: 0; border: 0; }
+body.single .row { display: block; margin: 0; }
+body.single .frame { position: fixed; inset: 0; width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; cursor: zoom-out; }
+
+/* the life: the pulse runs in the vessels, the organ beats, the screen flickers a hair */
+@keyframes pulse { to { stroke-dashoffset: -100; } }
+.pulse { stroke-dasharray: 6 94; animation: pulse 5.5s linear infinite; }
+.pulse.soft { stroke-dasharray: 14 86; }
+@keyframes beat { 0%, 100% { opacity: 0.45; } 7% { opacity: 1; } 14% { opacity: 0.6; } 21% { opacity: 0.95; } 40% { opacity: 0.45; } }
+.beat { animation: beat 1.5s ease-in-out infinite; }
+@keyframes flick { 0%, 100% { opacity: 1; } 48% { opacity: 0.97; } 50% { opacity: 0.9; } 52% { opacity: 0.98; } }
+.flick { animation: flick 4.7s steps(1) infinite; }
+@keyframes ghost { 0%, 100% { opacity: 0.55; } 30% { opacity: 0.2; } 33% { opacity: 0.7; } 60% { opacity: 0.4; } }
+.ghost { animation: ghost 3.1s steps(1) infinite; }
+@keyframes roll { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute; left:0; top:0" aria-hidden="true"><defs id="defs"></defs></svg>
+
+<header>
+    <div class="title">IV · THE DEEP <span>· views 13</span></div>
+    <div class="sub">Three directions for the rebuild, each in the same three states. Click a frame to see it alone.</div>
+    <nav class="tabs" id="tabs">
+        <button class="tab on" data-tab="a">A · THE WATCHER'S SCREEN</button>
+        <button class="tab" data-tab="b">B · STRATA</button>
+        <button class="tab" data-tab="c">C · STRIPPED 3D</button>
+        <button class="tab" data-tab="all">ALL, STACKED</button>
+    </nav>
+</header>
+<main id="main"></main>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ======================================================================== the palette */
+const ROCK = '#0a0d12', PLATE = '#d5dbe3', LANE = '#7b8595', INK = '#8fa1b6', DIM = '#55637a', SLAB = '#1e2733';
+const PULSE = 'var(--pulse)', PULSE_HI = 'var(--pulse-hi)', RED = '#a8132c';
+const HYC = '#b9c4ca', MUS = ['#4a3039', '#5b3b46', '#6a4652', '#3f2932'];
+const MUS_DK = '#170d11', TENDON = '#a9b2b9', ART = '#2c1219', ART_CORE = '#7d1f2e', STAIN = '#0c1013', BONE = '#d9dad3';
+const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+
+const DIRS = {
+    a: { name: "A · THE WATCHER'S SCREEN", cap: [
+        'Du spelar vaktaren och ser kolonin genom en skärm: en ritning ovanifrån, varje våning en egen ruta bredvid de andra.',
+        'Sömnen är en skärm som står på i mörkret och räknar år; när sinnet går blir det bildfel, efterbilder och en ruta som inte stämmer.',
+        'Köttet tar först över ritningen och sedan själva skärmen: gränsen mellan den som tittar och det som syns försvinner.'] },
+    b: { name: 'B · STRATA', cap: [
+        'Spelet blir ett snitt genom jorden: kolonin är några kamrar djupt nere, schaktet den enda vägen upp.',
+        'Varje sömn lägger nya lager ovanpå; tiden syns som djup, ytan glider bort och vägen ut blir längre för varje natt.',
+        'Köttet fyller kamrarna och skjuter rötter och kärl genom berget; uppstigningen är att bryta igenom alla lager som tiden lagt.'] },
+    c: { name: 'C · STRIPPED 3D', cap: [
+        'Samma våningar som förut men avskalade: tunga plattor utan gångar, hus och ikoner, ett enda ljus och en nära kamera som långsamt glider.',
+        'I sömnen slocknar ljuset och djupet faller ner i svart; det enda som syns i mörkret är det som inte finns.',
+        'Köttet ersätter plattorna en efter en och maskinens rör blir händer mitt i bilden; man ser kroppen, inte en karta.'] },
+};
+const STATES = ['tend', 'sleep', 'grow'];
+const STATE_NAME = { tend: 'I · TEND', sleep: 'II · SLEEP', grow: 'III · GROW' };
+const STATE_NOTE = { tend: 'the machine', sleep: 'the mind', grow: 'the body' };
+
+/* ======================================================================== helpers */
+function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const f1 = (v) => v.toFixed(1);
+function poly(pts) { return 'M ' + pts.map((p) => f1(p[0]) + ' ' + f1(p[1])).join(' L '); }
+function txt(x, y, s, o = {}) {
+    return `<text x="${f1(x)}" y="${f1(y)}" font-family="${o.f || MONO}" font-size="${o.s || 11}" fill="${o.c || INK}"` +
+        ` text-anchor="${o.a || 'start'}" letter-spacing="${o.ls || '0.12em'}" font-weight="${o.w || 400}"` +
+        (o.op !== undefined ? ` opacity="${o.op}"` : '') + (o.st ? ` style="${o.st}"` : '') + `>${s}</text>`;
+}
+const DEFS = new Map();
+function def(id, markup) { if (!DEFS.has(id)) DEFS.set(id, markup); return id; }
+
+/* ---- the tissue, after deep-tree-12: mycelium, sinew, vessels ---- */
+function crPts(P, k) {
+    const out = [];
+    for (let i = 0; i < P.length - 1; i++) {
+        const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+        for (let j = 0; j < k; j++) {
+            const t = j / k, t2 = t * t, t3 = t2 * t;
+            out.push([0, 1].map((c) => 0.5 * ((2 * p1[c]) + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3)));
+        }
+    }
+    out.push(P[P.length - 1].slice());
+    return out;
+}
+function noiseFn(seed) {
+    const r = rng(seed);
+    const a = [0, 1, 2].map(() => ({ f: 0.02 + r() * 0.09, p: r() * 6.28, m: 0.4 + r() }));
+    return (x) => a.reduce((s, o) => s + o.m * Math.sin(x * o.f + o.p), 0) / 2.2;
+}
+function normals(pts) {
+    return pts.map((p, i) => {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+        return [-dy / L, dx / L];
+    });
+}
+function wob(P, amp, seed, k) {
+    const pts = crPts(P, k || 10);
+    const n = noiseFn(seed), N = normals(pts);
+    let acc = 0;
+    return pts.map((p, i) => {
+        if (i > 0) acc += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]);
+        const o = amp * n(acc);
+        return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+    });
+}
+function ribbon(pts, wf) {
+    const N = normals(pts), L = [], R = [];
+    pts.forEach((p, i) => {
+        const t = i / Math.max(1, pts.length - 1), w = wf(t, i) / 2;
+        L.push([p[0] + N[i][0] * w, p[1] + N[i][1] * w]);
+        R.push([p[0] - N[i][0] * w, p[1] - N[i][1] * w]);
+    });
+    return poly(L.concat(R.reverse())) + ' Z';
+}
+function closedPath(pts) {
+    const n = pts.length;
+    let s = 'M ' + f1(pts[0][0]) + ' ' + f1(pts[0][1]);
+    for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+        s += ' C ' + f1(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f1(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+            f1(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f1(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f1(p2[0]) + ' ' + f1(p2[1]);
+    }
+    return s + ' Z';
+}
+function blobPts(cx, cy, r, irr, seed, n, sx, sy) {
+    const R = rng(seed);
+    n = n || 11;
+    const a0 = R() * 6.28, pts = [];
+    for (let i = 0; i < n; i++) {
+        const a = a0 + i / n * 6.28 + (R() - 0.5) * 0.4;
+        const rr = r * (1 - irr / 2 + R() * irr);
+        pts.push([cx + Math.cos(a) * rr * (sx || 1), cy + Math.sin(a) * rr * (sy || 1)]);
+    }
+    return pts;
+}
+function blob(cx, cy, r, irr, seed, n, sx, sy) { return closedPath(blobPts(cx, cy, r, irr, seed, n, sx, sy)); }
+function pulseOn(path, w, dur, delay, cls) {
+    return `<path class="${cls || 'pulse'}" pathLength="100" d="${path}" fill="none" style="stroke:${PULSE_HI};animation-duration:${dur}s;animation-delay:-${delay}s" stroke-width="${w}" stroke-linecap="round"/>`;
+}
+/* a hypha: a random walk that sometimes branches; fine, pale, mostly see-through */
+function hypha(x, y, a, steps, depth, r, out, w, step, op) {
+    const pts = [[x, y]], st = step || 3.4;
+    for (let i = 0; i < steps; i++) {
+        a += (r() - 0.5) * 0.55;
+        x += Math.cos(a) * st; y += Math.sin(a) * st;
+        pts.push([x, y]);
+        if (depth < 3 && r() < 0.07) hypha(x, y, a + (r() < 0.5 ? 0.8 : -0.8) * (0.6 + r() * 0.6), Math.floor(steps * 0.55), depth + 1, r, out, w * 0.7, st, op);
+    }
+    out.push(`<path d="${poly(pts)}" fill="none" stroke="${HYC}" stroke-width="${Math.max(0.35, w).toFixed(2)}" opacity="${((op || 1) * (0.16 + r() * 0.34)).toFixed(2)}" stroke-linecap="round"/>`);
+}
+/* an artery, branching into capillaries */
+function vein(P, w, seed, depth, out, r, pulse, amp, core) {
+    const pts = wob(P, amp === undefined ? 2.4 : amp, seed, 10);
+    out.push(`<path d="${ribbon(pts, (t) => w * 1.25 * (1 - 0.65 * t))}" fill="${ART}"/>`);
+    out.push(`<path d="${poly(pts)}" fill="none" stroke="${ART_CORE}" stroke-width="${(w * 0.32).toFixed(2)}" opacity="${core === undefined ? 0.85 : core}"/>`);
+    out.push(`<path d="${poly(pts)}" fill="none" stroke="#e6d9dc" stroke-width="0.45" opacity="0.28" transform="translate(-0.6,-0.7)"/>`);
+    if (pulse) out.push(pulseOn(poly(pts), (w * 0.42).toFixed(2), 6 + (seed % 5) * 0.4, (seed % 11) * 0.6, 'pulse soft'));
+    if (depth < 3) {
+        for (let k = 2; k < pts.length - 3; k += 4 + Math.floor(r() * 4)) {
+            const p = pts[k], q = pts[k + 1];
+            const a = Math.atan2(q[1] - p[1], q[0] - p[0]) + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.7);
+            const L = (12 + r() * 24 * (1 - depth * 0.25)) * Math.max(1, w / 4);
+            const e = [p[0] + Math.cos(a) * L, p[1] + Math.sin(a) * L];
+            vein([p, [(p[0] + e[0]) / 2 + (r() - 0.5) * 6, (p[1] + e[1]) / 2 + (r() - 0.5) * 6], e], w * 0.5, seed * 7 + k, depth + 1, out, r, false, undefined, core);
+        }
+    }
+    return pts;
+}
+/* a striated muscle bundle: a belly between two tendons */
+function bundle(P, wMid, nF, seed, r, tendon, pulse, amp) {
+    const pts = wob(P, amp === undefined ? 2 : amp, seed, 14);
+    const prof = (t) => wMid * (0.32 + 0.68 * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, t))), 0.7));
+    let h = `<path d="${ribbon(pts, prof)}" fill="${MUS_DK}"/>`;
+    const N = normals(pts);
+    for (let k = 0; k < nF; k++) {
+        const base = k / (nF - 1) - 0.5;
+        const n = noiseFn(seed * 13 + k);
+        const fp = pts.map((p, i) => {
+            const t = i / (pts.length - 1);
+            const o = (base * 0.86 + n(i * 3) * 0.06) * prof(t);
+            return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+        });
+        h += `<path d="${poly(fp)}" fill="none" stroke="${MUS[Math.floor(r() * 4)]}" stroke-width="${(0.9 + r() * 0.8) * Math.max(1, wMid / 40)}" stroke-linecap="round"/>`;
+    }
+    for (let i = 3; i < pts.length - 3; i += 2) {
+        if (r() < 0.55) continue;
+        const t = i / (pts.length - 1), w = prof(t) * (0.15 + r() * 0.3), p = pts[i], q = N[i];
+        const sl = (r() - 0.5) * 3;
+        h += `<path d="M ${f1(p[0] + q[0] * w + sl)} ${f1(p[1] + q[1] * w)} L ${f1(p[0] - q[0] * w * (0.6 + r() * 0.4))} ${f1(p[1] - q[1] * w * (0.6 + r() * 0.4) + sl)}" stroke="#0e0d12" stroke-width="0.7" opacity="0.6"/>`;
+    }
+    h += `<path d="${poly(pts.map((p, i) => { const w = prof(i / (pts.length - 1)) * 0.36; return [p[0] + N[i][0] * w, p[1] + N[i][1] * w]; }))}" fill="none" stroke="#c9cfd8" stroke-width="0.7" opacity="0.3"/>`;
+    if (tendon) {
+        [[0, 0.16], [0.84, 1]].forEach((rg) => {
+            const seg = pts.filter((p, i) => { const t = i / (pts.length - 1); return t >= rg[0] && t <= rg[1]; });
+            if (seg.length < 2) return;
+            h += `<path d="${ribbon(seg, (t) => { const e = rg[0] === 0 ? 1 - t : t; return wMid * (0.2 + 0.32 * e * e); })}" fill="${TENDON}"/>`;
+            h += `<path d="${poly(seg)}" fill="none" stroke="#ffffff" stroke-width="0.7" opacity="0.5" transform="translate(-0.5,-0.7)"/>`;
+        });
+    }
+    if (pulse) h += pulseOn(poly(pts), Math.max(1.2, wMid * 0.11).toFixed(2), 6.5 + r() * 2, r() * 6, 'pulse soft');
+    return h;
+}
+/* a knot of fibre: an organ; its core beats */
+function knot(x, y, scale, seed, r, frac) {
+    const f = frac === undefined ? 0.6 : frac;
+    const loops = 6 + Math.round(18 * f), tight = 1 - 0.36 * f;
+    let h = `<path d="${blob(x, y, 15 * scale * (0.82 + 0.18 * f), 0.5, seed, 10, 1.2, 0.9)}" fill="#141319"/>`;
+    for (let k = 0; k < loops; k++) {
+        const pts = blobPts(x + (r() - 0.5) * 6 * scale * tight, y + (r() - 0.5) * 5 * scale * tight, (7 + r() * 9) * scale * tight, 0.5, seed + k * 3, 9, 1 + r() * 0.6, 0.5 + r() * 0.5);
+        h += `<path d="${closedPath(pts)}" transform="rotate(${(r() * 180).toFixed(1)} ${x} ${y})" fill="none" stroke="${MUS[k % 4]}" stroke-width="${((0.9 + r() * 1.2 + 0.9 * f) * scale).toFixed(2)}"/>`;
+    }
+    h += `<path class="beat" d="${blob(x + 2, y + 1, (2.5 + 3 * f) * scale, 0.6, seed + 99, 8)}" style="fill:${PULSE}" opacity="${(0.4 + 0.5 * f).toFixed(2)}"/>`;
+    return h;
+}
+/* a tendon hooked over an edge */
+function band(P, w, seed) {
+    const pts = wob(P, 1.2, seed, 10);
+    return `<path d="${ribbon(pts, (t) => w * (0.7 + 0.3 * Math.sin(t * 3 + seed)))}" fill="#9ea8af"/>` +
+        `<path d="${poly(pts)}" fill="none" stroke="#ffffff" stroke-width="0.6" opacity="0.45" transform="translate(-0.4,-0.6)"/>`;
+}
+/* a mass of tissue covering a cell: dark ground, crossing bellies, a wet rim */
+function tissueCell(cx, cy, R, seed, o = {}) {
+    const r = rng(seed);
+    let h = `<path d="${blob(cx, cy, R * 1.04, 0.2, seed, 12, o.sx || 1, o.sy || 1)}" fill="${MUS_DK}"/>`;
+    const n = o.n || 3;
+    for (let k = 0; k < n; k++) {
+        const a = (o.a !== undefined ? o.a : r() * Math.PI) + k * (0.9 + r() * 0.6);
+        const L = R * (1.0 + r() * 0.25);
+        const sx = o.sx || 1, sy = o.sy || 1;
+        const P = [[cx - Math.cos(a) * L * sx, cy - Math.sin(a) * L * sy],
+            [cx + (r() - 0.5) * R * 0.4, cy + (r() - 0.5) * R * 0.4],
+            [cx + Math.cos(a) * L * sx, cy + Math.sin(a) * L * sy]];
+        h += bundle(P, R * (0.95 - 0.2 * k), 8 + Math.round(R / 8), seed * 7 + k, r, k === 0 && o.tendon !== false, false);
+    }
+    h += `<path d="${blob(cx, cy, R * 1.0, 0.2, seed + 3, 12, o.sx || 1, o.sy || 1)}" fill="none" stroke="#c9cfd8" stroke-width="0.8" opacity="0.16"/>`;
+    return h;
+}
+
+/* bellies lying side by side, one way, as muscle does; the way turns from cell to cell */
+function bellies(cx, cy, R, seed, r, a) {
+    let h = `<path d="${blob(cx, cy, R * 1.02, 0.2, seed, 12)}" fill="${MUS_DK}"/>`;
+    const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+    const n = 4;
+    for (let k = 0; k < n; k++) {
+        const o = (k / (n - 1) - 0.5) * R * 1.25 + (r() - 0.5) * 5, L = R * (0.95 + r() * 0.3), aa = (r() - 0.5) * 0.3;
+        const c = [cx + vx * o, cy + vy * o];
+        h += bundle([[c[0] - (ux + aa * vx) * L, c[1] - (uy + aa * vy) * L], [c[0] + (r() - 0.5) * 6, c[1] + (r() - 0.5) * 6], [c[0] + (ux - aa * vx) * L, c[1] + (uy - aa * vy) * L]], R * 0.62, 9, seed + k * 7, r, k === 1 || k === 3, false, 2);
+    }
+    h += `<path d="${blob(cx, cy, R, 0.2, seed + 3, 12)}" fill="none" stroke="#c9cfd8" stroke-width="0.8" opacity="0.14"/>`;
+    return h;
+}
+
+/* ---- a hand of sinew: fist, flat or two fingers (the game was always a game of hands) ---- */
+function finger(bx, by, ang, len, w, seed, r) {
+    const d = [Math.sin(ang), -Math.cos(ang)];
+    const bend = (r() - 0.5) * 0.12;
+    const P = [[bx, by], [bx + d[0] * len * 0.5 + d[1] * bend * len, by + d[1] * len * 0.5 - d[0] * bend * len], [bx + d[0] * len, by + d[1] * len]];
+    const pts = crPts(P, 10);
+    const prof = (t) => w * (1 - 0.22 * t) * (t > 0.88 ? Math.sqrt(Math.max(0, 1 - (t - 0.88) / 0.12)) * 0.9 + 0.1 : 1);
+    let h = `<path d="${ribbon(pts, prof)}" fill="${MUS_DK}"/>`;
+    const N = normals(pts);
+    for (let k = 0; k < 4; k++) {
+        const base = k / 3 - 0.5;
+        h += `<path d="${poly(pts.slice(0, -1).map((p, i) => { const o = base * 0.7 * prof(i / (pts.length - 1)); return [p[0] + N[i][0] * o, p[1] + N[i][1] * o]; }))}" fill="none" stroke="${MUS[(k + seed) % 4]}" stroke-width="1.2"/>`;
+    }
+    [0.36, 0.66].forEach((t) => {
+        const i = Math.round(t * (pts.length - 1)), p = pts[i], q = N[i], ww = prof(t) * 0.42;
+        h += `<path d="M ${f1(p[0] + q[0] * ww)} ${f1(p[1] + q[1] * ww)} Q ${f1(p[0] + d[0] * 2)} ${f1(p[1] + d[1] * 2)} ${f1(p[0] - q[0] * ww)} ${f1(p[1] - q[1] * ww)}" fill="none" stroke="#08060a" stroke-width="1.1" opacity="0.8"/>`;
+    });
+    h += `<path d="${poly(pts.slice(0, -2))}" fill="none" stroke="${TENDON}" stroke-width="${(w * 0.16).toFixed(2)}" opacity="0.55"/>`;
+    h += `<path d="${poly(pts.map((p, i) => { const o = prof(i / (pts.length - 1)) * 0.42; return [p[0] + N[i][0] * o, p[1] + N[i][1] * o]; }))}" fill="none" stroke="#dfe4ea" stroke-width="0.8" opacity="0.35"/>`;
+    return h;
+}
+function knuckle(x, y, rr, seed) {
+    return `<path d="${blob(x, y, rr, 0.2, seed, 9, 1, 0.9)}" fill="${MUS_DK}"/>` +
+        `<path d="${blob(x, y, rr * 0.7, 0.3, seed + 1, 8)}" fill="none" stroke="${MUS[seed % 4]}" stroke-width="1.4"/>` +
+        `<path d="M ${f1(x - rr * 0.6)} ${f1(y - rr * 0.55)} Q ${f1(x)} ${f1(y - rr * 1.05)} ${f1(x + rr * 0.6)} ${f1(y - rr * 0.55)}" fill="none" stroke="#dfe4ea" stroke-width="0.9" opacity="0.4"/>`;
+}
+function hand(x, y, sc, rot, kind, seed) {
+    const r = rng(seed);
+    let back = '', front = '';
+    // the palm: a lopsided pad of muscle, tendons fanning from the wrist
+    let palm = `<path d="${blob(0, 8, 25, 0.12, seed, 12, 1.0, 1.1)}" fill="${MUS_DK}"/>`;
+    for (let k = 0; k < 9; k++) {
+        const a = -Math.PI / 2 + (k / 8 - 0.5) * 1.5;
+        palm += `<path d="${poly(wob([[(r() - 0.5) * 8, 34], [Math.cos(a) * 12, 10 + Math.sin(a) * 10], [Math.cos(a) * 22, 8 + Math.sin(a) * 24]], 1.2, seed + k, 6))}" fill="none" stroke="${MUS[k % 4]}" stroke-width="2"/>`;
+    }
+    const tips = kind === 'fist' ? [] : kind === 'two' ? [-6, 6] : [-17, -6, 6, 17];
+    tips.forEach((tx) => { palm += `<path d="M ${(r() - 0.5) * 6} 36 Q ${tx * 0.6} 14 ${tx} ${-12}" fill="none" stroke="${TENDON}" stroke-width="2" opacity="0.5"/>`; });
+    palm += `<path d="${blob(0, 8, 24.5, 0.12, seed, 12, 1.0, 1.1)}" fill="none" stroke="#dfe4ea" stroke-width="0.9" opacity="0.28"/>`;
+    const vv = []; vein([[6, 40], [2, 20], [-6, 4]], 3, seed + 40, 2, vv, r, false, 1.2); palm += vv.join('');
+    if (kind === 'flat') {
+        [[-17, -12, -0.17, 38, 11], [-6, -16, -0.05, 46, 11.5], [6, -16, 0.06, 44, 11], [17, -12, 0.2, 33, 9.5]]
+            .forEach((f, i) => { back += finger(f[0], f[1], f[2], f[3], f[4], seed + i, r); });
+        back += finger(-22, 14, -1.05, 30, 12, seed + 9, r);
+        return `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${rot}) scale(${sc})">${back}${palm}</g>`;
+    }
+    if (kind === 'two') {
+        back += finger(-6, -14, -0.3, 46, 11.5, seed + 1, r) + finger(7, -14, 0.24, 45, 11, seed + 2, r);
+        front += knuckle(12, -12, 8.5, seed + 3) + knuckle(21, -6, 7.5, seed + 4);
+        front += `<path d="${ribbon(crPts([[-22, 16], [-10, 6], [6, 2]], 6), (t) => 11 - 3 * t)}" fill="${MUS_DK}"/>` +
+            `<path d="${poly(crPts([[-22, 16], [-10, 6], [6, 2]], 6))}" fill="none" stroke="${TENDON}" stroke-width="1.6" opacity="0.5"/>`;
+        return `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${rot}) scale(${sc})">${back}${palm}${front}</g>`;
+    }
+    // fist: the fingers folded over the palm, knuckles in a row, the thumb across
+    [[-18, -12], [-6, -16], [6, -16], [17, -12]].forEach((k, i) => {
+        front += `<path d="${blob(k[0], k[1] + 10, 6.5, 0.2, seed + 20 + i, 8, 0.9, 1.5)}" fill="${MUS_DK}" stroke="${MUS[i % 4]}" stroke-width="1.2"/>`;
+    });
+    [[-18, -12], [-6, -16], [6, -16], [17, -12]].forEach((k, i) => { front += knuckle(k[0], k[1], 8.5, seed + 30 + i); });
+    front += `<path d="${ribbon(crPts([[-26, 14], [-12, 6], [4, 2]], 6), (t) => 12 - 3 * t)}" fill="${MUS_DK}"/>` +
+        `<path d="${poly(crPts([[-26, 14], [-12, 6], [4, 2]], 6))}" fill="none" stroke="${TENDON}" stroke-width="1.8" opacity="0.55"/>`;
+    return `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${rot}) scale(${sc})">${palm}${front}</g>`;
+}
+
+/* ======================================================================== the HUD (same in every direction) */
+const G0 = Math.PI * 0.75, GS = Math.PI * 1.5;
+const gA = (v) => G0 + v * GS;
+const pt = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+function arc(cx, cy, r, a0, a1) {
+    const p0 = pt(cx, cy, r, a0), p1 = pt(cx, cy, r, a1);
+    return `M ${f1(p0[0])} ${f1(p0[1])} A ${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${f1(p1[0])} ${f1(p1[1])}`;
+}
+/* a strip of embossed tape: white raised letters, each pressed a little off */
+function dymo(x, y, s, o = {}) {
+    const fs = o.size || 13, cw = fs * 0.6, pad = fs * 0.62, h = fs * 1.62;
+    const w = s.length * cw + pad * 2;
+    const x0 = o.anchor === 'middle' ? x - w / 2 : o.anchor === 'end' ? x - w : x;
+    const r = rng(hash(s) + (o.seed || 0));
+    const rot = o.rot !== undefined ? o.rot : (r() - 0.5) * 1.6;
+    def('dymoSheen', `<linearGradient id="dymoSheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.13"/><stop offset="0.16" stop-color="#fff" stop-opacity="0.03"/><stop offset="0.55" stop-color="#fff" stop-opacity="0"/><stop offset="0.86" stop-color="#000" stop-opacity="0.3"/><stop offset="1" stop-color="#fff" stop-opacity="0.05"/></linearGradient>`);
+    let g = `<g transform="rotate(${rot.toFixed(2)} ${f1(x0 + w / 2)} ${f1(y)})" opacity="${o.op === undefined ? 1 : o.op}">`;
+    g += `<rect x="${f1(x0 + 1)}" y="${f1(y - h / 2 + 2)}" width="${f1(w)}" height="${f1(h)}" rx="2" fill="#000" opacity="0.55"/>`;
+    g += `<rect x="${f1(x0)}" y="${f1(y - h / 2)}" width="${f1(w)}" height="${f1(h)}" rx="2" fill="${o.tape || '#121519'}"/>`;
+    g += `<rect x="${f1(x0)}" y="${f1(y - h / 2)}" width="${f1(w)}" height="${f1(h)}" rx="2" fill="url(#dymoSheen)"/>`;
+    const lc = o.letter || '#e9edf1';
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === ' ') continue;
+        const cx = x0 + pad + cw * (i + 0.5), dy = (r() - 0.5) * 1.3, rr = (r() - 0.5) * 5;
+        const tr = `rotate(${rr.toFixed(1)} ${f1(cx)} ${f1(y)})`;
+        const base = `x="${f1(cx)}" font-family="'Roboto Condensed', 'Arial Narrow', sans-serif" font-weight="700" font-size="${fs}" text-anchor="middle" dominant-baseline="central" transform="${tr}"`;
+        g += `<text ${base} y="${f1(y + dy + 0.9)}" fill="#000" opacity="0.7">${ch}</text>`;
+        g += `<text ${base} y="${f1(y + dy)}" fill="${lc}" opacity="${(0.86 + r() * 0.14).toFixed(2)}">${ch}</text>`;
+    }
+    return g + '</g>';
+}
+/* a round gauge: bezel, face, ticks, the red arc for "runs out soon", a needle */
+function gauge(cx, cy, R, o) {
+    def('gBezel', `<linearGradient id="gBezel" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#3a4554"/><stop offset="0.5" stop-color="#1b222c"/><stop offset="1" stop-color="#0c1015"/></linearGradient>`);
+    def('gFace', `<radialGradient id="gFace" cx="0.45" cy="0.4" r="0.7"><stop offset="0" stop-color="#151b23"/><stop offset="1" stop-color="#0a0d12"/></radialGradient>`);
+    def('gFluid', `<linearGradient id="gFluid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a1422"/><stop offset="0.25" stop-color="#2c1219"/><stop offset="1" stop-color="#14080c"/></linearGradient>`);
+    const on = o.mode === 'on', flesh = o.mode === 'flesh';
+    let g = '';
+    g += `<circle cx="${cx}" cy="${cy + 2}" r="${R + 9}" fill="#000" opacity="0.5"/>`;
+    g += `<circle cx="${cx}" cy="${cy}" r="${R + 8}" fill="url(#gBezel)"/>`;
+    g += `<circle cx="${cx}" cy="${cy}" r="${R + 2}" fill="#07090c"/>`;
+    g += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#gFace)"/>`;
+    const cid = def(`gclip${cx}_${cy}`, `<clipPath id="gclip${cx}_${cy}"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>`);
+    if (flesh) {
+        const top = cy + R - o.level * 2 * R;
+        g += `<g clip-path="url(#${cid})"><rect x="${cx - R}" y="${f1(top)}" width="${2 * R}" height="${f1(cy + R - top)}" fill="url(#gFluid)"/>` +
+            `<path d="M ${cx - R} ${f1(top)} Q ${cx} ${f1(top + 3)} ${cx + R} ${f1(top)}" stroke="${ART_CORE}" stroke-width="1.6" fill="none"/>` +
+            `<path d="M ${cx - R * 0.7} ${f1(top + 2)} Q ${cx - R * 0.2} ${f1(top + 3.4)} ${cx + R * 0.2} ${f1(top + 2)}" stroke="#e6d9dc" stroke-width="0.6" opacity="0.3" fill="none"/></g>`;
+    }
+    const tickOp = on ? 0.75 : flesh ? 0.3 : 0.18;
+    g += `<path d="${arc(cx, cy, R - 7, gA(0), gA(o.red || 0.18))}" stroke="${RED}" stroke-width="5" fill="none" opacity="${on ? 0.95 : flesh ? 0.35 : 0.22}"/>`;
+    for (let i = 0; i <= 20; i++) {
+        const a = gA(i / 20), maj = i % 5 === 0;
+        const p0 = pt(cx, cy, R - 4, a), p1 = pt(cx, cy, R - (maj ? 13 : 8), a);
+        g += `<line x1="${f1(p0[0])}" y1="${f1(p0[1])}" x2="${f1(p1[0])}" y2="${f1(p1[1])}" stroke="${PLATE}" stroke-width="${maj ? 1.6 : 0.9}" opacity="${tickOp}"/>`;
+    }
+    if (!flesh) {
+        const a = gA(on ? o.v : 0.0);
+        const p0 = pt(cx, cy, -R * 0.2, a), p1 = pt(cx, cy, R * 0.8, a);
+        g += `<line x1="${f1(p0[0] + 1)}" y1="${f1(p0[1] + 2)}" x2="${f1(p1[0] + 1)}" y2="${f1(p1[1] + 2)}" stroke="#000" stroke-width="2.6" opacity="0.5" stroke-linecap="round"/>`;
+        g += `<line x1="${f1(p0[0])}" y1="${f1(p0[1])}" x2="${f1(p1[0])}" y2="${f1(p1[1])}" stroke="${on ? (o.v < (o.red || 0.18) ? '#ff6b78' : '#eef2f6') : '#3a434f'}" stroke-width="2.2" stroke-linecap="round"/>`;
+        g += `<circle cx="${cx}" cy="${cy}" r="5.5" fill="#1e2733" stroke="#3c4a5c" stroke-width="1"/>`;
+    }
+    if (flesh) {
+        const r = rng(o.seed || 7), out = [];
+        vein([[cx - R - 10, cy - R * 0.3 + (r() - 0.5) * 20], [cx - R * 0.2, cy - R * 0.1], [cx + R * 0.5, cy + R * 0.4], [cx + R + 6, cy + R * 0.2]], 3.2, o.seed || 7, 1, out, r, false, 3);
+        g += `<g opacity="0.9">${out.join('')}</g>`;
+        const hy = [];
+        for (let k = 0; k < 14; k++) hypha(cx - R + r() * 2 * R, cy - R + r() * 2 * R, r() * 6.28, 6 + Math.floor(r() * 8), 1, r, hy, 0.6, 3);
+        g += hy.join('');
+    }
+    g += `<path d="M ${cx - R * 0.72} ${cy - R * 0.38} A ${R * 0.85} ${R * 0.85} 0 0 1 ${cx + R * 0.42} ${cy - R * 0.74} A ${R * 1.1} ${R * 1.1} 0 0 0 ${cx - R * 0.72} ${cy - R * 0.38} Z" fill="#fff" opacity="0.06"/>`;
+    return g;
+}
+function lamp(x, y, on) {
+    def('lampOn', `<radialGradient id="lampOn" cx="0.42" cy="0.38" r="0.65"><stop offset="0" stop-color="#ffffff"/><stop offset="0.45" stop-color="#e8ecef"/><stop offset="1" stop-color="#8a96a4"/></radialGradient>`);
+    def('lampGlow', `<radialGradient id="lampGlow"><stop offset="0" stop-color="#e8f0f8" stop-opacity="0.35"/><stop offset="1" stop-color="#e8f0f8" stop-opacity="0"/></radialGradient>`);
+    let g = `<circle cx="${x}" cy="${y}" r="11" fill="url(#gBezel)"/>`;
+    if (on) g += `<circle cx="${x}" cy="${y}" r="24" fill="url(#lampGlow)"/><circle cx="${x}" cy="${y}" r="7.5" fill="url(#lampOn)"/>`;
+    else g += `<circle cx="${x}" cy="${y}" r="7.5" fill="#151a21"/><circle cx="${x - 2}" cy="${y - 2.5}" r="2.4" fill="#fff" opacity="0.07"/>`;
+    return g;
+}
+function screw(x, y, a) {
+    return `<circle cx="${x}" cy="${y}" r="4" fill="#1a212b" stroke="#0b0e12"/><line x1="${f1(x - Math.cos(a) * 3)}" y1="${f1(y - Math.sin(a) * 3)}" x2="${f1(x + Math.cos(a) * 3)}" y2="${f1(y + Math.sin(a) * 3)}" stroke="#07090c" stroke-width="1.2"/>`;
+}
+/* the instrument panel, left: what the machine reads */
+function hud(st) {
+    def('panelG', `<linearGradient id="panelG" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#121820"/><stop offset="1" stop-color="#0b0f14"/></linearGradient>`);
+    const on = st === 'tend', flesh = st === 'grow';
+    let s = '<g class="hud">';
+    s += `<rect x="26" y="28" width="250" height="676" rx="14" fill="#000" opacity="0.45"/>`;
+    s += `<rect x="24" y="24" width="250" height="676" rx="14" fill="url(#panelG)" stroke="#1d2530"/>`;
+    s += `<rect x="25" y="25" width="248" height="674" rx="13" fill="none" stroke="#ffffff" stroke-opacity="0.035"/>`;
+    s += screw(40, 40, 0.4) + screw(258, 40, 1.2) + screw(40, 684, 2.1) + screw(258, 684, 0.9);
+    s += txt(56, 74, 'IV · THE DEEP', { f: "'Bebas Neue', sans-serif", s: 22, c: '#394453', ls: '0.06em' });
+    const G = [
+        { x: 92, y: 158, name: 'ORE', organ: 'MASS', v: 0.78, lv: 0.66 },
+        { x: 206, y: 158, name: 'FOOD', organ: 'FEED', v: 0.11, lv: 0.2 },
+        { x: 92, y: 318, name: 'POWER', organ: 'PULSE', v: 0.52, lv: 0.58 },
+        { x: 206, y: 318, name: 'HANDS', organ: 'FLESH', v: 0.64, lv: 0.44 },
+    ];
+    G.forEach((g, i) => {
+        s += gauge(g.x, g.y, 44, { mode: on ? 'on' : flesh ? 'flesh' : 'off', v: g.v, level: g.lv, seed: 31 + i * 7 });
+        if (!flesh) s += dymo(g.x, g.y + 74, g.name, { anchor: 'middle', size: 12, op: on ? 1 : 0.55, seed: i });
+        else {
+            // the tape peels, the organ's name comes through underneath in a warmer hand
+            s += `<g transform="rotate(${i % 2 ? -24 : 24} ${g.x + (i % 2 ? -26 : 26)} ${g.y + 64})" opacity="0.4">${dymo(g.x + (i % 2 ? -26 : 26), g.y + 64, g.name, { anchor: i % 2 ? 'start' : 'end', size: 11, seed: i, rot: 0 })}</g>`;
+            s += txt(g.x, g.y + 80, g.organ, { f: "'Cormorant Garamond', Georgia, serif", s: 21, c: BONE, a: 'middle', ls: '0.14em', w: 600, st: 'font-style:italic' });
+        }
+    });
+    // the only advice in the game
+    if (on) s += dymo(42, 448, 'INSTRUMENTS: BUILD FARM', { size: 12.5, rot: -0.8 });
+    else if (st === 'sleep') s += dymo(42, 448, 'INSTRUMENTS: SLEEP', { size: 12.5, rot: -0.8, op: 0.4 });
+    else {
+        s += `<g transform="rotate(-9 60 444)" opacity="0.45">${dymo(42, 440, 'INSTRUMENTS: BUILD FARM', { size: 12.5, rot: 0 })}</g>`;
+        s += txt(46, 466, 'SPREAD', { f: "'Cormorant Garamond', Georgia, serif", s: 24, c: BONE, ls: '0.2em', w: 600, st: 'font-style:italic' });
+    }
+    // the three lamps of cryo
+    const L = [['FOOD RUNS ITSELF', false], ['POWER RUNS ITSELF', true], ['ORE RUNS ITSELF', true]];
+    L.forEach((l, i) => {
+        const y = 512 + i * 40;
+        s += lamp(54, y, on && l[1]);
+        s += dymo(76, y, l[0], { size: 10.5, op: on ? (l[1] ? 1 : 0.7) : 0.4, rot: (i - 1) * 0.6 });
+    });
+    if (on) s += dymo(42, 648, 'EMPTY 2', { size: 11, rot: 0.9 });
+    if (st === 'sleep') {
+        // the Watcher's own pulse, the only thing alive on the panel
+        let p = 'M 44 648';
+        for (let x = 44; x <= 254; x += 2) {
+            const k = (x - 44) % 70;
+            const y = 648 + (k > 30 && k < 34 ? -14 : k >= 34 && k < 37 ? 9 : k >= 37 && k < 40 ? -4 : Math.sin(x * 0.4) * 0.6);
+            p += ` L ${x} ${f1(y)}`;
+        }
+        s += `<path d="${p}" fill="none" stroke="${PLATE}" stroke-width="1.2" opacity="0.7"/>`;
+        s += dymo(42, 676, 'MIND', { size: 10, op: 0.5, rot: -0.5 });
+    }
+    if (flesh) {
+        const r = rng(901), out = [];
+        vein([[20, 600], [90, 560], [160, 590], [240, 540], [290, 520]], 5, 905, 1, out, r, true, 3);
+        vein([[150, 700], [140, 640], [176, 600]], 3.5, 913, 1, out, r, false, 2);
+        s += out.join('');
+        const hy = [];
+        for (let k = 0; k < 60; k++) hypha(30 + r() * 230, 480 + r() * 220, r() * 6.28, 8 + Math.floor(r() * 12), 1, r, hy, 0.6, 3.4);
+        s += hy.join('');
+        s += knot(54, 512, 0.7, 921, r, 0.4);
+    }
+    return s + '</g>';
+}
+/* the counter of years, an odometer, the surface's healing as a thin ring */
+function counter(cx, cy, R, years, heal, o = {}) {
+    def('drumG', `<linearGradient id="drumG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.85"/><stop offset="0.3" stop-color="#000" stop-opacity="0"/><stop offset="0.7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.85"/></linearGradient>`);
+    let s = '';
+    if (o.fade) {
+        def('ctrFade', `<radialGradient id="ctrFade"><stop offset="0" stop-color="#05070a" stop-opacity="0.9"/><stop offset="0.7" stop-color="#05070a" stop-opacity="0.7"/><stop offset="1" stop-color="#05070a" stop-opacity="0"/></radialGradient>`);
+        s += `<circle cx="${cx}" cy="${cy}" r="${R + 50}" fill="url(#ctrFade)"/>`;
+    }
+    const col = o.col || PLATE;
+    let lab = dymo(cx, cy - 66, 'THE COLONY HAS SLEPT', { anchor: 'middle', size: 13, rot: -0.6 });
+    s += `<g${o.filter ? ` filter="url(#${o.filter})"` : ''}>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${col}" stroke-width="1.2" opacity="0.18"/>`;
+    const a0 = -Math.PI / 2, a1 = a0 + heal * Math.PI * 2;
+    s += `<path d="${arc(cx, cy, R, a0, a1)}" fill="none" stroke="${col}" stroke-width="2.4" opacity="0.9"/>`;
+    const e = pt(cx, cy, R, a1);
+    s += `<circle cx="${f1(e[0])}" cy="${f1(e[1])}" r="3" fill="${col}"/>`;
+    const dw = 44, dh = 66, gap = 5, sp = 16;
+    const chars = years.split('');
+    const total = chars.reduce((w, c) => w + (c === ' ' ? sp : dw + gap), -gap);
+    let x = cx - total / 2;
+    const y = cy + 8;
+    chars.forEach((c, i) => {
+        if (c === ' ') { x += sp; return; }
+        const id = def(`drum${cx}_${cy}_${i}`, `<clipPath id="drum${cx}_${cy}_${i}"><rect x="${f1(x)}" y="${f1(y - dh / 2)}" width="${dw}" height="${dh}" rx="3"/></clipPath>`);
+        s += `<rect x="${f1(x)}" y="${f1(y - dh / 2)}" width="${dw}" height="${dh}" rx="3" fill="#0b0f14" stroke="#1e2733"/>`;
+        const last = i === chars.length - 1;
+        const off = last ? -11 : 0;
+        const fs = 50;
+        let g = `<text x="${f1(x + dw / 2)}" y="${f1(y + 17 + off)}" font-family="${MONO}" font-weight="700" font-size="${fs}" text-anchor="middle" fill="${o.digit || '#e8edf2'}">${c}</text>`;
+        if (last) g += `<text x="${f1(x + dw / 2)}" y="${f1(y + 17 + off + dh)}" font-family="${MONO}" font-weight="700" font-size="${fs}" text-anchor="middle" fill="${o.digit || '#e8edf2'}">${(+c + 1) % 10}</text>`;
+        s += `<g clip-path="url(#${id})">${g}<rect x="${f1(x)}" y="${f1(y - dh / 2)}" width="${dw}" height="${dh}" fill="url(#drumG)"/></g>`;
+        x += dw + gap;
+    });
+    s += txt(cx, cy + 64, 'YEARS', { s: 11, c: DIM, a: 'middle', ls: '0.4em' });
+    return s + '</g>' + lab;
+}
+
+/* ======================================================================== A · THE WATCHER'S SCREEN */
+const SX = 334, SY = 70, SW = 1042, SH = 752;
+const A_FLOORS = [
+    { name: 'FLOOR 1', x: 560, y: 318, g: ['MFD', 'PLF', 'DMP'] },
+    { name: 'FLOOR 2', x: 830, y: 318, g: ['FC+', 'MSD', 'PFM'] },
+    { name: 'FLOOR 3', x: 1100, y: 318, g: ['+M.', 'DSP', '.F.'] },
+];
+const A_PS = 240, A_CELL = A_PS / 3, A_PH = 29;
+const aC = (f, c, r) => [f.x + (c + 0.5) * A_CELL, f.y + (r + 0.5) * A_CELL];
+function roomMark(t, x, y, col, w) {
+    const sw = w || 1.6;
+    if (t === 'M') return [-10, -1, 8].map((d) => `<line x1="${x + d - 6}" y1="${y + 10}" x2="${x + d + 6}" y2="${y - 10}" stroke="${col}" stroke-width="${sw}"/>`).join('');
+    if (t === 'F') return [-11, -4, 3, 10].map((d) => `<line x1="${x - 14}" y1="${y + d}" x2="${x + 14}" y2="${y + d}" stroke="${col}" stroke-width="${sw}"/>`).join('');
+    if (t === 'P') return `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="${col}" stroke-width="${sw}"/><circle cx="${x}" cy="${y}" r="3" fill="${col}"/>`;
+    if (t === 'D') { let s = ''; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) s += `<rect x="${x - 14 + i * 10}" y="${y - 11 + j * 12}" width="7" height="9" fill="none" stroke="${col}" stroke-width="${sw * 0.8}"/>`; return s; }
+    if (t === 'C') return [-12, -4, 4, 12].map((d) => `<rect x="${x + d - 3}" y="${y - 12}" width="6" height="24" rx="3" fill="none" stroke="${col}" stroke-width="${sw * 0.9}"/>`).join('');
+    if (t === 'L') return `<circle cx="${x}" cy="${y}" r="12" fill="${col}"/><rect x="${x - 15}" y="${y - 2}" width="30" height="4" fill="${PLATE}" opacity="0.9"/>`;
+    if (t === 'S') return `<circle cx="${x}" cy="${y}" r="12" fill="${col}"/><circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${PLATE}" stroke-width="1" opacity="0.4"/>`;
+    return '';
+}
+function aFloor(f, st, o = {}) {
+    const lit = st !== 'sleep' || o.lit;
+    const r = rng(hash(f.name) + (o.seed || 0));
+    let s = '';
+    // the panel frame
+    s += `<rect x="${f.x - 10}" y="${f.y - 10}" width="${A_PS + 20}" height="${A_PS + 20}" fill="none" stroke="${INK}" stroke-opacity="${lit ? 0.22 : 0.1}"/>`;
+    [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([i, j]) => {
+        const x = f.x - 10 + i * (A_PS + 20), y = f.y - 10 + j * (A_PS + 20), dx = i ? -1 : 1, dy = j ? -1 : 1;
+        s += `<path d="M ${x} ${y + dy * 12} L ${x} ${y} L ${x + dx * 12} ${y}" fill="none" stroke="${PLATE}" stroke-opacity="${lit ? 0.7 : 0.25}" stroke-width="1.4"/>`;
+    });
+    if (!o.noLabel) s += txt(f.x - 10, f.y - 22, f.name, { s: 11, c: PLATE, op: lit ? 0.7 : 0.3, ls: '0.22em' });
+    const at = (c, rr) => (f.g[rr] && f.g[rr][c]) || '.';
+    // bridges (the streets the people walk)
+    for (let rr = 0; rr < 3; rr++) for (let c = 0; c < 3; c++) {
+        const t = at(c, rr);
+        if (t === '.' || t === '+') continue;
+        [[1, 0], [0, 1]].forEach(([dc, dr]) => {
+            const u = at(c + dc, rr + dr);
+            if (u === '.' || u === '+') return;
+            const [x0, y0] = aC(f, c, rr);
+            const bx = dc ? x0 + A_PH : x0 - 7, by = dr ? y0 + A_PH : y0 - 7;
+            const bw = dc ? A_CELL - 2 * A_PH : 14, bh = dr ? A_CELL - 2 * A_PH : 14;
+            s += `<rect x="${f1(bx)}" y="${f1(by)}" width="${f1(bw)}" height="${f1(bh)}" fill="${lit ? LANE : 'none'}" stroke="${lit ? 'none' : '#1e2733'}" opacity="${lit ? 0.9 : 1}"/>`;
+            if (lit && !o.noPeople) {
+                const n = Math.floor(r() * 3);
+                for (let k = 0; k < n; k++) {
+                    const t2 = 0.15 + r() * 0.7;
+                    const px = dc ? bx + bw * t2 : bx + 7 + (r() - 0.5) * 6, py = dr ? by + bh * t2 : by + 7 + (r() - 0.5) * 6;
+                    s += `<circle cx="${f1(px)}" cy="${f1(py)}" r="1.9" fill="#ffffff"/>`;
+                }
+            }
+        });
+    }
+    for (let rr = 0; rr < 3; rr++) for (let c = 0; c < 3; c++) {
+        const t = at(c, rr);
+        if (t === '.') continue;
+        const [x, y] = aC(f, c, rr);
+        if (t === '+') {
+            s += `<rect x="${f1(x - A_PH)}" y="${f1(y - A_PH)}" width="${2 * A_PH}" height="${2 * A_PH}" fill="none" stroke="${INK}" stroke-opacity="${lit ? 0.55 : 0.2}" stroke-dasharray="4 4"/>`;
+            s += `<path d="M ${f1(x - 6)} ${f1(y)} L ${f1(x + 6)} ${f1(y)} M ${f1(x)} ${f1(y - 6)} L ${f1(x)} ${f1(y + 6)}" stroke="${INK}" stroke-opacity="${lit ? 0.6 : 0.2}" stroke-width="1.3"/>`;
+            continue;
+        }
+        if (lit) {
+            s += `<rect x="${f1(x - A_PH)}" y="${f1(y - A_PH)}" width="${2 * A_PH}" height="${2 * A_PH}" fill="${PLATE}" opacity="0.92"/>`;
+            s += `<g opacity="0.75">${roomMark(t, x, y, ROCK)}</g>`;
+        } else {
+            const cryo = t === 'C';
+            s += `<rect x="${f1(x - A_PH)}" y="${f1(y - A_PH)}" width="${2 * A_PH}" height="${2 * A_PH}" fill="${cryo ? INK : 'none'}" fill-opacity="${cryo ? 0.12 : 0}" stroke="${cryo ? INK : '#26303c'}" stroke-opacity="${cryo ? 0.6 : 1}"/>`;
+            s += `<g opacity="${cryo ? 0.7 : 1}">${roomMark(t, x, y, cryo ? INK : '#1c242e', 1.2)}</g>`;
+        }
+    }
+    return s;
+}
+function aMachinePanel(st) {
+    const lit = st !== 'sleep';
+    const x = 376, y = 368, w = 150, h = 150, cx = x + w / 2, cy = y + h / 2;
+    let s = `<rect x="${x - 10}" y="${y - 10}" width="${w + 20}" height="${h + 20}" fill="none" stroke="${INK}" stroke-opacity="${lit ? 0.22 : 0.1}"/>`;
+    s += txt(x - 10, y - 22, 'MACHINE', { s: 11, c: PLATE, op: lit ? 0.7 : 0.3, ls: '0.22em' });
+    s += `<rect x="${cx - 52}" y="${cy - 52}" width="104" height="104" rx="6" fill="${lit ? PLATE : 'none'}" stroke="${lit ? 'none' : '#26303c'}" opacity="${lit ? 0.92 : 1}"/>`;
+    const heads = [[cx, cy - 24], [cx - 23, cy + 16], [cx + 23, cy + 16]];
+    heads.forEach(([hx, hy]) => {
+        s += `<line x1="${cx}" y1="${cy}" x2="${hx}" y2="${hy}" stroke="${lit ? ROCK : '#1c242e'}" stroke-width="3" opacity="0.7"/>`;
+        s += `<circle cx="${hx}" cy="${hy}" r="13" fill="${lit ? ROCK : 'none'}" stroke="${lit ? ROCK : '#26303c'}" stroke-width="2"/>`;
+        s += `<circle cx="${hx}" cy="${hy}" r="6" fill="${lit ? PLATE : '#151b23'}"/>`;
+    });
+    return s;
+}
+function barrelMap() {
+    // a CRT bulge as a displacement map: the edge of the picture bends away
+    const w = 260, h = 190, c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d'), im = g.createImageData(w, h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const nx = i / (w - 1) * 2 - 1, ny = j / (h - 1) * 2 - 1, r2 = nx * nx + ny * ny;
+        const dx = nx * r2 * 0.5, dy = ny * r2 * 0.5;
+        const k = (j * w + i) * 4;
+        im.data[k] = Math.round(128 + dx * 127); im.data[k + 1] = Math.round(128 + dy * 127); im.data[k + 2] = 128; im.data[k + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    return c.toDataURL();
+}
+function aDefs() {
+    def('barrel', `<filter id="barrel" filterUnits="userSpaceOnUse" x="${SX}" y="${SY}" width="${SW}" height="${SH}" color-interpolation-filters="sRGB">` +
+        `<feImage href="${barrelMap()}" x="${SX}" y="${SY}" width="${SW}" height="${SH}" preserveAspectRatio="none" result="m"/>` +
+        `<feDisplacementMap in="SourceGraphic" in2="m" scale="22" xChannelSelector="R" yChannelSelector="G"/></filter>`);
+    def('phos', `<filter id="phos" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="2.6" result="b"/><feComponentTransfer in="b" result="b2"><feFuncA type="linear" slope="0.65"/></feComponentTransfer><feMerge><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`);
+    def('phosBig', `<filter id="phosBig" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7" result="b"/><feComponentTransfer in="b" result="b2"><feFuncA type="linear" slope="0.55"/></feComponentTransfer><feMerge><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`);
+    def('scan', `<pattern id="scan" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1.1" fill="#000" opacity="0.32"/></pattern>`);
+    def('vig', `<radialGradient id="vig" cx="0.5" cy="0.5" r="0.72"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="0.9" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0.8"/></radialGradient>`);
+    def('scrOn', `<radialGradient id="scrOn" cx="0.5" cy="0.48" r="0.7"><stop offset="0" stop-color="#121a22"/><stop offset="1" stop-color="#05080b"/></radialGradient>`);
+    def('scrOff', `<radialGradient id="scrOff" cx="0.5" cy="0.48" r="0.7"><stop offset="0" stop-color="#0b1015"/><stop offset="1" stop-color="#030506"/></radialGradient>`);
+    def('bezelA', `<linearGradient id="bezelA" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0" stop-color="#1d242e"/><stop offset="0.5" stop-color="#141a21"/><stop offset="1" stop-color="#0c1015"/></linearGradient>`);
+    def('glassA', `<linearGradient id="glassA" x1="0" y1="0" x2="0.6" y2="0.8"><stop offset="0" stop-color="#fff" stop-opacity="0.07"/><stop offset="0.35" stop-color="#fff" stop-opacity="0.015"/><stop offset="0.36" stop-color="#fff" stop-opacity="0"/></linearGradient>`);
+    def('roomA', `<radialGradient id="roomA" cx="0.6" cy="0.55" r="0.8"><stop offset="0" stop-color="#11161d"/><stop offset="1" stop-color="#05070a"/></radialGradient>`);
+    def('clipScreen', `<clipPath id="clipScreen"><rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" rx="24"/></clipPath>`);
+    def('fshadow', `<filter id="fshadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="4" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.8"/></filter>`);
+    def('fog', `<filter id="fog" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>`);
+}
+function aScene(st) {
+    aDefs();
+    const lit = st !== 'sleep';
+    let s = `<rect width="1440" height="900" fill="url(#roomA)"/>`;
+    // the monitor
+    s += `<rect x="304" y="40" width="1104" height="842" rx="40" fill="#000" opacity="0.6"/>`;
+    s += `<rect x="298" y="32" width="1112" height="846" rx="40" fill="url(#bezelA)" stroke="#232b36"/>`;
+    s += `<rect x="300" y="34" width="1108" height="842" rx="38" fill="none" stroke="#fff" stroke-opacity="0.04"/>`;
+    s += `<rect x="318" y="54" width="1074" height="784" rx="30" fill="#06080b"/>`;
+    s += `<rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" rx="24" fill="#020304"/>`;
+    // what the screen shows
+    let c = `<rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" fill="url(#${lit ? 'scrOn' : 'scrOff'})"/>`;
+    // a faint grid on the glass, the plan's paper
+    let grid = '';
+    for (let x = SX + 26; x < SX + SW; x += 52) grid += `<line x1="${x}" y1="${SY}" x2="${x}" y2="${SY + SH}" stroke="${INK}" stroke-opacity="${lit ? 0.045 : 0.025}"/>`;
+    for (let y = SY + 20; y < SY + SH; y += 52) grid += `<line x1="${SX}" y1="${y}" x2="${SX + SW}" y2="${y}" stroke="${INK}" stroke-opacity="${lit ? 0.045 : 0.025}"/>`;
+    c += grid;
+    let plan = '';
+    plan += txt(374, 128, 'DEEP · PLAN', { s: 12, c: PLATE, op: lit ? 0.75 : 0.3, ls: '0.3em' });
+    plan += txt(1334, 128, st === 'tend' ? 'Y 4 · 0412' : st === 'sleep' ? 'Y 41 207' : 'Y 640 118', { s: 12, c: PLATE, op: lit ? 0.75 : 0.3, a: 'end', ls: '0.2em' });
+    plan += `<line x1="374" y1="142" x2="1334" y2="142" stroke="${PLATE}" stroke-opacity="${lit ? 0.18 : 0.08}"/>`;
+    plan += aMachinePanel(st);
+    A_FLOORS.forEach((f) => { plan += aFloor(f, st); });
+    // the shaft: one line through the floors
+    plan += `<line x1="374" y1="660" x2="1334" y2="660" stroke="${PLATE}" stroke-opacity="${lit ? 0.18 : 0.08}"/>`;
+    plan += txt(374, 690, st === 'grow' ? 'BODY 7 / 23' : 'ROOMS 21 · EMPTY 2', { s: 11, c: PLATE, op: lit ? 0.6 : 0.25, ls: '0.24em' });
+    plan += txt(1334, 690, st === 'sleep' ? 'CRYO III · 1 412 ASLEEP' : st === 'grow' ? 'FEED 0.4 Y' : 'AWAKE 1 412', { s: 11, c: PLATE, op: lit ? 0.6 : 0.25, a: 'end', ls: '0.24em' });
+    c += `<g filter="url(#phos)">${plan}</g>`;
+
+    if (st === 'sleep') {
+        // the hallucination: an afterimage of floor 2 lit, and a wrong frame torn across it
+        const f = A_FLOORS[1];
+        c += `<g opacity="0.13" transform="translate(9 -6)" filter="url(#phos)">${aFloor(f, 'tend', { noLabel: true, noPeople: true })}</g>`;
+        const by = 318 + 0.5 * A_CELL - 34, bh = 62;
+        def('tearClip', `<clipPath id="tearClip"><rect x="${SX}" y="${by}" width="${SW}" height="${bh}"/></clipPath>`);
+        const wrong = { name: 'X', x: f.x, y: f.y, g: ['FCD', '...', '...'] };
+        c += `<g class="ghost" clip-path="url(#tearClip)"><g transform="translate(34 0)" filter="url(#phos)">${aFloor(wrong, 'tend', { noLabel: true, noPeople: true })}` +
+            `<circle cx="${f1(aC(f, 2, 0)[0])}" cy="${f1(aC(f, 2, 0)[1] - 4)}" r="3" fill="${ROCK}"/><rect x="${f1(aC(f, 2, 0)[0] - 1.5)}" y="${f1(aC(f, 2, 0)[1] - 1)}" width="3" height="11" fill="${ROCK}"/></g>` +
+            `<rect x="${SX}" y="${by}" width="${SW}" height="1.5" fill="${PLATE}" opacity="0.5"/><rect x="${SX}" y="${by + bh - 1.5}" width="${SW}" height="1" fill="${PLATE}" opacity="0.3"/></g>`;
+        c += counter(855, 446, 196, '41 207', 0.051, { fade: true, filter: 'phosBig' });
+    }
+    let flesh = '';
+    if (st === 'grow') {
+        // the front on floor 1, on the screen: from the lid outward, one connected body
+        const f = A_FLOORS[0];
+        const taken = [[1, 1], [1, 0], [0, 1], [2, 1], [1, 2], [0, 0], [2, 0]];
+        const r = rng(4401);
+        let t = '';
+        taken.forEach(([cc, rr], i) => {
+            const [x, y] = aC(f, cc, rr);
+            t += `<path d="${blob(x, y, A_CELL * 0.7, 0.3, 460 + i, 12)}" fill="${STAIN}" opacity="0.95"/>`;
+            t += `<path d="${blob(x, y, A_CELL * 0.56, 0.25, 465 + i, 12)}" fill="#1a0a10" opacity="0.8"/>`;
+        });
+        // sinew across the streets between taken plates
+        const key = (a) => a.join(',');
+        const set = new Set(taken.map(key));
+        taken.forEach(([cc, rr], i) => {
+            [[1, 0], [0, 1]].forEach(([dc, dr]) => {
+                if (!set.has(key([cc + dc, rr + dr]))) return;
+                const a = aC(f, cc, rr), b = aC(f, cc + dc, rr + dr);
+                t += bundle([a, [(a[0] + b[0]) / 2 + (r() - 0.5) * 10, (a[1] + b[1]) / 2 + (r() - 0.5) * 10], b], 40, 12, 470 + i * 3 + dc, r, false, false, 3);
+            });
+        });
+        taken.forEach(([cc, rr], i) => { const [x, y] = aC(f, cc, rr); t += bellies(x + (r() - 0.5) * 6, y + (r() - 0.5) * 6, A_PH + 10, 480 + i * 11, r, r() * Math.PI); });
+        // the reachable plates glow faintly, the front's threads already on them
+        const hy = [];
+        [[0, 2], [2, 2]].forEach(([cc, rr]) => {
+            const [x, y] = aC(f, cc, rr);
+            t += `<rect x="${f1(x - A_PH - 3)}" y="${f1(y - A_PH - 3)}" width="${2 * A_PH + 6}" height="${2 * A_PH + 6}" fill="none" stroke="#7a4a36" stroke-width="2" opacity="0.6"/>`;
+            for (let k = 0; k < 16; k++) hypha(x + (r() - 0.5) * 40, y - A_CELL * 0.5, Math.PI / 2 + (r() - 0.5) * 1.2, 6 + Math.floor(r() * 8), 1, r, hy, 0.7, 3.2);
+        });
+        t += hy.join('');
+        const vv = [];
+        const L = aC(f, 1, 1);
+        vein([aC(f, 1, 2), L, aC(f, 1, 0), [aC(f, 1, 0)[0] - 30, aC(f, 1, 0)[1] - 20]], 5, 4441, 1, vv, r, true, 3);
+        vein([L, aC(f, 2, 1), aC(f, 2, 0)], 3.4, 4447, 2, vv, r, false, 2.5);
+        vein([L, aC(f, 0, 1), aC(f, 0, 0)], 3.4, 4453, 2, vv, r, false, 2.5);
+        t += vv.join('');
+        t += knot(L[0], L[1], 1.4, 4460, r, 0.8);
+        c += `<g>${t}</g>`;
+    }
+    s += `<g clip-path="url(#clipScreen)"><g filter="url(#barrel)" class="flick">${c}</g>` +
+        `<rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" fill="url(#scan)"/>` +
+        `<rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" fill="url(#vig)"/></g>`;
+    s += `<rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" rx="24" fill="url(#glassA)"/>`;
+    s += `<rect x="${SX}" y="${SY}" width="${SW}" height="${SH}" rx="24" fill="none" stroke="#000" stroke-width="6" opacity="0.6"/>`;
+    // the bezel: a tape, a lamp
+    s += dymo(855, 853, 'WATCHER', { anchor: 'middle', size: 10, rot: 0.4, op: 0.85 });
+    s += `<circle cx="1372" cy="853" r="3.5" fill="${lit ? '#e8f0f8' : '#2a3442'}"/>` + (lit ? `<circle cx="1372" cy="853" r="10" fill="url(#lampGlow)"/>` : '');
+    if (st === 'grow') {
+        // out of the picture: the body comes through the glass and onto the bezel
+        const r = rng(5501);
+        let p = '';
+        const hy = [];
+        for (let k = 0; k < 170; k++) {
+            const a = r() * 6.28, d = 150 + r() * 170;
+            hypha(680 + Math.cos(a) * d * 1.15, 438 + Math.sin(a) * d * 0.85, a + (r() - 0.5), 6 + Math.floor(r() * 12), 1, r, hy, 0.55, 3.6, 0.75);
+        }
+        for (let k = 0; k < 110; k++) hypha(520 + r() * 220, 842 + r() * 30, (r() - 0.5) * 1 + (r() < 0.5 ? 0 : Math.PI), 6 + Math.floor(r() * 12), 1, r, hy, 0.6, 3.4);
+        for (let k = 0; k < 60; k++) hypha(620 + r() * 120, 38 + r() * 26, (r() - 0.5) * 1 + (r() < 0.5 ? 0 : Math.PI), 6 + Math.floor(r() * 10), 1, r, hy, 0.6, 3.4);
+        for (let k = 0; k < 50; k++) hypha(300 + r() * 26, 640 + r() * 200, Math.PI / 2 + (r() - 0.5) * 2, 6 + Math.floor(r() * 10), 1, r, hy, 0.6, 3.4);
+        p += hy.join('');
+        // down across the glass to the bottom bezel, and hooked round its lip
+        p += bundle([[652, 548], [664, 640], [640, 720], [618, 800], [606, 850], [598, 900]], 17, 8, 5511, r, true, false, 6);
+        p += bundle([[640, 720], [604, 770], [560, 812], [536, 850]], 9, 5, 5512, r, false, false, 4);
+        p += band([[572, 836], [600, 846], [632, 852], [668, 868], [690, 900]], 5, 5513);
+        p += band([[520, 862], [548, 846], [580, 840]], 4, 5514);
+        // up to the top bezel
+        p += bundle([[712, 320], [700, 230], [680, 150], [668, 76], [662, 30]], 13, 7, 5517, r, true, false, 6);
+        p += band([[628, 52], [656, 40], [690, 36], [724, 42]], 4.5, 5519);
+        // over to the machine: the body takes it
+        p += bundle([[600, 438], [560, 446], [520, 440], [488, 444]], 34, 11, 5521, r, false, false, 3);
+        // and from the machine out over the left bezel
+        p += bundle([[430, 520], [400, 600], [360, 680], [322, 750], [296, 800]], 12, 6, 5523, r, true, false, 5);
+        const vv = [];
+        vein([[660, 560], [660, 660], [632, 760], [606, 900]], 3.2, 5531, 2, vv, r, false, 3);
+        vein([[600, 440], [540, 446], [470, 442]], 4.2, 5537, 2, vv, r, true, 2);
+        p += vv.join('');
+        // the machine: its three tubes have become hands
+        const MX = 451, MY = 443;
+        p += bundle([[MX, MY], [MX - 2, MY - 50], [MX - 2, 356]], 24, 9, 5541, r, false, false, 2);
+        p += bundle([[MX, MY], [MX - 30, MY + 44], [398, 520]], 22, 8, 5543, r, false, false, 2);
+        p += bundle([[MX, MY], [MX + 32, MY + 40], [506, 516]], 22, 8, 5547, r, false, false, 2);
+        p += `<path d="${blob(MX, MY, 40, 0.3, 5549, 12)}" fill="${MUS_DK}"/>` + tissueCell(MX, MY, 34, 5550, { n: 2 }) + knot(MX, MY, 1.2, 5551, r, 0.7);
+        p += `<ellipse cx="${MX}" cy="262" rx="74" ry="70" fill="#d5dbe3" opacity="0.07" filter="url(#fog)"/>`;
+        p += hand(MX, 292, 1.4, 2, 'flat', 5561);
+        p += hand(388, 560, 1.3, -146, 'fist', 5571);
+        p += hand(518, 556, 1.35, 140, 'two', 5581);
+        for (let k = 0; k < 7; k++) p += knot(560 + r() * 160, 852 + r() * 16, 0.35 + r() * 0.2, 5590 + k, r, 0.2);
+        flesh = `<g filter="url(#fshadow)">${p}</g>`;
+    }
+    s += flesh;
+    return s;
+}
+
+/* ======================================================================== B · STRATA */
+const BX0 = 300, BX1 = 1440, SHX = 860;
+function bDefs() {
+    const pat = (id, inner, w, h) => def(id, `<pattern id="${id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">${inner}</pattern>`);
+    pat('pDots', `<circle cx="2" cy="2" r="0.9" fill="${PLATE}" opacity="0.16"/><circle cx="7" cy="6" r="0.7" fill="${PLATE}" opacity="0.12"/>`, 10, 9);
+    pat('pDash', `<rect x="0" y="3" width="7" height="1" fill="${PLATE}" opacity="0.13"/><rect x="11" y="8" width="5" height="1" fill="${PLATE}" opacity="0.1"/>`, 18, 11);
+    pat('pLens', `<ellipse cx="6" cy="5" rx="5" ry="1.6" fill="none" stroke="${PLATE}" stroke-opacity="0.12" stroke-width="0.8"/><ellipse cx="20" cy="12" rx="3.5" ry="1.2" fill="none" stroke="${PLATE}" stroke-opacity="0.1" stroke-width="0.8"/>`, 28, 16);
+    pat('pFine', `<rect x="0" y="0" width="12" height="0.7" fill="${PLATE}" opacity="0.1"/>`, 12, 4);
+    pat('pAsh', `<circle cx="1.5" cy="1.5" r="0.6" fill="${PLATE}" opacity="0.2"/><circle cx="4.5" cy="4" r="0.5" fill="${PLATE}" opacity="0.14"/>`, 6, 6);
+    def('cone', `<linearGradient id="cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f7fa" stop-opacity="0.22"/><stop offset="1" stop-color="#f4f7fa" stop-opacity="0.02"/></linearGradient>`);
+    def('skyB', `<linearGradient id="skyB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030406"/><stop offset="1" stop-color="#151b23"/></linearGradient>`);
+    def('lampGlow', `<radialGradient id="lampGlow"><stop offset="0" stop-color="#e8f0f8" stop-opacity="0.35"/><stop offset="1" stop-color="#e8f0f8" stop-opacity="0"/></radialGradient>`);
+    def('warmGlow', `<radialGradient id="warmGlow"><stop offset="0" stop-color="#7a3a2a" stop-opacity="0.5"/><stop offset="1" stop-color="#7a3a2a" stop-opacity="0"/></radialGradient>`);
+    def('fshadow', `<filter id="fshadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="4" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.8"/></filter>`);
+    def('soft', `<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.2"/></filter>`);
+}
+function bnd(y0, seed, amp) {
+    const r = rng(seed), a = amp === undefined ? 1 : amp;
+    const p1 = r() * 6.28, p2 = r() * 6.28, p3 = r() * 6.28;
+    const out = [];
+    for (let x = BX0; x <= BX1 + 20; x += 20) out.push([x, y0 + a * (3.2 * Math.sin(x * 0.0072 + p1) + 1.8 * Math.sin(x * 0.023 + p2) + 0.8 * Math.sin(x * 0.07 + p3))]);
+    return out;
+}
+const B_TONES = { old: ['#1b2129', '#232a33', '#161b22', '#1f252e'], ash: ['#2f3743', '#262d37', '#343c48', '#2a313b', '#3a4350', '#2c333e', '#363e4a', '#29303a'] };
+function strata(st) {
+    let s = '';
+    const layers = [];      // {top, bot, tone, pat, label}
+    const crust = 236, oldB = [258, 292, 318, 352, 376];
+    if (st === 'tend') layers.push({ sky: true, top: -20, bot: crust });
+    else {
+        const ys = st === 'sleep' ? [-20, 36, 88, 140, 190, 222, crust] : [-20, 44, 78, 108, 136, 162, 186, 206, 223, crust];
+        const labs = st === 'sleep' ? ['40 000', '30 000', '20 000', '10 000', '1 000'] : ['600 000', '500 000', '400 000', '300 000', '200 000', '100 000', '40 000', '10 000'];
+        for (let i = 0; i < ys.length - 1; i++) layers.push({ top: ys[i], bot: ys[i + 1], tone: B_TONES.ash[i % 8], pat: i % 2 ? 'pAsh' : 'pFine', label: i > 0 ? labs[i - 1] : null, varves: true });
+    }
+    layers.push({ crust: true, top: crust, bot: oldB[0], tone: '#353e4a', pat: 'pDots', label: st === 'tend' ? 'SURFACE' : 'YEAR 0' });
+    for (let i = 0; i < oldB.length - 1; i++) layers.push({ top: oldB[i], bot: oldB[i + 1], tone: B_TONES.old[i], pat: ['pDash', 'pDots', 'pLens', 'pFine'][i] });
+    layers.push({ bed: true, top: oldB[oldB.length - 1], bot: 920, tone: '#0b0e13' });
+    layers.forEach((L, i) => {
+        const top = bnd(L.top, 100 + i * 7, L.sky ? 0 : 1), bot = bnd(L.bot, 107 + i * 7, 1);
+        const d = poly(top.concat(bot.slice().reverse())) + ' Z';
+        if (L.sky) {
+            s += `<path d="${d}" fill="url(#skyB)"/>`;
+            const r = rng(77);
+            for (let k = 0; k < 220; k++) {
+                const x = BX0 + r() * (BX1 - BX0 + 80), y = r() * crust, l = 14 + r() * 50;
+                s += `<line x1="${f1(x)}" y1="${f1(y)}" x2="${f1(x - l * 0.38)}" y2="${f1(y + l)}" stroke="${INK}" stroke-width="0.7" opacity="${(0.06 + r() * 0.16).toFixed(2)}"/>`;
+            }
+            for (let k = 0; k < 7; k++) s += `<ellipse cx="${f1(BX0 + r() * 1140)}" cy="${f1(30 + r() * 120)}" rx="${f1(120 + r() * 200)}" ry="${f1(10 + r() * 18)}" fill="#1e2733" opacity="0.35" filter="url(#soft)"/>`;
+            return;
+        }
+        s += `<path d="${d}" fill="${L.tone}"/>`;
+        if (L.pat) s += `<path d="${d}" fill="url(#${L.pat})"/>`;
+        if (L.varves) {
+            const r = rng(300 + i);
+            const n = Math.max(2, Math.floor((L.bot - L.top) / 4));
+            for (let k = 1; k < n; k++) {
+                const yy = L.top + (L.bot - L.top) * k / n + (r() - 0.5) * 1.5;
+                s += `<path d="${poly(bnd(yy, 100 + i * 7, 1))}" fill="none" stroke="${k % 3 ? '#000' : PLATE}" stroke-width="0.6" opacity="${k % 3 ? 0.18 : 0.07}"/>`;
+            }
+        }
+        if (L.bed) {
+            const r = rng(91);
+            for (let k = 0; k < 70; k++) {
+                let x = BX0 + r() * 1140, y = L.top + 20 + r() * 520, a = r() * 6.28;
+                const pts = [[x, y]];
+                for (let j = 0; j < 4 + r() * 5; j++) { a += (r() - 0.5) * 1.2; x += Math.cos(a) * (8 + r() * 14); y += Math.sin(a) * (8 + r() * 14); pts.push([x, y]); }
+                s += `<path d="${poly(pts)}" fill="none" stroke="#1a212b" stroke-width="${(0.6 + r()).toFixed(1)}" opacity="0.8"/>`;
+            }
+        }
+        s += `<path d="${poly(top)}" fill="none" stroke="${L.crust ? '#5b6676' : '#000'}" stroke-width="${L.crust ? 1.4 : 1}" opacity="${L.crust ? 0.9 : 0.35}"/>`;
+        if (L.label) {
+            const y = top[top.length - 3][1];
+            s += `<line x1="1372" y1="${f1(y)}" x2="1396" y2="${f1(y)}" stroke="${PLATE}" stroke-opacity="0.5"/>`;
+            s += txt(1366, y + 4, L.label, { s: 10, c: L.crust ? PLATE : '#aab8c9', a: 'end', ls: '0.14em', op: L.crust ? 0.85 : 0.7 });
+        }
+    });
+    if (st !== 'tend') s += txt(1366, 18, 'SURFACE ↑', { s: 10, c: PLATE, a: 'end', ls: '0.2em', op: 0.85 });
+    // the ruler
+    s += `<line x1="1396" y1="0" x2="1396" y2="900" stroke="${PLATE}" stroke-opacity="0.12"/>`;
+    for (let y = 10; y < 900; y += 20) s += `<line x1="1392" y1="${y}" x2="1396" y2="${y}" stroke="${PLATE}" stroke-opacity="0.15"/>`;
+    return s;
+}
+const B_FLOORS = [
+    { y: 560, rooms: [[500, 'M'], [620, 'F'], [740, 'D'], [980, 'P'], [1100, 'F'], [1220, 'M']] },
+    { y: 680, rooms: [[500, 'F'], [620, 'C'], [740, 'D'], [980, 'M'], [1100, 'P'], [1220, '+']] },
+    { y: 800, rooms: [[620, '+'], [740, 'M'], [980, 'D'], [1100, 'F'], [1220, 'P']] },
+];
+const BW = 92, BH = 66;
+function chamberPath(x, y, w, h, seed) {
+    const r = rng(seed);
+    const j = () => (r() - 0.5) * 3;
+    return `M ${x} ${y + h} L ${f1(x + j())} ${y + 12} Q ${f1(x + 2)} ${f1(y + j())} ${x + 16} ${f1(y + j())} L ${f1(x + w * 0.5)} ${f1(y - 2 + j())} L ${x + w - 16} ${f1(y + j())} Q ${x + w - 2} ${f1(y + j())} ${f1(x + w + j())} ${y + 12} L ${x + w} ${y + h} Z`;
+}
+function bContent(t, x, y, w, h, col) {
+    const fy = y + h - 10;  // the top of the floor plate
+    if (t === 'M') return `<path d="M ${x + 14} ${fy} L ${x + 30} ${fy - 16} L ${x + 40} ${fy - 11} L ${x + 52} ${fy - 22} L ${x + 66} ${fy} Z" fill="${col}"/>`;
+    if (t === 'F') { let s = ''; for (let i = 0; i < 7; i++) s += `<line x1="${x + 18 + i * 9}" y1="${fy}" x2="${x + 18 + i * 9}" y2="${fy - 10 - (i % 3) * 3}" stroke="${col}" stroke-width="1.6"/>`; return s; }
+    if (t === 'P') return `<rect x="${x + w / 2 - 9}" y="${fy - 26}" width="18" height="26" fill="${col}"/><ellipse cx="${x + w / 2}" cy="${fy - 26}" rx="9" ry="3" fill="${col}"/><rect x="${x + w / 2 + 14}" y="${fy - 12}" width="10" height="12" fill="${col}" opacity="0.7"/>`;
+    if (t === 'D') return `<rect x="${x + 12}" y="${fy - 8}" width="30" height="3" fill="${col}"/><rect x="${x + 12}" y="${fy - 20}" width="30" height="3" fill="${col}"/><rect x="${x + 52}" y="${fy - 8}" width="28" height="3" fill="${col}"/><rect x="${x + 52}" y="${fy - 20}" width="28" height="3" fill="${col}"/>` +
+        [12, 40, 52, 78].map((d) => `<rect x="${x + d}" y="${fy - 22}" width="2" height="22" fill="${col}"/>`).join('');
+    if (t === 'C') return [18, 34, 50, 66].map((d) => `<rect x="${x + d}" y="${fy - 34}" width="10" height="34" rx="5" fill="none" stroke="${col}" stroke-width="1.6"/>`).join('');
+    return '';
+}
+function bChamber(x0, y, t, st, seed, o = {}) {
+    const x = x0 - BW / 2, w = BW, h = BH;
+    const lit = (st !== 'sleep' || o.lit) && t !== '+';
+    let s = '';
+    if (t === '+') {
+        return `<path d="${chamberPath(x, y, w, h, seed)}" fill="#05070a" stroke="${INK}" stroke-opacity="${st === 'sleep' ? 0.18 : 0.5}" stroke-dasharray="4 4"/>` +
+            `<path d="M ${x0 - 6} ${y + h / 2} L ${x0 + 6} ${y + h / 2} M ${x0} ${y + h / 2 - 6} L ${x0} ${y + h / 2 + 6}" stroke="${INK}" stroke-opacity="${st === 'sleep' ? 0.2 : 0.65}" stroke-width="1.3"/>`;
+    }
+    s += `<path d="${chamberPath(x, y, w, h, seed)}" fill="#030405" stroke="#262f3b" stroke-width="1"/>`;
+    if (lit) {
+        s += `<path d="M ${x0 - 3} ${y + 4} L ${x0 + 3} ${y + 4} L ${x + w - 6} ${y + h - 10} L ${x + 6} ${y + h - 10} Z" fill="url(#cone)"/>`;
+        s += `<circle cx="${x0}" cy="${y + 4}" r="11" fill="url(#lampGlow)"/><circle cx="${x0}" cy="${y + 4}" r="2.4" fill="#ffffff"/>`;
+    }
+    const cryo = t === 'C';
+    s += `<rect x="${x + 3}" y="${y + h - 10}" width="${w - 6}" height="8" fill="${lit ? PLATE : cryo ? '#4a5564' : '#2a313b'}"/>`;
+    s += `<g opacity="${lit ? 0.85 : cryo ? 0.8 : 0.5}">${bContent(t, x, y, w, h, lit ? '#aeb8c4' : cryo ? INK : '#1c232c')}</g>`;
+    if (!lit && cryo) s += `<ellipse cx="${x0}" cy="${y + h - 26}" rx="44" ry="20" fill="url(#lampGlow)" opacity="0.5"/>`;
+    if (lit && !o.noPeople) {
+        const r = rng(seed + 5), n = 1 + Math.floor(r() * 3);
+        for (let k = 0; k < n; k++) {
+            const px = x + 12 + r() * (w - 24);
+            s += `<rect x="${f1(px - 1)}" y="${y + h - 17}" width="2.2" height="6" fill="#ffffff"/><circle cx="${f1(px + 0.1)}" cy="${y + h - 19}" r="1.6" fill="#ffffff"/>`;
+        }
+    }
+    return s;
+}
+function bColony(st) {
+    let s = '';
+    const lit = st !== 'sleep';
+    // the shaft: from the deepest floor up to the old ground, sealed there
+    const top = 236;
+    s += `<rect x="${SHX - 9}" y="${top}" width="18" height="${866 - top}" fill="#030405"/>`;
+    s += `<line x1="${SHX - 9}" y1="${top}" x2="${SHX - 9}" y2="866" stroke="${PLATE}" stroke-opacity="${lit ? 0.35 : 0.12}"/><line x1="${SHX + 9}" y1="${top}" x2="${SHX + 9}" y2="866" stroke="${PLATE}" stroke-opacity="${lit ? 0.35 : 0.12}"/>`;
+    s += `<rect x="${SHX - 14}" y="${top - 4}" width="28" height="7" rx="2" fill="${lit ? '#8b97a8' : '#3c4550'}"/>`;
+    // tunnels on each floor
+    B_FLOORS.forEach((F) => {
+        const xs = F.rooms.filter((r) => r[1] !== '+').map((r) => r[0]);
+        const x0 = Math.min(...xs, SHX), x1 = Math.max(...xs, SHX);
+        s += `<rect x="${x0}" y="${F.y + BH - 24}" width="${x1 - x0}" height="22" fill="#030405"/>`;
+        s += `<rect x="${x0}" y="${F.y + BH - 4}" width="${x1 - x0}" height="3" fill="${lit ? '#7b8595' : '#232a33'}"/>`;
+    });
+    // the machine's room on top of the colony
+    const mx = SHX - 120, my = 430, mw = 240, mh = 84;
+    s += `<path d="${chamberPath(mx, my, mw, mh, 61)}" fill="#030405" stroke="#262f3b"/>`;
+    if (lit) s += `<path d="M ${SHX - 4} ${my + 5} L ${SHX + 4} ${my + 5} L ${mx + mw - 10} ${my + mh - 10} L ${mx + 10} ${my + mh - 10} Z" fill="url(#cone)"/><circle cx="${SHX}" cy="${my + 5}" r="14" fill="url(#lampGlow)"/><circle cx="${SHX}" cy="${my + 5}" r="2.6" fill="#fff"/>`;
+    s += `<rect x="${mx + 3}" y="${my + mh - 10}" width="${mw - 6}" height="8" fill="${lit ? PLATE : '#2a313b'}"/>`;
+    if (st !== 'grow') {
+        const c = lit ? '#c3ccd6' : '#262e38';
+        s += `<rect x="${SHX - 64}" y="${my + mh - 30}" width="128" height="20" fill="${c}"/>`;
+        [[-36, 34], [0, 48], [36, 40]].forEach(([dx, hh]) => {
+            s += `<rect x="${SHX + dx - 4.5}" y="${my + mh - 30 - hh}" width="9" height="${hh}" fill="${c}"/>`;
+            s += `<rect x="${SHX + dx - 9}" y="${my + mh - 30 - hh - 9}" width="18" height="10" rx="4" fill="${c}"/>`;
+        });
+    }
+    B_FLOORS.forEach((F, fi) => F.rooms.forEach(([x, t], i) => { s += bChamber(x, F.y, t, st, 200 + fi * 20 + i); }));
+    return s;
+}
+function bScene(st) {
+    bDefs();
+    let s = `<rect width="1440" height="900" fill="#05070a"/>`;
+    s += `<g>${strata(st)}</g>`;
+    s += bColony(st);
+    if (st === 'sleep') {
+        // a lamp burns in a room that was never dug, up in the young rock
+        const x0 = 1130, y = 92;
+        s += `<g class="ghost"><g opacity="0.9">${bChamber(x0, y, 'D', 'tend', 777, { lit: true, noPeople: true })}</g>` +
+            `<g opacity="0.25" transform="translate(5 -3)">${bChamber(x0, y, 'D', 'tend', 777, { lit: true, noPeople: true })}</g>` +
+            `<rect x="${x0 + 18}" y="${y + BH - 25}" width="3" height="14" fill="#fff"/><circle cx="${x0 + 19.5}" cy="${y + BH - 28}" r="2.6" fill="#fff"/></g>`;
+        s += counter(SHX, 330, 140, '41 207', 0.051, { fade: true });
+    }
+    if (st === 'grow') s += bFlesh();
+    return s;
+}
+function bTissue(x, y, seed, r) {
+    // a room full of muscle: bellies lying along the floor, one over the other, never crossed in an X
+    let h = '';
+    const n = 4 + Math.floor(r() * 2);
+    for (let k = 0; k < n; k++) {
+        const yy = y + 12 + k * (BH - 18) / (n - 1) + (r() - 0.5) * 6;
+        const a = (r() - 0.5) * 0.5;
+        const L = BW * 0.62;
+        h += bundle([[x - L + (r() - 0.5) * 10, yy - Math.sin(a) * L], [x + (r() - 0.5) * 16, yy + (r() - 0.5) * 8], [x + L + (r() - 0.5) * 10, yy + Math.sin(a) * L]], 22 + r() * 10, 9, seed + k * 5, r, k === 1, false, 3);
+    }
+    if (seed % 3 === 0) h += knot(x + (r() - 0.5) * 30, y + BH * 0.55, 0.9, seed + 77, r, 0.5);
+    return h;
+}
+function bFlesh() {
+    const r = rng(7701);
+    let s = '';
+    const F = B_FLOORS[0];
+    const xs = F.rooms.map((q) => q[0]);
+    const ty = F.y + BH - 13;
+    // the reachable rooms below glow, warm, faintly
+    [[740, 1], [980, 1]].forEach(([x]) => { s += `<ellipse cx="${x}" cy="${B_FLOORS[1].y + 30}" rx="60" ry="40" fill="url(#warmGlow)" opacity="0.7"/>`; });
+    // roots and vessels: up through the bedrock into every layer time laid down, and sideways
+    const roots = [];
+    const R = [
+        [[500, 570], [470, 470], [430, 360], [400, 250], [380, 120], [372, -10]],
+        [[620, 566], [640, 470], [610, 380], [632, 290], [600, 190], [616, 80]],
+        [[1100, 566], [1080, 470], [1120, 360], [1090, 260], [1130, 150], [1110, 20]],
+        [[1220, 570], [1270, 480], [1300, 380], [1340, 300]],
+        [[740, 566], [770, 500], [760, 440]],
+        [[980, 566], [950, 500], [960, 440]],
+        [[470, 600], [400, 640], [330, 700], [300, 760]],
+        [[1230, 620], [1280, 680], [1320, 760], [1340, 860]],
+    ];
+    R.forEach((P, i) => vein(P, i < 3 ? 7 : 5, 7710 + i * 13, 1, roots, r, false, 5, 0.3));
+    s += roots.join('');
+    const hy = [];
+    for (let k = 0; k < 260; k++) {
+        const P = R[Math.floor(r() * R.length)], j = Math.floor(r() * (P.length - 1));
+        const t = r(), x = P[j][0] + (P[j + 1][0] - P[j][0]) * t, y = P[j][1] + (P[j + 1][1] - P[j][1]) * t;
+        hypha(x, y, r() * 6.28, 8 + Math.floor(r() * 14), 1, r, hy, 0.6, 3.6);
+    }
+    // threads from the floor down toward the next: the front
+    for (let k = 0; k < 40; k++) hypha(700 + r() * 320, 640, Math.PI / 2 + (r() - 0.5) * 1.4, 8 + Math.floor(r() * 10), 1, r, hy, 0.7, 3.4);
+    s += hy.join('');
+    // the tunnel is one long muscle, the rooms are full of it
+    let body = '';
+    body += bundle([[xs[0] - 30, ty], [640, ty + 2], [SHX, ty - 2], [1060, ty + 2], [xs[xs.length - 1] + 30, ty]], 22, 9, 7731, r, false, false, 2);
+    F.rooms.forEach(([x], i) => {
+        const cid = def(`bch${i}`, `<clipPath id="bch${i}"><path d="${chamberPath(x - BW / 2 - 6, F.y - 6, BW + 12, BH + 10, 200 + i)}"/></clipPath>`);
+        body += `<g clip-path="url(#${cid})"><rect x="${x - BW / 2 - 8}" y="${F.y - 8}" width="${BW + 16}" height="${BH + 16}" fill="${MUS_DK}"/>` +
+            bTissue(x, F.y, 7740 + i * 9, r) + '</g>';
+        body += `<path d="${chamberPath(x - BW / 2 - 6, F.y - 6, BW + 12, BH + 10, 200 + i)}" fill="none" stroke="#c9cfd8" stroke-width="0.8" opacity="0.18"/>`;
+    });
+    // the spine: down the shaft from the machine's room through floor 1 and on toward floor 2
+    body += bundle([[SHX, 500], [SHX + 2, 560], [SHX - 2, 630], [SHX, 690]], 20, 8, 7761, r, false, false, 1.5);
+    // the machine's room: its floor is a muscle, its tubes are arms, its arms end in hands
+    body += bundle([[SHX - 116, 506], [SHX - 40, 504], [SHX + 40, 508], [SHX + 116, 504]], 26, 9, 7771, r, false, false, 2);
+    // the rock cracks where the arms go through
+    const cr = [];
+    [[810, 430], [866, 428], [920, 432]].forEach(([x, y], i) => {
+        for (let k = 0; k < 6; k++) {
+            let a = -Math.PI / 2 + (r() - 0.5) * 2.4, px = x, py = y;
+            const pts = [[px, py]];
+            for (let j = 0; j < 4; j++) { a += (r() - 0.5) * 0.8; px += Math.cos(a) * (10 + r() * 14); py += Math.sin(a) * (10 + r() * 14); pts.push([px, py]); }
+            cr.push(`<path d="${poly(pts)}" fill="none" stroke="#000" stroke-width="2" opacity="0.8"/><path d="${poly(pts)}" fill="none" stroke="#5b6676" stroke-width="0.6" opacity="0.6" transform="translate(-0.8,-0.8)"/>`);
+        }
+    });
+    body += cr.join('');
+    body += bundle([[SHX - 36, 500], [SHX - 44, 440], [SHX - 60, 380]], 26, 9, 7781, r, false, false, 3);
+    body += bundle([[SHX, 500], [SHX + 4, 420], [SHX + 8, 330]], 28, 9, 7783, r, false, false, 3);
+    body += bundle([[SHX + 36, 500], [SHX + 52, 440], [SHX + 76, 384]], 26, 9, 7787, r, false, false, 3);
+    body += knot(SHX, 494, 1.3, 7791, r, 0.8);
+    const vv = [];
+    vein([[xs[0], ty - 4], [700, ty - 6], [SHX, ty - 8], [SHX, 520], [SHX + 6, 420], [SHX + 8, 330]], 4.2, 7795, 2, vv, r, true, 2);
+    body += vv.join('');
+    body += hand(SHX - 66, 352, 1.05, -22, 'fist', 7801);
+    body += hand(SHX + 10, 286, 1.15, 4, 'flat', 7811);
+    body += hand(SHX + 86, 356, 1.05, 24, 'two', 7821);
+    s += `<g filter="url(#fshadow)">${body}</g>`;
+    return s;
+}
+
+/* ======================================================================== SVG stage assembly */
+function svgStage(dir, st) {
+    let inner = dir === 'a' ? aScene(st) : bScene(st);
+    inner += hud(st);
+    return `<svg viewBox="0 0 1440 900" width="1440" height="900" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+}
+function overlayStage(st) {
+    let inner = '';
+    if (st === 'sleep') inner += counter(900, 440, 196, '41 207', 0.051, { fade: true });
+    inner += hud(st);
+    return `<svg viewBox="0 0 1440 900" width="1440" height="900" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+}
+
+/* ======================================================================== C · STRIPPED 3D */
+const P3 = { pitch: 3.4, slab: 2.3, thick: 0.7, gap: 3.8, floors: 4 };
+function fleshTextures(seed) {
+    // muscle, cold and wet: spindle-shaped bellies of fibre lying every which way, pale fascia
+    // over them, tendons where they end, arteries between, a fine pale mycelium over all
+    const S = 1024, r = rng(seed);
+    const cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const g = cv.getContext('2d');
+    const ev = document.createElement('canvas'); ev.width = ev.height = S;
+    const e = ev.getContext('2d');
+    e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    g.fillStyle = '#170e13'; g.fillRect(0, 0, S, S);
+    for (let k = 0; k < 50; k++) {
+        const x = r() * S, y = r() * S, rad = 80 + r() * 220;
+        const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+        gr.addColorStop(0, r() < 0.5 ? 'rgba(42,24,32,0.5)' : 'rgba(5,4,7,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    }
+    const cols = ['#4a3039', '#5b3b46', '#6a4652', '#3f2932', '#2a1a22'];
+    g.lineCap = 'round';
+    const bellies = [];
+    const flow = r() * Math.PI;
+    for (let b = 0; b < 46; b++) {
+        const cx = r() * S, cy = r() * S, a = flow + (r() - 0.5) * 1.3, L = 320 + r() * 420, W = 110 + r() * 170, bend = (r() - 0.5) * 0.6;
+        bellies.push({ cx, cy, a, L, W });
+        const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+        // the dark sheath first, then the fibres
+        g.save(); g.translate(cx, cy); g.rotate(a); g.scale(1, W / L);
+        g.beginPath(); g.arc(0, 0, L / 2, 0, Math.PI * 2); g.fillStyle = 'rgba(12,7,10,0.14)'; g.fill(); g.restore();
+        for (let k = 0; k < 170; k++) {
+            const o = (r() - 0.5) * 2;
+            g.beginPath();
+            for (let j = 0; j <= 24; j++) {
+                const t = j / 24 - 0.5;
+                const w = Math.pow(Math.cos(t * Math.PI), 0.8) * W / 2;
+                const x = cx + ux * t * L + vx * (o * w + bend * t * t * L * 0.4);
+                const y = cy + uy * t * L + vy * (o * w + bend * t * t * L * 0.4);
+                if (j) g.lineTo(x, y); else g.moveTo(x, y);
+            }
+            g.strokeStyle = cols[Math.floor(r() * cols.length)];
+            g.globalAlpha = 0.3 + r() * 0.45; g.lineWidth = 1 + r() * 2.2; g.stroke();
+        }
+        g.globalAlpha = 1;
+        // the tendons where a belly ends
+        if (r() < 0.6) [-0.5, 0.5].forEach((t) => {
+            g.beginPath(); g.moveTo(cx + ux * t * L * 0.86, cy + uy * t * L * 0.86); g.lineTo(cx + ux * t * L * 1.15, cy + uy * t * L * 1.15);
+            g.strokeStyle = '#a9b2b9'; g.globalAlpha = 0.35; g.lineWidth = 5 + r() * 6; g.stroke(); g.globalAlpha = 1;
+        });
+    }
+    // wet fascia: pale, cold, thin
+    for (let k = 0; k < 40; k++) {
+        const b = bellies[Math.floor(r() * bellies.length)];
+        const t = (r() - 0.5) * 0.7, o = (r() - 0.5) * 0.6;
+        const x = b.cx + Math.cos(b.a) * t * b.L - Math.sin(b.a) * o * b.W, y = b.cy + Math.sin(b.a) * t * b.L + Math.cos(b.a) * o * b.W;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(b.a) * (30 + r() * 60), y + Math.sin(b.a) * (30 + r() * 60));
+        g.strokeStyle = '#9aa6b0'; g.globalAlpha = 0.08 + r() * 0.1; g.lineWidth = 3 + r() * 8; g.stroke();
+    }
+    g.globalAlpha = 1;
+    // arteries; their cores also go into the glow map, which carries the one pulse
+    function vessel(x, y, a, w, depth) {
+        const pts = [[x, y]];
+        const n = 10 + Math.floor(r() * 16);
+        for (let j = 0; j < n; j++) { a += (r() - 0.5) * 0.5; x += Math.cos(a) * 10; y += Math.sin(a) * 10; pts.push([x, y]); }
+        const path = (c) => { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); pts.forEach((p) => c.lineTo(p[0], p[1])); };
+        path(g); g.strokeStyle = '#1c0c13'; g.globalAlpha = 1; g.lineWidth = w * 1.5; g.stroke();
+        path(g); g.strokeStyle = '#5e1a28'; g.globalAlpha = 0.75; g.lineWidth = w * 0.42; g.stroke(); g.globalAlpha = 1;
+        g.save(); g.translate(-1, -1); path(g); g.strokeStyle = 'rgba(230,217,220,0.2)'; g.lineWidth = 0.8; g.stroke(); g.restore();
+        if (w > 6.5) { path(e); e.strokeStyle = '#fff'; e.globalAlpha = Math.min(1, w / 8); e.lineWidth = w * 0.5; e.shadowColor = '#fff'; e.shadowBlur = 6; e.stroke(); e.shadowBlur = 0; }
+        if (depth < 3) for (let j = 3; j < pts.length - 2; j += 4 + Math.floor(r() * 4)) vessel(pts[j][0], pts[j][1], a + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.6), w * 0.55, depth + 1);
+    }
+    for (let k = 0; k < 5; k++) vessel(r() * S, r() * S, r() * 6.28, 6 + r() * 4, 0);
+    g.globalAlpha = 1;
+    for (let k = 0; k < 480; k++) {
+        let x = r() * S, y = r() * S, a = r() * 6.28;
+        g.beginPath(); g.moveTo(x, y);
+        for (let j = 0; j < 8 + r() * 18; j++) { a += (r() - 0.5) * 0.6; x += Math.cos(a) * 4; y += Math.sin(a) * 4; g.lineTo(x, y); }
+        g.strokeStyle = '#b9c4ca'; g.globalAlpha = 0.05 + r() * 0.15; g.lineWidth = 0.7; g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = 'rgba(18,24,32,0.2)'; g.fillRect(0, 0, S, S);
+    const map = new THREE.CanvasTexture(cv); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    const emi = new THREE.CanvasTexture(ev); emi.colorSpace = THREE.SRGBColorSpace;
+    emi.wrapS = emi.wrapT = THREE.RepeatWrapping;
+    return { map, emi };
+}
+let FLESH = null;
+function fleshMat() {
+    if (!FLESH) FLESH = fleshTextures(9090);
+    return new THREE.MeshPhysicalMaterial({
+        map: FLESH.map, bumpMap: FLESH.map, bumpScale: 3.0, roughness: 0.42, metalness: 0,
+        clearcoat: 1, clearcoatRoughness: 0.22, emissiveMap: FLESH.emi, emissive: new THREE.Color(0xff2a3c), emissiveIntensity: 0.2,
+    });
+}
+function noise3(seed) {
+    const r = rng(seed), P = Array.from({ length: 6 }, () => r() * 6.28);
+    return (x, y, z) => 0.5 * Math.sin(x * 1.7 + P[0]) * Math.sin(z * 1.4 + P[1]) + 0.3 * Math.sin(x * 3.3 + z * 2.6 + P[2]) + 0.2 * Math.sin(y * 4.1 + x * 1.1 + P[3]) + 0.15 * Math.sin(z * 6.2 + P[4]) * Math.sin(x * 5.3 + P[5]);
+}
+function sEll(hx, hy, hz, ex, amp, seed, uvs) {
+    const geo = new THREE.SphereGeometry(1, 64, 40);
+    const p = geo.attributes.position, uv = geo.attributes.uv, n = noise3(seed);
+    for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const sx = Math.sign(x) * Math.pow(Math.abs(x), ex), sy = Math.sign(y) * Math.pow(Math.abs(y), ex), sz = Math.sign(z) * Math.pow(Math.abs(z), ex);
+        let X = sx * hx, Y = sy * hy, Z = sz * hz;
+        const d = amp * n(X, Y, Z);
+        X *= 1 + d * 0.35; Z *= 1 + d * 0.35; Y += d * (Y > 0 ? 1 : 0.4) * hy;
+        p.setXYZ(i, X, Y, Z);
+    }
+    geo.computeVertexNormals();
+    const nn = geo.attributes.normal, k = 0.36, o = uvs || 0;
+    for (let i = 0; i < p.count; i++) {
+        const X = p.getX(i), Y = p.getY(i), Z = p.getZ(i), ax = Math.abs(nn.getX(i)), ay = Math.abs(nn.getY(i)), az = Math.abs(nn.getZ(i));
+        if (ay >= ax && ay >= az) uv.setXY(i, o + X * k, Z * k);
+        else if (ax >= az) uv.setXY(i, o + Z * k + 0.31, Y * k + 0.13);
+        else uv.setXY(i, o + X * k + 0.57, Y * k + 0.71);
+    }
+    return geo;
+}
+function makeHand(kind, mat, tendonMat) {
+    const g = new THREE.Group();
+    const palm = new THREE.Mesh(sEll(0.3, 0.34, 0.13, 0.8, 0.1, kind.length * 7), mat);
+    g.add(palm);
+    const cap = (rad, len) => new THREE.CapsuleGeometry(rad, len, 6, 12);
+    function fingerChain(x, y, angZ, segs, rad, curls) {
+        let parent = new THREE.Group();
+        parent.position.set(x, y, 0); parent.rotation.z = angZ;
+        g.add(parent);
+        segs.forEach((L, i) => {
+            const seg = new THREE.Group();
+            seg.rotation.x = curls[i] || 0;
+            parent.add(seg);
+            const m = new THREE.Mesh(cap(rad * (1 - i * 0.1), L), mat);
+            m.position.y = L / 2 + rad * 0.3;
+            seg.add(m);
+            const tend = new THREE.Mesh(cap(rad * 0.22, L * 0.9), tendonMat);
+            tend.position.set(0, L / 2 + rad * 0.3, -rad * 0.82);
+            seg.add(tend);
+            const next = new THREE.Group(); next.position.y = L + rad * 0.3; seg.add(next);
+            parent = next;
+        });
+    }
+    const X = [-0.2, -0.067, 0.067, 0.195];
+    const knk = (x, y) => { const k = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12), mat); k.position.set(x, y, 0.02); k.scale.set(1, 0.8, 0.9); g.add(k); };
+    if (kind === 'flat') {
+        [[0.24, 0.17, 0.13], [0.27, 0.19, 0.14], [0.26, 0.18, 0.13], [0.2, 0.15, 0.11]].forEach((s2, i) => fingerChain(X[i], 0.29, -(X[i]) * 0.55, s2, 0.085 - Math.abs(i - 1.5) * 0.006, [0.08, 0.06, 0.05]));
+        fingerChain(-0.29, -0.04, 0.75, [0.19, 0.15], 0.095, [0.25, 0.2]);
+    } else if (kind === 'fist') {
+        X.forEach((x) => { fingerChain(x, 0.27, 0, [0.18, 0.13, 0.1], 0.092, [-1.55, -1.6, -1.3]); knk(x, 0.31); });
+        fingerChain(-0.28, -0.06, 1.25, [0.19, 0.16], 0.098, [-0.4, -0.9]);
+    } else {
+        fingerChain(X[1], 0.29, 0.26, [0.27, 0.19, 0.14], 0.086, [0.06, 0.05, 0.04]);
+        fingerChain(X[2], 0.29, -0.22, [0.26, 0.18, 0.13], 0.084, [0.06, 0.05, 0.04]);
+        fingerChain(X[0], 0.27, 0.05, [0.17, 0.13, 0.1], 0.088, [-1.55, -1.6, -1.3]); knk(X[0], 0.31);
+        fingerChain(X[3], 0.27, -0.05, [0.15, 0.12, 0.09], 0.08, [-1.55, -1.6, -1.3]); knk(X[3], 0.3);
+        fingerChain(-0.28, -0.06, 1.25, [0.19, 0.16], 0.095, [-0.4, -0.9]);
+    }
+    return g;
+}
+function buildC(st) {
+    const scene = new THREE.Scene();
+    const BG = 0x040609;
+    scene.background = new THREE.Color(BG);
+    scene.fog = new THREE.Fog(BG, 15, st === 'sleep' ? 28 : 31);
+    const cam = new THREE.PerspectiveCamera(30, 1440 / 900, 0.1, 200);
+    cam.setViewOffset(1440, 900, -150, 0, 1440, 900);
+    const target = new THREE.Vector3(0, st === 'grow' ? 1.1 : -0.1, 0);
+    const amb = new THREE.AmbientLight(0xffffff, st === 'sleep' ? 0.04 : 0.08);
+    scene.add(amb);
+    const lamp = new THREE.PointLight(st === 'sleep' ? 0x9fb3cc : 0xffffff, st === 'sleep' ? 7 : 90, 0, 2);
+    lamp.position.set(2.4, 6.2, 3.4);
+    scene.add(lamp);
+
+    const plateM = new THREE.MeshStandardMaterial({ color: 0xd5dbe3, roughness: 0.92, metalness: 0 });
+    const holeM = new THREE.MeshBasicMaterial({ color: 0x05070a });
+    const wireM = new THREE.LineBasicMaterial({ color: 0x5b6676, transparent: true, opacity: st === 'sleep' ? 0.35 : 0.8 });
+    const fM = st === 'grow' ? fleshMat() : null;
+    const tendM = new THREE.MeshPhysicalMaterial({ color: 0x7d868d, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.2 });
+    const slabG = new THREE.BoxGeometry(P3.slab, P3.thick, P3.slab);
+    const empty = [[1, -1, 0], [-1, 1, 1]];             // [cx, cz, floor]
+    const taken = st === 'grow' ? [[0, 0], [-1, 0], [0, -1], [-1, -1], [1, 0], [0, 1], [-1, 1]] : [];
+    const isTaken = (cx, cz, f) => f === 0 && taken.some((t) => t[0] === cx && t[1] === cz);
+    const people = [];
+    const r = rng(st.length * 101);
+    // depth falls into black: every floor down takes less of the one light, and less of the eye
+    const DEPTH = [1, 0.24, 0.08, 0.025];
+    const floorM = DEPTH.map((k) => new THREE.MeshStandardMaterial({ color: new THREE.Color(0xd5dbe3).multiplyScalar(k), roughness: 0.92, metalness: 0 }));
+    const wireF = DEPTH.map((k) => new THREE.LineBasicMaterial({ color: 0x5b6676, transparent: true, opacity: (st === 'sleep' ? 0.35 : 0.8) * Math.max(0.15, k) }));
+    for (let f = 0; f < P3.floors; f++) {
+        const y = -f * P3.gap;
+        for (let cx = -1; cx <= 1; cx++) for (let cz = -1; cz <= 1; cz++) {
+            if (f > 0 && cx === 0 && cz === 0) continue;
+            const X = cx * P3.pitch, Z = cz * P3.pitch;
+            if (empty.some((e) => e[0] === cx && e[1] === cz && e[2] === f)) {
+                const ln = new THREE.LineSegments(new THREE.EdgesGeometry(slabG), wireF[f]);
+                ln.position.set(X, y, Z); scene.add(ln);
+                continue;
+            }
+            if (isTaken(cx, cz, f)) {
+                const m = new THREE.Mesh(sEll(P3.slab * 0.56, P3.thick * 0.72, P3.slab * 0.56, 0.32, 0.22, 500 + cx * 7 + cz * 13, (cx + 1) * 0.31 + (cz + 1) * 0.17), fM);
+                m.position.set(X, y + 0.06, Z);
+                m.rotation.y = (cx * 3 + cz) * 0.37;
+                scene.add(m);
+                continue;
+            }
+            const m = new THREE.Mesh(slabG, floorM[f]);
+            m.position.set(X, y, Z); scene.add(m);
+            if (f === 0 && cx === 0 && cz === 0) continue;
+            if (st !== 'sleep') for (let k = 0; k < 3 + Math.floor(r() * 4); k++) people.push(X + (r() - 0.5) * 1.9, y + P3.thick / 2 + 0.04, Z + (r() - 0.5) * 1.9);
+        }
+    }
+    // the cryo hall on floor 2: sleepers, a cold glow under the slab's skin
+    if (st === 'sleep') {
+        const m = new THREE.Mesh(slabG, new THREE.MeshStandardMaterial({ color: 0x0a0d12, emissive: 0x2a3a4e, emissiveIntensity: 0.9, roughness: 1 }));
+        m.position.set(-P3.pitch, -P3.gap + 0.01, 0); m.scale.set(1.002, 1.002, 1.002); scene.add(m);
+    }
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.Float32BufferAttribute(people, 3));
+    scene.add(new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x0a0d12, size: 0.07 })));
+    // the shaft
+    for (let f = 0; f < P3.floors; f++) {
+        const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, P3.gap, 32), floorM[f]);
+        sh.position.y = -f * P3.gap - P3.gap / 2 - 0.3; scene.add(sh);
+    }
+    // the machine, bigger, in the middle of everything
+    const block = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.3, 1.9), plateM);
+    block.position.set(0, P3.thick / 2 + 0.65, 0);
+    scene.add(block);
+    const topY = P3.thick / 2 + 1.3;
+    const tubes = [[0, -0.55, 2.0], [-0.5, 0.32, 2.5], [0.5, 0.32, 2.25]];
+    if (st !== 'grow') {
+        tubes.forEach(([x, z, h]) => {
+            const t = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, h, 24), plateM);
+            t.position.set(x, topY + h / 2, z); scene.add(t);
+            const hd = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.34, 32), plateM);
+            hd.position.set(x, topY + h + 0.1, z); scene.add(hd);
+            const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.02, 32), holeM);
+            rim.position.set(x, topY + h + 0.28, z); scene.add(rim);
+        });
+    }
+    const updates = [];
+    if (st === 'sleep') {
+        // the figure: on the plate that was never poured, lit by nothing
+        const fig = new THREE.Group();
+        const pale = new THREE.MeshBasicMaterial({ color: 0xc9d1da, fog: false });
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.62, 6, 12), pale); body.position.y = 0.39; fig.add(body);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 12), pale); head.position.y = 0.86; fig.add(head);
+        fig.position.set(P3.pitch * 1 - 0.3, P3.thick / 2, -P3.pitch * 1 + 0.4);
+        scene.add(fig);
+        updates.push((t) => { fig.visible = (t % 4.1) < 3.7; });
+    }
+    if (st === 'grow') {
+        // sinew across the streets between the taken plates
+        const key = (a) => a.join(',');
+        const set = new Set(taken.map(key));
+        taken.forEach(([cx, cz], i) => {
+            [[1, 0], [0, 1]].forEach(([dx, dz]) => {
+                if (!set.has(key([cx + dx, cz + dz]))) return;
+                for (let s2 = -1; s2 <= 1; s2 += 2) {
+                    const a = new THREE.Vector3(cx * P3.pitch, 0.05, cz * P3.pitch), b = new THREE.Vector3((cx + dx) * P3.pitch, 0.05, (cz + dz) * P3.pitch);
+                    const side = new THREE.Vector3(dz, 0, dx).multiplyScalar(0.45 * s2 + (r() - 0.5) * 0.3);
+                    const a1 = a.clone().lerp(b, 0.3).add(side), b1 = a.clone().lerp(b, 0.7).add(side);
+                    const mid = a.clone().lerp(b, 0.5).add(side).add(new THREE.Vector3(0, -0.12 - r() * 0.15, 0));
+                    const curve = new THREE.CatmullRomCurve3([a1, mid, b1]);
+                    scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.17 + r() * 0.08, 12), fM));
+                }
+            });
+        });
+        // the front: threads on the plates still concrete
+        const hyM = new THREE.LineBasicMaterial({ color: 0x4a3039, transparent: true, opacity: 0.8 });
+        const edgeX = P3.pitch - P3.slab / 2, edgeZ = P3.pitch - P3.slab / 2, yy = P3.thick / 2 + 0.006;
+        for (let k = 0; k < 70; k++) {
+            const alongX = k % 2 === 0;
+            let x = alongX ? edgeX : P3.pitch + (r() - 0.5) * 2.1, z = alongX ? P3.pitch + (r() - 0.5) * 2.1 : edgeZ;
+            let a = alongX ? (r() - 0.5) * 1.2 : Math.PI / 2 + (r() - 0.5) * 1.2;
+            const pts = [new THREE.Vector3(x, yy, z)];
+            for (let j = 0; j < 6 + r() * 16; j++) { a += (r() - 0.5) * 0.7; x += Math.cos(a) * 0.05; z += Math.sin(a) * 0.05; pts.push(new THREE.Vector3(x, yy, z)); }
+            scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), hyM));
+        }
+        // the spine: the shaft is flesh down to the next floor
+        const sp = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.1, -1.6, 0.05), new THREE.Vector3(-0.05, -3.2, 0), new THREE.Vector3(0, -4.6, 0.04)]);
+        scene.add(new THREE.Mesh(new THREE.TubeGeometry(sp, 40, 0.68, 16), fM));
+        // the machine's house half eaten; its tubes have become arms, the arms end in hands
+        const capM = new THREE.Mesh(sEll(1.12, 0.55, 1.12, 0.4, 0.35, 811, 0.2), fM);
+        capM.position.set(0, topY - 0.1, 0); scene.add(capM);
+        cam.position.set(Math.sin(0.67) * 18.5, 8.4, Math.cos(0.67) * 18.5);
+        cam.updateMatrixWorld();
+        const right = new THREE.Vector3(0.78, 0, -0.62).normalize();
+        const H = [
+            { kind: 'fist', base: [0, -0.55], at: right.clone().multiplyScalar(-1.55).add(new THREE.Vector3(0, 3.15, 0.2)), roll: 0.35 },
+            { kind: 'flat', base: [-0.5, 0.32], at: right.clone().multiplyScalar(0.05).add(new THREE.Vector3(0, 4.05, 0.3)), roll: 0.0 },
+            { kind: 'two', base: [0.5, 0.32], at: right.clone().multiplyScalar(1.6).add(new THREE.Vector3(0, 3.3, 0.1)), roll: -0.35 },
+        ];
+        H.forEach((h, i) => {
+            const hg = makeHand(h.kind, fM, tendM);
+            hg.position.copy(h.at);
+            hg.lookAt(cam.position.clone().setY(h.at.y + 0.5));
+            hg.rotateZ(h.roll);
+            hg.scale.setScalar(1.35);
+            scene.add(hg);
+            hg.updateMatrixWorld(true);
+            const wrist = hg.localToWorld(new THREE.Vector3(0, -0.36, 0));
+            const down = hg.localToWorld(new THREE.Vector3(0, -0.9, 0)).sub(wrist).normalize();
+            const b0 = new THREE.Vector3(h.base[0], topY + 0.1, h.base[1]);
+            const curve = new THREE.CatmullRomCurve3([b0, b0.clone().add(new THREE.Vector3(0, 0.8, 0)), wrist.clone().add(down.multiplyScalar(0.8)), wrist]);
+            scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.2, 14), fM));
+            for (let k = 0; k < 2; k++) {
+                const off = new THREE.Vector3(Math.cos(k * 2.6 + i) * 0.17, 0, Math.sin(k * 2.6 + i) * 0.17);
+                const pts = curve.getPoints(40).slice(2, 34).map((p, j) => p.clone().add(off).add(new THREE.Vector3(0, 0, Math.sin(j * 0.4) * 0.02)));
+                scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.022, 6), tendM));
+            }
+        });
+        updates.push((t) => {
+            const k = t % 1.4;
+            const beat = Math.exp(-Math.pow((k - 0.1) / 0.06, 2)) + 0.7 * Math.exp(-Math.pow((k - 0.32) / 0.07, 2));
+            fM.emissiveIntensity = 0.12 + 1.1 * beat;
+        });
+    }
+    return {
+        scene, cam,
+        tick(t) {
+            const a = 0.67 + Math.sin(t * 0.05) * 0.06;
+            const R = st === 'grow' ? 18.5 : 18, h = st === 'grow' ? 8.4 : 7.2;
+            cam.position.set(Math.sin(a) * R, h, Math.cos(a) * R);
+            cam.lookAt(target);
+            updates.forEach((u) => u(t));
+        },
+    };
+}
+
+/* ======================================================================== the page */
+const main = document.getElementById('main');
+const params = new URLSearchParams(location.search);
+const single = params.get('s');
+const C_STAGES = [];
+
+function frameHTML(dir, st) {
+    const id = `${dir}-${st}`;
+    return `<div class="cell"><div class="lab"><b>${STATE_NAME[st]}</b><span>${STATE_NOTE[st]}</span></div>` +
+        `<div class="frame" data-id="${id}"><div class="stage" data-dir="${dir}" data-st="${st}"></div></div></div>`;
+}
+function dirHTML(dir, stacked) {
+    const d = DIRS[dir];
+    return `<section class="dir" data-dir="${dir}">${stacked ? `<h2>${d.name}</h2>` : ''}<div class="caption">${d.cap.map((l) => `<div>${l}</div>`).join('')}</div>` +
+        `<div class="row">${STATES.map((st) => frameHTML(dir, st)).join('')}</div></section>`;
+}
+const svgCache = {};
+function fillStage(el) {
+    const dir = el.dataset.dir, st = el.dataset.st, key = dir + st;
+    if (dir === 'c') {
+        el.innerHTML = `<canvas width="1440" height="900"></canvas>` + (svgCache[key] || (svgCache[key] = overlayStage(st)));
+        C_STAGES.push({ el, canvas: el.querySelector('canvas'), st, r: null, s: null });
+    } else {
+        el.innerHTML = svgCache[key] || (svgCache[key] = svgStage(dir, st));
+    }
+}
+function render(tab) {
+    if (single) {
+        const [dir, st] = single.split('-');
+        document.body.classList.add('single');
+        main.innerHTML = `<section class="dir"><div class="row">${frameHTML(dir, st)}</div></section>`;
+    } else if (tab === 'all') {
+        main.innerHTML = ['a', 'b', 'c'].map((d) => dirHTML(d, true)).join('');
+    } else {
+        main.innerHTML = dirHTML(tab, false);
+    }
+    C_STAGES.length = 0;
+    main.querySelectorAll('.stage').forEach(fillStage);
+    document.getElementById('defs').innerHTML = [...DEFS.values()].join('');
+    fit();
+    main.querySelectorAll('.frame').forEach((f) => f.addEventListener('click', () => {
+        if (single) location.search = '';
+        else location.search = '?s=' + f.dataset.id;
+    }));
+}
+function fit() {
+    main.querySelectorAll('.frame').forEach((f) => {
+        const st = f.querySelector('.stage');
+        if (single) {
+            const k = Math.min(innerWidth / 1440, innerHeight / 900);
+            st.style.transform = `translate(${(innerWidth - 1440 * k) / 2}px, ${(innerHeight - 900 * k) / 2}px) scale(${k})`;
+        } else st.style.transform = `scale(${f.clientWidth / 1440})`;
+    });
+}
+addEventListener('resize', fit);
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && single) location.search = ''; });
+
+let tab = 'a';
+try { tab = localStorage.getItem('deep-views-13-tab') || 'a'; } catch { /* private window */ }
+if (['a', 'b', 'c', 'all'].includes(params.get('tab'))) tab = params.get('tab');
+document.querySelectorAll('.tab').forEach((b) => {
+    b.classList.toggle('on', b.dataset.tab === tab);
+    b.addEventListener('click', () => {
+        tab = b.dataset.tab;
+        try { localStorage.setItem('deep-views-13-tab', tab); } catch { /* ignore */ }
+        document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
+        render(tab);
+    });
+});
+
+await document.fonts.ready;
+render(tab);
+
+const t0 = performance.now();
+let frames = 0;
+function loop() {
+    const t = (performance.now() - t0) / 1000;
+    C_STAGES.forEach((c) => {
+        if (!c.el.isConnected) return;
+        const box = c.el.parentElement.getBoundingClientRect();
+        if (box.bottom < 0 || box.top > innerHeight) return;
+        if (!c.r) {
+            c.r = new THREE.WebGLRenderer({ canvas: c.canvas, antialias: true });
+            c.r.setPixelRatio(1);
+            c.r.setSize(1440, 900, false);
+            c.s = buildC(c.st);
+        }
+        c.s.tick(t);
+        c.r.render(c.s.scene, c.s.cam);
+    });
+    frames++;
+    if (frames === 4) window.__ready = true;
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
