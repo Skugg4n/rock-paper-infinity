@@ -455,3 +455,34 @@ itself). Shots: docs/playtests/rebuild-shots/grow2-graft, -question, -early, -la
 **Not done here.** APPETITE comes only after a necrosis; the scripted player never starves, so it never sees it.
 The people rate shows nothing under half a person a day (the body's net is small awake now that time moves in
 the dreams). The heart's pulse is a ring over the lid, not the flesh of the lid itself.
+
+## GROW, third pass: the body is built from organs you choose (2026-10-03)
+
+Ola on v1.78.0: "Should be able to convert mines into growth vats or something, to grow
+the flesh faster. Has anyone playtested this? From when you start becoming flesh you have
+zero things to do. You can click a piece of flesh that does something unclear. Ah, x2 if
+you click in time with the pulse. Fun! Still it makes no noticeable difference to anything.
+The player's job is to watch while the Body sleeps. Or?"
+
+Claude's answer: no human had played GROW; scripts and sims prove things work and nobody
+gets stuck, not that there is something to do. GROW has no real decisions: every take is
+the same, the pump changes numbers nobody sees.
+
+### The design
+- **Every take is a choice of organ.** Taking a chamber opens a small ring of four
+  organs: VAT (grows people), GUT (turns ore into mass), HEART (pumps; reaches FEED to the
+  edge so it does not starve; makes pumping stronger), NERVE (takes go faster; dreams last
+  longer). The room's old function makes one organ cheap: dormitory → VAT, mine → GUT,
+  generator → HEART, farm → VAT or GUT, cryo hall → NERVE. A mine CAN become a vat.
+- **The four gauges are the four organs** (MASS = guts, FEED = vats, PULSE = hearts,
+  FLESH = nerves) and the weakest one limits the body, as the four bars limited the
+  colony at the start of the chapter. Every take is a trade: people, mass, reach or speed.
+- **Pumping takes chambers.** A take in progress is filled by the player's beats: each
+  pump sends a visible red wave from the heart along the vessels to the front and moves
+  the take a visible step; on the beat it counts double. Dreaming does the same slowly by
+  itself. The active player is faster; the idle player can dream.
+- **Each organ looks different** in the locked flesh style: a vat with curled figures, a
+  gut of coiled tube, a heart chamber that beats, nerve fibres that flicker.
+- **Process rule:** before telling Ola something is playable, a tester agent plays it as a
+  human asking "what choice do I have right now, and does it show?" every 30 seconds,
+  writes down every stretch with no choice, and Claude looks at the result.
