@@ -2253,3 +2253,70 @@ body.in-deep #version-info { z-index: 1400; }
 #phase-deep #deep-watcher { bottom: auto; }
 /* asleep the rates stay: they are the dive's, a second at a time (B331) */
 #phase-deep.is-night .deep-rate { opacity: 1; visibility: visible; }
+
+/* ---- deep-organs: the body is built from organs you choose ---------------------------------- */
+/* the body's mass beside ore, stars and people, in GROW only */
+#phase-deep:not(.is-grow) #deep-mass-row { display: none; }
+.deep-mass-sign { width: 24px; height: 24px; color: #e09aa3; }
+.deep-sign.is-mass { color: #e09aa3; }
+/* the dot on the weakest gauge: the one that limits the body (as the dot marked the weakest bar) */
+.deep-gauge { position: relative; }
+.deep-gauge::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    width: 9px;
+    height: 9px;
+    margin-left: -4.5px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #ff8a92, #a8132c 60%, #4a0812);
+    box-shadow: 0 0 8px 2px rgba(214, 40, 60, 0.75);
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 400ms ease, transform 400ms ease;
+}
+.deep-gauge.is-weakest::after { opacity: 1; transform: scale(1); }
+/* the ring of organs: the same ring as the rooms', warmer; the room's own organ marked cheap */
+.deep-ring.is-organs .deep-ring-room { background: rgba(38, 18, 24, 0.97); color: #e8c8c0; }
+.deep-ring.is-organs .deep-ring-room.is-ok { background: rgba(70, 24, 34, 0.98); color: #ffe6e0; box-shadow: 0 0 0 1px rgba(240, 96, 110, 0.45); }
+.deep-ring.is-organs .deep-ring-room.is-ok:hover { background: #e9c2bf; color: #2a0a10; }
+.deep-ring.is-organs .deep-ring-room:not(.is-ok) { opacity: 0.55; }
+.deep-ring.is-organs .deep-ring-room.is-cheap .deep-ring-price { color: #9fe0a0; }
+.deep-ring.is-organs .deep-ring-room.is-cheap::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #7fcf86;
+    box-shadow: 0 0 6px rgba(127, 207, 134, 0.8);
+}
+.deep-organ-glyph { width: 26px; height: 26px; display: block; }
+.deep-ring-hub.is-organs { border-color: rgba(240, 96, 110, 0.4); }
+#deep-ring.is-organs .deep-ring-say { white-space: nowrap; max-width: none; }
+#deep-ring.is-organs .deep-ring-say.is-rest { opacity: 0.85; }
+#deep-ring.is-organs .deep-ring-say { transform: translate(-50%, 92px) rotate(-1deg); }
+/* the fill ring on the chamber being taken: a faint circle, a red arc of what is filled */
+#deep-marks .deep-fill-back { fill: rgba(20, 4, 8, 0.25); stroke: rgba(240, 96, 110, 0.25); stroke-width: 2; }
+#deep-marks .deep-fill-arc { fill: none; stroke: #ff3c52; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255, 60, 82, 0.9)); }
+#deep-marks .deep-fill.is-regrow .deep-fill-arc { stroke: #f2c4a0; }
+/* the pump's wave: a bright red head running along the body, a trail fading behind it */
+#deep-marks .deep-wave { fill: none; stroke: #ff5a6a; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(255, 40, 60, 0.95)); }
+#deep-marks .deep-wave.is-beat { stroke: #ffd0d4; stroke-width: 7; }
+#deep-marks .deep-wave-trail { fill: none; stroke: rgba(214, 40, 60, 0.55); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+#deep-marks .deep-wave-trail.is-beat { stroke: rgba(255, 90, 106, 0.7); stroke-width: 3.5; }
+#deep-marks .deep-wave-drop { fill: #ff6170; stroke: rgba(255, 220, 224, 0.9); stroke-width: 1.5; filter: drop-shadow(0 0 8px rgba(255, 40, 60, 1)); }
+#deep-marks .deep-wave-drop.is-beat { fill: #ffd6da; }
+/* the words over a plate: the organ a take became, the share a pump filled, a cascade */
+.deep-float.is-organ { font-size: 22px; letter-spacing: 0.12em; }
+.deep-float.is-vat { color: #e6e3da; }
+.deep-float.is-gut { color: #f0b49a; }
+.deep-float.is-heart { color: #ff8d98; }
+.deep-float.is-nerve { color: #cfe0ea; }
+.deep-float.is-cascade { font-size: 24px; color: #ffe2a8; text-shadow: 0 0 12px rgba(255, 180, 60, 0.8), 0 2px 3px rgba(0, 0, 0, 0.9); }
+.deep-float.is-fill { color: #ff9aa4; }
+.deep-float.is-mass { color: #f3b4bb; }
+.deep-float.is-dead { color: #9a9ea2; text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9); }

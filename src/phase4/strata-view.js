@@ -74,6 +74,7 @@ import {
 } from './flesh.js';
 import { emptyChambers, sectorOf } from './layout.js';
 import { slotOf, MACHINE } from './growth.js';
+import { makeOrganArt } from './organ-art.js';
 import { digCost } from './deep.js';
 import * as S from './strata.js';
 
@@ -925,6 +926,11 @@ export function createStrataView(container, opts = {}) {
     const hyBatches = [];             // { from, to, root } segments revealed with their root
     let body = new Set(), necrotic = new Set(), reachSet = [];
     let lone = new Set();             // deep-grow2: the grafts, flesh joined to nothing
+    // deep-organs: what each chamber of the body grew into, drawn in it (organ-art.js); the take in
+    // progress grows its organ in as it fills; the hearts beat on the heartbeat
+    let organMap = null;              // id -> 'vat' | 'gut' | 'heart' | 'nerve' (null: an old body, the dormitories are vats)
+    const organArt = new Map();       // id -> { organ, art }
+    let beatPhase = null;
     let hoverId = '';
     const handsArms = { on: false, arms: [], anchors: [], hands: null, grow: -1, cracks: null };
     let rising = null;
@@ -1680,6 +1686,8 @@ export function createStrataView(container, opts = {}) {
     }
     function syncVats() {
         let n = 0;
+        // deep-organs: a vat is drawn by its organ art; the old capsule tile stays for an old body
+        if (organMap) { vats.count = 0; vats.instanceMatrix.needsUpdate = true; return; }
         for (const id of body) {
             const slot = slotOf(id);
             if (slot < 0 || n >= 40) continue;
@@ -1775,8 +1783,9 @@ export function createStrataView(container, opts = {}) {
     function syncFolkTargets() {
         for (let f = 0; f < floors; f++) {
             const row = chambers.filter((c) => c.floor === f && c.isBody && !necrotic.has(`s${c.slot}`));
-            floorVats[f] = row.filter((c) => c.type === 'dorm').map((c) => c.x);
-            floorOrgans[f] = row.filter((c) => c.type !== 'dorm').map((c) => c.x);
+            const isVat = (c) => (organMap ? organMap[`s${c.slot}`] === 'vat' : c.type === 'dorm');
+            floorVats[f] = row.filter(isVat).map((c) => c.x);
+            floorOrgans[f] = row.filter((c) => !isVat(c)).map((c) => c.x);
         }
         floorVats.length = floors;
         floorOrgans.length = floors;
@@ -1827,6 +1836,47 @@ export function createStrataView(container, opts = {}) {
             placeGlow(reach, n++, wp.x, wp.y, 2.6 * big * (id === hoverId ? 1.15 : 1), 1.9 * big, 0x7a2a22, hot + n * 0.13);
         }
         glowsDone(reach, n);
+    }
+    /**
+     * deep-organs: the organs in their chambers. `map` id -> organ for the body; `taking` the take in
+     * progress ({ id, organ, k }), its organ growing in as k fills; `dead` the necrotic ids.
+     */
+    function setOrgans(map, { taking = null, dead = [] } = {}) {
+        organMap = map ? { ...map } : null;
+        const want = new Map();
+        for (const [id, o] of Object.entries(organMap || {})) if (slotOf(id) >= 0 && body.has(id)) want.set(id, { organ: o, k: 1 });
+        if (taking && slotOf(taking.id) >= 0 && taking.organ && taking.organ !== 'hands') want.set(taking.id, { organ: taking.organ, k: Math.max(0.04, taking.k || 0), grow: true });
+        for (const [id, rec] of organArt) {
+            const w = want.get(id);
+            if (!w || w.organ !== rec.organ) { rec.art.dispose(); organArt.delete(id); }
+        }
+        const deadSet = new Set(dead || []);
+        for (const [id, w] of want) {
+            let rec = organArt.get(id);
+            if (!rec) {
+                const c = chambers[slotOf(id)];
+                if (!c) continue;
+                const art = makeOrganArt(w.organ, { w: S.CH_W * 0.78, h: S.CH_H * 0.62, seed: slotOf(id) + 11, env });
+                art.group.position.set(c.x, c.y + S.CH_H * 0.42, 0.3);
+                art.group.traverse((o) => { o.renderOrder = 24; });
+                fleshGroup.add(art.group);
+                rec = { organ: w.organ, art };
+                organArt.set(id, rec);
+            }
+            rec.art.setGrow(w.k);
+            rec.art.setNecrotic(deadSet.has(id));
+        }
+        syncVats();
+        syncFolkTargets();
+    }
+    function stepOrgans(dt) {
+        // zoomed in past the fit the colony fades out at the sides (the light's uSide): the organs with it
+        const sv = lightU.uSide.value;
+        for (const rec of organArt.values()) {
+            const x = rec.art.group.position.x;
+            rec.art.group.visible = !(sv.z > 0.3 && (x < sv.x + 0.4 || x > sv.y - 0.4));
+            if (rec.art.group.visible) rec.art.step(dt, beatPhase);
+        }
     }
     /** The hands go back into the house: the arms, the hands and the cracks are taken away. */
     function dropHands() {
@@ -1895,6 +1945,7 @@ export function createStrataView(container, opts = {}) {
         return true;
     }
     function stepGrow(dt) {
+        stepOrgans(dt);
         for (let i = 0; i < roots.length; i++) {
             const t = roots[i];
             if (t.t >= t.dur) continue;
@@ -2418,6 +2469,13 @@ export function createStrataView(container, opts = {}) {
         },
         /* --- GROW --- */
         setBody,
+        /** deep-organs: the organs in their chambers, the take in progress growing in (see setOrgans). */
+        setOrgans,
+        /** deep-organs: the heartbeat's phase (0 on the thump): the hearts beat on it. */
+        setBeat(phase) { beatPhase = Number.isFinite(phase) ? phase : null; },
+        /** deep-organs: about how big a node is on the screen (px, its half height), for the fill ring. */
+        nodeRadius(id) { return id === MACHINE ? 1.1 * ppu : slotOf(id) >= 0 ? S.CH_W * 0.46 * ppu : 0.45 * ppu; },
+        get organArt() { return [...organArt.entries()].map(([id, r]) => ({ id, organ: r.organ, grow: r.art.grow, necrotic: r.art.necrotic })); },
         onChamberClick(cb) { clickers.add(cb); return () => clickers.delete(cb); },
         setHands,
         rise,
@@ -2484,6 +2542,16 @@ export function extendHooks(base, view) {
         // step(); the hooks' step hands it the machine's throws, so the hands keep its rhythm
         onChamberHover: (cb) => view.onChamberHover(cb),
         step: (dt, throws) => { view.setThrows(throws); base.stepOverlay(); },
+        // deep-organs: the organs are the view's; the ring, the fill ring and the pump's wave the overlay's
+        setOrgans: (map, o) => view.setOrgans(map, o),
+        setBeat: (phase) => view.setBeat(phase),
+        get organArt() { return view.organArt; },
+        openOrganRing: (...a) => base.openOrganRing(...a),
+        closeOrganRing: () => base.closeOrganRing(),
+        get organRingAt() { return base.organRingAt; },
+        setTaking: (t) => base.setTaking(t),
+        pumpWave: (ids, o) => base.pumpWave(ids, o),
+        get waves() { return base.waves; },
         setHands: (on, o) => view.setHands(on, o),
         rise: (cb) => view.rise(cb),
         get bodyStats() { return view.bodyStats; },

@@ -153,15 +153,24 @@ export function createGrowth(graph) {
     return { body: [graph.heart || HEART], necrotic: [], years: 0 };
 }
 
-const isVat = (n) => !!n && n.kind === 'room' && n.type === 'dorm';
-/** True for an organ that never dies back: the heart, the machine, a vat. */
-export function isProtected(graph, id) {
+/**
+ * Is this node a vat? deep-organs: when the state names its organs (`state.organs`, the player's
+ * choice at each take) a vat is a chamber grown as one; without that (the tests, an old body) a
+ * dormitory taken is a vat, as before.
+ */
+const isVat = (n, state = null) => {
+    if (!n || n.kind !== 'room') return false;
+    if (state && state.organs && typeof state.organs === 'object') return state.organs[n.id] === 'vat';
+    return n.type === 'dorm';
+};
+/** True for an organ that never dies back from hunger: the heart, the machine, a vat. */
+export function isProtected(graph, id, state = null) {
     const n = look(graph).byId.get(id);
-    return id === graph.heart || (n && n.kind === 'machine') || isVat(n);
+    return id === graph.heart || (n && n.kind === 'machine') || isVat(n, state);
 }
 export function isBody(state, id) { return state.body.includes(id); }
 export function isNecrotic(state, id) { return state.necrotic.includes(id); }
-export function isVatOrgan(graph, state, id) { return isBody(state, id) && isVat(look(graph).byId.get(id)); }
+export function isVatOrgan(graph, state, id) { return isBody(state, id) && isVat(look(graph).byId.get(id), state); }
 
 /** Is every node on floor `f` body? */
 export function floorFull(graph, state, f) {
@@ -229,7 +238,7 @@ export function distances(graph, state) {
  *  APPETITE, bought in the drawer). */
 export function eatOf(graph, state, id, levels = {}, k = 1) {
     const n = look(graph).byId.get(id);
-    if (!n || !isBody(state, id) || isNecrotic(state, id) || isVat(n)) return 0;
+    if (!n || !isBody(state, id) || isNecrotic(state, id) || isVat(n, state)) return 0;
     if (n.kind === 'machine') return EAT_MACHINE * k;
     const lvl = n.type ? (levels[n.type] || 0) : 0;
     return k * EAT_PER_ORGAN * (1 + EAT_PER_LEVEL * lvl) * Math.pow(HUNGER_FLOOR_GROWTH, Math.max(0, n.floor));
@@ -247,7 +256,7 @@ export function hunger(graph, state, levels = {}, opts = {}) {
     for (const id of state.body) {
         eat += eatOf(graph, state, id, levels, ek);
         const n = byId.get(id);
-        if (isVat(n) && !isNecrotic(state, id)) grow += gk * VAT_GROWTH * (1 + VAT_PER_LEVEL * (levels.dorm || 0)) * Math.pow(VAT_FLOOR_GROWTH, Math.max(0, n.floor));
+        if (isVat(n, state) && !isNecrotic(state, id)) grow += gk * VAT_GROWTH * (1 + VAT_PER_LEVEL * (levels.dorm || 0)) * Math.pow(VAT_FLOOR_GROWTH, Math.max(0, n.floor));
     }
     return { eat, grow, net: grow - eat };
 }
@@ -289,7 +298,7 @@ export function tick(graph, state, people, opts = {}) {
         const d = distances(graph, state);
         const living = state.body
             .map((id, i) => ({ id, i }))
-            .filter(({ id }) => !necrotic.includes(id) && !isProtected(graph, id));
+            .filter(({ id }) => !necrotic.includes(id) && !isProtected(graph, id, state));
         living.sort((a, b) => ((d.get(b.id) ?? 0) - (d.get(a.id) ?? 0)) || (b.i - a.i));
         for (const { id } of living.slice(0, NECROSIS_PER_YEAR)) { necrotic.push(id); died.push(id); }
     }
@@ -368,7 +377,7 @@ export function roomOutput(graph, state) {
         o.rooms++;
         if (isBody(state, n.id)) o.body++;
         if (isNecrotic(state, n.id)) o.necrotic++;
-        o.effective += isVat(n) && isBody(state, n.id) ? 0 : outputMultiplier(graph, state, n.id);
+        o.effective += isVat(n, state) && isBody(state, n.id) ? 0 : outputMultiplier(graph, state, n.id);
     }
     return out;
 }

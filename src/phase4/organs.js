@@ -1,0 +1,257 @@
+/**
+ * Chapter IV · THE DEEP, movement III · GROW, third pass (deep-organs): THE BODY IS BUILT FROM ORGANS
+ * YOU CHOOSE. Pure: no DOM, no three.js, no clock. docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md,
+ * "GROW, third pass".
+ *
+ * Ola on v1.78.0: "From when you start becoming flesh you have zero things to do. You click a piece of
+ * flesh that does something unclear. Still it makes no noticeable difference to anything."
+ *
+ * EVERY TAKE IS A CHOICE OF ORGAN. A chamber the body takes becomes one of four:
+ *   VAT    grows people (FEED)
+ *   GUT    turns the rock into MASS, the body's currency: every take is paid in mass
+ *   HEART  reaches the edge (PULSE): the body's hearts can feed so much flesh and no more; flesh beyond
+ *          their reach starves. Each heart also makes the player's pumps stronger.
+ *   NERVE  speed (FLESH): takes fill faster, dreams last longer
+ * The room's old function makes one organ cheap (CHEAP_FOR): a dormitory a vat, a mine a gut, a
+ * generator a heart, a farm a vat or a gut, the cryo hall a nerve. A living organ can be grown again
+ * into another, for a price.
+ *
+ * THE FOUR GAUGES ARE THE FOUR ORGANS. Each reads a ratio: what its organs give over what the body's
+ * size asks (1 is enough). The weakest limits the body (`pace`): every take fills at that pace, as the
+ * four bars limited the colony at the start of the chapter. The lid (the first heart) gives a little of
+ * each, so a small body is green everywhere and the gauges fall one by one as it grows.
+ *
+ * UPHILL AND DOWNHILL, PER FLOOR. A deeper chamber costs more mass (TAKE_FLOOR), takes more work
+ * (WORK_FLOOR) and asks more of the hearts and nerves (DEMAND_FLOOR) than its organ gives back
+ * (SUPPLY_FLOOR): the floor is uphill. A full floor cascades: its organs give FULL_FLOOR times, and the
+ * landing below becomes spine by itself.
+ *
+ * The graph is growth.js's. `st` here is { body, necrotic, organs } (grow.js bodyState).
+ */
+
+import { floorFull, MACHINE, HEART, isNecrotic } from './growth.js';
+
+/* ------------------------------------------------------------------ the organs */
+export const ORGANS = ['vat', 'gut', 'heart', 'nerve'];
+export const ORGAN_NAME = { vat: 'VAT', gut: 'GUT', heart: 'HEART', nerve: 'NERVE' };
+/** Which gauge each organ fills, and back. */
+export const ORGAN_GAUGE = { gut: 'M', vat: 'F', heart: 'E', nerve: 'H' };
+export const GAUGE_ORGAN = { M: 'gut', F: 'vat', E: 'heart', H: 'nerve' };
+/** What each does, in one short line (the ring's hover). */
+export const ORGAN_DOES = {
+    vat: 'Grows people.',
+    gut: 'Turns rock into mass.',
+    heart: 'Feeds the edge. Pumps harder.',
+    nerve: 'Takes fill faster.',
+};
+/** The organ the room's old function makes cheap. */
+export const CHEAP_FOR = { dorm: ['vat'], mine: ['gut'], generator: ['heart'], farm: ['vat', 'gut'], cryo: ['nerve'] };
+/** A cheap organ costs this share of the price. */
+export const CHEAP = 0.4;
+/** Growing an organ again into another costs this share of a take there. */
+export const REGROW = 0.6;
+export const cheapOrgans = (type) => CHEAP_FOR[type] || [];
+
+/* ------------------------------------------------------------------ the numbers */
+/** What a chamber asks of the body a floor down, times this a floor (uphill). */
+export const DEMAND_FLOOR = 1.5;
+/** What an organ gives a floor down, times this a floor (less than it asks: uphill). */
+export const SUPPLY_FLOOR = 1.35;
+/** A full floor: its organs give this many times (the cascade, downhill). */
+export const FULL_FLOOR = 1.5;
+/** The machine house as hands asks this much of the body. */
+export const MACHINE_DEMAND = 2;
+/** One organ of a kind gives this much against one unit of size: one in four is a little more than enough. */
+export const ORGAN_K = 4;
+/** The lid gives this much reach (PULSE) and this much speed (FLESH) by itself: a small body is green. */
+export const LID_REACH = 7;
+export const LID_NERVE = 5;
+/** The weakest gauge sets the pace of every take; never slower than this. */
+export const PACE_MIN = 0.3;
+
+/** A take costs this much MASS on floor 0 ... */
+export const TAKE_MASS = 14;
+/** ... times this for every chamber taken before it ... */
+export const TAKE_STEP = 1.035;
+/** ... times this a floor down ... */
+export const TAKE_FLOOR = 1.8;
+/** ... and the machine house this many times. */
+export const TAKE_MACHINE = 3;
+/** A take needs this much WORK (a pump on the beat with one heart is 2) on floor 0 ... */
+export const TAKE_WORK = 32;
+/** ... times this a floor down, and the machine house this many times. */
+export const WORK_FLOOR = 1.35;
+export const WORK_MACHINE = 2;
+/** A regrow needs this share of a take's work. */
+export const REGROW_WORK = 0.5;
+
+/** THE PUMP. One pump fills this much work; on the beat it counts PUMP_ON_BEAT, off it PUMP_OFF_BEAT. */
+export const PUMP_STEP = 2;
+export const PUMP_ON_BEAT = 2;
+export const PUMP_OFF_BEAT = 0.5;
+/** Each heart beyond the lid makes a pump this much stronger, up to PUMP_HEARTS_MAX times. */
+export const PUMP_PER_HEART = 0.12;
+export const PUMP_HEARTS_MAX = 1.8;
+/** Left alone, awake, a take fills by itself this much work a second at full pace (a player pumping a
+ *  pump every second and a half, half of them on the beat, fills about five times that). */
+export const TRICKLE = 0.3;
+/** Dreaming, this much a second (the idle player still grows; the active one is clearly faster). */
+export const DREAM_TRICKLE = 1.0;
+
+/** A gut makes this much mass a second on floor 0 (one gut pays a take in about ten seconds). */
+export const GUT_MASS = 0.4;
+/** The lid makes this much mass a second by itself. */
+export const LID_MASS = 0.22;
+/** A pump with no take in progress sends the blood to the guts: this many seconds of their mass. */
+export const PUMP_MASS_S = 1.2;
+
+/* ------------------------------------------------------------------ reading the body */
+/** Every node of the graph by id (cached per graph). */
+const byIdCache = new WeakMap();
+export function nodeOf(graph, id) {
+    let m = byIdCache.get(graph);
+    if (!m) { m = new Map(graph.nodes.map((n) => [n.id, n])); byIdCache.set(graph, m); }
+    return m.get(id) || null;
+}
+/** The organ a body node is: 'heart' for the lid, 'spine' for a landing, 'hands' for the machine
+ *  house, else what was chosen (st.organs), or null. */
+export function organOf(graph, st, id) {
+    if (id === HEART) return 'heart';
+    const n = nodeOf(graph, id);
+    if (!n) return null;
+    if (n.kind === 'hub') return 'spine';
+    if (n.kind === 'machine') return 'hands';
+    return (st.organs && st.organs[id]) || null;
+}
+/** The floors that are full, as a set. */
+export function fullFloors(graph, st) {
+    const out = new Set();
+    const floors = new Set(graph.nodes.filter((n) => n.floor >= 0).map((n) => n.floor));
+    for (const f of floors) if (floorFull(graph, st, f)) out.add(f);
+    return out;
+}
+const demandOf = (n) => (n.kind === 'machine' ? MACHINE_DEMAND : Math.pow(DEMAND_FLOOR, Math.max(0, n.floor)));
+const supplyOf = (n, full) => Math.pow(SUPPLY_FLOOR, Math.max(0, n.floor)) * (full.has(n.floor) ? FULL_FLOOR : 1);
+
+/**
+ * The body's size (what it asks of its hearts and nerves) and what each kind of organ gives.
+ * Living organs only: dead flesh asks nothing and gives nothing. The lid counts 1, a landing 0.
+ * (MUSCLE is not in here: it doubles what the guts and the vats MAKE, grow.js, not the reach or the speed.)
+ * @returns {{size:number, give:{vat:number,gut:number,heart:number,nerve:number}, count:object, full:Set<number>}}
+ */
+export function bodySums(graph, st) {
+    const full = fullFloors(graph, st);
+    const give = { vat: 0, gut: 0, heart: 0, nerve: 0 };
+    const count = { vat: 0, gut: 0, heart: 0, nerve: 0 };
+    let size = 0;
+    for (const id of st.body) {
+        if (isNecrotic(st, id)) continue;
+        const n = nodeOf(graph, id);
+        if (!n) continue;
+        if (id === HEART) { size += 1; continue; }
+        if (n.kind === 'hub') continue;
+        size += demandOf(n);
+        const o = organOf(graph, st, id);
+        if (ORGANS.includes(o)) { give[o] += supplyOf(n, full); count[o]++; }
+    }
+    return { size, give, count, full };
+}
+/** PULSE: the hearts' reach over the body's size (1: every organ is fed to the edge). */
+export function pulseRatio(sums) { return (LID_REACH + ORGAN_K * sums.give.heart) / Math.max(1, sums.size); }
+/** FLESH: the nerves' speed over the body's size. */
+export function nerveRatio(sums) { return (LID_NERVE + ORGAN_K * sums.give.nerve) / Math.max(1, sums.size); }
+/** The mass the body makes a second: the guts (times MUSCLE's `muscle`) and the lid. */
+export function massRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle; }
+/** The pace of a take: the weakest of the four ratios, never under PACE_MIN, never over 1. */
+export const paceOf = (ratios) => Math.max(PACE_MIN, Math.min(1, ...Object.values(ratios)));
+/** Nerves to spare (FLESH over 1) make every take quicker still: up to NERVE_SPEED more at FLESH 2. */
+export const NERVE_SPEED = 0.4;
+export const nerveSpeed = (H) => 1 + NERVE_SPEED * Math.max(0, Math.min(1, (Number(H) || 0) - 1));
+/** The weakest gauge ('M' | 'F' | 'E' | 'H'): the lowest ratio, the first in M F E H order on a tie. */
+export function weakestOf(ratios) {
+    let best = null;
+    for (const c of ['M', 'F', 'E', 'H']) if (Number.isFinite(ratios[c]) && (best === null || ratios[c] < ratios[best] - 1e-9)) best = c;
+    return best || 'M';
+}
+/** How much stronger the player's pumps are for the hearts (beyond the lid). */
+export const heartPump = (sums) => Math.min(PUMP_HEARTS_MAX, 1 + PUMP_PER_HEART * sums.count.heart);
+
+/**
+ * THE EDGE STARVES. The organs beyond the hearts' reach: walking out from the heart through the body,
+ * the farthest living organs whose size the reach cannot carry. The lid, the landings and the machine
+ * house never starve this way. @returns {string[]} ids, farthest first
+ */
+export function beyondReach(graph, st, sums, dist) {
+    const cap = LID_REACH + ORGAN_K * sums.give.heart;
+    let over = sums.size - cap;
+    if (over <= 1e-9) return [];
+    const living = st.body.filter((id) => !isNecrotic(st, id) && id !== HEART && id !== MACHINE && nodeOf(graph, id)?.kind === 'room');
+    living.sort((a, b) => ((dist.get(b) ?? 0) - (dist.get(a) ?? 0)) || (st.body.indexOf(b) - st.body.indexOf(a)));
+    const out = [];
+    for (const id of living) {
+        if (over <= 1e-9) break;
+        out.push(id);
+        over -= demandOf(nodeOf(graph, id));
+    }
+    return out;
+}
+/** May a dead organ come back without starving the edge again? (Its size fits under the reach.) */
+export function fitsReach(graph, sums, id) {
+    const n = nodeOf(graph, id);
+    if (!n) return false;
+    return sums.size + demandOf(n) <= LID_REACH + ORGAN_K * sums.give.heart + 1e-9;
+}
+
+/* ------------------------------------------------------------------ prices and work */
+/** The mass a take of `id` costs as `organ` after `taken` takes (CHEAP for the room's own organ). */
+export function takeMass(graph, id, organ, taken = 0) {
+    const n = nodeOf(graph, id);
+    if (!n) return Infinity;
+    const k = Math.pow(TAKE_STEP, Math.max(0, taken)) * Math.pow(TAKE_FLOOR, Math.max(0, n.floor));
+    if (n.kind === 'machine') return Math.ceil(TAKE_MASS * TAKE_MACHINE * k);
+    const cheap = cheapOrgans(n.type).includes(organ) ? CHEAP : 1;
+    return Math.ceil(TAKE_MASS * k * cheap);
+}
+/** The mass to grow a living organ again into `organ`. */
+export function regrowMass(graph, id, organ, taken = 0) {
+    return Math.ceil(takeMass(graph, id, organ, taken) * REGROW);
+}
+/** The work a take of `id` needs (pumps fill it; the trickle and the dream too). */
+export function takeWork(graph, id, { regrow = false } = {}) {
+    const n = nodeOf(graph, id);
+    if (!n) return Infinity;
+    const w = TAKE_WORK * Math.pow(WORK_FLOOR, Math.max(0, n.floor)) * (n.kind === 'machine' ? WORK_MACHINE : 1);
+    return regrow ? w * REGROW_WORK : w;
+}
+/** What one pump fills: the beat, the hearts, the pace. */
+export function pumpFill({ beat = false, hearts = 1, pace = 1 } = {}) {
+    return PUMP_STEP * (beat ? PUMP_ON_BEAT : PUMP_OFF_BEAT) * hearts * pace;
+}
+/** What a second fills by itself: awake (TRICKLE) or dreaming (DREAM_TRICKLE); `spread` is SPREAD's factor. */
+export function trickleFill({ pace = 1, dreaming = false, spread = 1 } = {}) {
+    return (dreaming ? DREAM_TRICKLE : TRICKLE) * pace * spread;
+}
+
+/**
+ * The organ the body needs most: the weakest gauge's, unless that is MASS while a gut cannot be had
+ * cheaper than the weakest after it. The dream picks with it, and the sim's player.
+ */
+export function neededOrgan(ratios) { return GAUGE_ORGAN[weakestOf(ratios)]; }
+
+/**
+ * The organ a save from before deep-organs gives each chamber of its body: the cheap one for the room
+ * (a farm alternates vat and gut), an empty or unknown chamber a nerve then a heart, in turn.
+ * @returns {Object<string,string>}
+ */
+export function migrateOrgans(graph, body) {
+    const out = {};
+    let farm = 0, other = 0;
+    for (const id of body) {
+        const n = nodeOf(graph, id);
+        if (!n || n.kind !== 'room') continue;
+        if (n.type === 'farm') out[id] = (farm++ % 2) ? 'gut' : 'vat';
+        else if (cheapOrgans(n.type).length) out[id] = cheapOrgans(n.type)[0];
+        else out[id] = (other++ % 2) ? 'heart' : 'nerve';
+    }
+    return out;
+}

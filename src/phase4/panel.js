@@ -206,6 +206,9 @@ export function createPanel(els) {
                 if (!x) continue;
                 g[c].target = x.k;
                 if (g[c].red !== x.red) { g[c].red = x.red; g[c].cell.classList.toggle('is-red', x.red); }
+                // deep-organs: the dot marks the weakest gauge, the one that limits the body
+                const weak = !!x.weakest;
+                if (g[c].weak !== weak) { g[c].weak = weak; g[c].cell.classList.toggle('is-weakest', weak); }
                 const num = x.num || '';
                 if (g[c].num.dataset.text !== num) { g[c].num.dataset.text = num; g[c].num.innerHTML = signHtml(num); g[c].num.hidden = !num; }
             }

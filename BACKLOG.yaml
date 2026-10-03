@@ -2994,3 +2994,93 @@ items:
     status: done
     resolved_in: deep-econ (version at merge)
     notes: "scripts/accept-iv-cut.mjs; src/checkpoints.js iv-long; docs/playtests/rebuild-shots/econ-*.png."
+
+  - id: B340
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-organs"
+    request: |
+      Every take is a choice of organ: a ring of four (VAT, GUT, HEART, NERVE) priced in mass on the chamber taken, the room's old function makes one cheap, a living organ can be grown again into another. Pure rules in a new module, tested.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "src/phase4/organs.js (+ organs.test.js); grow.js takeOffer/startTake/fillTake/regrow; view-hooks.js openOrganRing."
+
+  - id: B341
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-organs"
+    request: |
+      The four gauges are the four organs (MASS guts, FEED vats, PULSE hearts, FLESH nerves); the weakest limits the body and has the dot; the tape names the organ to grow.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "grow.js bodyRatios/growGauges/adviseGrow; panel.js is-weakest; organs.js paceOf/weakestOf."
+
+  - id: B342
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-organs"
+    request: |
+      Pumping takes chambers: each pump sends a visible red wave from the heart along the body to the take and moves it a visible step (a fill ring); on the beat x2, off x1/2; hearts make pumps bigger; dreaming advances takes slowly by itself; every pump seen and heard.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "grow.js pump/pumpPath/stepGrow trickle; view-hooks.js pumpWave/setTaking (overlay over both views); sound.js 'organ', 'arrive', 'ring'. The space bar stays the pause."
+
+  - id: B343
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-organs"
+    request: |
+      Each organ looks different in the locked flesh style: vat with curled pale figures, gut a coiled tube, heart a chamber that beats, nerve flickering fibres; readable at the strata view's chamber size; both views.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "src/phase4/organ-art.js; strata-view.js setOrgans/setBeat; view-hooks.js (3D) setOrgans on the plates."
+
+  - id: B344
+    added: 2026-10-03
+    source: "Ola on v1.78.0, deep-organs"
+    request: |
+      Challenge and payoff per floor: deeper chambers cost more and starve faster, a full floor cascades (its organs x1.5, the spine), the hands a big payoff (games x3 x PULSE, faster throws), hunger a slope with clear recovery.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "organs.js DEMAND_FLOOR/SUPPLY_FLOOR/FULL_FLOOR/beyondReach; grow.js settleFloors/handsGames/deadFix/regrowGlow."
+
+  - id: B345
+    added: 2026-10-03
+    source: "deep-organs"
+    request: |
+      MASS as the body's currency: a counter in GROW beside ore, stars and people, its rate a second, its own glyph; the MASS gauge carries the amount.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "readout.js MASS_SIGN/MASS_GLYPH; index.html #deep-mass-row."
+
+  - id: B346
+    added: 2026-10-03
+    source: "deep-organs"
+    request: |
+      The body's clock in real seconds (a body year every 3 s); a mid-GROW save given organs and mass; VATS to level 8; SPREAD a faster trickle; MUSCLE x1.5 on what guts and vats make.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "grow.js normalizeGrow migration (organs.js migrateOrgans), BODY_YEAR_S, VATS_TOP, SPREAD_STEP, MUSCLE_STEP."
+
+  - id: B347
+    added: 2026-10-03
+    source: "deep-organs"
+    request: |
+      Sim and pacing: the policy reads the gauges and pumps at a human rate; GROW a third to a half of the act, the act 30 to 40 min, the longest stretch without a decision in GROW under 30 s.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "policy.js pickTake/PUMP_EVERY_S; sim-phase4.mjs organs, pumps, cascades, take times, weakest shares. Strata 31m11s, GROW 42 %, 25 s."
+
+  - id: B348
+    added: 2026-10-03
+    source: "deep-organs"
+    request: |
+      Human-eyed play pass: eight minutes of GROW from iv-grow, a line every 30 s (what choice, does it show), fix every 'nothing to do' or 'can't see it', play again until none.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "docs/playtests/2026-10-03-grow-organs-play.md; shots docs/playtests/rebuild-shots/organs-*.png."
+
+  - id: B349
+    added: 2026-10-03
+    source: "deep-organs"
+    request: |
+      Checkpoints iv-grow, iv-body, iv-rise for the organs; acceptance: the organ ring, a pump moves a take, the weakest organ gets the dot, the starving edge and its fix, both views. Open from here: a keyboard pump (the space is the pause), the new sounds heard by a human, the people counter growing very large late in GROW.
+    status: done
+    resolved_in: deep-organs (version at merge)
+    notes: "src/checkpoints.js growColony organs/mass; scripts/accept-iv-cut.mjs O P W N D A."
