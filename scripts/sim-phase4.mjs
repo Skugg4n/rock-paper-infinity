@@ -33,7 +33,7 @@ import {
   roomMultiplier, digCost, roomCost, levelCost, automationCost, CRYO, DAYS_PER_YEAR, survival,
   startBuild, completeBuilds, buildPending, BUILD_DAYS, sleepTrouble, launchProbe, resolveDueProbes,
   probeCost, scoutParty, MIN_SLEEPERS, PROBE_ENERGY, repairTick, mourn, mourning, nextCryo,
-  feedCost, FEED_MAX,
+  feedCost, FEED_MAX, nextPrice, cryoPrice, feedPrice, setIncome, beginSleepYield, endSleepYield, sleepFull,
 } from '../src/phase4/deep.js';
 import {
   initialWatcher, watchSleep, alarmHit, beginSleep, firstSleep, FIRST_SLEEP_DAYS, recoverAwake,
@@ -44,12 +44,15 @@ import { THROWS, beats, counter, visitDue, TYPE_MS, NIGHTS } from '../src/phase4
 // deep-tree (step 1): every level, automation, cryo tier and Watcher step is bought ON THE TREE,
 // the way the game's panel buys it. The greedy player still decides what to buy, as before; the
 // tree only does the buying. The sim never kept the queue's cap of eight (it orders one per lane).
-import { buy as treeBuy, canBuy as treeCanBuy, LEVEL_NODE, AUTO_NODE, cryoNode, nextWatcherNode, initialTree, GIFT_PRICE, LEVEL_MAX } from '../src/phase4/tree.js';
+import { buy as treeBuy, canBuy as treeCanBuy, priceOf as treePriceOf, LEVEL_NODE, AUTO_NODE, cryoNode, nextWatcherNode, initialTree, GIFT_PRICE, LEVEL_MAX } from '../src/phase4/tree.js';
 // deep-grow: MOVEMENT III. The question answered, the body grows awake: the policy (src/phase4/policy.js
 // decideGrow) buys the drawer's body items, takes reachable chambers it can afford without starving,
 // and pulls RISE when the deepest floor is full and the machine is body. The act ends at the rise.
 import { normalizeGrow, growOn, risen, organsOf, stepGrow, fleshShare, graphOf, riseReady, hungerNow, setChamberPlace, dreamDaysAt, dreamWake, dreamEnd } from '../src/phase4/grow.js';
 import { decideGrow, pressGrow, TAKES_PER_SECOND } from '../src/phase4/policy.js';
+// deep-econ: after the hall the player follows the instruments' named goal (SAVE FOR ..., BUY ...)
+import { goalOf } from '../src/phase4/instruments.js';
+import { cryoRoad } from '../src/phase4/readout.js';
 // deep-grow2: Surface's nights 4 and 5 give a graft; the player places it at the next wake, in a room of
 // the weakest column. GROW is awake at a day a second; when nothing can be taken the player marks the
 // next chambers and dreams (the body grows toward the marks) until HUNGER, REACHED or DREAM_MAX seconds.
@@ -119,6 +122,7 @@ function playOne() {
 /** Surface comes: a night says its line (and opens its gift), and the player plays. */
 function surfaceComes(force = false) {
   const v = openSurface(w, s, { force });
+  if (v.night) decided();
   if (v.night) nightAt.push({ n: v.night, real, year: s.day / DAYS_PER_YEAR, perDay: tickDay(JSON.parse(JSON.stringify(s)), false).stars, stars: s.stars });
   playOne();
   return v;
@@ -144,8 +148,8 @@ const onCurve = (perDay) => { for (let k = 0; k <= 16 && perDay >= 10 ** k; k++)
 function buyFeed(asleep) {
   let k = 0;
   while ((s.feed || 0) < FEED_MAX && k < FEED_MAX) {
-    const price = feedCost(s.feed || 0);
-    if (s.stars < price) return;
+    const price = feedPrice(s);
+    if (s.stars - reserve < price) return;
     const now = tickDay(JSON.parse(JSON.stringify(s)), asleep).stars;
     const then = tickDay(JSON.parse(JSON.stringify({ ...s, feed: (s.feed || 0) + 1 })), asleep).stars;
     const perSecond = (then - now) * (asleep ? CRYO[Math.max(0, s.cryo)].days : 1);
@@ -156,11 +160,40 @@ function buyFeed(asleep) {
     k++;
   }
 }
+/* deep-econ: THE GOAL. After the hall the player does what the tape says: the named goal is bought
+   the moment it can be paid, and its price is kept back from everything else until then (`reserve`). */
+const priceOfNode = (id) => treePriceOf(s, id)?.stars ?? Infinity;
+let goalRoad = null, goalRoadKey = '', simAsleep = false;
+function simGoal() {
+  if (s.cryo < 0 || answered()) return null;
+  // the road to the next tier, worked out once a purchase changes the colony (dry runs are dear)
+  const key = `${s.cryo}|${JSON.stringify(s.level)}|${JSON.stringify(s.auto)}|${JSON.stringify(s.rooms)}|${(s.builds || []).length}|${Math.floor(s.day / 30)}`;
+  if (!simAsleep && key !== goalRoadKey && nextCryo(s)) { goalRoadKey = key; goalRoad = cryoRoad(s.cryo + 1, s); }
+  // the tape reads Surface's schedule off the Watcher; the plain run keeps it off the state otherwise
+  const had = s.watcher;
+  s.watcher = had || w;
+  try { return goalOf(s, { road: nextCryo(s) ? goalRoad : null }); } finally { s.watcher = had; }
+}
+let reserve = 0;
+function buyGoal() {
+  // GOAL_DEBUG=1: the goal, the road to the next tier and the income every twenty seconds
+  if (process.env.GOAL_DEBUG && real % 20 < 1) { const g = simGoal(); console.log(fmt(real), goalRoad && goalRoad.text, JSON.stringify(g), "stars", s.stars.toPrecision(3), "income", JSON.stringify(s.income), "sleepGot", JSON.stringify(s.sleepGot)); }
+  reserve = 0;
+  for (let k = 0; k < 12; k++) {
+    const g = simGoal();
+    if (!g) return;
+    if (g.gap > 0 || !treeCanBuy(s, g.id, { ...SIM, asleep: false, need: null }).ok) { reserve = g.gap > 0 ? g.price : 0; return; }
+    onTree(g.id, { ...SIM, need: null });
+    if (GIFT_PRICE[g.id]) giftAt[g.id] = { real, year: s.day / DAYS_PER_YEAR };
+    events.push({ real, day: s.day, e: `goal ${g.id}` });
+    if (answered()) return;
+  }
+}
 /* deep-fix2: CULTURE VATS. Asleep only the vats grow people; the player buys each level awake the
    moment it can be paid, once the hall stands (the panel says BUILD CULTURE VATS for the first). */
 const vatsAt = [];                 // { level, real, year }
 function buyVats() {
-  while (treeCanBuy(s, 'vats', { ...SIM, asleep: false }).ok) {
+  while (treeCanBuy(s, 'vats', { ...SIM, asleep: false }).ok && s.stars - reserve >= priceOfNode('vats')) {
     onTree('vats');
     vatsAt.push({ level: s.vats, real, year: s.day / DAYS_PER_YEAR });
     events.push({ real, day: s.day, e: `culture vats ${s.vats}` });
@@ -190,6 +223,19 @@ let scoutsSent = 0, scoutsLost = 0, monsters = 0, diedInIce = 0, handWakes = 0, 
 const slots = () => ROOMS.flatMap((t) => new Array(s.rooms[t] || 0).fill(t));
 const weakAwake = { M: 0, F: 0, E: 0, H: 0 }, weakAsleep = { M: 0, F: 0, E: 0, H: 0 };
 const events = [], log = [], buysPerWake = [], pressesPerTier = CRYO.map(() => 0);
+/* deep-econ: THE PACING RULE. A DECISION is anything new the player gets to do: a purchase (every
+   event the log keeps is one), a graft placed, a chamber taken by hand, a mark or a dream, a night's
+   line, pulling the lever to sleep, or waking by hand because something can be bought. The sim
+   reports the longest stretch of real time between two of them, per movement (TEND before the hall,
+   SLEEP until the question, GROW after it); the target is 60 s at most. */
+const idle = { last: 0, TEND: [0, 0], SLEEP: [0, 0], GROW: [0, 0] };
+const movement = () => (answered() ? 'GROW' : s.cryo < 0 ? 'TEND' : 'SLEEP');
+function decided() {
+  const k = real - idle.last, m = movement();
+  if (k > idle[m][0]) idle[m] = [k, real];
+  idle.last = real;
+}
+{ const push = events.push.bind(events); events.push = (...a) => { decided(); return push(...a); }; }
 let starved = 0, minHumans = s.humans, starsDay0 = 0, starsDayEnd = 0, stall = 0, worstStall = 0;
 const fmt = (sec) => `${Math.floor(sec / 60)}m${String(Math.round(sec) % 60).padStart(2, '0')}s`;
 const yr = (d) => (d / DAYS_PER_YEAR).toFixed(1);
@@ -228,22 +274,33 @@ function buy(report) {
   // 2. take people off a job: automate the room type that eats the most crew (stars)
   if (t === 'auto') {
     const hungriest = ROOMS.filter((r) => crewOf(r) > 0 && !buildPending(s, 'auto', r)).sort((a, b) => crewOf(b) - crewOf(a))[0];
-    if (hungriest && s.stars >= automationCost(hungriest, s.auto[hungriest])) {
+    if (hungriest && s.stars - reserve >= nextPrice(s, 'auto', hungriest)) {
       onTree(AUTO_NODE[hungriest]);
       return `auto ${hungriest} ${s.auto[hungriest] + 1} ordered (${BUILD_DAYS.auto} d)`;
     }
     t = 'dorm';
   }
+  // deep-econ: before the hall the player does what the tape says, AUTOMATE ... on Cryo I's road
+  if (s.cryo < 0) {
+    for (const r of ['generator', 'farm', 'mine']) {
+      if ((s.rooms[r] || 0) > 0 && !(s.auto[r] > 0) && !buildPending(s, 'auto', r) && s.stars >= nextPrice(s, 'auto', r)) {
+        onTree(AUTO_NODE[r]);
+        return `auto ${r} ${s.auto[r] + 1} ordered (${BUILD_DAYS.auto} d)`;
+      }
+    }
+  }
   // 3. level or automate the weakest, cheaper first (stars)
-  const lv = levelCost(t, s.level[t]), au = automationCost(t, s.auto[t]);
+  // deep-econ: the prices the drawer shows, held inside their band of the income (deep.js banded)
+  const lv = nextPrice(s, 'level', t), au = nextPrice(s, 'auto', t);
   // the tree draws LEVEL_MAX levels and sells no more (B175)
   const canLv = !buildPending(s, 'level', t) && (s.level[t] || 0) < LEVEL_MAX, canAu = !buildPending(s, 'auto', t);
-  if (canLv && lv <= au && s.stars >= lv) { onTree(LEVEL_NODE[t]); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
-  if (canAu && s.stars >= au) { onTree(AUTO_NODE[t]); return `auto ${t} ${s.auto[t] + 1} ordered (${BUILD_DAYS.auto} d)`; }
-  if (canLv && s.stars >= lv) { onTree(LEVEL_NODE[t]); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
+  const purse = s.stars - reserve;
+  if (canLv && lv <= au && purse >= lv) { onTree(LEVEL_NODE[t]); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
+  if (canAu && purse >= au) { onTree(AUTO_NODE[t]); return `auto ${t} ${s.auto[t] + 1} ordered (${BUILD_DAYS.auto} d)`; }
+  if (canLv && purse >= lv) { onTree(LEVEL_NODE[t]); return `level ${t} ${s.level[t] + 1} ordered (${BUILD_DAYS.level} d)`; }
   // 4. a faster sleep (stars), once a dry run says the colony could sleep a second of it safely
   const next = nextCryo(s);
-  if (next && s.stars >= next.cost && (s.cryo < 0 ? true : !sleepTrouble(s, next.days))) {
+  if (next && purse >= cryoPrice(s, s.cryo + 1) && (s.cryo < 0 ? true : !sleepTrouble(s, next.days))) {
     if (s.cryo < 0 && sleepTrouble(s, next.days)) return null;
     onTree(cryoNode(s.cryo + 1), { ...SIM, need: null });     // the gate is the dry run just above
     return `${next.id} (${next.days} d a second)`;
@@ -263,8 +320,9 @@ function waitDays(report) {
   if (mournWait(report)) return Infinity;
   const t = ROOM_FOR_COLUMN[report.weakest];
   const mineralTarget = usedChambers() < s.chambers ? roomCost(t, s.rooms[t]) : digCost(s.chambers);
-  const starTarget = Math.min(levelCost(t, s.level[t]), automationCost(t, s.auto[t]),
-    nextCryo(s) ? nextCryo(s).cost : Infinity);
+  // deep-econ: after the hall the stars wait for the goal (wantsToWake), not for the weakest column
+  const starTarget = s.cryo >= 0 ? Infinity : Math.min(nextPrice(s, 'level', t), nextPrice(s, 'auto', t),
+    nextCryo(s) ? cryoPrice(s, s.cryo + 1) : Infinity);
   const reserve = Math.max(80, report.fuel * FUEL_DAYS);
   const mineralWait = report.parts.M > 0 ? (mineralTarget + reserve - s.minerals) / report.parts.M : Infinity;
   const starWait = report.stars > 0 ? (starTarget - s.stars) / report.stars : Infinity;
@@ -273,10 +331,14 @@ function waitDays(report) {
 
 /** Would the player wake now? When the next thing it wants is paid for. */
 function wantsToWake() {
+  // deep-econ: after the hall the player wakes when the tape says WAKE: the goal can be paid
+  // (the store full is checked by the caller). Ore waits for the wake.
+  const g = simGoal();
+  if (g) return g.gap <= 0;
   const r = tickDay(JSON.parse(JSON.stringify(s)), false);
   if (waitDays(r) <= 0) return true;
   const next = nextCryo(s);
-  return !!next && s.stars >= next.cost && !sleepTrouble(s, next.days);
+  return !!next && s.stars >= cryoPrice(s, s.cryo + 1) && !sleepTrouble(s, next.days);
 }
 
 /** A party when it is cheap: the ring is the goal, and every reading narrows it. */
@@ -373,7 +435,7 @@ function growSecond() {
       if (a.kind === 'body' && boughtNow) continue;
       if (!pressGrow(s, growLayout, a, r.stars, r.minerals)) continue;
       did = true;
-      if (a.kind === 'take') { grown.hand++; takes++; progressed(); }
+      if (a.kind === 'take') { grown.hand++; takes++; progressed(); decided(); }
       if (a.kind === 'body') { boughtNow = true; progressed(); grown.items.push(`${a.id} ${s.grow.lv[a.id]} ${fmt(real)}`); events.push({ real, day: s.day, e: `body ${a.id} ${s.grow.lv[a.id]}` }); }
       if (a.kind === 'rise') { progressed(); events.push({ real, day: s.day, e: 'RISE' }); }
       if (a.kind === 'dream') { dreams++; dreamInto = 0; real += DREAM_DOWN_SECONDS; events.push({ real, day: s.day, e: `dream toward ${s.grow.marks.join(', ')}` }); }
@@ -424,6 +486,7 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
   // a human at a wake-up clicks several buttons, not one
   let bought, n = 0;
   buyGifts(false);
+  buyGoal();
   buyFeed(false);
   buyVats();
   placeGrafts(r);
@@ -433,6 +496,9 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
   // not be woken to trouble at once. That is the lesson the chapter teaches: a manual room
   // stops the moment everyone lies down, and the alarm says so.
   if (n === 0 && s.cryo >= 0 && waitDays(r) > WAIT_DAYS && s.humans >= MIN_SLEEPERS && !sleepTrouble(s, CRYO[s.cryo].days)) {
+    decided();                         // the lever, pulled
+    simAsleep = true;
+    beginSleepYield(s);                // deep-econ: a sleep brings at most SLEEP_CAP_SECONDS of income
     real += SLEEP_SECONDS;
     const hist = { M: 0, F: 0, E: 0, H: 0 };
     let alarm = null, slept = 0, died = 0, held = 0, lookClock = 0;
@@ -492,9 +558,14 @@ while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
       // deep-voice: a line is due in this sleep and has not come or not finished typing yet
       const waitsOnVoice = visitThisSleep && (w.surface.visit ? voiceLeft > 0 : true);
       if (waitsOnVoice && wantsToWake()) continue;
-      if (wantsToWake()) { alarm = 'hand'; handWakes++; break; }
+      if (wantsToWake()) { alarm = 'hand'; handWakes++; decided(); break; }
+      // deep-econ: the store is full and nothing more comes in this sleep: the instruments say WAKE
+      if (sleepFull(s) && !waitsOnVoice && !waitsOnCapacity) { alarm = 'full'; decided(); break; }
     }
     closeSurface(w);
+    simAsleep = false;
+    endSleepYield(s);
+    setIncome(s);                      // deep-econ: the prices follow the income from this wake on
     // v1.50.0: the body is whole, and this was its last sleep: nobody comes out. The run ends here.
     if (WATCHER && bodyWhole(w)) { bodyEnd = { real, year: s.day / DAYS_PER_YEAR, were: lastWake(w, s) }; break; }
     // v1.48.0: a sleep that cost lives in the ice is mourned for a year after the wake
@@ -583,6 +654,7 @@ if (growAt !== null) {
   console.log(`  dreams ${dreams} (${fmt(dreamReal)} dreaming; woke ${Object.entries(dreamWoke).map(([k, v]) => `${k} ${v}`).join(', ') || 'never'})  longest stuck ${Math.round(longestStuck)} s (ending at ${fmt(stuckAt)})  the drawer: ${['vats', 'appetite', 'spread', 'muscle'].map((id) => `${id} ${seenAt[id] === undefined ? 'never' : fmt(seenAt[id])}`).join('  ')}`);
   console.log(`  body items  ${grown.items.join('  ') || 'none'}`);
 } else console.log('GROW (deep-grow)  the question never answered');
+console.log(`longest without a decision (deep-econ, target 60 s)  TEND ${Math.round(idle.TEND[0])} s (ending ${fmt(idle.TEND[1])})  SLEEP ${Math.round(idle.SLEEP[0])} s (ending ${fmt(idle.SLEEP[1])})  GROW ${Math.round(idle.GROW[0])} s (ending ${fmt(idle.GROW[1])})`);
 const shown = process.argv.includes('--all') ? events : events.slice(0, 30);
 if (!process.argv.includes('--quiet')) for (const e of shown) console.log(`  ${fmt(e.real).padStart(7)}  y${yr(e.day).padStart(7)}  ${e.e}`);
 if (process.argv.includes('--table')) console.table(log);

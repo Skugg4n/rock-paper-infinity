@@ -43,9 +43,10 @@ import {
     sleepTrouble, repairTick, MIN_SLEEPERS, RESURFACE_AT, resolveDueProbes,
     ordersDone, mourn, orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep,
     cancelOrder, digSpare, nextCryo, CRYO_TOP, FEED_MAX, buildProgress,
+    setIncome, beginSleepYield, endSleepYield, sleepCap,
 } from './deep.js';
 import { pushFeed, alarmLine } from './advisor.js';
-import { short, span, cryoRoad, cryoNeed, ORE_SIGN, signHtml } from './readout.js';
+import { short, span, cryoRoad, cryoNeed, ORE_SIGN, signHtml, rateText, FULL_TEXT } from './readout.js';
 import { initialLayout, freeChamber, normalizeLayout, sectorOf, claimChambers, emptyChambers } from './layout.js';
 import { createScene, supportsWebGL, chamberPlace as sceneChamberPlace } from './scene.js';
 import { createStrataView, extendHooks, chamberPlace as strataChamberPlace } from './strata-view.js';
@@ -60,15 +61,16 @@ import {
     playSurface, selfSolve, autoSnapDue, bodyWhole, lastWake, ascendAlone,
     NOBODY_LINE, BODY_GROW_SECONDS, sealLine,
     lampSlots, isLamp, pressLamp, expireLamps, lampFactor, DARK_MS, rungOpenLine,
-    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, lookDue, sleepDaysAt,
+    sealCandidates, sealSector, choosingSector, bodyGlyph, inBody, textMadness, lookDue, sleepDaysAt, sleepPace,
 } from './watcher.js';
-import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS } from './surface.js';
+import { THROWS, THROW_ICON, SENTENCE, SENTENCE_LINE, TYPE_MS, NIGHTS } from './surface.js';
 import { NODE_BY_ID, buy as treeBuy, buyMany as treeBuyMany, normalizeTree, canBuy } from './tree.js';
 import { machineTempo, machineSays } from './machine.js';
 import { createTreeView } from './tree-view.js';
 import {
     gauges as readGauges, advise, cryoLamps, wakeWord, hallucinationsAt, SNAP_CLEAR_MS, healing,
     drawerGroups, drawerCount, surfaceTape, MERGE_MS, RPS_FADE_MS, cardGone,
+    adviseAsleep, adviceNote, RECALL_MS,
 } from './instruments.js';
 import { createPanel } from './panel.js';
 import { createDrawer } from './drawer.js';
@@ -80,7 +82,7 @@ import {
     takeTip, canAfford, toggleMark, markThreads, dreamStart, dreamWake, dreamEnd, dreaming, dreamDaysAt,
     pump, beatPhase, onBeat, PUMP_COOLDOWN_MS, peoplePerDay, organMultiplier, unlockBody,
 } from './grow.js';
-import { normalizeGraft, graftOwed, graftCandidates, graftWords, placeGraft, loneGrafts, GRAFT_MULT } from './graft.js';
+import { normalizeGraft, graftOwed, graftCandidates, graftWords, placeGraft, loneGrafts, GRAFT_MULT, graftEffect } from './graft.js';
 import { HANDS_SECONDS } from './view-hooks.js';
 import { playChapterCard } from '../chapterCard.js';
 import { audio } from '../audio.js';
@@ -257,7 +259,7 @@ export function init() {
         rpsBtns: [...document.querySelectorAll('#deep-surface .deep-rps-btn')],
         snapRing: $('deep-snap-ring'), snapArc: document.querySelector('#deep-snap-ring .arc'),
         drawer: $('deep-drawer'), ring: $('deep-ring'),
-        takeTip: $('deep-take-tip'), riseLines: $('deep-rise-lines'),
+        takeTip: $('deep-take-tip'), riseLines: $('deep-rise-lines'), recall: $('deep-recall'),
         // deep-grow2
         people: $('deep-people'), peopleRate: $('deep-people-rate'),
         heart: $('deep-heart'), marks: $('deep-marks'), float: $('deep-float'), diveWord: $('deep-dive-word'),
@@ -309,7 +311,7 @@ export function init() {
     const hooks = scene && viewKind !== '3d' ? extendHooks(baseHooks, scene) : baseHooks;
     mountViewItem(viewKind);
     const panel = createPanel({
-        root: ui.panel, gauges: $('deep-gauges'), advice: $('deep-advice'), empty: $('deep-empty'),
+        root: ui.panel, gauges: $('deep-gauges'), advice: $('deep-advice'), note: $('deep-advice-note'), empty: $('deep-empty'),
         lamps: $('deep-lamps'), alarm: $('deep-alarm'), alarmWord: $('deep-alarm-word'),
     });
 
@@ -321,6 +323,7 @@ export function init() {
     let lastSleepAt = 0;
     let sleepTicks = 0;
     let sleepClock = 0;             // deep-rebuild: real seconds into this sleep, for the dive
+    let nightBefore = state.watcher.surface.night | 0;   // deep-econ: the night the sleep began on
     let lookClock = 0;              // deep-fix: real seconds of this sleep, for the look at Cryo I and II
     let diveOffset = 0;             // the years slept, as days, less the calendar day: constant within a sleep
     let alarmUntil = 0;             // the wake's lamp goes out then (0: it is out)
@@ -330,6 +333,11 @@ export function init() {
     const dryRun = () => tickDay(JSON.parse(JSON.stringify(state)), state.asleep);
     // deep-grow2: the lone grafts make five times and eat a few people (grow.js organsOf)
     state.organs = organsOf(state, layout);
+    // deep-econ (B330): the prices follow the colony's income, worked out afresh when the save is
+    // opened, so a save sitting on an absurd stock (Ola's ★ 9.8e16) lands where it can buy again.
+    // A save that slept with no cap counted keeps sleeping without one until its next wake
+    if (!growOn(state)) setIncome(state);
+    if (!state.asleep) endSleepYield(state);
     let report = dryRun();
     // deep-grow: a save that answered The question (or owns the old biological steps) has its body
     if (normalizeGrow(state, layout, report)) {
@@ -493,15 +501,26 @@ export function init() {
     }
 
     /* ---- THE CHROME ---------------------------------------------------------------------------- */
-    const perDay = (v) => (Math.abs(v) < 0.5 ? '' : `${v >= 0 ? '+' : '-'}${formatCount(Math.abs(v))} a day`);
+    /* deep-econ (B331): RATES PER REAL SECOND. Awake a day is a second; asleep the dive runs the tier's
+       days a second times its pace (watcher.js sleepPace); a dream its own (grow.js dreamDaysAt). */
+    function daysPerSecond() {
+        if (state.asleep) return sleepPace(sleepClock) * CRYO[Math.max(0, Math.min(CRYO.length - 1, state.cryo))].days;
+        if (dreaming(state)) return dreamDaysAt(dreamClock, 1);
+        return 1;
+    }
     let leverWas = null;
     function updateChrome() {
         if (!state.asleep && !roll) drawCounters(snapshot());
-        const oreDay = perDay(report.parts.M), starDay = perDay(report.stars);
+        const dps = daysPerSecond();
+        // a sleep's store, once full, brings nothing more (deep.js SLEEP_CAP_SECONDS): it says so
+        const cap = state.asleep ? sleepCap(state) : null;
+        const capFull = (k, c) => !!cap && cap[c] > 0 && state.sleepGot[k] >= cap[c] * (1 - 1e-9);
+        const oreDay = capFull('ore', 'ore') ? FULL_TEXT : rateText(report.parts.M * dps);
+        const starDay = capFull('stars', 'stars') ? FULL_TEXT : rateText(report.stars * dps);
         if (ui.oreRate.textContent !== oreDay) ui.oreRate.textContent = oreDay;
         if (ui.starsRate.textContent !== starDay) ui.starsRate.textContent = starDay;
-        // deep-grow2: the people a day: born less lost awake; in the body what its vats grow less what it eats
-        const pDay = state.asleep || dreaming(state) ? '' : perDay((growOn(state) ? peoplePerDay(state, layout) : (report.born || 0)) - (report.died || 0));
+        // deep-grow2: the people: born less lost; in the body what its vats grow less what it eats
+        const pDay = rateText(((growOn(state) ? peoplePerDay(state, layout) : (report.born || 0)) - (report.died || 0)) * dps);
         if (ui.peopleRate && ui.peopleRate.textContent !== pDay) ui.peopleRate.textContent = pDay;
         // the machine's tempo IS the stars a day
         const tempo = machineTempo(report, { asleep: !!state.asleep, feed: state.feed });
@@ -519,9 +538,12 @@ export function init() {
         const gone = !!state.watcher.gone;
         const asleep = !!state.asleep || gone;
         const growing = growOn(state);
+        // deep-econ (B332): asleep the tape still names the goal, or says WAKE when it can be paid
+        const word = risen(state) || gone ? '' : state.asleep ? adviseAsleep(state, { road: roadNow }) : inst.advice;
         panel.update({
             gauges: growing ? growGauges(state, report, layout) : readGauges(state, report),
-            advice: asleep || risen(state) ? '' : inst.advice,
+            advice: word,
+            note: growing ? '' : adviceNote(state, word, { road: roadNow }),
             empty: asleep || growing ? 0 : emptyChambers(state, layout).length,
             lamps: growing ? (risen(state) ? null : inst.lamps) : (!asleep && state.cryo < 0 ? inst.lamps : null),
         });
@@ -565,7 +587,9 @@ export function init() {
         ui.root.classList.toggle('has-lever', leverOn);
         const dreamt = dreaming(state);
         ui.leverWrap.classList.toggle('is-down', !!state.asleep || dreamt);
-        ui.leverWrap.classList.toggle('is-ready', !state.asleep && !dreamt && (inst.advice === 'SLEEP' || inst.advice === 'RISE' || inst.advice === 'DREAM'));
+        // the knob glows when the tape says to pull it: SLEEP (or SAVE FOR, a sleep is how stars come), WAKE
+        ui.leverWrap.classList.toggle('is-ready', state.asleep ? word === 'WAKE'
+            : !dreamt && (word === 'SLEEP' || word === 'RISE' || word === 'DREAM' || (!growing && word.startsWith('SAVE FOR '))));
         ui.leverWrap.classList.toggle('is-flesh', growing);
         const few = !growing && !state.asleep && state.humans < MIN_SLEEPERS;
         ui.leverWrap.classList.toggle('is-locked', busy || few);
@@ -1367,7 +1391,8 @@ export function init() {
         sound?.event('take');
         afterChange();
         hooks.floatText(id, `×${GRAFT_MULT}`);
-        showTip('', 0, 0);
+        // deep-econ (B336): and the room's own output before and after, where the cursor is
+        showTip(id, tipAt.x, tipAt.y);
         return true;
     }
     /** The price over the chamber under the cursor, in plain words (red when the body would starve). */
@@ -1376,7 +1401,7 @@ export function init() {
         tipAt = { x, y };
         const t = !id ? { text: '', red: false }
             : growOn(state) ? (dreaming(state) ? { text: '', red: false } : takeTip(state, layout, id))
-                : { text: !state.asleep ? graftWords(state, layout, id) : '', red: false };
+                : { text: !state.asleep ? (graftWords(state, layout, id) || graftedWords(id)) : '', red: false };
         const el = ui.takeTip;
         if (!el) return;
         if (el.dataset.text !== t.text) { el.dataset.text = t.text; el.innerHTML = signHtml(t.text); }
@@ -1384,6 +1409,10 @@ export function init() {
         el.hidden = !t.text;
         ui.sceneHost.classList.toggle('is-over-take', !!t.text);
         if (t.text) el.style.transform = `translate(${x + 16}px, ${y + 14}px)`;
+    }
+    /** deep-econ (B336): over a lone graft, what it makes now against what the room made before. */
+    function graftedWords(id) {
+        return loneGrafts(state).includes(id) ? graftEffect(state, layout, report, id) : '';
     }
     function nudgeTip() {
         const el = ui.takeTip;
@@ -1616,6 +1645,9 @@ export function init() {
         sound?.event('sleep');
         ui.root.classList.add('is-sleeping');
         beginSleep(state.watcher, state.cryo);
+        // deep-econ: one sleep brings at most SLEEP_CAP_SECONDS of the income (deep.js capYield)
+        beginSleepYield(state);
+        nightBefore = state.watcher.surface.night | 0;
         trackStrata();
         setDiveOffset();
         ui.dive.hidden = false;
@@ -1704,6 +1736,12 @@ export function init() {
         sound?.event('wake');
         const w = state.watcher;
         closeSurface(w);
+        // deep-econ: the prices follow the income from this wake on; the cap counts again next sleep
+        endSleepYield(state);
+        setIncome(state);
+        // deep-econ (B335): a night that came in this sleep is said again, low, once the panel is back
+        const missed = (w.surface.night | 0) > nightBefore ? w.surface.night | 0 : 0;
+        nightBefore = w.surface.night | 0;
         stopRps();
         leaveChoice();
         if (w.puzzle) dismissPuzzle(w, state.cryo);
@@ -1735,6 +1773,7 @@ export function init() {
         // the one lamp, and the panel's lights back on, while they walk out
         panel.alarm(wakeWord(rebooted && alarm.kind !== 'reboot' ? { kind: 'reboot' } : alarm));
         alarmUntil = performance.now() + ALARM_LAMP_MS;
+        if (missed) recallNight(missed);
         await Promise.all([panel.lights(true, LIGHTS_MS), scene ? scene.release(SLEEP_TIMING.release) : Promise.resolve()]);
         sleepSum = null;
         setBusy(false);
@@ -1743,6 +1782,25 @@ export function init() {
         saveGame();
     }
 
+    /* deep-econ (B335): MISSED NIGHTS ARE TOLD ON WAKING. Ola: "Suddenly a red light in the rooms.
+       Nothing I did. No explanation." The night's line came while he slept; on the wake nothing said
+       it. Now the line is said again, low, for RECALL_MS; the tape says what its gift asks for. */
+    let recallTimers = [];
+    function recallNight(n) {
+        const line = NIGHTS[n - 1]?.line;
+        if (!line || !ui.recall) return;
+        for (const t of recallTimers) clearTimeout(t);
+        ui.recall.textContent = `“${line}”`;
+        ui.recall.hidden = false;
+        void ui.recall.offsetWidth;
+        ui.recall.classList.add('is-in');
+        recallShown = { n, at: performance.now() };
+        recallTimers = [
+            setTimeout(() => ui.recall.classList.remove('is-in'), RECALL_MS),
+            setTimeout(() => { ui.recall.hidden = true; }, RECALL_MS + 750),
+        ];
+    }
+    let recallShown = null;
     /** THE LAST WAKE-UP (v1.50.0), for a save at the old body's end: nobody comes out. */
     async function lastWakeUp() {
         const w = state.watcher;
@@ -1787,7 +1845,8 @@ export function init() {
     /* ---- THE SNAP: a click on the base while the colony sleeps. It snaps rigid, holds a little,
        and every false thing goes with a short flicker. ---- */
     function snapBase() {
-        if (!state.asleep || busy) return;
+        // deep-econ (B337): the snap is the sleep's alone: awake (or in a dream) a click makes no sound
+        if (!state.asleep || busy || dreaming(state)) return;
         if (snapWait(state.watcher, Date.now()) > 0) {
             ui.snapRing?.classList.remove('is-nudged');
             void ui.snapRing?.offsetWidth;
@@ -2041,6 +2100,13 @@ export function init() {
         get treeDrawn() { return treeView ? treeView.drawn : {}; },
         get machineTip() { return { text: machineText, shown: !!ui.machineTip && !ui.machineTip.hidden }; },
         get road() { return roadNow; },
+        // deep-econ
+        get note() { return panel.note; },
+        get recall() { return recallShown && ui.recall && !ui.recall.hidden ? { ...recallShown, text: ui.recall.textContent } : null; },
+        get rates() { return { ore: ui.oreRate.textContent, stars: ui.starsRate.textContent, people: ui.peopleRate ? ui.peopleRate.textContent : '' }; },
+        get tip() { return ui.takeTip && !ui.takeTip.hidden ? ui.takeTip.textContent : ''; },
+        snap: () => snapBase(),
+        showTip: (id) => { const p = scene?.screenOfNode?.(id); showTip(id, p ? p.x : 400, p ? p.y : 400); },
         openTree: () => openTree(),
         closeTree: () => closeTree(),
         // deep-rebuild

@@ -199,6 +199,109 @@ export const starsFor = (fed) => gamesFor(fed) * WIN_ODDS;
 export const FEED_AT_TIER = [1, 3, 5, 8, 8, 8, 8, 8];
 export const impliedFeed = (cryo) => ((cryo ?? -1) < 0 ? 0 : FEED_AT_TIER[Math.min(cryo, FEED_AT_TIER.length - 1)]);
 
+/* ---------------------------------------------------------------------------
+ * PRICES FOLLOW INCOME (deep-econ, B330). Ola's playtest of v1.78.0: a sleep of a million years
+ * left ★ 9.8e16, everything in the drawer was free at once, and then Cryo VI at ★ 3e17 stood out of
+ * reach for ten minutes with nothing else to do. The rule, from the hall on:
+ *   1. INCOME is what one real second of sleep brings at the colony's tier, at the dive's base pace:
+ *      the stars (and the ore) of a sleeping day times the tier's days a second (`state.income`).
+ *      It is set when the colony wakes and when a tier is bought, never while the player looks at a
+ *      price, so a price does not move under the cursor.
+ *   2. Every star price of an upgrade (a level, an automation, the machine's feed, the culture vats,
+ *      a cryo tier, Surface's gifts) is its old price held inside PRICE_BAND[kind] seconds of that
+ *      income: never less than the low end, so a long sleep does not make it free; never more than
+ *      the high end, so nothing stands out of reach for minutes. Prices are rounded to two figures.
+ *   3. One sleep brings at most SLEEP_CAP_SECONDS of income, stars and ore; past that the store is
+ *      full, the counter says so and the instruments say WAKE.
+ * The dive runs from 0.15 to 3 times the base pace (watcher.js RAMP), so 30 to 90 seconds of income
+ * is about 15 to 45 real seconds of a sleep, and the cap about a minute and a half of one.
+ * Before the hall there is no sleep and no income: TEND keeps its prices as they were.
+ * The Watcher's ladder is left out: capacity, which only the sleep fills, is what paces it.
+ * ------------------------------------------------------------------------ */
+export const PRICE_BAND = {
+    level: [35, 80], auto: [45, 85], feed: [35, 80], vats: [35, 70], cryo: [45, 90], gift: [35, 70],
+};
+export const SLEEP_CAP_SECONDS = 200;
+/** Two significant figures, rounded up: "★ 2.4 T", never "★ 2.37951 T". */
+export function roundPrice(x) {
+    if (!(x > 0) || !Number.isFinite(x)) return x;
+    const p = Math.pow(10, Math.floor(Math.log10(x)) - 1);
+    return Math.ceil(x / p - 1e-9) * p;
+}
+/**
+ * What one real second of sleep brings now, worked out by a dry run of a sleeping day: { stars, ore }
+ * (ore is the net of the mines over what the generators burn, never below zero). Null before the hall.
+ * @param {object} s
+ */
+export function incomeNow(s) {
+    if (!((s.cryo ?? -1) >= 0) || !CRYO[s.cryo]) return null;
+    const c = JSON.parse(JSON.stringify(s));
+    c.probes = [];
+    const r = tickDay(c, true);
+    const days = CRYO[s.cryo].days;
+    return { stars: Math.max(0, r.stars) * days, ore: Math.max(0, r.parts.M) * days, tier: s.cryo };
+}
+/** Set the colony's income (on a wake, when a tier is bought, when a save is opened). */
+export function setIncome(s) {
+    s.income = incomeNow(s);
+    return s.income;
+}
+/** The income the prices read, or null (before the hall, or a save that has none yet). */
+export const incomeOf = (s) => (s && s.income && s.income.stars > 0 && (s.cryo ?? -1) >= 0 ? s.income : null);
+/**
+ * A base price held inside its band of the income (rule 2 above).
+ * @param {object} s
+ * @param {'level'|'auto'|'feed'|'vats'|'cryo'|'gift'} kind
+ * @param {number} base - the price the old curves give
+ */
+export function banded(s, kind, base) {
+    const inc = incomeOf(s);
+    const band = PRICE_BAND[kind];
+    if (!inc || !band || !Number.isFinite(base)) return base;
+    return roundPrice(Math.min(band[1] * inc.stars, Math.max(band[0] * inc.stars, base)));
+}
+/** The next level of the machine's feed, the next level of the vats, a cryo tier: banded. */
+export const feedPrice = (s) => banded(s, 'feed', feedCost(feedLevel(s)));
+export const vatsPrice = (s) => banded(s, 'vats', vatsCost(vatsLevel(s)));
+export const cryoPrice = (s, tier) => (CRYO[tier] ? banded(s, 'cryo', CRYO[tier].cost) : Infinity);
+/** A sleep begins: its yield is counted from nothing (rule 3). */
+export function beginSleepYield(s) { s.sleepGot = { stars: 0, ore: 0 }; }
+/** The colony wakes: no yield is counted until the next sleep. */
+export function endSleepYield(s) { s.sleepGot = null; }
+/** What one sleep may bring at most, or null when nothing is capped. */
+export function sleepCap(s) {
+    const inc = incomeOf(s);
+    if (!inc || !s.sleepGot) return null;
+    return { stars: SLEEP_CAP_SECONDS * inc.stars, ore: SLEEP_CAP_SECONDS * inc.ore };
+}
+/** Is this sleep's store of stars full? */
+export function sleepFull(s) {
+    const cap = sleepCap(s);
+    return !!cap && cap.stars > 0 && s.sleepGot.stars >= cap.stars * (1 - 1e-9);
+}
+/**
+ * Hold what a sleeping stretch just added to the stores inside the cap. The day's numbers were
+ * already added (tickDay, or the fast forward); whatever is over the cap is taken back off.
+ * @returns {{stars:number, ore:number}} what was kept
+ */
+function capYield(s, stars, ore) {
+    const cap = sleepCap(s);
+    if (!cap) return { stars, ore };
+    const got = s.sleepGot;
+    let st = stars, o = ore;
+    if (st > 0 && cap.stars > 0) {
+        const room = Math.max(0, cap.stars - got.stars);
+        if (st > room) { s.stars -= st - room; st = room; }
+        got.stars += st;
+    }
+    if (o > 0 && cap.ore > 0) {
+        const room = Math.max(0, cap.ore - got.ore);
+        if (o > room) { s.minerals -= o - room; o = room; }
+        got.ore += o;
+    }
+    return { stars: st, ore: o };
+}
+
 /** Thousands are grouped with a space, never a comma: the counter reads the same in every locale. */
 export const group = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 /**
@@ -733,8 +836,9 @@ export function chambersAhead(s) {
 export function nextPrice(s, kind, type = null) {
     if (kind === 'dig') return digCost(s.chambers + ordered(s, 'dig'));
     if (kind === 'room') return roomCost(type, (s.rooms[type] || 0) + ordered(s, 'room', type));
-    if (kind === 'level') return levelCost(type, (s.level[type] || 0) + ordered(s, 'level', type));
-    return automationCost(type, (s.auto[type] || 0) + ordered(s, 'auto', type));
+    // deep-econ: a level and an automation are held inside their band of the income (banded)
+    if (kind === 'level') return banded(s, 'level', levelCost(type, (s.level[type] || 0) + ordered(s, 'level', type)));
+    return banded(s, 'auto', automationCost(type, (s.auto[type] || 0) + ordered(s, 'auto', type)));
 }
 
 /** Can this job start today: its lane free, and for a room a chamber to put it in. */
@@ -1055,8 +1159,8 @@ export function canActOn(s, column) {
     const t = ROOM_FOR_COLUMN[column];
     if (!t) return false;
     if (freeChambers(s) > 0 && !buildPending(s, 'room', t) && s.minerals >= roomCost(t, s.rooms[t] || 0)) return true;
-    if (!buildPending(s, 'level', t) && s.stars >= levelCost(t, s.level[t] || 0)) return true;
-    return !buildPending(s, 'auto', t) && s.stars >= automationCost(t, s.auto[t] || 0);
+    if (!buildPending(s, 'level', t) && s.stars >= nextPrice(s, 'level', t)) return true;
+    return !buildPending(s, 'auto', t) && s.stars >= nextPrice(s, 'auto', t);
 }
 
 /**
@@ -1128,8 +1232,9 @@ export function sleep(s, days, opts = {}) {
     const opens = resurfaceDay(s.doom0);
     /** How much of a room type actually turned over that day: crew and power, whichever is shorter. */
     const worked = (r, t) => Math.min(r.staff[t], r.power[t]);
-    const add = (r, n) => {
-        sum.minerals += n * r.minerals; sum.food += n * r.food; sum.stars += n * r.stars;
+    // deep-econ: `kept` is the stars a stretch actually brought, after the sleep's cap (capYield)
+    const add = (r, n, kept = n * r.stars) => {
+        sum.minerals += n * r.minerals; sum.food += n * r.food; sum.stars += kept;
         sum.born += n * r.born; sum.died += n * r.died; sum.spare += n * r.energySpare;
         sum.weakest[r.weakest] = (sum.weakest[r.weakest] || 0) + n;
         for (const t of ROOMS) sum.ran[t] += n * worked(r, t);
@@ -1155,7 +1260,7 @@ export function sleep(s, days, opts = {}) {
         const h0 = s.humans, food0 = s.food;
         const r = tickDay(s, true);
         sum.days++;
-        add(r, 1);
+        add(r, 1, capYield(s, r.stars, r.parts.M).stars);
         if (ringDue()) { surfaced(); break; }
         if (alarms) {
             const bad = troubleIn(s, r);
@@ -1201,7 +1306,7 @@ export function sleep(s, days, opts = {}) {
             const foodPerDay = s.food - food0;        // grown, less what the creches took
             s.minerals += n * r.parts.M; s.food += n * foodPerDay; s.stars += n * r.stars; s.day += n;
             sum.days += n;
-            add(r, n);
+            add(r, n, capYield(s, n * r.stars, n * r.parts.M).stars);
             if (thinning) {
                 // the people fall by the same share every day: the deaths summed exactly, not n of today's
                 const before = s.humans;

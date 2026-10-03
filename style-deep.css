@@ -1546,33 +1546,55 @@ body.in-deep #version-info { z-index: 1400; }
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .deep-lever-arm {
+    /* deep-econ (B333): the arm turns on a pivot in the middle of the slot (y 75). Up, it runs from the
+       pivot up to the ball at the top end; pulled, it is turned over and runs down to the ball at the
+       bottom end. A scale of 1 to -1 about the pivot is the turn seen from the front */
     position: absolute;
     left: 50%;
-    top: 20px;
+    top: 30px;
     width: 8px;
-    height: 46px;
+    height: 45px;
     margin-left: -4px;
     border-radius: 4px;
     background: linear-gradient(90deg, #6d7682, #e3e7ec 45%, #7f8893);
+    transform-origin: 50% 100%;
     transition: transform 520ms cubic-bezier(.5, 0, .2, 1.25);
 }
-.deep-lever-knob {
+.deep-lever-pivot {
     position: absolute;
     left: 50%;
-    top: -16px;
+    top: 69px;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #c9ced6, #59616c 60%, #23282f);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.deep-lever-knob {
+    /* the ball rides the end of the arm: its centre at the pivot less the arm's length times the turn */
+    position: absolute;
+    left: 50%;
+    top: 13px;
     width: 34px;
     height: 34px;
     margin-left: -17px;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #ff9a84, #c22a17 50%, #5e0c05 100%);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6), inset 0 -3px 6px rgba(0, 0, 0, 0.35);
+    transition: top 520ms cubic-bezier(.5, 0, .2, 1.25);
 }
-.deep-lever:hover .deep-lever-arm { transform: translateY(4px); }
-.deep-lever-wrap.is-down .deep-lever-arm { transform: translateY(66px); }
-.deep-lever-wrap.is-down .deep-lever:hover .deep-lever-arm { transform: translateY(60px); }
+.deep-lever:hover .deep-lever-arm { transform: scaleY(0.9); }
+.deep-lever:hover .deep-lever-knob { top: 17.5px; }
+.deep-lever-wrap.is-down .deep-lever-arm { transform: scaleY(-1); }
+.deep-lever-wrap.is-down .deep-lever-knob { top: 103px; }
+.deep-lever-wrap.is-down .deep-lever:hover .deep-lever-arm { transform: scaleY(-0.9); }
+.deep-lever-wrap.is-down .deep-lever:hover .deep-lever-knob { top: 98.5px; }
 .deep-lever-wrap.is-locked .deep-lever { cursor: default; opacity: 0.45; }
 .deep-lever-wrap.is-locked .deep-lever:hover .deep-lever-arm { transform: none; }
-.deep-lever-wrap.is-locked.is-down .deep-lever:hover .deep-lever-arm { transform: translateY(66px); }
+.deep-lever-wrap.is-locked .deep-lever:hover .deep-lever-knob { top: 13px; }
+.deep-lever-wrap.is-locked.is-down .deep-lever:hover .deep-lever-arm { transform: scaleY(-1); }
+.deep-lever-wrap.is-locked.is-down .deep-lever:hover .deep-lever-knob { top: 103px; }
 #phase-deep .deep-lever-tape { transform: rotate(-1.5deg); }
 #phase-deep.is-busy .deep-act-col .btn { pointer-events: none; opacity: 0.45; }
 #phase-deep.is-busy .deep-lever { pointer-events: none; }
@@ -1781,7 +1803,7 @@ body.in-deep #version-info { z-index: 1400; }
 #phase-deep .deep-night-stage.is-fading { opacity: 0; }
 
 /* the lever waits for its pull: the knob glows when the instruments say SLEEP */
-.deep-lever-wrap.is-ready:not(.is-down) .deep-lever-knob { animation: deep-knob-ready 2.2s ease-in-out infinite; }
+.deep-lever-wrap.is-ready .deep-lever-knob { animation: deep-knob-ready 2.2s ease-in-out infinite; }
 @keyframes deep-knob-ready { 50% { box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6), inset 0 -3px 6px rgba(0, 0, 0, 0.35), 0 0 18px 4px rgba(226, 65, 47, 0.55); } }
 /* the count keeps inside its ring as the years grow */
 .deep-dive-years[data-size="m"] { font-size: 66px; }
@@ -2197,3 +2219,37 @@ body.in-deep #version-info { z-index: 1400; }
 /* ---- THE BODY DREAMS: the panel dims, the counter of years in the middle reads THE BODY DREAMS ---- */
 #phase-deep.is-dreaming #deep-gauges, #phase-deep.is-dreaming .deep-advice-row { opacity: 0.45; transition: opacity 900ms ease; }
 #phase-deep.is-dreaming #deep-heart { display: none; }
+
+/* ---- deep-econ ------------------------------------------------------------------------------- */
+/* the small line under the tape: what its word waits for */
+.deep-advice-note { text-align: center; font-size: 12px; line-height: 16px; color: #c9b98f; margin-top: 4px; letter-spacing: 0.02em; }
+.deep-advice-note[hidden] { display: none; }
+/* asleep the panel goes dark, but the tape still names the goal (B332), a little dimmed */
+#phase-deep.is-sleeping .deep-advice-row #deep-advice.is-off { opacity: 0.78; }
+#phase-deep.is-sleeping .deep-advice-note { opacity: 0.78; }
+.deep-lever-wrap.is-flesh .deep-lever-pivot { background: radial-gradient(circle at 40% 35%, #b98b93, #5a2632 60%, #200a0f); }
+/* a night that came in the sleep, said again once on the wake: low, in Surface's tone, then gone */
+.deep-recall {
+    position: fixed;
+    left: 50%;
+    bottom: 64px;
+    transform: translateX(-50%);
+    max-width: min(720px, calc(100vw - 32px));
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 18px;
+    line-height: 26px;
+    color: #cfc9bb;
+    text-shadow: 0 0 14px rgba(0, 0, 0, 0.9), 0 0 18px rgba(207, 201, 187, 0.16);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 700ms ease;
+    z-index: 30;
+}
+.deep-recall[hidden] { display: none; }
+.deep-recall.is-in { opacity: 0.92; }
+/* the Watcher's label sits in the panel's flow under the tape and its note (it was lifted 34 px over an
+   empty row; the note lives there now) */
+#phase-deep #deep-watcher { bottom: auto; }
+/* asleep the rates stay: they are the dive's, a second at a time (B331) */
+#phase-deep.is-night .deep-rate { opacity: 1; visibility: visible; }

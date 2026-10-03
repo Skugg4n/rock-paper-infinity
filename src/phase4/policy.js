@@ -24,8 +24,8 @@
  */
 
 import {
-    tickDay, sleepTrouble, ordersDone, CRYO, ROOM_FOR_COLUMN, roomCost, digCost, levelCost,
-    automationCost, freeChambers, buildPending, startBuild, feedCost, FEED_MAX,
+    tickDay, sleepTrouble, ordersDone, CRYO, ROOM_FOR_COLUMN, roomCost, digCost, nextPrice,
+    freeChambers, buildPending, startBuild, feedPrice, cryoPrice, FEED_MAX,
 } from './deep.js';
 import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js';
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
@@ -66,7 +66,8 @@ export function decide(state, view = screen(state)) {
     const { need, low, offers, autoShown } = view;
     if (state.cryo < 0 && !need) return [{ kind: 'cryo' }];
     // stars: the goal's button when it can be paid, else save for it when it is near, else level
-    const priceOf = (kind, t) => (kind === 'auto' ? automationCost(t, state.auto[t] || 0) : levelCost(t, state.level[t] || 0));
+    // deep-econ: the prices the drawer shows (deep.js banded)
+    const priceOf = (kind, t) => nextPrice(state, kind, t);
     const perDay = view.report.stars;
     let saving = false;
     for (const kind of ['auto', 'level']) {
@@ -79,7 +80,7 @@ export function decide(state, view = screen(state)) {
         else if (perDay > 0 && (price - state.stars) / perDay <= SAVE_DAYS) saving = true;
     }
     // the hall's own price, when it is all that is left
-    if (need && need.kind === 'stars' && perDay > 0 && (CRYO[state.cryo + 1].cost - state.stars) / perDay <= SAVE_DAYS) saving = true;
+    if (need && need.kind === 'stars' && perDay > 0 && (cryoPrice(state, state.cryo + 1) - state.stars) / perDay <= SAVE_DAYS) saving = true;
     if (!saving && !out.length) {
         const o = offers.level;
         const t = o.type;
@@ -87,7 +88,7 @@ export function decide(state, view = screen(state)) {
         // and the machine, with what is left over
         const spent = out.reduce((a, x) => a + priceOf(x.kind, x.type), 0);
         const feed = state.feed || 0;
-        if (feed < FEED_MAX && state.stars - spent >= feedCost(feed)) out.push({ kind: 'feed' });
+        if (feed < FEED_MAX && state.stars - spent >= feedPrice(state)) out.push({ kind: 'feed' });
     }
     // ore: what the dot marks
     const t = low.column ? ROOM_FOR_COLUMN[low.column] : null;

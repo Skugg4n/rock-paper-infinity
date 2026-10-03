@@ -486,3 +486,73 @@ the same, the pump changes numbers nobody sees.
 - **Process rule:** before telling Ola something is playable, a tester agent plays it as a
   human asking "what choice do I have right now, and does it show?" every 30 seconds,
   writes down every stretch with no choice, and Claude looks at the result.
+
+## Built: economy and clarity (deep-econ)
+
+Ola's playtest of v1.78.0, six notes: "Why can't I buy Cryo?" (★ 9.8e16 against ★ 3e17, the row never said
+the gap); the lever's ball at the outer edge and the stick toward the middle; "They have slept for 1 000 000
+years. The last 600 000 years nothing has happened"; "Bonk" and a cooldown on the dark rooms; "Suddenly a red
+light in the rooms. Nothing I did" (the graft came while he slept); "The numbers are so big that everything
+stands still". Built on the branch `deep-econ` (B330 to B339). GROW's mechanics are untouched (its next pass
+rebuilds it); only its display changed.
+
+**The pacing rule.** Through the whole act, never more than 60 real seconds without a new DECISION: a purchase
+that has become affordable, a graft, a take or a mark, a night's line, the lever pulled for a reason. The sim
+measures it per movement ("longest without a decision").
+
+**Prices follow income** (deep.js, the block "PRICES FOLLOW INCOME"). From the hall on, the colony's INCOME is
+what one real second of sleep brings at its tier at the dive's base pace (`state.income`, stars and ore, set
+on each wake, when a tier is bought and when a save is opened, never while a price is looked at). Every star
+price of an upgrade is its old price held inside a band of that income (`PRICE_BAND`: a level 35 to 80 s, an
+automation 45 to 85, the feed 35 to 80, the culture vats 35 to 70, a cryo tier 45 to 90, a gift 35 to 70),
+rounded up to two figures: a long sleep no longer makes it free, and nothing stands out of reach for minutes.
+One sleep brings at most `SLEEP_CAP_SECONDS` (200) of income; past that the counter reads "store full" and
+the tape WAKE. The dive runs at 0.15 to 3 times the base pace, so a price is about 15 to 45 real seconds of a
+sleep. Before the hall TEND keeps its prices. The Watcher's ladder is left out: capacity paces it.
+
+**Nights follow sleeps** (surface.js). Visits every 2 sleeps, then every sleep (`VISIT_GAPS` 2, 2, 2, 1), a
+line every other visit (a win sooner). Nights 1 to 3 wait for no tier; night 4 (the first graft) for Cryo III,
+night 5 for Cryo IV, night 6 (the question) for Cryo V: the deep of time is the gift's condition, and the tape
+and the night log say so ("SURFACE WAITS FOR CRYO IV", "★ 3 T to go" under it).
+
+**The tape always names the next goal** (instruments.js `goalOf`, `adviceNote`, `adviseAsleep`). The goal: The
+question once open; an opened gift; the tier a night waits for, once only its price stands in the way; else the
+cheapest of the levels, automations, feed and vats, with the next tier preferred when it costs no more than half
+again of that (`TIER_OVER`); the first culture vats before anything. Awake after the hall: "BUY SEAM" (LONGER
+SLEEP for a tier) when it can be paid, else "SAVE FOR CRYO VI" with "★ 2e17 to go" and the lever glowing.
+Asleep the tape stays lit (dimmed): FEED THE MACHINE, BUY a gift, WAKE ("Cryo VI can be bought." or "The store
+is full."), SURFACE WAITS FOR, SAVE FOR.
+
+**Display.** Rates per real second on every counter, the people's too, and they stay on screen asleep
+(readout.js `rateText`: "+3.5 T a second"). A locked drawer row says the gap on its own line ("You need ★ 2e17
+more.") under the ticks of what else it needs. The lever's arm turns on a pivot in the middle of its slot
+(`.deep-lever-pivot`; a scale of 1 to -1 about it, the ball riding its end). The snap answers only asleep. A
+night that came in the sleep is said again, low, for six seconds on the wake (`#deep-recall`); with a graft
+the tape says GRAFT A ROOM and the rooms glow with "Five times the output. Takes ⚇ N of your ⚇ N."; grafted, the
+room says "Ore 1.7 k → 8.6 k a second." (graft.js `graftEffect`) beside its "×5".
+
+**The sim's player** follows the tape after the hall: it buys the goal the moment it can be paid and keeps its
+price back from everything else; asleep it wakes when the goal can be paid or the store is full (no longer for
+ore). Before the hall it buys the automations of Cryo I's road as the tape says.
+
+| run | before (v1.78.0) | after |
+|---|---|---|
+| strata | 26m15s, GROW 5m10s (20 %), longest without a decision TEND 78 / SLEEP 35 / GROW 28 s | 33m03s, GROW 14m56s (45 %), TEND 43 / SLEEP 45 / GROW 35 s |
+| 3D | 25m57s, GROW 4m53s (19 %), 78 / 35 / 28 s | 33m03s, GROW 14m56s (45 %), 43 / 45 / 35 s |
+| --watcher | 29m16s, GROW 5m20s (18 %), 78 / 35 / 28 s | 34m54s, GROW 14m59s (43 %), 43 / 58 / 35 s |
+
+The old greedy player woke by hand the moment anything (ore included) could be bought, so its 35 s in SLEEP
+never met Ola's dead stretch; the new player wakes only as the tape says. Nights now come at 6 to 19 minutes,
+the question at 18 to 20, the colony reaches Cryo V (year about 97 000). GROW is long because the colony meets
+the question smaller than before (fewer people and chambers at Cryo V); its own "longest stuck" is 85 to 114 s.
+That is the next pass's (GROW rebuilt around organs the player chooses); it was not retuned here.
+
+**Acceptance** (`node scripts/accept-iv-cut.mjs`, both views; `--econ` runs only these): X the lever's ball at
+the top end up and the bottom end pulled, the arm from the ball to the pivot; Z no snap awake, the snap asleep;
+S the rates per second awake and asleep, moving with the dive; G the gap on a locked cryo row; L from "IV · a
+long sleep" (Ola's save, new checkpoint) the tape names the goal and what is to go; M a night missed in the
+sleep said again on the wake, GRAFT A ROOM, the hover, gone after six seconds, the before and after once
+grafted. Shots: docs/playtests/rebuild-shots/econ-1-drawer-gap, econ-2-missed-night-graft, econ-3-long-sleep-goal.
+
+**Not done here.** GROW's length and its "longest stuck" (next pass). The ore cap counts only what the mines
+bring beyond the generators. Long count still waits on Cryo VII to be bought, as before.

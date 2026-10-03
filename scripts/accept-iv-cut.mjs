@@ -218,6 +218,109 @@ try {
         return { shown: !!b && b.width > 0, count: document.getElementById('deep-people').textContent, glyph: !!r.querySelector('svg, i'), right: Math.abs(b.right - ore.right) < 4 }; })()`);
     check(pc.shown && /^[\d.]+( k| M| B)?$/.test(pc.count) && pc.glyph && pc.right, `P. the people counter stands beside ore and stars: "${pc.count}" with its glyph`);
 
+    // ================= deep-econ: Ola's playtest of v1.78.0 =========================================
+    const econShot = async (name) => {
+        if (!SHOTS || VIEW !== 'strata') return;
+        fs.mkdirSync(SHOTS, { recursive: true });
+        const out = await send('Page.captureScreenshot', { format: 'png' });
+        fs.writeFileSync(path.join(SHOTS, `econ-${name}.png`), Buffer.from(out.result.data, 'base64'));
+    };
+    /** Where the lever's ball, pivot and slot are, and the arm's span (B333). */
+    const LEVER = `(() => { const box = (s) => document.querySelector(s).getBoundingClientRect();
+        const k = box('#deep-lever .deep-lever-knob'), p = box('#deep-lever .deep-lever-pivot'), sl = box('#deep-lever .deep-lever-slot'), a = box('#deep-lever .deep-lever-arm');
+        return { ball: k.top + k.height / 2, pivot: p.top + p.height / 2, top: sl.top, bottom: sl.bottom, armTop: a.top, armBottom: a.bottom,
+            down: document.getElementById('deep-lever-wrap').classList.contains('is-down') }; })()`;
+    // X. THE LEVER pivots in the middle of its slot: up, the ball at the top end, the arm from it to the pivot
+    await jump('iv-late', { asleep: false });
+    const e_up = await evaluate(LEVER);
+    const e_mid = (e_up.top + e_up.bottom) / 2;
+    check(!e_up.down && Math.abs(e_up.pivot - e_mid) < 3 && e_up.ball < e_up.top + 24 && Math.abs(e_up.armTop - e_up.ball) < 4 && Math.abs(e_up.armBottom - e_up.pivot) < 4,
+        `X. the lever up: the ball at the top end (${Math.round(e_up.ball - e_up.top)} px into the slot), the arm from it to the pivot in the middle`);
+    // Z. awake a click on a room does nothing audible: no snap, no cooldown ring, no snap cursor
+    const e_roomPlate = await evaluate(`(${PLATE_AT})(rpiDeep.layout.slots.map((t, i) => (t && t !== 'cryo' ? i : -1)).filter((i) => i >= 0))`);
+    const e_snap0 = await D('state.watcher.lastSnapAt || 0');
+    if (e_roomPlate) { await click(e_roomPlate.x, e_roomPlate.y); await sleepMs(300); }
+    const e_z = await evaluate(`({ snap: rpiDeep.state.watcher.lastSnapAt || 0, ring: !document.getElementById('deep-snap-ring').hidden,
+        cursor: document.getElementById('deep-scene').classList.contains('is-over-base') })`);
+    check(!!e_roomPlate && e_z.snap === e_snap0 && !e_z.ring && !e_z.cursor, `Z. awake, a click on a room makes no snap (no cooldown ring, no snap cursor)`);
+    // S. RATES PER REAL SECOND, awake: a day is a second
+    const e_ra = await D('rates');
+    check(/ a second$/.test(e_ra.stars) && / a second$/.test(e_ra.ore), `S. awake the counters say what comes in a second: ${e_ra.stars} | ${e_ra.ore} | ${e_ra.people || '(people steady)'}`);
+    // G. THE GAP: a locked cryo row says what is missing, on a line of its own
+    await evaluate(`(() => { const s = rpiDeep.state; s.stars = 1; return true; })()`);
+    await D('openDrawer()');
+    await sleepMs(1200);
+    const e_gap = await evaluate(`[...document.querySelectorAll('#deep-drawer .deep-dr-row.is-next')].map((r) => ({ name: r.querySelector('.deep-dr-name').textContent, sub: r.querySelector('.deep-dr-sub').innerText }))`);
+    const e_cryoRow = e_gap.find((r) => /^CRYO /.test(r.name));
+    check(!!e_cryoRow && /\n?You need ★ \S+( \w)? more\.$/.test(e_cryoRow.sub) && e_gap.every((r) => !/★/.test(r.sub) || /You need ★/.test(r.sub)),
+        `G. the locked ${e_cryoRow ? e_cryoRow.name : 'cryo'} row says the gap: "${e_cryoRow ? e_cryoRow.sub.replace(/\n/g, ' / ') : ''}"`);
+    await econShot('1-drawer-gap');
+    await key('Escape');
+    // the lever, pulled: the ball at the bottom end, the arm from the pivot down to it
+    // (the checkpoint's scouts would wake the colony at once: they are called home first)
+    await evaluate(`(() => { const s = rpiDeep.state; s.stars = 0; s.probes = []; s.food = 1e15; s.watcher.sleeps = 12;
+        s.tree = { opened: ['lossless', 'cold'], bought: ['lossless', 'cold'], unseen: false }; return true; })()`);
+    const lvX = await centre('#deep-lever');
+    await click(lvX.x, lvX.y);
+    await sleepMs(4200);
+    const e_dn = await evaluate(LEVER);
+    check(e_dn.down && e_dn.ball > e_dn.bottom - 24 && Math.abs(e_dn.armBottom - e_dn.ball) < 4 && Math.abs(e_dn.armTop - e_dn.pivot) < 4,
+        `X. pulled, the ball at the bottom end (${Math.round(e_dn.bottom - e_dn.ball)} px from it), the arm from the pivot down to it`);
+    // S. asleep the rates are the dive's: per second, and they move
+    const e_r1 = await D('rates');
+    await sleepMs(2500);
+    const e_r2 = await D('rates');
+    check(/ a second$/.test(e_r1.stars) && / a second$/.test(e_r2.stars) && e_r1.stars !== e_r2.stars,
+        `S. asleep the rates follow the dive: ${e_r1.stars} then ${e_r2.stars}`);
+    // the snap is the sleep's: a click on the base answers asleep
+    const e_asleepPlate = await evaluate(`(${PLATE_AT})(rpiDeep.layout.slots.map((_, i) => i))`);
+    if (e_asleepPlate) { await click(e_asleepPlate.x, e_asleepPlate.y); await sleepMs(300); }
+    const e_snapped = await D('state.watcher.lastSnapAt || 0');
+    check(e_snapped > e_snap0, 'Z. asleep the same click snaps (it is the sleep\'s alone)');
+    // L. THE LONG SLEEP: the tape names the next goal and what is still to go
+    await jump('iv-long', { asleep: true });
+    const e_goal = await evaluate(`import('/src/phase4/instruments.js').then((m) => m.goalOf(rpiDeep.state, { road: rpiDeep.road }))`);
+    await evaluate(`(() => { const s = rpiDeep.state; s.stars = ${e_goal ? e_goal.price * 0.35 : 0}; s.feed = 8; return true; })()`);
+    let longTape = null;
+    for (let i = 0; i < 24; i++) {
+        await sleepMs(500);
+        longTape = await evaluate(`({ advice: rpiDeep.instruments.advice, note: rpiDeep.note, shown: !document.getElementById('deep-advice').hidden })`);
+        if (/^SAVE FOR |^SURFACE WAITS FOR /.test(longTape.advice) && /to go$/.test(longTape.note)) break;
+    }
+    check(longTape.shown && /^(SAVE FOR|SURFACE WAITS FOR) [A-Z ]+$/.test(longTape.advice) && /^★ \S+( \w)? to go$/.test(longTape.note),
+        `L. late in the sleep the tape names the next goal: "INSTRUMENTS: ${longTape.advice}" / "${longTape.note}"`);
+    await econShot('3-long-sleep-goal');
+    // M. A MISSED NIGHT IS TOLD ON WAKING: night 4 comes in the sleep with its graft; on the wake its
+    // line is said again, low, and the tape says GRAFT A ROOM; a candidate's hover offers it
+    await jump('iv-surface', { asleep: true });
+    await evaluate('debug_deep("night")');
+    await sleepMs(3500);
+    await evaluate('debug_deep("alarm")');
+    let e_rec = null;
+    for (let i = 0; i < 12 && !(e_rec && e_rec.recall); i++) { await sleepMs(250); e_rec = await evaluate(`({ recall: rpiDeep.recall, owed: rpiDeep.graft.owed })`); }
+    let e_word = '';
+    for (let i = 0; i < 24 && e_word !== 'GRAFT A ROOM'; i++) { await sleepMs(250); e_word = await D('instruments.advice'); }
+    let e_busyFor = 0;
+    for (; e_busyFor < 60 && await evaluate(`document.getElementById('phase-deep').classList.contains('is-busy')`); e_busyFor++) await sleepMs(250);
+    const e_cand = await evaluate(`(() => { for (const id of rpiDeep.graftOffer) { const p = rpiDeep.screenOfNode(id);
+        if (p && rpiDeep.chamberAt(p.x, p.y) === id) return { id, x: p.x, y: p.y }; } return null; })()`);
+    if (e_cand) { await mouse('mouseMoved', e_cand.x, e_cand.y); await sleepMs(400); }
+    const e_hover = await D('tip');
+    const e_under = e_cand ? await evaluate(`(() => { const e = document.elementFromPoint(${e_cand.x}, ${e_cand.y}); return e ? (e.id || e.className || e.tagName) : ''; })()`) : '';
+    await econShot('2-missed-night-graft');
+    check(!!e_rec && !!e_rec.recall && e_rec.recall.n === 4 && /Your humans\. What use are they\?/.test(e_rec.recall.text) && e_rec.owed === 1,
+        `M. on the wake the missed night is said again: ${e_rec && e_rec.recall ? e_rec.recall.text : 'nothing'}`);
+    check(e_word === 'GRAFT A ROOM' && /^Five times the output\. Takes .+ of your .+\.$/.test(e_hover.replace(/\s+/g, ' ').trim()),
+        `M. the tape says ${e_word}; a room's hover (${e_cand ? e_cand.id : 'no room on screen'}, under ${e_under}): "${e_hover}"`);
+    await sleepMs(6500);
+    check(!(await D('recall')), 'M. the line is gone after six seconds');
+    if (e_cand) await click(e_cand.x, e_cand.y);
+    await sleepMs(500);
+    const e_after = await D('tip');
+    check(/^(Ore|Food|Power) \S+( \w)? → \S+( \w)? a second\.$|^Beds .+ → .+\.$/.test(e_after.trim()), `M. grafted, the room's own output before and after: "${e_after}"`);
+    if (process.argv.includes('--econ')) throw new Error('ECON_ONLY');
+    await jump('iv-start', { asleep: false });
+
     // ================= T. TEND: the panel, the empty chamber and its ring, the drawer ================
     await shot('0-iv-start');
     const p0 = await evaluate(`(() => ({
@@ -677,7 +780,7 @@ try {
     check(errors.length === 0, `no errors in the console${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
     ws.close();
 } catch (e) {
-    check(false, `the run broke: ${e.stack || e}`);
+    if (!String(e && e.message).includes('ECON_ONLY')) check(false, `the run broke: ${e.stack || e}`);
 } finally {
     await cleanup();
 }

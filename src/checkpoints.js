@@ -235,6 +235,34 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, initialLayout(deep)));
         set(PHASE_KEY, 'DEEP');
     } },
+    { id: 'iv-long', label: 'IV · a long sleep', apply: () => {
+        clearAll();
+        // deep-econ: OLA'S SAVE of v1.78.0. Asleep at a thousand years a second, the better part of a
+        // million years slept, ★ 9.8e16 in hand, night 5 said and its graft placed, Cryo VI at ★ 3e17 under
+        // the old prices. Opened now, the prices follow the income (deep.js banded): the tape names the
+        // next goal, or says WAKE when it can be paid, and nothing stands out of reach for minutes.
+        const deep = initialDeepState({ salvage: 1500, doom0: 85 });
+        const day = 600000 * DAYS_PER_YEAR;
+        const slept = 590000;
+        Object.assign(deep, {
+            day, minerals: 4.0e9, food: 4.0e7, stars: 9.8e16, humans: 4000,
+            chambers: 36, rooms: { mine: 10, farm: 8, generator: 10, dorm: 6, cryo: 1 },
+            level: { mine: 9, farm: 8, generator: 9, dorm: 6 },
+            auto: { mine: 3, farm: 3, generator: 3, dorm: 2 },
+            cryo: 4, asleep: true, vats: 3, feed: impliedFeed(4),
+            est: { bias: -4, spread: 20 }, estRevealed: true, probesSent: 1, shaftOpen: true,
+            watcher: {
+                ...initialWatcher(), stage: 1, stability: 70, capacity: 160, sleptYears: slept, seed: 5, sleeps: 30,
+                nextPuzzleYears: slept + puzzleGapYears(4), saidSpace: true,
+                bought: ['watchdog', 'scheduler', 'deepread', 'nightvision'],
+                surface: { ...initialSurface(), visits: 14, words: 5, lastSleep: 30, wins: 5, losses: 2, lastYou: 'paper', night: 5, toLine: 1 },
+            },
+            tree: { opened: ['lossless', 'cold', 'longcount'], bought: ['lossless', 'cold'], unseen: false },
+            graft: { owed: 0, slots: ['s3', 's9'] },
+        });
+        set(P4, serializeDeep(deep, initialLayout(deep)));
+        set(PHASE_KEY, 'DEEP');
+    } },
     { id: 'iv-grow', label: 'IV · the question answered', apply: () => {
         clearAll();
         // deep-grow: MOVEMENT III begins. Surface has said its six lines, the question is answered
@@ -269,7 +297,7 @@ export const CHECKPOINTS = [
     } },
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
-export const CHECKPOINT_CRYO = { 'iv-graft': CRYO[3], 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
+export const CHECKPOINT_CRYO = { 'iv-long': CRYO[4], 'iv-graft': CRYO[3], 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
 
 /**
  * deep-grow: a late colony at The question, laid out the way one built as it went is (every kind

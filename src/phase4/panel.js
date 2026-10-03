@@ -128,7 +128,7 @@ function fluidPaths(k, t, phase) {
 
 /**
  * Builds the panel's gauges, lamps and labels into the elements of index.html's chapter IV markup.
- * @param {object} els - { gauges, advice, empty, lamps, alarm, alarmWord, root }
+ * @param {object} els - { gauges, advice, note, empty, lamps, alarm, alarmWord, root }
  * @returns {object} the panel's handful of calls
  */
 export function createPanel(els) {
@@ -196,10 +196,11 @@ export function createPanel(els) {
          * @param {object} view
          * @param {Object<string,{k:number, red:boolean}>} view.gauges
          * @param {string} view.advice - the word, without the prefix ('' for none)
+         * @param {string} [view.note] - deep-econ: the small line under it ("★ 2e17 to go")
          * @param {number} view.empty - chambers dug and empty
          * @param {{key:string,label:string,lit:boolean,ordered:boolean}[]|null} view.lamps - null: none
          */
-        update({ gauges, advice: want = '', empty = 0, lamps = null }) {
+        update({ gauges, advice: want = '', note = '', empty = 0, lamps = null }) {
             for (const { c } of GAUGES) {
                 const x = gauges && gauges[c];
                 if (!x) continue;
@@ -223,6 +224,12 @@ export function createPanel(els) {
                 }
                 els.advice.hidden = !text;
             }
+            // deep-econ (B332): the small line under the tape belongs to the word on it
+            if (els.note) {
+                const n = advice.word === want ? note : '';
+                if (els.note.dataset.text !== n) { els.note.dataset.text = n; els.note.innerHTML = signHtml(n); }
+                els.note.hidden = !n;
+            }
             const em = empty > 0 ? `EMPTY ${empty}` : '';
             if (els.empty.textContent !== em) els.empty.textContent = em;
             els.empty.hidden = !em;
@@ -238,6 +245,8 @@ export function createPanel(els) {
         },
         /** The advice as it reads now (tests). */
         get advice() { return advice.word; },
+        /** The line under it as it reads now (tests). */
+        get note() { return els.note && !els.note.hidden ? els.note.textContent : ''; },
         /** One frame: the needles ride their springs; a twitching needle points somewhere false. */
         step(dt) {
             const d = Math.min(0.05, Math.max(0, dt));

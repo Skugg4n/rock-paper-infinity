@@ -87,11 +87,18 @@ describe('the script (deep-voice)', () => {
         expect(openVisit(sf, 5, { tier: 6 })).toMatchObject({ night: 0, line: '' });
         expect(sf.toLine).toBe(0);
         closeVisit(sf);
-        // night 2 waits for Cryo II
-        expect(openVisit(sf, 8, { tier: 0 })).toMatchObject({ night: 0, line: '' });
-        closeVisit(sf);
-        expect(openVisit(sf, 10, { tier: 1 })).toMatchObject({ night: 2, line: NIGHTS[1].line });
+        // deep-econ: nights 2 and 3 come on the sleeps alone, at any tier
+        expect(openVisit(sf, 8, { tier: 0 })).toMatchObject({ night: 2, line: NIGHTS[1].line });
         expect(nightsSaid(sf).map((x) => x.to)).toEqual(['watchdog', 'lossless']);
+        closeVisit(sf);
+        openVisit(sf, 9, { tier: 0 }); closeVisit(sf);
+        expect(openVisit(sf, 10, { tier: 0 })).toMatchObject({ night: 3 });
+        closeVisit(sf);
+        // night 4 waits for a deeper sleep (Cryo III): its graft asks for the deep of time
+        openVisit(sf, 11, { tier: 1 }); closeVisit(sf);
+        expect(openVisit(sf, 12, { tier: 1 })).toMatchObject({ night: 0, line: '' });
+        closeVisit(sf);
+        expect(openVisit(sf, 13, { tier: 2 })).toMatchObject({ night: 4, line: NIGHTS[3].line });
     });
     test('a win brings the next line one visit sooner; a loss does nothing extra', () => {
         const won = initialSurface(), lost = initialSurface();
@@ -115,7 +122,7 @@ describe('the script (deep-voice)', () => {
     test('an old save starts at the night its visits imply, at the tier it has', () => {
         expect(impliedNight(0, 3)).toEqual({ night: 0, toLine: 0 });
         expect(impliedNight(6, 3).night).toBe(3);      // nights 1 to 3 every second visit
-        expect(impliedNight(30, 1).night).toBe(2);     // Cryo II: night 3 waits for Cryo III
+        expect(impliedNight(30, 1).night).toBe(3);     // deep-econ: Cryo II, night 4 waits for Cryo III
         expect(impliedNight(30, 6).night).toBe(NIGHTS.length);
     });
 });

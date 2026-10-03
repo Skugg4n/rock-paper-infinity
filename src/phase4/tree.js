@@ -32,8 +32,9 @@
 
 import {
     CRYO, CRYO_TOP, MAX_AUTO, QUEUE_MAX, cryoName, nextPrice, orderBuild, buildPending, ordered,
-    tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedCost, feedShare, ROOMS, BIRTH_FOOD,
-    FOOD_ALARM_DAYS, NIGHT_VISION_LATE, scoutOdds, isQueued, MIN_SLEEPERS, buildEta, VATS_MAX, vatsCost, vatsLevel,
+    tickDay, sleepTrouble, ordersDone, gift, FEED_MAX, feedShare, ROOMS, BIRTH_FOOD,
+    FOOD_ALARM_DAYS, NIGHT_VISION_LATE, scoutOdds, isQueued, MIN_SLEEPERS, buildEta, VATS_MAX, vatsLevel,
+    banded, feedPrice, vatsPrice, cryoPrice, setIncome,
 } from './deep.js';
 import { NIGHTS, nightsSaid, visitDue } from './surface.js';
 import {
@@ -158,6 +159,8 @@ export const GIFT_PRICE = {
     longcount: CRYO[CRYO_TOP + 1].cost,
     question: 1.0e17,
 };
+/** deep-econ: a gift's price held inside its band of the colony's income (deep.js banded). */
+export const giftPrice = (state, id) => (GIFT_PRICE[id] ? banded(state, 'gift', GIFT_PRICE[id]) : Infinity);
 /** What a gift needs besides its price: Long count stands on Cryo VII. */
 const GIFT_NEEDS = { longcount: CRYO_TOP };
 /** Has Surface opened this node? */
@@ -330,14 +333,14 @@ export function priceOf(state, id) {
         const p = nextPrice(state, n.kind, n.type);
         return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
     }
-    if (n.kind === 'cryo') return CRYO[n.tier] ? { currency: 'stars', stars: CRYO[n.tier].cost } : null;
-    if (n.kind === 'surface') return GIFT_PRICE[id] ? { currency: 'stars', stars: GIFT_PRICE[id] } : null;
+    if (n.kind === 'cryo') return CRYO[n.tier] ? { currency: 'stars', stars: cryoPrice(state, n.tier) } : null;
+    if (n.kind === 'surface') return GIFT_PRICE[id] ? { currency: 'stars', stars: giftPrice(state, id) } : null;
     if (n.kind === 'feed') {
-        const p = feedCost(levelOf(state, id));
+        const p = feedPrice(state);
         return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
     }
     if (n.kind === 'vats') {
-        const p = vatsCost(levelOf(state, id));
+        const p = vatsPrice(state);
         return Number.isFinite(p) ? { currency: 'stars', stars: p } : null;
     }
     if (n.kind === 'watcher' || n.kind === 'bio') {
@@ -415,13 +418,13 @@ export function canBuy(state, id, ctx = {}) {
     // Surface's gifts: bought awake or asleep, with stars, once opened (and Long count on Cryo VII)
     if (n.kind === 'surface') {
         if (GIFT_NEEDS[id] !== undefined && (state.cryo ?? -1) < GIFT_NEEDS[id]) return no('prereq', `Needs ${cryoName(GIFT_NEEDS[id])} first.`);
-        const miss = affordText({ price: GIFT_PRICE[id], have: state.stars || 0, perDay });
+        const miss = affordText({ price: giftPrice(state, id), have: state.stars || 0, perDay });
         return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
     }
 
     // the machine runs itself: its feed is bought awake or asleep, with stars, at once
     if (n.kind === 'feed') {
-        const miss = affordText({ price: feedCost(levelOf(state, id)), have: state.stars || 0, perDay });
+        const miss = affordText({ price: feedPrice(state), have: state.stars || 0, perDay });
         return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
     }
 
@@ -429,7 +432,7 @@ export function canBuy(state, id, ctx = {}) {
     if (n.kind === 'vats') {
         if ((state.cryo ?? -1) < 0) return no('prereq', `Needs ${cryoName(0)} first.`);
         if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
-        const miss = affordText({ price: vatsCost(levelOf(state, id)), have: state.stars || 0, perDay });
+        const miss = affordText({ price: vatsPrice(state), have: state.stars || 0, perDay });
         return miss ? no('afford', miss) : { ok: true, reason: '', kind: 'ok' };
     }
 
@@ -451,10 +454,10 @@ export function canBuy(state, id, ctx = {}) {
         if (asleep) return no('mode', 'The colony is asleep: wake it to buy.');
         const need = ctx.need !== undefined ? ctx.need : cryoNeedNow(state, ctx.starsPerDay);
         if (need) {
-            if (need.kind === 'stars') return no('afford', affordText({ price: CRYO[tier].cost, have: state.stars || 0, perDay }));
+            if (need.kind === 'stars') return no('afford', affordText({ price: cryoPrice(state, tier), have: state.stars || 0, perDay }));
             return no('gate', need.long);
         }
-        if ((state.stars || 0) < CRYO[tier].cost) return no('afford', affordText({ price: CRYO[tier].cost, have: state.stars || 0, perDay }));
+        if ((state.stars || 0) < cryoPrice(state, tier)) return no('afford', affordText({ price: cryoPrice(state, tier), have: state.stars || 0, perDay }));
         return { ok: true, reason: '', kind: 'ok' };
     }
 
@@ -807,28 +810,28 @@ export function buy(state, id, ctx = {}) {
         return { id, kind: n.kind, type: n.type, price, job };
     }
     if (n.kind === 'feed') {
-        const price = feedCost(levelOf(state, id));
+        const price = feedPrice(state);
         state.stars -= price;
         state.feed = levelOf(state, id) + 1;
         return { id, kind: 'feed', level: state.feed, price };
     }
     if (n.kind === 'vats') {
-        const price = vatsCost(levelOf(state, id));
+        const price = vatsPrice(state);
         state.stars -= price;
         state.vats = levelOf(state, id) + 1;
         return { id, kind: 'vats', level: state.vats, price };
     }
     if (n.kind === 'surface') {
-        const price = GIFT_PRICE[id];
+        const price = giftPrice(state, id);
         state.stars -= price;
         state.tree = normalizeTree(state.tree);
         state.tree.bought.push(id);
         // Long count IS the tier past Cryo VII: the colony sleeps at it from now on
-        if (id === 'longcount') state.cryo = CRYO_TOP + 1;
+        if (id === 'longcount') { state.cryo = CRYO_TOP + 1; setIncome(state); }
         return { id, kind: 'gift', gift: id, price };
     }
     if (n.kind === 'cryo') {
-        const price = CRYO[n.tier].cost;
+        const price = cryoPrice(state, n.tier);
         state.stars -= price;
         if (n.tier === 0) {
             state.cryo = 0;
@@ -837,6 +840,8 @@ export function buy(state, id, ctx = {}) {
         } else {
             state.cryo = n.tier;
         }
+        // deep-econ: a deeper sleep brings more a second, and the prices follow from now on
+        setIncome(state);
         return { id, kind: 'cryo', tier: n.tier, price };
     }
     if (can.kind === 'choose') return { id, kind: n.kind, choose: true };

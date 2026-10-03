@@ -483,6 +483,8 @@
                 <span class="dymo is-advice deep-light" id="deep-advice" hidden></span>
                 <span class="dymo is-small deep-light" id="deep-empty" hidden></span>
             </div>
+            <!-- deep-econ: under the tape, what its word waits for ("★ 2e17 to go") -->
+            <div class="deep-mono deep-advice-note" id="deep-advice-note" hidden></div>
             <div class="deep-cryo-lamps" id="deep-lamps" hidden></div>
             <!-- what stays awake while the colony sleeps: its own label, on the same tape -->
             <div id="deep-watcher" hidden>
@@ -527,7 +529,11 @@
                 <span class="dymo is-small deep-lever-tape" id="deep-lever-tape">SLEEP</span>
                 <button class="deep-lever" id="deep-lever" aria-label="Sleep">
                     <span class="deep-lever-slot"></span>
-                    <span class="deep-lever-arm"><span class="deep-lever-knob"></span></span>
+                    <!-- deep-econ: the arm turns on a pivot in the middle of the slot; up, the ball is at
+                         the top end and the stick runs down to the pivot; pulled, the ball is at the bottom -->
+                    <span class="deep-lever-arm"></span>
+                    <span class="deep-lever-pivot"></span>
+                    <span class="deep-lever-knob"></span>
                 </button>
                 <span class="deep-mono deep-act-price" id="deep-lever-price"></span>
             </div>
@@ -636,6 +642,8 @@
         <div id="deep-machine-tip" class="deep-mono" hidden></div>
         <!-- deep-grow: over a chamber the body can take, what it costs, in plain words -->
         <div id="deep-take-tip" class="deep-mono" hidden></div>
+        <!-- deep-econ: a night's line that came while the colony slept, said again once on the wake -->
+        <div class="deep-chrome deep-recall" id="deep-recall" hidden aria-live="polite"></div>
         <!-- deep-grow: the rise, the last two lines in the Watcher's own hand -->
         <div class="deep-chrome deep-rise-lines" id="deep-rise-lines" hidden aria-live="polite"></div>
 
@@ -675,7 +683,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.78.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.79.0</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">
