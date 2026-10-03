@@ -44,7 +44,9 @@
 
 import * as THREE from 'three';
 import { ROOM_ICON } from './scene.js';
-import { signHtml } from './readout.js';
+import { signHtml, short, MASS_SIGN } from './readout.js';
+import { ORGAN_NAME, ORGAN_DOES } from './organs.js';
+import { makeOrganArt, organGlyph } from './organ-art.js';
 import {
     fleshify, setNecrotic, setReachable, growTendrils, setTendrilsNecrotic, stepFlesh, makeWetEnvironment,
     setFleshEnvironment, forget, forgetTendrils, makeFleshMaterial, FLESH_SECONDS,
@@ -71,6 +73,7 @@ export const RING_R = 58;
  */
 export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () => null, marksHost = null, floatHost = null }) {
     let ring = null;            // { slot, pick }
+    let oring = null;           // deep-organs: { id } while the ring of organs is open
     const shown = { lamp: false, figure: false, breathe: false };
     const body = createBody(scene, graph);
     const over = createOverlay(scene, { marksHost, floatHost });
@@ -79,6 +82,13 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
         if (!ring) return;
         ring = null;
         ringHost.classList.remove('is-open');
+        ringHost.hidden = true;
+        ringHost.textContent = '';
+    }
+    function closeOrganRing() {
+        if (!oring) return;
+        oring = null;
+        ringHost.classList.remove('is-open', 'is-organs');
         ringHost.hidden = true;
         ringHost.textContent = '';
     }
@@ -142,6 +152,67 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
         },
         closeRoomRing,
         get ringSlot() { return ring ? ring.slot : -1; },
+        /**
+         * deep-organs: THE RING OF ORGANS over a chamber the body can take (or a living organ it can grow
+         * again): each organ's glyph and its price in mass, bright when it can be paid, the room's own
+         * organ marked cheap. The middle says the wallet, and on hover what the organ does (or what is
+         * missing). A click on a bright one picks it.
+         * @param {string} id - the chamber (growth.js id)
+         * @param {number} x - client pixels (the click), used when the chamber is off the screen
+         * @param {number} y
+         * @param {{organs:{organ:string, mass:number, ok:boolean, cheap:boolean, need:string}[], have:number,
+         *          regrow?:string|null, onPick:(organ:string)=>void}} o
+         */
+        openOrganRing(id, x, y, { organs, have = 0, regrow = null, onPick }) {
+            closeRoomRing();
+            closeOrganRing();
+            oring = { id };
+            const at = scene && typeof scene.screenOfNode === 'function' ? scene.screenOfNode(id) : null;
+            const px = at ? at.x : x, py = at ? at.y : y;
+            const mx = Math.max(RING_R + 40, Math.min(window.innerWidth - RING_R - 40, px));
+            const my = Math.max(RING_R + 40, Math.min(window.innerHeight - RING_R - 50, py));
+            ringHost.style.left = `${mx}px`;
+            ringHost.style.top = `${my}px`;
+            ringHost.innerHTML = '<span class="deep-ring-hub is-organs"><span class="dymo is-small deep-ring-say"></span></span>';
+            const say = ringHost.querySelector('.deep-ring-say');
+            const wallet = `${regrow ? `${ORGAN_NAME[regrow]} now. ` : ''}You have ${MASS_SIGN} ${short(Math.floor(have))}.`;
+            const rest = () => { say.innerHTML = signHtml(wallet); say.classList.add('is-rest'); };
+            rest();
+            const n = organs.length;
+            organs.forEach((r, i) => {
+                const a = n === 1 ? -Math.PI / 2 : -Math.PI / 2 + i * (2 * Math.PI / n) - (n === 4 ? Math.PI / 4 : 0);
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = `deep-ring-room deep-ring-organ${r.ok ? ' is-ok' : ''}${r.cheap ? ' is-cheap' : ''}`;
+                b.dataset.organ = r.organ;
+                b.style.left = `${(RING_R * Math.cos(a)).toFixed(1)}px`;
+                b.style.top = `${(RING_R * Math.sin(a)).toFixed(1)}px`;
+                b.innerHTML = `${organGlyph(r.organ)}<span class="deep-ring-price deep-mono">${signHtml(`${MASS_SIGN} ${short(r.mass)}`)}</span>`;
+                const name = r.organ === 'hands' ? 'HANDS' : ORGAN_NAME[r.organ];
+                const does = r.organ === 'hands' ? 'The machine plays with hands.' : ORGAN_DOES[r.organ];
+                b.addEventListener('pointerenter', () => { say.classList.remove('is-rest'); say.innerHTML = signHtml(r.ok ? `${name}. ${does}` : `${name}. ${r.need}`); });
+                b.addEventListener('pointerleave', rest);
+                b.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!r.ok) {
+                        b.classList.remove('is-no');
+                        void b.offsetWidth;
+                        b.classList.add('is-no');
+                        return;
+                    }
+                    closeOrganRing();
+                    onPick(r.organ);
+                });
+                ringHost.appendChild(b);
+            });
+            ringHost.classList.add('is-organs');
+            ringHost.hidden = false;
+            void ringHost.offsetWidth;
+            ringHost.classList.add('is-open');
+        },
+        closeOrganRing,
+        /** The chamber the ring of organs is open over, or ''. */
+        get organRingAt() { return oring ? oring.id : ''; },
         /** Bring a kind of hallucination on or off. 'twitch' is the HUD's own and is ignored here. */
         hallucinate(kind, on) {
             if (!(kind in shown)) return false;
@@ -154,6 +225,13 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
         get showing() { return { ...shown }; },
         /* ---- deep-grow: the body ---- */
         setBody: (ids, necrotic, reachable, lone) => body.setBody(ids, necrotic, reachable, lone),
+        /* ---- deep-organs: the organs in their chambers, the take in progress, the pump's wave ---- */
+        setOrgans: (map, o) => body.setOrgans(map, o),
+        setBeat: (phase) => body.setBeat(phase),
+        get organArt() { return body.organArt; },
+        setTaking: (t) => over.setTaking(t),
+        pumpWave: (ids, o) => over.pumpWave(ids, o),
+        get waves() { return over.waves; },
         onChamberClick: (cb) => body.onClick(cb),
         onChamberHover: (cb) => body.onHover(cb),
         setHands: (on, o) => body.setHands(on, o),
@@ -194,9 +272,16 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
 const SVGNS = 'http://www.w3.org/2000/svg';
 /** A floating word rises this far (px) and is gone after this long (ms). */
 export const FLOAT_PX = 40, FLOAT_MS = 2600;
+/** deep-organs: the pump's wave runs from the heart to the front in this long (ms), its bright head this
+ *  long (px); the fill ring's radius when the view cannot say how big a chamber is. */
+export const WAVE_MS = 520, WAVE_HEAD = 34, FILL_R = 17;
+/** ... and at least this many ms a pixel of its way. */
+export const WAVE_MS_PER_PX = 2.4;
 function createOverlay(scene, { marksHost, floatHost }) {
     const marks = new Map();        // id -> { from, path, ring }
     const floats = [];              // { id, el, t0 }
+    const waves = [];               // deep-organs: { ids, path, glow, t0, ms, onArrive, arrived }
+    let fill = null;                // deep-organs: { id, k, shown, g, back, arc, pulse }
     const at = (id) => (scene && typeof scene.screenOfNode === 'function' ? scene.screenOfNode(id) : null);
     const origin = () => {
         const r = marksHost ? marksHost.getBoundingClientRect() : { left: 0, top: 0 };
@@ -254,6 +339,65 @@ function createOverlay(scene, { marksHost, floatHost }) {
         step() {
             for (const [id, m] of marks) drawMark(m, id);
             const now = performance.now();
+            const o0 = origin();
+            // the fill ring follows its chamber, its arc easing to the new share
+            if (fill) {
+                const p = at(fill.id);
+                fill.g.setAttribute('visibility', p ? 'visible' : 'hidden');
+                fill.shown += (fill.k - fill.shown) * 0.22;
+                fill.pulse = Math.max(0, fill.pulse - 0.06);
+                if (p) {
+                    const r = (scene && typeof scene.nodeRadius === 'function' ? scene.nodeRadius(fill.id) : 0) || FILL_R;
+                    const cx = p.x - o0.x, cy = p.y - o0.y;
+                    const rr = Math.max(10, r) * (1 + 0.12 * fill.pulse);
+                    fill.back.setAttribute('cx', cx.toFixed(1));
+                    fill.back.setAttribute('cy', cy.toFixed(1));
+                    fill.back.setAttribute('r', rr.toFixed(1));
+                    const k = Math.min(0.9999, Math.max(0, fill.shown));
+                    const a0 = -Math.PI / 2, a1 = a0 + k * Math.PI * 2;
+                    const large = k > 0.5 ? 1 : 0;
+                    fill.arc.setAttribute('d', k <= 0 ? '' : `M ${(cx + rr * Math.cos(a0)).toFixed(1)} ${(cy + rr * Math.sin(a0)).toFixed(1)} A ${rr.toFixed(1)} ${rr.toFixed(1)} 0 ${large} 1 ${(cx + rr * Math.cos(a1)).toFixed(1)} ${(cy + rr * Math.sin(a1)).toFixed(1)}`);
+                    fill.arc.style.strokeWidth = `${(3 + 3 * fill.pulse).toFixed(2)}px`;
+                }
+            }
+            // the waves run along the body; their arrivals are answered after the loop (an arrival may
+            // redraw, and a redraw steps this again)
+            const arrived = [];
+            for (let i = waves.length - 1; i >= 0; i--) {
+                const w = waves[i];
+                if (!w) continue;
+                const pts = w.ids.map((id) => at(id)).filter(Boolean);
+                const k = (now - w.t0) / w.ms;
+                if (pts.length < 2 || k >= 1.35) {
+                    if (!w.arrived) { w.arrived = true; arrived.push(w); }
+                    w.path.remove(); w.glow.remove(); w.drop.remove(); waves.splice(i, 1);
+                    continue;
+                }
+                const d = pts.map((q, j) => `${j ? 'L' : 'M'} ${(q.x - o0.x).toFixed(1)} ${(q.y - o0.y).toFixed(1)}`).join(' ');
+                w.path.setAttribute('d', d);
+                w.glow.setAttribute('d', d);
+                const len = typeof w.path.getTotalLength === 'function' ? w.path.getTotalLength() : 200;
+                // a long way takes a little longer, so the drop is seen on its way (set once, on the first frame)
+                if (!w.sized) { w.sized = true; w.ms = Math.max(w.ms, len * WAVE_MS_PER_PX); }
+                const e = Math.min(1, k);
+                const ease = 1 - Math.pow(1 - e, 2);
+                const head = Math.max(8, Math.min(WAVE_HEAD, len * 0.4));
+                w.path.style.strokeDasharray = `${head.toFixed(1)} ${(len + head * 2).toFixed(1)}`;
+                w.path.style.strokeDashoffset = (-(ease * (len + head)) + head).toFixed(1);
+                w.glow.style.strokeDasharray = `${(ease * len).toFixed(1)} ${(len * 2).toFixed(1)}`;
+                w.glow.style.opacity = String(Math.max(0, 0.55 * (1 - Math.max(0, k - 0.6) / 0.75)));
+                // the drop: along the way, then it bursts on the chamber it was sent to
+                if (typeof w.path.getPointAtLength === 'function') {
+                    const q = w.path.getPointAtLength(Math.min(len, ease * len));
+                    w.drop.setAttribute('cx', q.x.toFixed(1));
+                    w.drop.setAttribute('cy', q.y.toFixed(1));
+                }
+                const burst = k > 1 ? (k - 1) / 0.35 : 0;
+                w.drop.setAttribute('r', ((w.beat ? 7 : 5) * (1 + 3.2 * burst)).toFixed(1));
+                w.drop.style.opacity = String(k > 1 ? Math.max(0, 1 - burst) : 1);
+                if (!w.arrived && k >= 1) { w.arrived = true; arrived.push(w); }
+            }
+            for (const w of arrived) w.onArrive?.();
             const o = floatHost ? floatHost.getBoundingClientRect() : { left: 0, top: 0 };
             for (let i = floats.length - 1; i >= 0; i--) {
                 const f = floats[i];
@@ -266,6 +410,54 @@ function createOverlay(scene, { marksHost, floatHost }) {
         },
         get marks() { return [...marks.keys()]; },
         get floats() { return floats.map((f) => f.el.textContent); },
+        /**
+         * deep-organs: THE FILL RING on the chamber the body is taking: a faint circle and a red arc of
+         * how much is filled (k, 0 to 1). It eases to a new k, so each pump is seen as a step. null: none.
+         */
+        setTaking(t) {
+            if (!marksHost) return;
+            if (!t) { if (fill) { fill.g.remove(); fill = null; } return; }
+            if (!fill || fill.id !== t.id) {
+                if (fill) fill.g.remove();
+                const g = document.createElementNS(SVGNS, 'g');
+                g.setAttribute('class', 'deep-fill');
+                const back = document.createElementNS(SVGNS, 'circle');
+                back.setAttribute('class', 'deep-fill-back');
+                const arc = document.createElementNS(SVGNS, 'path');
+                arc.setAttribute('class', 'deep-fill-arc');
+                g.appendChild(back);
+                g.appendChild(arc);
+                marksHost.appendChild(g);
+                fill = { id: t.id, k: 0, shown: 0, g, back, arc, pulse: 0 };
+            }
+            if (t.k > fill.k + 1e-6) fill.pulse = 1;
+            fill.k = Math.max(0, Math.min(1, t.k));
+            fill.g.classList.toggle('is-regrow', !!t.regrow);
+            this.step();
+        },
+        /**
+         * deep-organs: THE PUMP'S WAVE: a red pulse runs from the first id to the last along the body
+         * (the ids in order), over WAVE_MS; `onArrive` when it gets there (the fill ring steps then).
+         */
+        pumpWave(ids, { beat = false, onArrive = null } = {}) {
+            if (!marksHost || !ids || ids.length < 2) { onArrive?.(); return false; }
+            const path = document.createElementNS(SVGNS, 'path');
+            path.setAttribute('class', `deep-wave${beat ? ' is-beat' : ''}`);
+            const glow = document.createElementNS(SVGNS, 'path');
+            glow.setAttribute('class', `deep-wave-trail${beat ? ' is-beat' : ''}`);
+            // the bolus of blood itself, a bright drop running ahead of the trail
+            const drop = document.createElementNS(SVGNS, 'circle');
+            drop.setAttribute('class', `deep-wave-drop${beat ? ' is-beat' : ''}`);
+            drop.setAttribute('r', beat ? '7' : '5');
+            marksHost.appendChild(glow);
+            marksHost.appendChild(path);
+            marksHost.appendChild(drop);
+            waves.push({ ids: ids.slice(), path, glow, drop, beat, t0: performance.now(), ms: WAVE_MS * (beat ? 1 : 1.15), onArrive, arrived: false });
+            this.step();
+            return true;
+        },
+        get waves() { return waves.length; },
+        get filling() { return fill ? { id: fill.id, k: fill.k, shown: +fill.shown.toFixed(3) } : null; },
     };
 }
 
@@ -279,6 +471,7 @@ function createBody(scene, graphOf) {
         meshes: new Set(), tendrils: new Map(), spine: false, vertebrae: new Set(), env: null,
         hands: null, handsOn: false, clickCb: null, hoverCb: null, rising: null, later: [], clock: 0,
         bone: null, listening: false, lone: new Set(),
+        organs: new Map(), organMap: null, beat: null,      // deep-organs
     };
     const later = (sec, fn) => fl.later.push({ at: fl.clock + sec, fn });
     const parts = () => scene.fleshParts();
@@ -483,6 +676,38 @@ function createBody(scene, graphOf) {
             fl.reach = reach;
             hint(P);
         },
+        /** deep-organs: the organs on their plates (organ-art.js, laid flat on the slab), the take in progress growing in. */
+        setOrgans(map, { taking = null, dead = [] } = {}) {
+            if (!scene) return;
+            const P = parts();
+            fl.organMap = map ? { ...map } : null;
+            const want = new Map();
+            for (const [id, o] of Object.entries(fl.organMap || {})) if (fl.body.has(id) && P.plates.get(id)) want.set(id, { organ: o, k: 1 });
+            if (taking && taking.organ && taking.organ !== 'hands' && P.plates.get(taking.id)) want.set(taking.id, { organ: taking.organ, k: Math.max(0.04, taking.k || 0) });
+            for (const [id, rec] of fl.organs) {
+                const w = want.get(id);
+                if (!w || w.organ !== rec.organ || rec.build !== P.build) { rec.art.dispose(); fl.organs.delete(id); }
+            }
+            const deadSet = new Set(dead || []);
+            for (const [id, w] of want) {
+                let rec = fl.organs.get(id);
+                if (!rec) {
+                    const plate = P.plates.get(id);
+                    const art = makeOrganArt(w.organ, { w: P.plateW * 0.82, h: P.plateW * 0.62, seed: id.length * 7 + (Number(id.slice(1)) || 0), env: env(P) });
+                    art.group.rotation.x = -Math.PI / 2;
+                    const c = plate.getWorldPosition(new THREE.Vector3());
+                    art.group.position.set(c.x, c.y + P.plateH / 2 + 0.03, c.z);
+                    art.group.rotation.z = Math.atan2(c.x, c.z);
+                    P.world.add(art.group);
+                    rec = { organ: w.organ, art, build: P.build };
+                    fl.organs.set(id, rec);
+                }
+                rec.art.setGrow(w.k);
+                rec.art.setNecrotic(deadSet.has(id));
+            }
+        },
+        setBeat(phase) { fl.beat = Number.isFinite(phase) ? phase : null; },
+        get organArt() { return [...fl.organs.entries()].map(([id, r]) => ({ id, organ: r.organ, grow: r.art.grow, necrotic: r.art.necrotic })); },
         onClick(cb) { fl.clickCb = cb; if (scene) listen(parts()); },
         onHover(cb) { fl.hoverCb = cb; if (scene) listen(parts()); },
         setHands(on, { instant = false } = {}) {
@@ -556,6 +781,7 @@ function createBody(scene, graphOf) {
             fl.clock += dt;
             for (let i = fl.later.length - 1; i >= 0; i--) if (fl.later[i].at <= fl.clock) { const f = fl.later[i].fn; fl.later.splice(i, 1); f(); }
             stepFlesh(dt);
+            for (const rec of fl.organs.values()) rec.art.step(dt, fl.beat);
             if (scene) {
                 const P = parts();
                 P.world.traverse((o) => {

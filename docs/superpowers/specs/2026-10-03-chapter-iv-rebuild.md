@@ -556,3 +556,62 @@ grafted. Shots: docs/playtests/rebuild-shots/econ-1-drawer-gap, econ-2-missed-ni
 
 **Not done here.** GROW's length and its "longest stuck" (next pass). The ore cap counts only what the mines
 bring beyond the generators. Long count still waits on Cryo VII to be bought, as before.
+
+## Built: GROW third pass (deep-organs)
+
+Built on the branch `deep-organs` (2026-10-03), B340 to B349. The play log: docs/playtests/2026-10-03-grow-organs-play.md.
+
+**Where it lives.** `src/phase4/organs.js` (pure: the four organs, what is cheap where, the prices and the work, the
+four ratios, the pace, the hearts' reach and the edge beyond it, the migration of an old body); `grow.js` (the body on
+the colony: the ring's offer, the take in progress and its fill, the pump, the body's clock in seconds, the gauges, the
+word, the cascade, the hands, the dream); `growth.js` (a vat is a chamber grown as one when the state names its organs);
+`organ-art.js` (what each organ looks like, both views); `strata-view.js` and `view-hooks.js` (setOrgans, setBeat; the
+ring of organs, the fill ring and the pump's wave on the overlay over either view); `panel.js` (the dot); `readout.js`
+(MASS_SIGN); `sound.js` ('ring', 'organ', 'arrive'); `index.js` (the wiring); `policy.js` and `sim-phase4.mjs`.
+
+**Decisions taken where the brief left room.**
+- MASS is the body's currency: every take is paid in mass at once; the guts make it (0.4 a second each on floor 0), the
+  lid a little (0.22). A take costs 14 x 1.035 per take before it x 1.8 per floor down (the machine house 3 times); the
+  room's own organ costs 0.4 of that; a regrow 0.6 of a take there. People are no longer a price: the organs eat them.
+- The ratios: PULSE = (7 + 4 x the hearts' give) / the body's size, FLESH = (5 + 4 x the nerves' give) / size, FEED = what
+  the vats grow over what the organs eat (growth.js), MASS = (mass in hand + 12 s of the guts) / the cheapest take in
+  reach. A floor's organs give 1.35 times a floor down and ask 1.5 times (uphill); a full floor gives 1.5 times (the
+  cascade). The pace of a take is the weakest of FEED (only while the people last under 12 body years), PULSE and FLESH,
+  between 0.3 and 1; nerves to spare add up to 40 % on top. MASS limits by itself (a take must be paid).
+- The work of a take: 32 on floor 0, x1.35 a floor, the machine house twice, a regrow half. A pump fills 2 x (4 on the
+  beat, 1 off it, the existing timing kept) x the hearts (1 + 0.12 a heart, at most 1.8) x the pace; the trickle 0.3 a
+  second awake, 1.0 dreaming (SPREAD doubles it a level). The sim's player (a pump every 1.5 s, half on the beat) is about
+  twice the dream; a player who keeps the beat about four times.
+- One take at a time. A click on the chamber being taken pumps too; the heart button pumps; the space bar stays the
+  pause (it pumped and paused at once in the first play round).
+- The edge beyond the hearts' reach dies one organ every 3 s, the farthest first; a dead room revives every 3 s while
+  there are people and the reach for it, the pump hurries it. FEED empty kills a room a body year (growth.js). Dead flesh
+  does not spread, so the tape asks first for the organ that brings it back (GROW A HEART, or GROW A VAT), and when no
+  chamber in reach can be that organ the living organs that can be grown again glow.
+- The cascade: a full floor's landing below is taken by itself (the spine), and "×1.5" floats over each organ there.
+  The hands: games x3 x PULSE (between 0.6 and 2.5), the hands' throws faster by the same factor, "★ ×N" over the house.
+- A body year every 3 s; the dream: the calendar dives as before, the body runs a second a second, it begins takes
+  toward the marks itself with the organ the weakest gauge wants, and lasts 30 s x FLESH (0.6 to 1.6); it wakes HUNGER,
+  REACHED or SPENT.
+- VATS stops at level 8 (the culture vats count); SPREAD is a faster trickle now; MUSCLE x1.5 a level on what guts and
+  vats make (not on reach or speed).
+- An old body (v1.78 and before, mid-GROW) is given organs: each chamber the organ its room made cheap (a farm in turn a
+  vat and a gut, anything else a nerve then a heart), mass for a few takes; the old growing organs and SPREAD clock go.
+
+**Numbers.** (sim, a pump every 1.5 s, half on the beat)
+
+| run | before (v1.79.0) | after |
+|---|---|---|
+| strata | 33m03s, GROW 14m56s (45 %), longest without a decision in GROW 35 s, 5 taken by hand | 31m11s, GROW 13m04s (42 %), 25 s; 49 taken by hand, a take 15 s (median) |
+| 3D | 33m03s, GROW 14m56s (45 %), 35 s | 31m06s, GROW 12m59s (42 %), 21 s |
+| --watcher | 34m54s, GROW 14m59s (43 %), 35 s | 32m52s, GROW 12m57s (39 %), 24 s |
+
+The sim's player never starves (it grows what the gauges ask). In the play pass a player who takes the cheap organ
+three times in four ran at a pace of 0.73 to 0.97 and lost and won back three organs.
+
+**Acceptance.** `node scripts/accept-iv-cut.mjs` both views: O, P, A, W, N, D (see its header). Shots:
+docs/playtests/rebuild-shots/organs-ring, organs-wave, organs-four, organs-starving, organs-hands.
+
+**Not done here.** A keyboard pump (the space is the pause); the new sounds heard by a human ear; the people counter
+grows very large late in GROW (the vats make many more than the organs eat once FEED is green); the organ art in the 3D
+view lies flat on the plates and is a lighter pass than the strata's.

@@ -13,7 +13,7 @@ import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
 import { initialWatcher, puzzleGapYears } from './phase4/watcher.js';
 import { initialSurface } from './phase4/surface.js';
-import { startGrow, graphOf, organsOf } from './phase4/grow.js';
+import { startGrow, graphOf, organsOf, settleFloors } from './phase4/grow.js';
 import { LADDER } from './phase4/watcher.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
@@ -267,30 +267,30 @@ export const CHECKPOINTS = [
         clearAll();
         // deep-grow: MOVEMENT III begins. Surface has said its six lines, the question is answered
         // (bought): on load the body begins on the lid and the panel overgrows over ten seconds. The
-        // arms of the first floor glow; a click on one takes it. deep-grow2: the two grafts of nights 4
-        // and 5 are lone organs in a mine and a farm; the drawer opens empty (one verb: take a chamber)
-        // and VATS comes into it when FEED first falls; the lever reads DREAM.
+        // chambers beside the lid glow. deep-organs: a click on one opens the ring of four organs (the
+        // room's own one cheap); the take is paid in mass and filled by pumping the heart (a red wave
+        // runs to it, its ring fills). The two grafts of nights 4 and 5 are lone organs in a mine and a
+        // farm; the drawer opens empty; the lever reads DREAM.
         const { deep, layout } = growColony();
         set(P4, serializeDeep(deep, layout));
         set(PHASE_KEY, 'DEEP');
     } },
     { id: 'iv-body', label: 'IV · the body', apply: () => {
         clearAll();
-        // deep-grow: a third of the first floor is body (the four arms off the lid), the dormitory
-        // among them a vat that grows people, and the people have run out: the generator's arm is
-        // dead flesh at the edge, FEED is red. deep-grow2: the panel says GROW VATS (VATS and APPETITE
-        // are in the drawer); with people to spare it revives by itself, the heart's pumps hurry it.
-        const { deep, layout } = growColony({ body: ['h0', 's0', 's1', 's2', 's3'], necrotic: ['s3'], humans: 14 });
-        // the culture vats are not yet grown on: only the one vat in the body feeds it
-        deep.vats = 0;
-        deep.grow.lv.vats = 0;
+        // deep-organs: THE EDGE STARVES. Half the first floor is body, grown as guts, vats and nerves and
+        // no heart but the lid: the hearts' reach is short of the body's size, the outermost organ is dead
+        // flesh, PULSE is red with the dot, the tape says GROW A HEART. There is mass for one: grown, the
+        // reach comes back and the dead revive one by one.
+        const organs = { s0: 'gut', s1: 'vat', s2: 'gut', s3: 'nerve', s4: 'gut', s5: 'vat', s6: 'gut', s7: 'nerve', s8: 'gut', s9: 'nerve' };
+        const { deep, layout } = growColony({ body: ['h0', ...Object.keys(organs)], necrotic: ['s8'], humans: 2400, organs, mass: 40 });
         set(P4, serializeDeep(deep, layout));
         set(PHASE_KEY, 'DEEP');
     } },
     { id: 'iv-rise', label: 'IV · ready to rise', apply: () => {
         clearAll();
         // deep-grow: every chamber is body, the machine house too (the hands): the lever is back,
-        // overgrown, and reads RISE. Pulling it ends the act on V · UNITY.
+        // overgrown, and reads RISE. Pulling it ends the act on V · UNITY. deep-organs: the organs in turn,
+        // vat, gut, heart, nerve, the hands throwing fast on a strong PULSE.
         const { deep, layout } = growColony({ body: 'all' });
         set(P4, serializeDeep(deep, layout));
         set(PHASE_KEY, 'DEEP');
@@ -304,7 +304,7 @@ export const CHECKPOINT_CRYO = { 'iv-long': CRYO[4], 'iv-graft': CRYO[3], 'iv-cr
  * of room on every floor), three floors deep. With `body` the movement is under way: 'all' is
  * every chamber and the machine; a list is those node ids (growth.js), `necrotic` among them dead.
  */
-function growColony({ body = null, necrotic = [], humans = 2400 } = {}) {
+function growColony({ body = null, necrotic = [], humans = 2400, organs = null, mass = null } = {}) {
     const deep = initialDeepState({ salvage: 1500, doom0: 85 });
     const pattern = ['mine', 'dorm', 'farm', 'generator'];
     const slots = [];
@@ -339,6 +339,12 @@ function growColony({ body = null, necrotic = [], humans = 2400 } = {}) {
         deep.grow.hand = deep.grow.taken;
         deep.grow.overgrown = true;
         deep.grow.hands = deep.grow.body.includes('machine');
+        // deep-organs: each chamber of the body as the organ given, or in turn vat, gut, heart, nerve
+        const kinds = ['vat', 'gut', 'heart', 'nerve'];
+        const rooms = deep.grow.body.filter((id) => /^s\d+$/.test(id));
+        deep.grow.organs = organs ? { ...organs } : Object.fromEntries(rooms.map((id, i) => [id, kinds[i % 4]]));
+        settleFloors(deep, layout, { silent: true });
+        if (mass !== null) deep.grow.mass = mass;
         deep.organs = organsOf(deep, layout);
     }
     return { deep, layout };

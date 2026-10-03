@@ -76,12 +76,14 @@ import { createPanel } from './panel.js';
 import { createDrawer } from './drawer.js';
 import { createViewHooks } from './view-hooks.js';
 import {
-    growOn, risen, normalizeGrow, organsOf, stepGrow, takeChamber, takeWords, viewOf, graphOf,
+    growOn, risen, normalizeGrow, organsOf, stepGrow, viewOf, graphOf,
     growGauges, adviseGrow, riseLamps, riseReady, bodyGroups, buyBody, fleshShare, rise as riseBody,
     GROW_GAUGES, GROW_DAYS_PER_SECOND, GROW_END, RISE_LINES, setChamberPlace,
-    takeTip, canAfford, toggleMark, markThreads, dreamStart, dreamWake, dreamEnd, dreaming, dreamDaysAt,
-    pump, beatPhase, onBeat, PUMP_COOLDOWN_MS, peoplePerDay, organMultiplier, unlockBody,
+    takeTip, toggleMark, markThreads, dreamStart, dreamWake, dreamEnd, dreaming, dreamDaysAt,
+    pump, beatPhase, onBeat, PUMP_COOLDOWN_MS, peoplePerSecond, organMultiplier,
+    takeOffer, startTake, taking, bodyRatios, pumpPath, ORGAN_NAME, HANDS_PULSE, handsGames,
 } from './grow.js';
+import { MASS_SIGN } from './readout.js';
 import { normalizeGraft, graftOwed, graftCandidates, graftWords, placeGraft, loneGrafts, GRAFT_MULT, graftEffect } from './graft.js';
 import { HANDS_SECONDS } from './view-hooks.js';
 import { playChapterCard } from '../chapterCard.js';
@@ -262,6 +264,7 @@ export function init() {
         takeTip: $('deep-take-tip'), riseLines: $('deep-rise-lines'), recall: $('deep-recall'),
         // deep-grow2
         people: $('deep-people'), peopleRate: $('deep-people-rate'),
+        mass: $('deep-mass'), massRate: $('deep-mass-rate'),
         heart: $('deep-heart'), marks: $('deep-marks'), float: $('deep-float'), diveWord: $('deep-dive-word'),
     };
     $('deep-crust').hidden = true;
@@ -388,6 +391,11 @@ export function init() {
         ui.stars.textContent = formatCount(v.stars);
         const ppl = formatCount(Math.max(0, state.humans || 0));
         if (ui.people && ui.people.textContent !== ppl) ui.people.textContent = ppl;
+        // deep-organs: the body's mass, its currency, beside them in GROW
+        if (ui.mass && growOn(state)) {
+            const m = formatCount(Math.floor(Math.max(0, state.grow.mass || 0)));
+            if (ui.mass.textContent !== m) ui.mass.textContent = m;
+        }
     }
     const snapshot = () => ({ day: state.day, ore: state.minerals, stars: state.stars });
 
@@ -520,8 +528,13 @@ export function init() {
         if (ui.oreRate.textContent !== oreDay) ui.oreRate.textContent = oreDay;
         if (ui.starsRate.textContent !== starDay) ui.starsRate.textContent = starDay;
         // deep-grow2: the people: born less lost; in the body what its vats grow less what it eats
-        const pDay = rateText(((growOn(state) ? peoplePerDay(state, layout) : (report.born || 0)) - (report.died || 0)) * dps);
+        // deep-organs: in the body its own clock is real seconds, awake and dreaming alike
+        const pDay = rateText(growOn(state) ? peoplePerSecond(state, layout) - (report.died || 0) * dps : ((report.born || 0) - (report.died || 0)) * dps);
         if (ui.peopleRate && ui.peopleRate.textContent !== pDay) ui.peopleRate.textContent = pDay;
+        if (ui.massRate && growOn(state)) {
+            const mr = rateText(bodyRatios(state, layout).massRate);
+            if (ui.massRate.textContent !== mr) ui.massRate.textContent = mr;
+        }
         // the machine's tempo IS the stars a day
         const tempo = machineTempo(report, { asleep: !!state.asleep, feed: state.feed });
         lastTempo = tempo;
@@ -1232,6 +1245,8 @@ export function init() {
     const growLog = { taken: 0, died: 0, revived: 0, pumps: 0, onBeat: 0, dreams: 0, grafts: 0 };
     let frontFloor = -1;
     let fleshKey = '';
+    let organKey = '';                  // deep-organs: the organs as last drawn
+    let heldK = null;                   // deep-organs: the take's share shown while a pump's wave is on its way
     /**
      * The flesh on the view: before the question the grafts (and, awake with a graft to place, the
      * rooms it may go into, glowing); in the body the body, its dead, what it can reach and the lone
@@ -1253,9 +1268,16 @@ export function init() {
     function drawBody() {
         const v = viewOf(state, layout);
         const lone = loneGrafts(state);
-        const reach = dreaming(state) ? [] : v.reachable;
+        // deep-organs: the chambers in reach glow, and the living organs the tape asks to grow again
+        const reach = dreaming(state) ? [] : v.glow;
         const key = `g|${v.body.join(',')}|${v.necrotic.join(',')}|${reach.join(',')}|${lone.join(',')}`;
         if (key !== fleshKey) { fleshKey = key; hooks.setBody([...v.body, ...lone], v.necrotic, reach, lone); }
+        // deep-organs: the organs in their chambers; the take in progress grows its organ in and its fill
+        // ring steps when the pump's wave arrives (heldK: the share shown until then)
+        const t = v.taking ? { ...v.taking, k: heldK === null ? v.taking.k : Math.min(heldK, v.taking.k) } : null;
+        const okey = `${JSON.stringify(v.organs)}|${t ? `${t.id}:${t.organ}:${t.k.toFixed(3)}` : ''}|${v.necrotic.join(',')}`;
+        if (okey !== organKey) { organKey = okey; hooks.setOrgans?.(v.organs, { taking: t, dead: v.necrotic }); }
+        hooks.setTaking?.(t);
         syncMarks();
         // the camera follows the front down, a floor at a time (never once the player holds it)
         const floorOf = (id) => Math.max(0, graphOf(layout).nodes.find((n) => n.id === id)?.floor ?? 0);
@@ -1280,14 +1302,35 @@ export function init() {
         for (const id of hooks.marks || []) if (!ids.has(id)) hooks.markChamber(id, false);
         for (const m of want) hooks.markChamber(m.id, true, m.from);
     }
-    /** "×20" over a plate the body took (a vat says VAT, the machine house HANDS). */
+    /** deep-organs: over a plate the body took, the organ it became (the machine house: HANDS). */
     function floatTake(id) {
         const n = graphOf(layout).nodes.find((x) => x.id === id);
         if (!n) return;
         if (n.kind === 'machine') { hooks.floatText(id, 'HANDS'); return; }
+        const o = growOn(state) ? state.grow.organs[id] : null;
+        if (o) { hooks.floatText(id, ORGAN_NAME[o], `is-organ is-${o}`); return; }
         if (n.kind !== 'room' || !n.type || n.type === 'cryo') return;
-        if (n.type === 'dorm') { hooks.floatText(id, 'VAT'); return; }
         hooks.floatText(id, `×${formatCount(Math.round(organMultiplier(state, layout, id)))}`);
+    }
+    /** deep-organs: a take is done: its organ floats up; a full floor cascades over all its organs. */
+    function tookIt(t) {
+        if (!t) return;
+        growLog.taken++;
+        sound?.event('take');
+        floatTake(t.id);
+        if (t.cascade && t.cascade.length) {
+            const graph = graphOf(layout);
+            sound?.event('swell');
+            for (const f of t.cascade) {
+                growLog.cascades = (growLog.cascades || 0) + 1;
+                for (const n of graph.nodes) if (n.floor === f && n.kind === 'room' && state.grow.organs[n.id]) hooks.floatText(n.id, '×1.5', 'is-cascade');
+            }
+        }
+        // the hands: the machine plays this many times the games, and the stars jump with it
+        if (t.id === 'machine') {
+            growLog.hands = (growLog.hands || 0) + 1;
+            setTimeout(() => hooks.floatText('machine', `★ ×${formatCount(Math.round(handsGames(state, layout)))}`, 'is-cascade'), 900);
+        }
     }
     /** Items that came into the drawer just now: its button carries the mark, as a gift does. */
     function newItems(seen) {
@@ -1332,29 +1375,28 @@ export function init() {
         lastGrowAt = now;
         if (risen(state) || dreaming(state)) return;
         const days = Math.max(1, Math.round(secs * GROW_DAYS_PER_SECOND));
-        const y = runBody(days);
+        runColony(days);
+        const y = stepGrow(state, layout, secs);
         recoverAwake(state.watcher, days);
         afterBody(y);
         afterChange();
     }
-    /** `days` colony days of the body: the rules day by day. @returns the summed report */
-    function runBody(days, stop = null) {
-        const out = { died: [], revived: [], spread: [], seen: [], woke: '', days: 0 };
+    /** deep-organs: `days` colony days (the machine, the stars, the ore); the body keeps its own clock. */
+    function runColony(days) {
         for (let i = 0; i < days; i++) {
             landBuilds();
             state.organs = organsOf(state, layout);
             report = tickDay(state, false);
-            const y = stepGrow(state, layout, 1);
-            out.days++;
-            out.died.push(...y.died); out.revived.push(...y.revived); out.spread.push(...y.spread); out.seen.push(...y.seen);
-            if (stop) { const w = stop(y); if (w) { out.woke = w; break; } }
         }
-        return out;
     }
     function afterBody(y) {
-        if (y.died.length) { sound?.event('necrosis'); growLog.died += y.died.length; }
-        if (y.revived.length) growLog.revived += y.revived.length;
-        if (y.spread.length) { sound?.event('take'); growLog.taken += y.spread.length; for (const t of y.spread) floatTake(t.id); }
+        if (y.died.length) {
+            sound?.event('necrosis'); growLog.died += y.died.length;
+            for (const id of y.died) hooks.floatText(id, 'STARVING', 'is-small is-dead');
+        }
+        if (y.revived.length) { growLog.revived += y.revived.length; for (const id of y.revived) hooks.floatText(id, 'BACK', 'is-small'); }
+        for (const t of y.done || []) tookIt(t);
+        if ((y.started || []).length) organKey = '';
         newItems(y.seen);
     }
     /** A click on a chamber. Before the question, with a graft to place: graft it. In the body: the
@@ -1365,24 +1407,40 @@ export function init() {
         if (!growOn(state)) return graftAt(id);
         if (risen(state) || dreaming(state)) return false;
         if (id === 'h0') return pumpHeart();
-        const tip = takeTip(state, layout, id);
-        const r = canAfford(state, layout, id) ? takeChamber(state, layout, id) : null;
-        if (!r) {
-            if (state.grow.body.includes(id)) { if (tip.text) nudgeTip(); return false; }
-            toggleMark(state, layout, id);
-            afterChange();
-            showTip(id, tipAt.x, tipAt.y);
-            return false;
+        // deep-organs: the chamber being taken pumps too (the wave runs to it)
+        const T = taking(state);
+        if (T && T.id === id) return pumpHeart();
+        const offer = takeOffer(state, layout, id);
+        if (offer) {
+            if (T) { nudgeTip(); return false; }
+            showTip('', 0, 0);
+            hooks.openOrganRing(id, tipAt.x, tipAt.y, {
+                organs: offer.organs, have: state.grow.mass, regrow: offer.regrow,
+                onPick: (organ) => chooseOrgan(id, organ),
+            });
+            sound?.event('ring');
+            return true;
         }
-        growLog.taken++;
-        sound?.event('take');
+        const tip = takeTip(state, layout, id);
+        if (state.grow.body.includes(id)) { if (tip.text) nudgeTip(); return false; }
+        if (viewOf(state, layout).reachable.includes(id)) { nudgeTip(); return false; }
+        toggleMark(state, layout, id);
         afterChange();
-        floatTake(id);
-        newItems(unlockSeen());
         showTip(id, tipAt.x, tipAt.y);
+        return false;
+    }
+    /** deep-organs: an organ picked in the ring: the take begins (paid now), its ring on the chamber. */
+    function chooseOrgan(id, organ) {
+        if (busy || paused() || !growOn(state) || dreaming(state)) return false;
+        const t = startTake(state, layout, id, organ);
+        if (!t) return false;
+        growLog.chosen = growLog.chosen || {};
+        growLog.chosen[organ] = (growLog.chosen[organ] || 0) + 1;
+        sound?.event('organ', { organ });
+        organKey = '';
+        afterChange();
         return true;
     }
-    const unlockSeen = () => unlockBody(state, layout);
     /** deep-grow2: a graft placed: the room turns to flesh and makes five times as much. */
     function graftAt(id) {
         const r = placeGraft(state, layout, id);
@@ -1408,7 +1466,12 @@ export function init() {
         el.classList.toggle('is-red', !!t.red);
         el.hidden = !t.text;
         ui.sceneHost.classList.toggle('is-over-take', !!t.text);
-        if (t.text) el.style.transform = `translate(${x + 16}px, ${y + 14}px)`;
+        // deep-organs: the tip stays on the screen (it went off the right edge over the last chambers)
+        if (t.text) {
+            const w = el.offsetWidth || 260, h = el.offsetHeight || 30;
+            const tx = Math.min(x + 16, window.innerWidth - w - 12), ty = Math.min(y + 14, window.innerHeight - h - 12);
+            el.style.transform = `translate(${Math.max(8, tx)}px, ${Math.max(8, ty)}px)`;
+        }
     }
     /** deep-econ (B336): over a lone graft, what it makes now against what the room made before. */
     function graftedWords(id) {
@@ -1442,14 +1505,33 @@ export function init() {
         if (now - lastPumpAt < PUMP_COOLDOWN_MS) return false;
         lastPumpAt = now;
         const beat = onBeat(beatNow());
-        const r = pump(state, layout, { beat, orePerDay: report.minerals });
+        // deep-organs: the share shown stays where it was until the wave gets there
+        const before = taking(state);
+        const k0 = before ? before.done / before.work : null;
+        const r = pump(state, layout, { beat });
         if (!r) return false;
         growLog.pumps++;
         if (beat) growLog.onBeat++;
         sound?.event('pump', { beat });
         hooks.floatText('h0', beat ? '×2' : '×½', beat ? 'is-beat' : 'is-small');
-        if (r.revived) hooks.floatText(r.revived, 'BACK', 'is-small');
-        for (const id of r.grown) floatTake(id);
+        if (before) heldK = k0;
+        const targets = r.to.slice(0, 3);
+        targets.forEach((to, i) => {
+            const path = pumpPath(state, layout, to);
+            const last = i === targets.length - 1;
+            hooks.pumpWave?.(path.length > 1 ? path : ['h0', to], {
+                beat,
+                onArrive: !last ? null : () => {
+                    heldK = null;
+                    sound?.event('arrive', { beat });
+                    if (r.done) tookIt(r.done);
+                    else if (r.take) { const T = taking(state); if (T) hooks.floatText(T.id, `${Math.round(100 * T.done / T.work)} %`, 'is-small is-fill'); }
+                    if (r.revived) hooks.floatText(r.revived, 'BACK', 'is-small');
+                    if (r.mass > 0) hooks.floatText(to, `+${MASS_SIGN} ${formatCount(Math.round(r.mass * 10) / 10)}`, 'is-small is-mass');
+                    afterChange({ save: false });
+                },
+            });
+        });
         ui.heart?.classList.remove('is-pumped');
         void ui.heart?.offsetWidth;
         ui.heart?.classList.add('is-pumped');
@@ -1468,6 +1550,7 @@ export function init() {
         el.style.left = `${Math.round(p.x - r.left)}px`;
         el.style.top = `${Math.round(p.y - r.top)}px`;
         const ph = beatNow();
+        hooks.setBeat?.(ph);
         el.style.setProperty('--beat', (1 + 0.22 * Math.exp(-ph * 9)).toFixed(3));
         el.classList.toggle('is-cool', performance.now() - lastPumpAt < PUMP_COOLDOWN_MS);
     }
@@ -1511,11 +1594,13 @@ export function init() {
         if (paused() || !(dt > 0)) return;
         const days = Math.max(1, Math.round(dreamDaysAt(dreamClock, dt)));
         dreamClock += dt;
-        const y = runBody(days, (yy) => dreamWake(state, layout, yy));
+        runColony(days);
+        const y = stepGrow(state, layout, dt);
+        const woke = dreamWake(state, layout, y);
         afterBody(y);
         drawCounters(snapshot());
         afterChange({ save: ++dreamTicks % 10 === 0 });
-        if (y.woke) wakeDream(y.woke);
+        if (woke) wakeDream(woke);
     }
     /** The body wakes: one lamp, one word (HUNGER, REACHED, AWAKE). */
     function wakeDream(word) {
@@ -1941,10 +2026,12 @@ export function init() {
     // leave it open (Ola: "you can click Dig, but the drawer just closes and nothing is dug")
     document.addEventListener('pointerdown', (e) => {
         if (hooks.ringSlot >= 0 && !ui.ring.contains(e.target)) hooks.closeRoomRing();
+        if (hooks.organRingAt && !ui.ring.contains(e.target)) hooks.closeOrganRing();
         if (drawer.isOpen() && ui.sceneHost.contains(e.target)) closeDrawer();
     }, { signal, capture: true });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        if (hooks.organRingAt) { hooks.closeOrganRing(); return; }
         if (hooks.ringSlot >= 0) { hooks.closeRoomRing(); return; }
         if (treeView?.isOpen()) { closeTree(); return; }
         if (drawer.isOpen()) { closeDrawer(); return; }
@@ -2030,7 +2117,9 @@ export function init() {
         if (state.asleep && ui.surface && !ui.surface.hidden && surfaceGone(state.watcher.surface.visit)) drawSurface();
         else if (state.asleep && voice && voice.merge) drawSurface();
         panel.step(paused() ? 0 : dt);
-        hooks.step(paused() ? 0 : dt, lastTempo.throws || 0);
+        // deep-organs: the hands throw faster with PULSE (the hearts drive them)
+        const handsK = growOn(state) && state.grow.body.includes('machine') ? Math.max(HANDS_PULSE[0], Math.min(HANDS_PULSE[1], bodyRatios(state, layout).ratios.E)) : 1;
+        hooks.step(paused() ? 0 : dt, (lastTempo.throws || 0) * handsK);
         scene?.step(paused() ? 0 : dt);
         placeCentre();
         placeHeart();
@@ -2142,7 +2231,20 @@ export function init() {
         get growLog() { return { ...growLog }; },
         get riseReady() { return riseReady(state, layout); },
         take: (id) => takeAt(id),
-        takeWords: (id) => takeWords(state, layout, id),
+        takeWords: (id) => takeTip(state, layout, id).text,
+        // deep-organs
+        choose: (id, organ) => chooseOrgan(id, organ),
+        redraw: () => { fleshKey = ''; organKey = ''; afterChange(); return true; },
+        get organRingAt() { return hooks.organRingAt || ''; },
+        get organRing() {
+            return [...ui.ring.querySelectorAll('.deep-ring-organ')].map((b) => ({ organ: b.dataset.organ, ok: b.classList.contains('is-ok'),
+                cheap: b.classList.contains('is-cheap'), price: b.querySelector('.deep-ring-price').textContent.trim() }));
+        },
+        get organArt() { return hooks.organArt || []; },
+        get ratios() { return growOn(state) ? bodyRatios(state, layout) : null; },
+        get waves() { return hooks.waves || 0; },
+        get taking() { return taking(state) ? { ...taking(state) } : null; },
+        get weakestGauge() { const el = document.querySelector('#deep-gauges .deep-gauge.is-weakest'); return el ? el.dataset.col : ''; },
         screenOfNode: (id) => scene?.screenOfNode(id) || null,
         chamberAt: (x, y) => scene?.chamberAt(x, y) || '',
     };

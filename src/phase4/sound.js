@@ -533,6 +533,34 @@ export function createDeepSound(audio, opts = {}) {
         const bp = filter('bandpass', 420, 2.2); bp.frequency.setValueAtTime(420, t + 0.12); bp.frequency.exponentialRampToValueAtTime(120, t + 0.9);
         bp.connect(env(t + 0.12, 0.22, 0.05, 0.6, g)); noise(t + 0.12, 0.9, bp);
     }
+    /* ---- deep-organs: the organs' words ---- */
+    /** The ring of organs opens: a soft wet breath of air, short. */
+    function ringOpen(t) {
+        const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.3);
+        const bp = filter('bandpass', 900, 1.6); bp.frequency.setValueAtTime(600, t); bp.frequency.exponentialRampToValueAtTime(1400, t + 0.18);
+        bp.connect(env(t, 0.1, 0.02, 0.16, g)); noise(t, 0.22, bp);
+    }
+    /** An organ is chosen: the take begins. Each organ its own low voice: the vat a hollow knock, the gut a
+     *  wet slide, the heart a thump, the nerve a dry tick. */
+    function organ(t, o) {
+        const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.4);
+        if (o === 'heart') { heart(t, 0.8, 0.5, inp.blood, true); return; }
+        if (o === 'nerve') {
+            const hp = filter('highpass', 2400); hp.connect(env(t, 0.22, 0.001, 0.04, g)); noise(t, 0.05, hp);
+            const hp2 = filter('highpass', 3200); hp2.connect(env(t + 0.09, 0.12, 0.001, 0.03, g)); noise(t + 0.09, 0.04, hp2);
+            return;
+        }
+        const f = o === 'vat' ? 150 : 90;
+        const x = osc('sine', f, t, t + 0.6, env(t, 0.32, 0.005, 0.45, g)); x.frequency.exponentialRampToValueAtTime(f * 0.55, t + 0.4);
+        const bp = filter('bandpass', o === 'gut' ? 300 : 700, 2); bp.frequency.exponentialRampToValueAtTime(o === 'gut' ? 110 : 350, t + 0.5);
+        bp.connect(env(t + 0.03, 0.16, 0.04, 0.45, g)); noise(t + 0.03, 0.55, bp);
+    }
+    /** The pump's wave arrives at the front: a soft wet tap, brighter on the beat. */
+    function arrive(t, beat) {
+        const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.25);
+        const bp = filter('bandpass', beat ? 520 : 380, 3); bp.connect(env(t, beat ? 0.2 : 0.12, 0.003, 0.12, g)); noise(t, 0.14, bp);
+        const o = osc('sine', beat ? 110 : 85, t, t + 0.2, env(t, beat ? 0.2 : 0.12, 0.003, 0.15, g)); o.frequency.exponentialRampToValueAtTime(50, t + 0.16);
+    }
     /** necrosis: an edge dies back. A dull drop: a low thud that sinks and goes dry, no ring. */
     function necrosis(t) {
         const g = ctx.createGain(); g.connect(wordsOut); sendW(g, 0.15);
@@ -799,6 +827,9 @@ export function createDeepSound(audio, opts = {}) {
         case 'take': take(t); break;
         case 'pump': heart(t, Math.max(0.5, data && data.beat ? 1 : 0.6), 0.6, inp.blood, true); break;   // deep-grow2: a pump of the heart
         case 'necrosis': necrosis(t); break;
+        case 'ring': ringOpen(t); break;                                      // deep-organs
+        case 'organ': organ(t, data && data.organ); break;
+        case 'arrive': arrive(t, !!(data && data.beat)); break;
         case 'hands': handThrow(t); break;
         case 'knock': knock(t); break;
         case 'boom': boom(t); break;

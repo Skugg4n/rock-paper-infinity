@@ -30,9 +30,10 @@ import {
 import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js';
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
 import {
-    growOn, risen, riseReady, hungry, bodyPrice, buyBody, viewOf, graphOf, canAfford, takePrice, takeChamber, rise,
-    wouldStarve, bodySeen, bodyPays, toggleMark, dreamStart,
+    growOn, risen, riseReady, hungry, bodyPrice, buyBody, viewOf, graphOf, rise, bodySeen, bodyPays, toggleMark, dreamStart,
+    taking, takeOffer, startTake, bodyRatios, adviseGrow,
 } from './grow.js';
+import { neededOrgan } from './organs.js';
 
 /** "Affordable in N days": a player waits for the goal when N is under this, a minute of play. */
 export const SAVE_DAYS = 60;
@@ -134,30 +135,30 @@ export function press(state, a, view = null) {
 }
 
 /* ---- deep-grow: MOVEMENT III, the body, as a player who does what the panel says ---------------
-   Once The question is answered: every body item the drawer shows is bought when it can be paid (the
-   vats first while the body is hungry or a take would starve it); reachable chambers are taken while
-   they can be paid and the body would not starve for them (grow.js canAfford), the machine house
-   first, a dormitory next (it becomes a vat), then the cheapest; the lever is pulled the moment it
-   reads RISE. deep-grow2: when nothing can be taken, the player marks the next chambers the body
-   should reach and pulls DREAM; the heart is never pumped (the sim leaves it out). */
+   deep-organs: the player READS THE GAUGES. With no take in progress it grows the organ of the weakest
+   gauge (the tape's GROW A ...), in the chamber where that organ is cheap if there is one, else the
+   cheapest in reach; the machine house the moment it can be paid (the hands). With a take in progress
+   it pumps (the sim pumps at a human rate, PUMP_EVERY_S, on the beat half the time). Every body item the
+   drawer shows is bought when it can be paid (VATS first while the body is hungry). When the next take
+   is further off than the tape's DREAM, it marks the next chambers and dreams. RISE when it can. */
 /** A human clicks this many chambers a second at most. */
 export const TAKES_PER_SECOND = 1;
 /** Marks the player sets before a dream. */
 export const DREAM_MARKS = 6;
+/** A human pumps once every this many seconds, on the beat this share of the time. */
+export const PUMP_EVERY_S = 1.5;
+export const PUMP_ON_SHARE = 0.5;
 /**
  * @param {object} state
  * @param {object} layout
- * @returns {{kind:'rise'|'body'|'take'|'mark'|'dream', id?:string, ids?:string[]}[]} in the order pressed
+ * @returns {{kind:'rise'|'body'|'take'|'mark'|'dream', id?:string, organ?:string, ids?:string[]}[]} in the order pressed
  */
 export function decideGrow(state, layout) {
     if (!growOn(state) || risen(state) || state.grow.dreaming) return [];
     if (riseReady(state, layout).ready) return [{ kind: 'rise' }];
     const out = [];
-    const reach = viewOf(state, layout).reachable;
-    const blocked = reach.some((id) => wouldStarve(state, layout, id));
-    const canTake = reach.some((id) => canAfford(state, layout, id));
-    const short = hungry(state, layout) || blocked || !canTake;
-    const order = short ? ['vats', 'appetite', 'muscle', 'spread'] : ['spread', 'muscle', 'appetite', 'vats'];
+    const short = hungry(state, layout);
+    const order = short ? ['vats', 'appetite', 'muscle', 'spread'] : ['muscle', 'spread', 'appetite', 'vats'];
     const purse = { stars: state.stars || 0, ore: state.minerals || 0 };
     for (const id of order) {
         if (!bodySeen(state, id)) continue;
@@ -167,22 +168,46 @@ export function decideGrow(state, layout) {
         // one item a moment, as a hand in the drawer buys
         if (Number.isFinite(price) && purse[pay] >= price) { out.push({ kind: 'body', id }); purse[pay] -= price; break; }
     }
-    const graph = graphOf(layout);
-    const typeOf = (id) => graph.nodes.find((n) => n.id === id)?.type;
-    // the machine the moment it can be had (the hands), then a dormitory (a vat), then the cheapest
-    const rank = (id) => (id === 'machine' ? 0 : typeOf(id) === 'dorm' ? 1 : 2);
-    // deep-swap: with the machine house in reach, the player saves the people for it rather than
-    // spending them on cheaper chambers (in the strata row the dormitories come late)
-    const saving = reach.includes('machine') && !canAfford(state, layout, 'machine');
-    const picks = saving ? [] : reach
-        .filter((id) => canAfford(state, layout, id))
-        .sort((a, b) => (rank(a) - rank(b)) || (takePrice(state, layout, a).people - takePrice(state, layout, b).people));
-    if (picks.length) { out.push({ kind: 'take', id: picks[0] }); return out; }
+    if (taking(state)) return out;
+    const pick = pickTake(state, layout);
+    if (pick) { out.push({ kind: 'take', ...pick }); return out; }
     if (out.length) return out;
-    // nothing to take: mark where the body should go, and dream
-    out.push({ kind: 'mark', ids: nextMarks(state, layout, DREAM_MARKS) });
-    out.push({ kind: 'dream' });
+    // nothing to take: dream when the tape says so (the next take is far off), else wait and pump
+    if (adviseGrow(state, layout) === 'DREAM') {
+        out.push({ kind: 'mark', ids: nextMarks(state, layout, DREAM_MARKS) });
+        out.push({ kind: 'dream' });
+    }
     return out;
+}
+/** The take the gauges ask for: the weakest gauge's organ, where it is cheap; the machine first. */
+export function pickTake(state, layout) {
+    const reach = viewOf(state, layout).reachable;
+    if (reach.includes('machine')) {
+        const o = takeOffer(state, layout, 'machine');
+        if (o && o.organs[0].ok) return { id: 'machine', organ: 'hands' };
+        // saving for the hands: a cheap take in the meantime only while it leaves the price in hand
+    }
+    const R = bodyRatios(state, layout);
+    const want = neededOrgan(R.ratios);
+    let best = null;
+    for (const id of reach) {
+        if (id === 'machine') continue;
+        const o = takeOffer(state, layout, id);
+        if (!o) continue;
+        for (const r of o.organs) {
+            if (!r.ok) continue;
+            // the organ the gauges want, cheap where it can be; another organ only when it is cheap here
+            const score = (r.organ === want ? 0 : 2) + (r.cheap ? 0 : 1) + r.mass / 1e6;
+            if (r.organ !== want && !r.cheap) continue;
+            if (!best || score < best.score) best = { id, organ: r.organ, score };
+        }
+    }
+    if (reach.includes('machine') && best) {
+        const m = takeOffer(state, layout, 'machine').organs[0];
+        const after = state.grow.mass - (takeOffer(state, layout, best.id).organs.find((r) => r.organ === best.organ) || { mass: 0 }).mass;
+        if (after < m.mass * 0.5) return null;
+    }
+    return best ? { id: best.id, organ: best.organ } : null;
 }
 /** The chambers the body should reach next: the machine house once in reach, else the nearest. */
 export function nextMarks(state, layout, n = DREAM_MARKS) {
@@ -191,13 +216,13 @@ export function nextMarks(state, layout, n = DREAM_MARKS) {
     const reach = viewOf(state, layout).reachable;
     if (reach.includes('machine')) return ['machine'];
     const near = (id) => { const x = graph.nodes.find((m) => m.id === id); return x.floor * 100 + Math.abs(x.x) + Math.abs(x.z); };
-    return graph.nodes.filter((x) => !body.has(x.id) && x.id !== 'machine').map((x) => x.id).sort((a, b) => near(a) - near(b)).slice(0, n);
+    return graph.nodes.filter((x) => !body.has(x.id) && x.id !== 'machine' && x.kind !== 'hub').map((x) => x.id).sort((a, b) => near(a) - near(b)).slice(0, n);
 }
 /** Do what decideGrow chose. `starsPerDay`, `orePerDay` (the day's report) price the next level of an item. */
 export function pressGrow(state, layout, a, starsPerDay = 0, orePerDay = 0) {
     if (a.kind === 'rise') return rise(state, layout);
     if (a.kind === 'body') return !!buyBody(state, a.id, starsPerDay, orePerDay);
-    if (a.kind === 'take') return !!takeChamber(state, layout, a.id);
+    if (a.kind === 'take') return !!startTake(state, layout, a.id, a.organ);
     if (a.kind === 'mark') {
         for (const id of state.grow.marks.slice()) toggleMark(state, layout, id);
         for (const id of a.ids || []) toggleMark(state, layout, id);
