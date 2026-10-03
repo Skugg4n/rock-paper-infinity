@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>IV · GROW · the flesh (prototype)</title>
+<!-- deep-flesh: movement III of docs/superpowers/specs/2026-10-03-chapter-iv-rebuild.md, as a scene
+     prototype. It runs the REAL modules: src/phase4/growth.js (the rules), flesh.js (the material),
+     hands.js (the machine's hands), machine-model.js (the machine) and layout.js (where chambers
+     sit). The colony around them is rebuilt here in the look of scene.js (scene.js keeps its meshes
+     to itself, so it cannot be dressed in flesh from outside): same pitch, same slab, same two
+     colours, lanes and houses cut into the plates, white people on the lanes, the lid, the shaft, the
+     machine house on top and the crust over it.
+     Serve the repo root (python3 -m http.server 8127) and open /docs/mockups/deep-flesh-proto.html.
+     ?stage=1..4 jumps to the four stages the screenshots were taken at; ?plan=1 opens the plan. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+<style>
+:root { --rock: #0a0d12; --plate: #d5dbe3; --dim: #7b8595; --bone: #b8bab4; --pulse: #a8132c; }
+html, body { margin: 0; height: 100%; background: var(--rock); color: var(--plate); overflow: hidden; }
+body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+#view { position: fixed; inset: 0; }
+#view canvas { display: block; }
+.mark { position: fixed; left: 28px; top: 24px; font-size: 11px; letter-spacing: 0.32em; color: var(--dim); pointer-events: none; }
+.mark b { display: block; color: var(--bone); font-weight: 700; letter-spacing: 0.24em; font-size: 13px; margin-bottom: 4px; }
+.gauges { position: fixed; left: 28px; top: 78px; display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-size: 11px; letter-spacing: 0.2em; pointer-events: none; }
+.gauges span { color: var(--dim); }
+.gauges em { font-style: normal; color: var(--bone); text-align: right; min-width: 7ch; }
+.gauges em.low { color: #ff4a60; }
+.bar { position: fixed; left: 16px; right: 16px; bottom: 22px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.bar button {
+    font: inherit; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--plate); background: rgba(10, 13, 18, 0.82); border: 1px solid #2a313b; padding: 8px 11px; cursor: pointer; white-space: nowrap;
+}
+.bar button:hover { border-color: var(--bone); color: #fff; }
+.bar button.on { border-color: var(--pulse); color: #fff; }
+.bar button.sep { margin-left: 12px; }
+.hint { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); font-size: 11px; letter-spacing: 0.24em; color: var(--dim); pointer-events: none; transition: opacity 0.6s; }
+.planlbl { position: fixed; font-size: 10px; letter-spacing: 0.3em; color: var(--dim); pointer-events: none; display: none; }
+.divider { position: fixed; top: 0; bottom: 0; width: 1px; background: #1b2028; display: none; }
+.ver { position: fixed; right: 18px; bottom: 10px; font-size: 10px; color: #3a424d; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div class="mark"><b>IV · GROW</b>THE FLESH · PROTOTYPE</div>
+<div class="gauges">
+  <span>MASS</span><em id="g-mass">0</em>
+  <span>FEED</span><em id="g-feed">0</em>
+  <span>FLESH</span><em id="g-flesh">0</em>
+  <span>YEAR</span><em id="g-year">0</em>
+</div>
+<div class="hint" id="hint">click a glowing plate</div>
+<div class="divider" id="divider"></div>
+<div class="planlbl" id="lbl-f0">FLOOR 1</div>
+<div class="planlbl" id="lbl-f1">FLOOR 2</div>
+<div class="planlbl" id="lbl-m">THE MACHINE</div>
+<div class="bar">
+  <button id="b-take">take a reachable plate</button>
+  <button id="b-fill">fill the floor</button>
+  <button id="b-machine">reach the machine</button>
+  <button id="b-starve" class="sep">starve</button>
+  <button id="b-feed">feed</button>
+  <button id="b-plan" class="sep">plan view</button>
+  <button id="b-look">look at the machine</button>
+  <button id="b-reset">reset</button>
+</div>
+<div class="ver">deep-flesh 0.1</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as G from '../../src/phase4/growth.js';
+import {
+    fleshify, setNecrotic, setReachable, growTendrils, setTendrilsNecrotic, stepFlesh, makeWetEnvironment,
+    setFleshEnvironment, fleshShared, fleshStats, disposeFlesh,
+} from '../../src/phase4/flesh.js';
+import { createHands, findArmHeads } from '../../src/phase4/hands.js';
+import { createMachine } from '../../src/phase4/machine-model.js';
+
+/* ---------------------------------------------------------------- the colony's measures (scene.js) */
+const ROCK = 0x0a0d12, PLATE = 0xd5dbe3, LANE = 0x7b8595, CRUST = 0x353e4a, BONE = 0xa9aca6;
+const PITCH = 2.6, PLATE_W = 2.0, PLATE_H = 0.26, FLOOR_GAP = 3.2, SHAFT_R = 0.52;
+const R_ROOM = 0.55, R_HUB = 0.8, LANE_W = 0.14, WALK_Y = 0.17;
+const CRUST_Y = 4.4, CRUST_T = 0.34, CRUST_W = 4.6, SHAFT_UP_R = 0.34;
+const LID_TOP = PLATE_H / 2 + 0.24, MACH_Y = 1.75;
+const PLAN_FLOOR_DZ = 14.5;          // the plan lays floor 2 under floor 1
+const YEAR_SECONDS = 1.0;
+const PLAN_ENV = 0.22;           // the plan looks straight down into the lamp: less of it in the wet
+const THROWS = 0.55;
+
+/* two floors: twelve chambers on the first, seven on the second */
+const SLOTS = ['mine', 'farm', 'generator', 'dorm', 'mine', 'farm', 'generator', 'dorm', 'cryo', 'mine', 'generator', 'farm',
+    'mine', 'farm', 'dorm', 'generator', 'farm', 'mine', 'generator'];
+const graph = G.graphFromSlots(SLOTS);
+const node = new Map(graph.nodes.map((n) => [n.id, n]));
+const neighbours = new Map(graph.nodes.map((n) => [n.id, []]));
+for (const e of graph.edges) { neighbours.get(e.a).push({ to: e.b, kind: e.kind }); neighbours.get(e.b).push({ to: e.a, kind: e.kind }); }
+const edgeKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+/* ---------------------------------------------------------------- renderer, two scenes, two cameras */
+const host = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(ROCK, 1);
+host.appendChild(renderer.domElement);
+const env = makeWetEnvironment(renderer);
+setFleshEnvironment(env);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(ROCK);
+scene.add(new THREE.AmbientLight(0xffffff, 0.34));
+const lamp = new THREE.PointLight(0xffffff, 26, 0, 1.25);
+lamp.position.set(1.2, 8, 1.6);
+scene.add(lamp);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+controls.minDistance = 1.2;
+controls.maxDistance = 70;
+controls.minPolarAngle = 0.42;
+controls.maxPolarAngle = 1.33;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.3;
+controls.addEventListener('start', () => { controls.autoRotate = false; });
+const HOME = { tgt: new THREE.Vector3(0.6, -1.5, 0), dir: new THREE.Vector3(0.498, 0.485, 0.723).normalize(), dist: 20 };
+function home() {
+    camera.position.copy(HOME.tgt).addScaledVector(HOME.dir, HOME.dist);
+    controls.target.copy(HOME.tgt);
+    controls.update();
+}
+
+const plan = new THREE.Scene();
+plan.background = new THREE.Color(ROCK);
+plan.add(new THREE.AmbientLight(0xffffff, 1.5));
+// low and from the side: straight down, the wet would mirror the light over every plate
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(-8, 2.5, -5);
+plan.add(sun);
+const planCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+planCam.position.set(0, 30, PLAN_FLOOR_DZ / 2);
+planCam.up.set(0, 0, -1);
+planCam.lookAt(0, 0, PLAN_FLOOR_DZ / 2);
+let planOn = false;
+
+/* ---------------------------------------------------------------- the 3D colony */
+const plateMat = new THREE.MeshLambertMaterial({ color: PLATE });
+const laneMat = new THREE.MeshBasicMaterial({ color: LANE });
+const rockMat = new THREE.MeshLambertMaterial({ color: ROCK });
+const boneMat = new THREE.MeshPhysicalMaterial({ color: BONE, roughness: 0.36, clearcoat: 0.7, clearcoatRoughness: 0.25, envMap: env });
+const plateGeo = new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_W, 12, 3, 12);
+const bridgeGeo = new THREE.BoxGeometry(PITCH - PLATE_W + 0.04, PLATE_H, 0.84, 4, 3, 4);
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const world = new THREE.Group();
+scene.add(world);
+
+const floorY = (f) => -f * FLOOR_GAP;
+const at3 = (n) => new THREE.Vector3(n.x * PITCH, floorY(n.floor), n.z * PITCH);
+const v3 = {
+    plates: new Map(),     // id -> slab
+    cuts: new Map(),       // id -> lanes and houses on it
+    extras: new Map(),     // id -> what else turns with it (the lid's rim and bar)
+    bridges: new Map(),    // edge key -> slab
+    tendrils: new Map(),   // id -> tendril groups reaching into it
+};
+const pickables = [];
+
+function cut(list, cx, y, cz, w, d, mat = laneMat) {
+    const m = new THREE.Mesh(unitBox, mat);
+    m.scale.set(w, 0.02, d);
+    m.position.set(cx, y + PLATE_H / 2 + 0.012, cz);
+    world.add(m);
+    list.push(m);
+}
+function buildPlate(n) {
+    const p = at3(n);
+    const m = new THREE.Mesh(plateGeo, plateMat);
+    m.position.copy(p);
+    m.userData.id = n.id;
+    world.add(m);
+    v3.plates.set(n.id, m);
+    pickables.push(m);
+    const cuts = [];
+    const r = n.kind === 'hub' ? R_HUB : R_ROOM;
+    const span = 2 * r + LANE_W;
+    cut(cuts, p.x, p.y, p.z - r, span, LANE_W);
+    cut(cuts, p.x, p.y, p.z + r, span, LANE_W);
+    cut(cuts, p.x - r, p.y, p.z, LANE_W, span);
+    cut(cuts, p.x + r, p.y, p.z, LANE_W, span);
+    // lanes out over the bridges to every neighbour on the floor
+    for (const { to, kind } of neighbours.get(n.id)) {
+        if (kind !== 'bridge') continue;
+        const o = node.get(to);
+        const dx = o.x - n.x, dz = o.z - n.z;
+        const mid = (r + 1.0) / 2, len = 1.0 - r;
+        cut(cuts, p.x + dx * mid, p.y, p.z + dz * mid, dx ? len : LANE_W, dx ? LANE_W : len);
+    }
+    if (n.kind === 'room') {
+        const rnd = rng(n.id.length * 977 + n.x * 131 + n.z * 71 + n.floor * 13 + 5);
+        // a side street, and houses along the ring, never on it
+        const s = Math.floor(rnd() * 4), sgn = rnd() < 0.5 ? -1 : 1;
+        const t = (0.25 + rnd() * 0.5) * sgn * r;
+        if (s % 2) cut(cuts, p.x + t, p.y, p.z + (s === 1 ? 1 : -1) * (r + 0.18), 0.1, 0.36);
+        else cut(cuts, p.x + (s === 0 ? 1 : -1) * (r + 0.18), p.y, p.z + t, 0.36, 0.1);
+        const nh = 4 + Math.floor(rnd() * 4);
+        for (let i = 0; i < nh; i++) {
+            const side = Math.floor(rnd() * 4), u = (rnd() - 0.5) * 1.6 * r;
+            const w = 0.14 + rnd() * 0.28, d = 0.13 + rnd() * 0.12;
+            const out = rnd() < 0.6 ? 1 : -1;
+            const off = r + out * (LANE_W / 2 + 0.08 + d / 2);
+            const hx = side % 2 ? (side === 1 ? off : -off) : u;
+            const hz = side % 2 ? u : (side === 0 ? -off : off);
+            const hw = side % 2 ? d : w, hd = side % 2 ? w : d;
+            if (Math.abs(hx) + hw / 2 > 0.95 || Math.abs(hz) + hd / 2 > 0.95) continue;
+            cut(cuts, p.x + hx, p.y, p.z + hz, hw, hd, rockMat);
+        }
+    }
+    v3.cuts.set(n.id, cuts);
+    if (n.id === G.HEART) {
+        // the hatch from chapter III: a rim in plate, a well of rock, the bar laid across
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.18, 40, 2), plateMat);
+        rim.position.set(0, PLATE_H / 2 + 0.04, 0);
+        const well = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.2, 40), rockMat);
+        well.position.set(0, PLATE_H / 2 + 0.02, 0);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.14, 0.24, 8, 1, 2), plateMat);
+        bar.position.set(0, PLATE_H / 2 + 0.14, 0);
+        world.add(rim, well, bar);
+        v3.extras.set(n.id, [rim, bar]);
+    }
+}
+for (const n of graph.nodes) if (n.floor >= 0) buildPlate(n);
+for (const e of graph.edges) {
+    if (e.kind !== 'bridge') continue;
+    const a = node.get(e.a), b = node.get(e.b);
+    const m = new THREE.Mesh(bridgeGeo, plateMat);
+    m.position.set((a.x + b.x) / 2 * PITCH, floorY(a.floor), (a.z + b.z) / 2 * PITCH);
+    if (a.z !== b.z) m.rotation.y = Math.PI / 2;
+    world.add(m);
+    v3.bridges.set(edgeKey(e.a, e.b), m);
+    const l = new THREE.Mesh(unitBox, laneMat);
+    l.scale.set(a.z !== b.z ? LANE_W : PITCH - PLATE_W + 0.04, 0.02, a.z !== b.z ? PITCH - PLATE_W + 0.04 : LANE_W);
+    l.position.set(m.position.x, m.position.y + PLATE_H / 2 + 0.012, m.position.z);
+    world.add(l);
+    m.userData.lane = l;
+}
+// the shaft: plate colour, from the deepest landing up under the lid
+const deepest = Math.max(...graph.nodes.map((n) => n.floor));
+const shaftH = deepest * FLOOR_GAP - 0.05;
+const shaft = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_R, SHAFT_R, shaftH, 40, 16), plateMat);
+shaft.position.set(0, -shaftH / 2 - 0.05, 0);
+world.add(shaft);
+// the neck, the machine house, the crust
+const neckH = MACH_Y - PLATE_H / 2 - LID_TOP + 0.04;
+const neck = new THREE.Mesh(new THREE.CylinderGeometry(SHAFT_UP_R, SHAFT_UP_R, neckH, 32, 6), plateMat);
+neck.position.set(0, LID_TOP - 0.02 + neckH / 2, 0);
+world.add(neck);
+const machine = createMachine({ below: PLATE_H / 2 - MACH_Y });
+machine.group.position.set(0, MACH_Y, 0);
+world.add(machine.group);
+machine.setTempo({ throws: THROWS, drive: 0.6, quiet: 1 });
+machine.plate.userData.id = G.MACHINE;
+pickables.push(machine.plate);
+v3.plates.set(G.MACHINE, machine.plate);
+const crust = new THREE.Mesh(new THREE.BoxGeometry(CRUST_W, CRUST_T, CRUST_W), new THREE.MeshLambertMaterial({ color: CRUST }));
+crust.position.set(0, CRUST_Y + CRUST_T / 2, 0);
+world.add(crust);
+
+/* ---------------------------------------------------------------- the plan: plain slabs from above */
+const planOf = (n) => (n.kind === 'machine'
+    ? new THREE.Vector3(-2 * PITCH, 0, -2 * PITCH)
+    : new THREE.Vector3(n.x * PITCH, 0, n.z * PITCH + n.floor * PLAN_FLOOR_DZ));
+const quadGeo = new THREE.PlaneGeometry(PLATE_W, PLATE_W).rotateX(-Math.PI / 2);
+const planPlateMat = new THREE.MeshLambertMaterial({ color: PLATE });
+const p2 = { plates: new Map(), bridges: new Map() };
+const planPick = [];
+for (const n of graph.nodes) {
+    const m = new THREE.Mesh(quadGeo, planPlateMat);
+    m.position.copy(planOf(n));
+    m.userData.id = n.id;
+    plan.add(m);
+    p2.plates.set(n.id, m);
+    planPick.push(m);
+    if (n.kind === 'hub' || n.kind === 'machine') {
+        const d = new THREE.Mesh(new THREE.CircleGeometry(n.kind === 'hub' ? 0.47 : 0.3, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: ROCK }));
+        d.position.copy(m.position).setY(0.01);
+        plan.add(d);
+    }
+}
+for (const e of graph.edges) {
+    if (e.kind !== 'bridge') continue;
+    const a = planOf(node.get(e.a)), b = planOf(node.get(e.b));
+    const horiz = Math.abs(a.x - b.x) > 0.1;
+    const g = new THREE.PlaneGeometry(horiz ? PITCH - PLATE_W + 0.02 : 0.84, horiz ? 0.84 : PITCH - PLATE_W + 0.02).rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, planPlateMat);
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    plan.add(m);
+    p2.bridges.set(edgeKey(e.a, e.b), m);
+}
+
+/* ---------------------------------------------------------------- the people: white dots on the lanes */
+const MAX_DOTS = 180;
+const dotPos = new Float32Array(MAX_DOTS * 3);
+const dotGeo = new THREE.BufferGeometry();
+dotGeo.setAttribute('position', new THREE.BufferAttribute(dotPos, 3));
+const dotsMesh = new THREE.Points(dotGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.085 }));
+dotsMesh.frustumCulled = false;
+scene.add(dotsMesh);
+let dots = [];
+function seedDots() {
+    dots = [];
+    const r = rng(7);
+    for (const n of graph.nodes) {
+        if (n.kind !== 'room') continue;
+        const k = n.type === 'dorm' ? 9 : 6;
+        for (let i = 0; i < k && dots.length < MAX_DOTS; i++) {
+            dots.push({ id: n.id, c: at3(n), t: r() * 4, speed: (0.12 + r() * 0.12) * (r() < 0.5 ? -1 : 1), state: 'walk', k: 0, from: new THREE.Vector3() });
+        }
+    }
+}
+function ringPoint(t, rad, out) {
+    const s = Math.floor(((t % 4) + 4) % 4), u = (((t % 1) + 1) % 1) * 2 - 1;
+    if (s === 0) out.set(u * rad, 0, -rad);
+    else if (s === 1) out.set(rad, 0, u * rad);
+    else if (s === 2) out.set(-u * rad, 0, rad);
+    else out.set(-rad, 0, -u * rad);
+    return out;
+}
+const tmpV = new THREE.Vector3();
+function stepDots(dt) {
+    for (let i = 0; i < dots.length; i++) {
+        const d = dots[i];
+        if (d.state === 'gone') { dotPos[i * 3 + 1] = -999; continue; }
+        if (d.state === 'walk') {
+            d.t += d.speed * dt;
+            ringPoint(d.t, R_ROOM, tmpV).add(d.c);
+        } else {
+            d.k = Math.min(1, d.k + dt / 1.6);
+            tmpV.lerpVectors(d.from, d.c, d.k * d.k);
+            if (d.k >= 1) d.state = 'gone';
+        }
+        dotPos[i * 3] = tmpV.x; dotPos[i * 3 + 1] = tmpV.y + WALK_Y; dotPos[i * 3 + 2] = tmpV.z;
+    }
+    dotGeo.setDrawRange(0, dots.length);
+    dotGeo.attributes.position.needsUpdate = true;
+}
+function swallowPeople(id) {
+    for (const d of dots) {
+        if (d.id !== id || d.state !== 'walk') continue;
+        ringPoint(d.t, R_ROOM, d.from).add(d.c);
+        d.state = 'enter'; d.k = 0;
+    }
+}
+
+/* ---------------------------------------------------------------- the clock and the queue of things to come */
+let simTime = 0;
+let queue = [];
+function later(sec, fn) { queue.push({ at: simTime + sec, fn }); }
+
+/* ---------------------------------------------------------------- the body, drawn */
+let state = G.createGrowth(graph);
+let people = 520;
+let famine = false;
+let year = 0;
+let hover = null;
+let hands = null;
+
+/** The point on `id`'s slab edge that faces `from` (world), at the top of the slab. */
+function edgePoint(id, from, planView = false) {
+    const n = node.get(id), f = node.get(from);
+    const c = planView ? planOf(n) : at3(n);
+    const top = planView ? 0 : PLATE_H / 2;
+    if (!f || f.floor !== n.floor || n.kind === 'machine') return c.clone().setY(c.y + top);
+    return c.clone().add(new THREE.Vector3(f.x - n.x, 0, f.z - n.z).multiplyScalar(PLATE_W / 2)).setY(c.y + top);
+}
+function midPoint(a, b, planView = false) {
+    const pa = planView ? planOf(node.get(a)) : at3(node.get(a));
+    const pb = planView ? planOf(node.get(b)) : at3(node.get(b));
+    return pa.add(pb).multiplyScalar(0.5).setY(planView ? 0 : pa.y + PLATE_H / 2);
+}
+
+function turnHeart() {
+    const from = new THREE.Vector3(0, PLATE_H / 2 + 0.1, 0);
+    fleshify(v3.plates.get(G.HEART), { from, duration: 2.6, swallow: v3.cuts.get(G.HEART), bulge: 0.05, seed: 3 });
+    for (const m of v3.extras.get(G.HEART)) fleshify(m, { from, duration: 2.2, bulge: 0, breathe: false, seed: 4 });
+    fleshify(p2.plates.get(G.HEART), { from: new THREE.Vector3(0, 0, 0), duration: 2.6, breathe: false, envMapIntensity: PLAN_ENV, seed: 3 });
+}
+
+/** The body takes `id`: the slab turns from the edge it grows in from, tendrils reach across. */
+function takeNode(id) {
+    const reach = G.reachableFrom(graph, state);
+    const from = reach.get(id);
+    const next = G.take(graph, state, id);
+    if (next === state) return false;
+    state = next;
+    const n = node.get(id);
+    setReachable(v3.plates.get(id), 0);
+    setReachable(p2.plates.get(id), 0);
+    if (n.kind === 'machine') {
+        fleshify(neck, { from: new THREE.Vector3(0, LID_TOP, 0), duration: 1.8, breathe: false, seed: 9 });
+        later(1.2, () => fleshify(machine.plate, { from: new THREE.Vector3(0.0, MACH_Y - PLATE_H / 2, 0), duration: 2.4, bulge: 0.04, breathe: false, seed: 10 }));
+        later(1.0, () => {
+            hands = createHands({ envMap: env });
+            hands.attach(findArmHeads(machine.group));
+            hands.overgrow();
+        });
+        fleshify(p2.plates.get(id), { from: planOf(n), duration: 2.4, breathe: false, envMapIntensity: PLAN_ENV, seed: 10 });
+    } else if (n.kind === 'hub' && from && node.get(from).floor !== n.floor) {
+        // the spine: the shaft turns from the top down, vertebra by vertebra, then the landing below
+        fleshify(shaft, { from: new THREE.Vector3(0, -0.05, 0), duration: 3.4, breathe: false, seed: 12 });
+        growVertebrae(n.floor);
+        later(2.8, () => fleshify(v3.plates.get(id), { from: at3(n).setY(floorY(n.floor) + PLATE_H / 2), duration: 2.4, swallow: v3.cuts.get(id), bulge: 0.05, seed: 13 }));
+        fleshify(p2.plates.get(id), { from: planOf(n), duration: 2.4, breathe: false, envMapIntensity: PLAN_ENV, seed: 13 });
+    } else {
+        const seed = 20 + (G.slotOf(id) + 1) * 7;
+        fleshify(v3.plates.get(id), { from: edgePoint(id, from), duration: 2.1, swallow: v3.cuts.get(id), bulge: 0.06, seed });
+        fleshify(p2.plates.get(id), { from: edgePoint(id, from, true), duration: 2.1, breathe: false, envMapIntensity: PLAN_ENV, seed });
+        swallowPeople(id);
+        // every bridge to the body turns, the one it grew over first, with sinew across it
+        for (const { to, kind } of neighbours.get(id)) {
+            if (kind !== 'bridge' || !G.isBody(state, to)) continue;
+            const k = edgeKey(id, to);
+            const first = to === from;
+            const o3 = first ? edgePoint(to, id) : midPoint(id, to);
+            const o2 = first ? edgePoint(to, id, true) : midPoint(id, to, true);
+            const b3 = v3.bridges.get(k);
+            fleshify(b3, { from: o3, duration: first ? 0.9 : 1.6, swallow: [b3.userData.lane], bulge: 0.04, seed: seed + 1 });
+            fleshify(p2.bridges.get(k), { from: o2, duration: first ? 0.9 : 1.6, breathe: false, envMapIntensity: PLAN_ENV, seed: seed + 1 });
+            const grp = growTendrils(v3.plates.get(to), v3.plates.get(id), { count: first ? 4 : 2, duration: first ? 1.4 : 2.0, parent: world, seed: seed * 13 + G.slotOf(to) });
+            if (!v3.tendrils.has(id)) v3.tendrils.set(id, []);
+            v3.tendrils.get(id).push(grp);
+        }
+    }
+    refreshHints();
+    return true;
+}
+
+function growVertebrae(floor) {
+    const top = floorY(floor - 1) - PLATE_H / 2 - 0.05, bottom = floorY(floor) + PLATE_H / 2;
+    const r = rng(floor * 31);
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+        const y = top - (i + 0.5) * (top - bottom) / n;
+        const g = new THREE.TorusGeometry(SHAFT_R + 0.02, 0.055 + r() * 0.02, 8, 36);
+        g.rotateX(Math.PI / 2);
+        const m = new THREE.Mesh(g, boneMat);
+        m.position.set((r() - 0.5) * 0.03, y, (r() - 0.5) * 0.03);
+        m.rotation.set((r() - 0.5) * 0.12, r() * 6, (r() - 0.5) * 0.12);
+        m.scale.set(0.001, 0.001, 0.001);
+        world.add(m);
+        later(0.3 + i * 0.32, () => { m.userData.grow = 0; growing.push(m); });
+    }
+}
+const growing = [];
+function stepGrowing(dt) {
+    for (let i = growing.length - 1; i >= 0; i--) {
+        const m = growing[i];
+        m.userData.grow = Math.min(1, m.userData.grow + dt / 0.6);
+        const k = m.userData.grow, e = 1 - Math.pow(1 - k, 3);
+        m.scale.set(e, 0.7 * e, e);
+        if (k >= 1) growing.splice(i, 1);
+    }
+}
+
+function refreshHints() {
+    const reach = G.reachableFrom(graph, state);
+    for (const n of graph.nodes) {
+        const m3 = v3.plates.get(n.id), m2 = p2.plates.get(n.id);
+        if (reach.has(n.id)) {
+            const level = hover === n.id ? 1.5 : 0.9;
+            const from = reach.get(n.id);
+            if (m3) setReachable(m3, level, { from: edgePoint(n.id, from) });
+            setReachable(m2, level, { from: edgePoint(n.id, from, true), breathe: false, envMapIntensity: PLAN_ENV });
+        } else {
+            if (m3) setReachable(m3, 0);
+            setReachable(m2, 0);
+        }
+    }
+    document.getElementById('hint').style.opacity = reach.size ? 1 : 0;
+}
+
+function applyYear(r) {
+    for (const id of r.died) markNecrotic(id, true);
+    for (const id of r.revived) markNecrotic(id, false);
+}
+function markNecrotic(id, on) {
+    const m3 = v3.plates.get(id);
+    if (m3) setNecrotic(m3, on);
+    setNecrotic(p2.plates.get(id), on);
+    for (const g of v3.tendrils.get(id) || []) setTendrilsNecrotic(g, on);
+    for (const { to, kind } of neighbours.get(id)) {
+        if (kind !== 'bridge' || !G.isBody(state, to)) continue;
+        const dead = on || G.isNecrotic(state, to);
+        setNecrotic(v3.bridges.get(edgeKey(id, to)), dead);
+        setNecrotic(p2.bridges.get(edgeKey(id, to)), dead);
+    }
+}
+
+function yearTick() {
+    year++;
+    const levels = famine ? { dorm: -1 / G.VAT_PER_LEVEL } : {};
+    const r = G.tick(graph, state, famine ? 0 : people, { levels });
+    state = r.state;
+    people = famine ? 0 : r.people;
+    applyYear(r);
+    if (r.died.length || r.revived.length) refreshHints();
+}
+
+/* ---------------------------------------------------------------- the buttons */
+const onFloor = (f) => graph.nodes.filter((n) => n.floor === f);
+function frontFloor() { return G.front(graph, state).floor; }
+function takeOne() {
+    const reach = [...G.reachableFrom(graph, state).keys()];
+    if (!reach.length) return false;
+    const f = frontFloor();
+    const same = reach.filter((id) => node.get(id).floor === f);
+    const pick = (same.length ? same : reach.filter((id) => id !== G.MACHINE)).concat(reach)[0];
+    return takeNode(pick);
+}
+function fillFloor(then) {
+    const f = frontFloor();
+    const step = () => {
+        const reach = [...G.reachableFrom(graph, state).keys()].filter((id) => node.get(id).floor === f);
+        if (reach.length) { takeNode(reach[0]); later(0.32, step); return; }
+        const down = G.hubId(f + 1);
+        if (!then && G.reachable(graph, state).includes(down)) takeNode(down);
+        if (then) then();
+    };
+    step();
+}
+function reachMachine() {
+    if (G.isBody(state, G.MACHINE)) return;
+    const go = () => { if (G.reachable(graph, state).includes(G.MACHINE)) takeNode(G.MACHINE); };
+    if (G.floorFull(graph, state, 0)) go(); else fillFloor(go);
+}
+let looking = false;
+function lookAtMachine(on = !looking) {
+    looking = on;
+    controls.autoRotate = false;
+    if (on) {
+        controls.target.set(0, MACH_Y + 0.7, 0);
+        camera.position.set(1.55, MACH_Y + 1.35, 1.95);
+    } else home();
+    controls.update();
+    document.getElementById('b-look').classList.toggle('on', on);
+}
+function setPlan(on) {
+    planOn = on;
+    document.getElementById('b-plan').classList.toggle('on', on);
+    resize();
+}
+document.getElementById('b-take').onclick = () => takeOne();
+document.getElementById('b-fill').onclick = () => fillFloor();
+document.getElementById('b-machine').onclick = () => reachMachine();
+document.getElementById('b-starve').onclick = () => { famine = true; people = 0; yearsOn = true; mark(); };
+document.getElementById('b-feed').onclick = () => { famine = false; people += 900; yearsOn = true; mark(); };
+document.getElementById('b-plan').onclick = () => setPlan(!planOn);
+document.getElementById('b-look').onclick = () => lookAtMachine();
+document.getElementById('b-reset').onclick = () => { location.search = planOn ? '?plan=1' : ''; };
+function mark() {
+    document.getElementById('b-starve').classList.toggle('on', famine);
+}
+
+/* ---------------------------------------------------------------- pointer: hover glows more, click takes */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function pickAt(ev) {
+    const W = window.innerWidth, H = window.innerHeight;
+    const split = planOn ? W / 2 : W;
+    if (ev.clientX < split) {
+        ndc.set(ev.clientX / split * 2 - 1, -(ev.clientY / H) * 2 + 1);
+        ray.setFromCamera(ndc, camera);
+        const hit = ray.intersectObjects(pickables, false)[0];
+        return hit ? hit.object.userData.id : null;
+    }
+    ndc.set((ev.clientX - split) / (W - split) * 2 - 1, -(ev.clientY / H) * 2 + 1);
+    ray.setFromCamera(ndc, planCam);
+    const hit = ray.intersectObjects(planPick, false)[0];
+    return hit ? hit.object.userData.id : null;
+}
+renderer.domElement.addEventListener('pointermove', (ev) => {
+    const id = pickAt(ev);
+    const h = id && G.reachable(graph, state).includes(id) ? id : null;
+    renderer.domElement.style.cursor = h ? 'pointer' : '';
+    if (h !== hover) { hover = h; refreshHints(); }
+});
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', (ev) => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', (ev) => {
+    if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
+    const id = pickAt(ev);
+    if (id && G.reachable(graph, state).includes(id)) takeNode(id);
+});
+
+/* ---------------------------------------------------------------- the frame */
+function resize() {
+    const W = window.innerWidth, H = window.innerHeight;
+    renderer.setSize(W, H);
+    const w3 = planOn ? W / 2 : W;
+    camera.aspect = w3 / H;
+    camera.updateProjectionMatrix();
+    // the plan: both floors and the machine, fitted
+    const wp = W - w3 || 1;
+    const minX = -2 * PITCH - 1.6, maxX = 2 * PITCH + 1.6, minZ = -2 * PITCH - 2.4, maxZ = 2 * PITCH + 1.6 + PLAN_FLOOR_DZ;
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+    let hw = (maxX - minX) / 2, hh = (maxZ - minZ) / 2;
+    if (hw / hh < wp / H) hw = hh * wp / H; else hh = hw * H / wp;
+    planCam.left = -hw; planCam.right = hw; planCam.top = hh; planCam.bottom = -hh;
+    planCam.position.set(cx, 30, cz);
+    planCam.lookAt(cx, 0, cz);
+    planCam.updateProjectionMatrix();
+    const div = document.getElementById('divider');
+    div.style.display = planOn ? 'block' : 'none';
+    div.style.left = `${w3}px`;
+    const label = (el, x, z) => {
+        el.style.display = planOn ? 'block' : 'none';
+        const v = new THREE.Vector3(x, 0, z).project(planCam);
+        el.style.left = `${w3 + (v.x + 1) / 2 * wp}px`;
+        el.style.top = `${(1 - v.y) / 2 * H}px`;
+    };
+    label(document.getElementById('lbl-f0'), 0.6 * PITCH, -2 * PITCH - 1.7);
+    label(document.getElementById('lbl-f1'), 0.6 * PITCH, -2 * PITCH - 1.7 + PLAN_FLOOR_DZ);
+    label(document.getElementById('lbl-m'), -2 * PITCH - 1.0, -2 * PITCH - 1.7);
+}
+window.addEventListener('resize', resize);
+
+let yearClock = 0;
+let yearsOn = true;
+function advance(dt) {
+    simTime += dt;
+    for (let i = 0; i < queue.length; i++) {
+        if (queue[i].at <= simTime) { const q = queue[i]; queue.splice(i, 1); i--; q.fn(); }
+    }
+    yearClock += dt;
+    while (yearsOn && yearClock >= YEAR_SECONDS) { yearClock -= YEAR_SECONDS; yearTick(); }
+    if (!yearsOn) yearClock = 0;
+    stepFlesh(dt);
+    stepDots(dt);
+    stepGrowing(dt);
+    machine.step(dt);
+    if (hands) hands.step(dt, THROWS);
+}
+function draw() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const w3 = planOn ? Math.floor(W / 2) : W;
+    renderer.setScissorTest(true);
+    renderer.setViewport(0, 0, w3, H);
+    renderer.setScissor(0, 0, w3, H);
+    renderer.render(scene, camera);
+    if (planOn) {
+        renderer.setViewport(w3, 0, W - w3, H);
+        renderer.setScissor(w3, 0, W - w3, H);
+        renderer.render(plan, planCam);
+    }
+    renderer.setScissorTest(false);
+}
+function gauges() {
+    document.getElementById('g-mass').textContent = G.mass(graph, state).toFixed(1);
+    const feed = document.getElementById('g-feed');
+    feed.textContent = Math.round(people);
+    feed.classList.toggle('low', people < 1);
+    const alive = state.body.length - state.necrotic.length;
+    document.getElementById('g-flesh').textContent = `${alive}/${graph.nodes.length}`;
+    document.getElementById('g-year').textContent = year;
+}
+let last = performance.now();
+let paused = false;
+function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!paused) advance(dt);
+    controls.update();
+    draw();
+    gauges();
+    requestAnimationFrame(frame);
+}
+
+/* ---------------------------------------------------------------- the stages of the screenshots */
+function settle(seconds) {
+    for (let t = 0; t < seconds; t += 1 / 30) advance(1 / 30);
+}
+function stage(n) {
+    yearClock = -1e9;               // no years pass while a stage is set up
+    if (n >= 2) { for (const id of ['s0', 's1', 's5', 's6']) { takeNode(id); settle(0.4); } settle(2.5); }
+    if (n === 3) {
+        for (const id of ['s2', 's7', 's3', 's9']) { takeNode(id); settle(0.4); }
+        settle(2.5);
+        famine = true; people = 0; mark();
+        for (let i = 0; i < 3; i++) { yearTick(); settle(0.25); }
+        settle(2);
+        yearsOn = false;
+    }
+    if (n === 4) {
+        let guard = 0;
+        while (!G.floorFull(graph, state, 0) && guard++ < 40) {
+            const r = [...G.reachableFrom(graph, state).keys()].filter((id) => node.get(id).floor === 0);
+            if (!r.length) break;
+            takeNode(r[0]);
+            settle(0.2);
+        }
+        settle(2.5);
+        takeNode(G.MACHINE);
+        settle(6);
+        lookAtMachine(true);
+    }
+    yearClock = 0;
+}
+
+/* ---------------------------------------------------------------- go */
+seedDots();
+resize();
+home();
+turnHeart();
+refreshHints();
+const q = new URLSearchParams(location.search);
+if (q.get('plan') === '1') setPlan(true);
+const st = Number(q.get('stage') || 0);
+if (st) {
+    controls.autoRotate = false;
+    settle(3);
+    if (st > 1) stage(st);
+    if (q.get('freeze') === '1') { paused = true; yearClock = 0; }
+}
+if (q.get('cam')) {
+    const c = q.get('cam').split(',').map(Number);
+    controls.autoRotate = false;
+    camera.position.set(c[0], c[1], c[2]);
+    controls.target.set(c[3], c[4], c[5]);
+    controls.update();
+}
+window.__flesh = {
+    get state() { return state; }, get people() { return people; }, stats: () => ({ ...fleshStats(), hands: hands?.stats || null, year }),
+    stage, settle, takeNode, fleshShared, dispose: disposeFlesh,
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
