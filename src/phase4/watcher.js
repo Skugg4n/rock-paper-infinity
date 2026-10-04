@@ -330,14 +330,29 @@ export function snapWait(w, now) {
  * @param {object} w - mutated
  * @param {number} now - wall clock, ms
  * @param {number} [tier] - the cryo tier the colony sleeps at (the snap scales with its drift)
- * @returns {number} the stability gained: snapGain(w, tier), or 0 inside the cooldown
+ * @returns {number} the stability gained: snapGain(w, tier), less inside the cooldown (snapShare)
  */
 export function snap(w, now, tier = 0) {
-    if (now - (w.lastSnapAt || 0) < SNAP_COOLDOWN_MS && now >= (w.lastSnapAt || 0)) return 0;
+    const share = snapShare(w, now);
     w.lastSnapAt = now;
     const before = w.stability;
-    w.stability = Math.min(STABILITY_MAX, w.stability + snapGain(w, tier));
+    w.stability = Math.min(STABILITY_MAX, w.stability + snapGain(w, tier) * share);
     return w.stability - before;
+}
+/**
+ * deep-pass4 (B415): EVERY CLICK COUNTS. The human pass: "eight quick clicks did nothing, one per four
+ * seconds works". Now a click inside the cooldown is not swallowed: it gives the share of a snap the
+ * time since the last one has charged, (elapsed / SNAP_COOLDOWN_MS) ^ SNAP_CURVE, never under
+ * SNAP_MIN_SHARE. A quick rhythm steadies the mind faster than a slow one, with diminishing returns: a
+ * click a second gives about 0.38 of a snap (1.5 snaps in four seconds), a click every 0.4 s 0.2.
+ */
+export const SNAP_MIN_SHARE = 0.2;
+export const SNAP_CURVE = 0.7;
+export function snapShare(w, now) {
+    const last = (w && w.lastSnapAt) || 0;
+    if (!last || now < last) return 1;
+    const k = (now - last) / SNAP_COOLDOWN_MS;
+    return k >= 1 ? 1 : Math.max(SNAP_MIN_SHARE, Math.pow(k, SNAP_CURVE));
 }
 
 /** How soft the base is, 0 (rigid) to 1 (as soft as it gets), from the stability.

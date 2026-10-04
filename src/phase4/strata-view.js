@@ -98,6 +98,9 @@ const MAX_DEBRIS = 220;
 const PERSON_H = 0.26;
 const LIGHT_SECONDS = 1.2;         // the colony goes dark (or lit) over this when they sleep (wake)
 const CLICK_PX = 6;
+/** deep-pass4 (B417): the ruler's YEAR labels: at least this far apart on the screen, at most this many. */
+const LABEL_GAP_PX = 30;
+const LABELS_SHOWN = 3;
 
 /* the atlas: every chamber look, drawn once at start (2 px per mockup px) */
 const TILE_W = 200, TILE_H = 160;          // a chamber tile, in atlas px
@@ -153,6 +156,7 @@ uniform float uTime;
 uniform float uDawn;
 uniform float uRiseY;
 uniform float uRise;
+uniform float uQuake;
 uniform float uSleep;
 uniform float uPx;
 uniform vec3 uTone[8];
@@ -263,6 +267,15 @@ void main() {
         float a = atan(d.y, d.x);
         float cr = sline(fract(a * 2.6 + sn(vW * 1.4) * 0.35) - 0.5, 0.03 + r * 0.004);
         col = mix(col, vec3(0.0), cr * uRise * (1.0 - smoothstep(0.4, 2.2, r)) * step(0.0, d.y + 0.6) * 0.7);
+    }
+    if (uQuake > 0.0) {
+        // deep-pass4 (B410): the finale: cracks run up from the crust over the colony, further with every room
+        vec2 d = vW - vec2(0.0, -0.3);
+        float r = length(d);
+        float a = atan(d.y, d.x);
+        float cr = sline(fract(a * 3.3 + sn(vW * 0.9) * 0.5) - 0.5, 0.018 + r * 0.003);
+        float reach = 1.2 + 7.5 * uQuake;
+        col = mix(col, vec3(0.0), cr * (1.0 - smoothstep(reach * 0.55, reach, r)) * step(0.0, d.y) * 0.9);
     }
     gl_FragColor = vec4(col, 1.0);
     #include <colorspace_fragment>
@@ -712,7 +725,7 @@ export function createStrataView(container, opts = {}) {
     const tones = ['#2f3743', '#262d37', '#343c48', '#2a313b', '#3a4350', '#2c333e', '#363e4a', '#29303a'].map((c) => new THREE.Color(c));
     const backU = {
         uB: { value: new Float32Array(S.MAX_LAYERS) }, uN: { value: 0 }, uTime: time, uDawn: { value: 0 },
-        uRiseY: { value: 0 }, uRise: { value: 0 }, uSleep: { value: 0 }, uPx: { value: 1 / 46 }, uTone: { value: tones },
+        uRiseY: { value: 0 }, uRise: { value: 0 }, uQuake: { value: 0 }, uSleep: { value: 0 }, uPx: { value: 1 / 46 }, uTone: { value: tones },
     };
     const quad = new THREE.PlaneGeometry(1, 1);
     const backMat = new THREE.ShaderMaterial({ uniforms: backU, vertexShader: BACK_VERT, fragmentShader: BACK_FRAG, depthWrite: true });
@@ -1034,6 +1047,7 @@ export function createStrataView(container, opts = {}) {
     let focusZoom = 0, focusUntil = 0;     // a short look closer (focusMachine), then back to the fit
     let focusY = S.floorLine(0);
     let shake = 0;
+    let quakeK = 0;                    // deep-pass4: the finale's cracks over the colony (quake)
     const viewH = () => H / ppu;
     function deepestLine() { return S.floorLine(Math.max(0, floors - 1)); }
     function home() { return lastState && lastState.asleep && !rising ? S.sleepHomeY(viewH(), ppu) : S.homeY(viewH(), floors); }
@@ -1424,7 +1438,7 @@ export function createStrataView(container, opts = {}) {
     // deep-swap: the HUD on the right (what we hold, the buttons and the lever): no year label under it
     let avoidRects = [], avoidClock = 0;
     function underHud(sy) {
-        for (const r of avoidRects) if (sy > r.top - 10 && sy < r.bottom + 10) return true;
+        for (const r of avoidRects) if (sy > r.top - 12 && sy < r.bottom + 18) return true;   // deep-pass4: a label never just under a counter
         return false;
     }
     let labelYear = -1;
@@ -1435,7 +1449,7 @@ export function createStrataView(container, opts = {}) {
         const yearNow = Math.floor(Math.max(0, (lastState && lastState.day) || 0) / 365);
         if (yearNow !== labelYear) { labelYear = yearNow; labelsDirty = true; }
         if (labelsDirty && labelClock <= 0) {
-            labels = S.strataLabels(layers, Math.max(0.4, 22 / ppu));
+            labels = S.strataLabels(layers, Math.max(0.4, LABEL_GAP_PX / ppu));
             labelClock = 0.1;
             labelsDirty = false;
             for (let i = 0; i < labelEls.length; i++) {
@@ -1460,10 +1474,16 @@ export function createStrataView(container, opts = {}) {
             avoidRects = (opts.avoid() || []).filter((r) => r && r.width > 0 && r.right > cr.right - 230 && r.left < cr.right - 30)
                 .map((r) => ({ top: r.top - cr.top, bottom: r.bottom - cr.top }));
         }
+        // deep-pass4 (B417): THIN THEM. The human pass saw the YEAR labels stack down the right edge and under
+        // the people counter. From the newest down: at most LABELS_SHOWN years (and YEAR 0), each at least
+        // LABEL_GAP_PX below the one shown above it, none under the counters
+        let shownN = 0, lastY = -Infinity;
         for (let i = 0; i < labelEls.length; i++) {
             const rec = labelEls[i];
             const sy = Number.isFinite(rec.y) ? toScreenY(rec.y) : NaN;
-            const on = sy > 30 && sy < H - 8 && !underHud(sy);
+            const zero = labels[i] && labels[i].kind === 'zero';
+            const on = sy > 30 && sy < H - 8 && !underHud(sy) && sy - lastY >= LABEL_GAP_PX && (zero || shownN < LABELS_SHOWN);
+            if (on) { lastY = sy; if (!zero) shownN++; }
             if (on !== rec.shown) { rec.el.hidden = !on; rec.shown = on; }
             if (on && !(Math.abs(sy - rec.sy) <= 0.25)) { rec.el.style.transform = `translate3d(0, ${sy.toFixed(1)}px, 0)`; rec.sy = sy; }
             const gone = !!rising && rec.y < rising.frontY && Number.isFinite(rec.y);
@@ -2500,6 +2520,15 @@ export function createStrataView(container, opts = {}) {
         onChamberClick(cb) { clickers.add(cb); return () => clickers.delete(cb); },
         setHands,
         rise,
+        /** deep-pass4 (B410): THE FINALE. k 0 to 1 (how much of the deepest floor is body once every floor
+         *  above it is full): the layers over the colony bow and crack, more with k; `jolt` shakes the view. */
+        quake(k, { jolt = false } = {}) {
+            quakeK = Math.max(0, Math.min(1, Number(k) || 0));
+            if (jolt) shake = Math.max(shake, 0.35 + 0.4 * quakeK);
+            backU.uQuake.value = quakeK;
+            if (!rising) { backU.uRise.value = quakeK > 0 ? 0.15 + 0.35 * quakeK : 0; backU.uRiseY.value = -0.4; }
+        },
+        get quakeK() { return quakeK; },
         /** The body as the hooks report it (view-hooks.js bodyStats). */
         get bodyStats() {
             return {
@@ -2577,6 +2606,7 @@ export function extendHooks(base, view) {
         get waves() { return base.waves; },
         setHands: (on, o) => view.setHands(on, o),
         rise: (cb) => view.rise(cb),
+        quake: (k, o) => view.quake?.(k, o),
         get bodyStats() { return view.bodyStats; },
     };
 }

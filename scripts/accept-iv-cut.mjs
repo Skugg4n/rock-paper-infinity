@@ -469,7 +469,7 @@ try {
         lever: !document.getElementById('deep-lever-wrap').hidden, price: document.getElementById('deep-lever-price').textContent,
         advice: rpiDeep.instruments.advice }))()`);
     const priceTape = await evaluate(`(() => { const e = document.querySelector('#deep-lamps .deep-cryo-lamp.is-price .dymo'); return e ? e.textContent : ''; })()`);
-    check(l0.lamps.length === 4 && l0.lamps.every((x) => x.endsWith(':lit')) && priceTape === '★ 15 k', `7. four lamps lit, the fourth the price "${priceTape}": ${l0.lamps.join(' ')}`);
+    check(l0.lamps.length === 4 && l0.lamps.every((x) => x.endsWith(':lit')) && priceTape === '★ 7.5 k', `7. four lamps lit, the fourth the price "${priceTape}": ${l0.lamps.join(' ')}`);
     check(l0.lever && l0.price === '' && l0.advice === 'SLEEP', `the lever is there, its price only on the lamp ("${l0.price}"), the panel says ${l0.advice}`);
     // 7. without the stars the price lamp is dark and there is no lever
     const keepStars = await D('state.stars');
@@ -749,8 +749,9 @@ try {
         markOk = m.marks.includes(far.id) && m.thread >= 1 && /^Mark it\./.test(markTip);
     }
     check(markOk, `D. a chamber out of reach (${far && far.id}) is marked with a red thread from the body`);
-    // a fed body, mass to spare, and SPREAD at its top so the dream's slow takes come in a test's time
-    await evaluate(`(() => { const G = rpiDeep.state.grow; G.mass = 1e5; G.lv.spread = 3; G.lv.vats = 6; return true; })()`);
+    // a fed body and mass to spare (deep-pass4: a dream grows a room in a few seconds by itself; with SPREAD at its
+    // top as well it reached the mark before the check could see it dream)
+    await evaluate(`(() => { const G = rpiDeep.state.grow; G.mass = 1e5; G.lv.vats = 6; return true; })()`);
     await evaluate('debug_deep("people", 1e7)');
     const b0 = (await D('bodyView')).body.length;
     const lvr = await centre('#deep-lever');
@@ -774,7 +775,7 @@ try {
     const dp = await evaluate(`rpiDeep.screenOfNode(${JSON.stringify(dead)})`);
     let deadTip = '';
     if (dp) { await mouse('mouseMoved', dp.x, dp.y); await sleepMs(300); deadTip = await D('tip'); }
-    check(deadTip === 'Starving. The hearts do not reach it.', `N. the dead room says why: "${deadTip}"`);
+    check(deadTip === 'Dead. Grow a heart to reach it.', `N. the dead room says why: "${deadTip}"`);
     await shot('grow-2b-starving');
     await shot2('starving');
     // grow a living gut into a heart: the ring of the other three, then pump
@@ -786,10 +787,20 @@ try {
     const hb = await evaluate(`(() => { const e = document.querySelector('.deep-ring-organ[data-organ="heart"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     if (hb) { await click(hb.x, hb.y); await sleepMs(300); }
     for (let i = 0; i < 40 && (await D('taking')); i++) { await evaluate('rpiDeep.pumpHeart()'); await sleepMs(420); }
-    let n2 = n1;
-    for (let i = 0; i < 60 && n2 >= n1; i++) { await sleepMs(250); n2 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
+    // deep-pass4: the checkpoint's PULSE is 0.5: one heart is not enough, more of the edge dies first; while the dead
+    // still lie beyond the reach ("Dead. Grow a heart to reach it.") the next heart is grown the same way
+    let peak = await evaluate('rpiDeep.bodyView.necrotic.length');
+    for (let k = 0; k < 5 && (await evaluate(`(async () => { const G = await import('/src/phase4/grow.js'); return G.deadFix(rpiDeep.state, rpiDeep.layout) === 'heart'; })()`)); k++) {
+        const more = await evaluate(`(async () => { const G = await import('/src/phase4/grow.js'); const d = rpiDeep; const id = G.growTarget(d.state, d.layout, 'GROW A HEART');
+            if (!id || !d.state.grow.organs[id] && !d.bodyView.reachable.includes(id)) return null; d.state.grow.mass = Math.max(d.state.grow.mass, 200); return d.choose(id, 'heart') ? id : null; })()`);
+        if (!more) break;
+        for (let i = 0; i < 40 && (await D('taking')); i++) { await evaluate('rpiDeep.pumpHeart()'); await sleepMs(420); }
+        peak = Math.max(peak, await evaluate('rpiDeep.bodyView.necrotic.length'));
+    }
+    let n2 = peak;
+    for (let i = 0; i < 80 && n2 >= peak; i++) { await sleepMs(250); n2 = await evaluate('rpiDeep.bodyView.necrotic.length'); }
     const now = await evaluate(`({ organ: rpiDeep.bodyView.organs[${JSON.stringify(gut && gut.id)}], E: rpiDeep.ratios.ratios.E })`);
-    check(now.organ === 'heart' && n2 < n1, `N. grown into a heart (PULSE ${now.E.toFixed(2)}), the dead come back (${n1} to ${n2})`);
+    check(now.organ === 'heart' && n2 < peak, `N. grown into a heart (PULSE ${now.E.toFixed(2)}), the dead come back (${n1}, at most ${peak}, to ${n2})`);
 
     // ================= R. THE HANDS, AND THE RISE ================================================
     await jump('iv-rise', { asleep: false });

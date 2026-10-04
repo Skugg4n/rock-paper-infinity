@@ -59,6 +59,40 @@ export const DEMAND_FLOOR = 1.5;
 export const SUPPLY_FLOOR = 1.35;
 /** A full floor: its organs give this many times (the cascade, downhill). */
 export const FULL_FLOOR = 1.5;
+/** deep-pass4 (B410): MOMENTUM. The human pass of v1.84.0 had the hands at 3:13 and then four minutes of
+ *  pump-and-dream for a floor: the rise stood out of reach at 8:00. Now every full floor makes ALL the
+ *  guts give this many times the mass (a floor is uphill as it starts and downhill once it falls). */
+export const FLOOR_MOMENTUM = 1.1;
+/** deep-pass4 (B410): THE FINALE. Once every floor but the deepest is full, the body accelerates: a take on
+ *  the deepest floor costs FINALE_MASS of its mass and FINALE_WORK of its work, less with every room of
+ *  that floor already body (down to (1 - FINALE_RAMP) of that at the last), and fills by itself
+ *  FINALE_TRICKLE times as fast. The strata crack over it (the view). */
+export const FINALE_MASS = 0.7;
+export const FINALE_WORK = 0.7;
+export const FINALE_RAMP = 0.65;
+export const FINALE_TRICKLE = 3;
+/**
+ * The finale now: { floor, share, mass, work } (share: how much of the deepest floor is body), or null.
+ */
+export function finaleOf(graph, st) {
+    const floor = finaleFloor(graph, st);
+    if (floor < 0) return null;
+    const ids = graph.nodes.filter((n) => n.floor === floor && n.kind === 'room');
+    const body = new Set(st.body);
+    const share = ids.length ? ids.filter((n) => body.has(n.id)).length / ids.length : 0;
+    const k = 1 - FINALE_RAMP * share;
+    return { floor, share, mass: FINALE_MASS * k, work: FINALE_WORK * k };
+}
+/** The deepest floor while the finale is on (every floor above it full, it not yet), else -1. */
+export function finaleFloor(graph, st) {
+    let deepest = -1;
+    for (const n of graph.nodes) if (n.floor > deepest) deepest = n.floor;
+    if (deepest < 1) return -1;
+    const full = fullFloors(graph, st);
+    if (full.has(deepest)) return -1;
+    for (let f = 0; f < deepest; f++) if (!full.has(f)) return -1;
+    return deepest;
+}
 /** The machine house as hands asks this much of the body. */
 export const MACHINE_DEMAND = 2;
 /** One organ of a kind gives this much against one unit of size. deep-tension: a heart reaches two
@@ -121,8 +155,10 @@ export const PUMP_HEARTS_MAX = 1.8;
 /** Left alone, awake, a take fills by itself this much work a second at full pace (a drummer fills about
  *  ten times that). */
 export const TRICKLE = 0.3;
-/** Dreaming, this much a second (the idle player still grows; the active one is clearly faster). */
-export const DREAM_TRICKLE = 1.0;
+/** Dreaming, this much a second (the idle player still grows; the active one is clearly faster).
+ *  deep-pass4 (B411): 1 made a room 13 to 24 s of watching; now a room grows in a few seconds once its
+ *  mass is there (a drummer on the beat still fills two or three times this). */
+export const DREAM_TRICKLE = 3.5;
 
 /** A gut makes this much mass a second on floor 0. deep-tension: the guts are the ONLY source. */
 export const GUT_MASS = 0.19;
@@ -173,6 +209,13 @@ const supplyOf = (n, full) => Math.pow(SUPPLY_FLOOR, Math.max(0, n.floor)) * (fu
  */
 export function bodySums(graph, st) {
     const full = fullFloors(graph, st);
+    // deep-pass4 (B410): in the finale the deepest floor asks of the hearts and the nerves what the floor
+    // above it does (it is no longer uphill: the body is breaking through)
+    let deepest = -1;
+    for (const n of graph.nodes) if (n.floor > deepest) deepest = n.floor;
+    let fin = deepest >= 1 && !full.has(deepest) ? deepest : -1;
+    for (let f = 0; fin >= 0 && f < deepest; f++) if (!full.has(f)) fin = -1;
+    const ask = (n) => (n.kind !== 'machine' && n.floor === fin ? Math.pow(DEMAND_FLOOR, fin - 1) : demandOf(n));
     const give = { vat: 0, gut: 0, heart: 0, nerve: 0 };
     const count = { vat: 0, gut: 0, heart: 0, nerve: 0 };
     let size = 0, vatAsk = 0;
@@ -182,15 +225,15 @@ export function bodySums(graph, st) {
         if (!n) continue;
         if (id === HEART) { size += 1; continue; }
         if (n.kind === 'hub') continue;
-        size += demandOf(n);
+        size += ask(n);
         const o = organOf(graph, st, id);
         if (ORGANS.includes(o)) { give[o] += supplyOf(n, full); count[o]++; }
-        if (o === 'vat') vatAsk += demandOf(n);
+        if (o === 'vat') vatAsk += ask(n);
     }
     // deep-pass3 (B402): a colony bigger than TAKE_REF's makes its mass in proportion, so GROW lasts about as
     // long whatever the colony's size (a colony of 60 chambers rose after half an hour)
     const scale = Math.max(1, roomCount(graph) / TAKE_REF);
-    return { size, give, count, full, vatAsk, scale };
+    return { size, give, count, full, vatAsk, scale, momentum: Math.pow(FLOOR_MOMENTUM, full.size) };
 }
 /** PULSE: the hearts' reach over the body's size (1: every organ is fed to the edge). */
 export function pulseRatio(sums) { return reachOf(sums) / Math.max(1, sums.size); }
@@ -199,7 +242,7 @@ export const reachOf = (sums) => LID_REACH + HEART_K * sums.give.heart;
 /** FLESH: the nerves' speed over the body's size. */
 export function nerveRatio(sums) { return (LID_NERVE + NERVE_K * sums.give.nerve) / Math.max(1, sums.size); }
 /** The mass the guts make a second (times MUSCLE's `muscle`), before the vats eat theirs. */
-export function gutRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle * (sums.scale || 1); }
+export function gutRate(sums, muscle = 1) { return LID_MASS + GUT_MASS * sums.give.gut * muscle * (sums.scale || 1) * (sums.momentum || 1); }
 /** What the living vats eat of it a second. */
 export function vatMass(sums) { return VAT_MASS * (sums.vatAsk || 0) * (sums.scale || 1); }
 /** The mass the body gains a second: the guts' less the vats'. deep-pass3 (B402): the vats eat the guts'
@@ -248,9 +291,10 @@ export function fitsReach(graph, sums, id) {
 
 /* ------------------------------------------------------------------ prices and work */
 /** The mass a take of `id` costs as `organ` after `taken` takes (CHEAP for the room's own organ). */
-export function takeMass(graph, id, organ, taken = 0) {
+export function takeMass(graph, id, organ, taken = 0, finale = null) {
     const n = nodeOf(graph, id);
     if (!n) return Infinity;
+    if (finale && n.floor === finale.floor) return Math.ceil(takeMass(graph, id, organ, taken) * finale.mass);
     // deep-pass3 (B402): the step per take is spread over a bigger colony, so its last take costs what the
     // last take of a TAKE_REF colony does (1.05 a take made a colony of 60 chambers cost 45 times as much at
     // the end, and GROW ran half an hour)
@@ -261,13 +305,14 @@ export function takeMass(graph, id, organ, taken = 0) {
     return Math.ceil(TAKE_MASS * k * cheap);
 }
 /** The mass to grow a living organ again into `organ`. */
-export function regrowMass(graph, id, organ, taken = 0) {
-    return Math.ceil(takeMass(graph, id, organ, taken) * REGROW);
+export function regrowMass(graph, id, organ, taken = 0, finale = null) {
+    return Math.ceil(takeMass(graph, id, organ, taken, finale) * REGROW);
 }
 /** The work a take of `id` needs (pumps fill it; the trickle and the dream too). */
-export function takeWork(graph, id, { regrow = false } = {}) {
+export function takeWork(graph, id, { regrow = false, finale = null } = {}) {
     const n = nodeOf(graph, id);
     if (!n) return Infinity;
+    if (finale && n.floor === finale.floor) return takeWork(graph, id, { regrow }) * finale.work;
     // deep-pass3 (B402): in a colony bigger than TAKE_REF's a take is that much less work (more of them)
     const w = TAKE_WORK * Math.pow(WORK_FLOOR, floorK(n.floor)) * (n.kind === 'machine' ? WORK_MACHINE : 1)
         * TAKE_REF / Math.max(TAKE_REF, roomCount(graph));

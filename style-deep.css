@@ -1508,6 +1508,10 @@ body.in-deep #version-info { z-index: 1400; }
     gap: 22px;
     z-index: 12;
 }
+/* deep-pass4: the column's empty box never catches a click (the outermost chamber of floor 2 lay under it, and the
+   tape's TAKE A CHAMBER could not be done for six minutes of a play pass); its buttons, the lever and the tapes do */
+#deep-act { pointer-events: none; }
+#deep-act .deep-act-col > *, #deep-act .deep-lever-wrap > * { pointer-events: auto; }
 .deep-act-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 #phase-deep .btn.deep-round { width: 60px; height: 60px; background: linear-gradient(180deg, #252e3a, #1a212b); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06); color: #c3cfdd; }
 .deep-act-price { font-size: 11px; color: #8fa1b6; white-space: nowrap; min-height: 14px; }
@@ -2332,6 +2336,8 @@ body.in-deep #version-info { z-index: 1400; }
 /* deep-tension: the organ the body is short of: a red ring round it, the same red as its gauge */
 .deep-ring.is-organs .deep-ring-room.is-want { box-shadow: 0 0 0 2px #ff3c52, 0 0 14px rgba(255, 60, 82, 0.7); }
 .deep-ring.is-organs .deep-ring-room.is-want:not(.is-ok) { opacity: 0.8; }
+/* deep-pass4 (B410): nothing short, the organ of the lowest gauge is ringed in gold: a hint, not an alarm */
+.deep-ring.is-organs .deep-ring-room.is-hint { box-shadow: 0 0 0 2px #d9b25f, 0 0 10px rgba(217, 178, 95, 0.45); }
 .deep-organ-glyph { width: 26px; height: 26px; display: block; }
 .deep-ring-hub.is-organs { border-color: rgba(240, 96, 110, 0.4); }
 #deep-ring.is-organs .deep-ring-say { white-space: nowrap; max-width: none; }

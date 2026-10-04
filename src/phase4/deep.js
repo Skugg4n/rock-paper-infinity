@@ -83,6 +83,11 @@ export const VATS_MAX = 3;
 export const VAT_GROWTH = [0, SLEEP_GROWTH, 2 * SLEEP_GROWTH, 1];
 /** What each level of vats costs, in stars. */
 export const VATS_COST = [2e4, 1e6, 1e8];
+/** deep-pass4 (B416): THE VATS HOLD THEIR OWN. The human pass bought CULTURE VATS ("Grows people while the
+ *  colony sleeps") and the people stayed 16 through four sleeps: the beds were full, so the vats grew
+ *  nobody. Now, asleep, the vats grow people into places of their own, this share of the beds at each
+ *  level; the people they grew wake with the rest (more hands, more mouths). */
+export const VAT_ROOM = [0, 0.25, 0.5, 1];
 export const vatsLevel = (s) => Math.max(0, Math.min(VATS_MAX, Math.floor((s && s.vats) || 0)));
 export const vatsCost = (level) => (level < VATS_MAX ? VATS_COST[level] : Infinity);
 export const DAYS_PER_YEAR = 365;
@@ -208,7 +213,8 @@ export const impliedFeed = (cryo) => ((cryo ?? -1) < 0 ? 0 : FEED_AT_TIER[Math.m
  *   1. INCOME is what one real second of sleep brings at the colony's tier, at the dive's base pace:
  *      the stars (and the ore) of a sleeping day times the tier's days a second (`state.income`).
  *      It is set when the colony wakes and when a tier is bought, never while the player looks at a
- *      price, so a price does not move under the cursor.
+ *      price, so a price does not move under the cursor. deep-pass4 (B412): and a price, once set,
+ *      stays until that item is bought (banded's memo): a good buy never makes the next tier dearer.
  *   2. Every star price of an upgrade (a level, an automation, the machine's feed, the culture vats,
  *      a cryo tier, Surface's gifts) is its old price held inside PRICE_BAND[kind] seconds of that
  *      income: never less than the low end, so a long sleep does not make it free; never more than
@@ -260,8 +266,26 @@ export function banded(s, kind, base) {
     const inc = incomeOf(s);
     const band = PRICE_BAND[kind];
     if (!inc || !band || !Number.isFinite(base)) return base;
-    return roundPrice(Math.min(band[1] * inc.stars, Math.max(band[0] * inc.stars, base)));
+    // deep-pass4 (B412): A PRICE IS SET ONCE. The human pass of v1.84.0 bought LOSSLESS RELAY and BEDS (a
+    // good buy: the income doubled) and Cryo V went from 1.6 B to 5.6 B. Now a price is fixed the first
+    // time it is asked for after the hall (the item, at its level, is its old price `base`), and stays
+    // until it is bought; the next level is priced off the income of its own day.
+    const key = `${kind}:${base}`;
+    if (!s.priceMemo || typeof s.priceMemo !== 'object') s.priceMemo = {};
+    const memo = s.priceMemo;
+    if (Number.isFinite(memo[key]) && memo[key] > 0) return memo[key];
+    const price = roundPrice(Math.min(band[1] * PRICE_AHEAD * inc.stars, Math.max(band[0] * PRICE_AHEAD * inc.stars, base)));
+    memo[key] = price;
+    const keys = Object.keys(memo);
+    if (keys.length > PRICE_MEMO_MAX) delete memo[keys[0]];
+    return price;
 }
+/** deep-pass4 (B412): a price set once no longer follows the income up, so it is set where the income is
+ *  headed: PRICE_AHEAD times the band (scripts/sim-phase4.mjs: 1 let the act run away, the stars ×1e14 and
+ *  eleven buys a wake; 2 keeps the act and the tiers where the band had them). */
+export const PRICE_AHEAD = 2;
+/** deep-pass4: the prices kept at most (the oldest go first; a level bought is never asked for again). */
+export const PRICE_MEMO_MAX = 160;
 /** The next level of the machine's feed, the next level of the vats, a cryo tier: banded. */
 export const feedPrice = (s) => banded(s, 'feed', feedCost(feedLevel(s)));
 export const vatsPrice = (s) => banded(s, 'vats', vatsCost(vatsLevel(s)));
@@ -270,6 +294,23 @@ export const cryoPrice = (s, tier) => (CRYO[tier] ? banded(s, 'cryo', CRYO[tier]
 export function beginSleepYield(s) { s.sleepGot = { stars: 0, ore: 0 }; }
 /** The colony wakes: no yield is counted until the next sleep. */
 export function endSleepYield(s) { s.sleepGot = null; }
+/**
+ * deep-pass4 (B414): THE RESTART COSTS. The human pass ignored the mind on purpose: "FAULT: THE MIND
+ * RESTARTED. It cost me nothing I could see; I was due to wake anyway." Now a restart loses REBOOT_LOSS of
+ * what the sleep had brought, stars and ore (never more than is in store), and the wake lamp says how much.
+ * @param {object} s - mutated
+ * @param {{stars:number, ore:number}|null} got - the sleep's yield (s.sleepGot, read before the wake ends it)
+ * @returns {{stars:number, ore:number}} what was lost
+ */
+export const REBOOT_LOSS = 0.5;
+export function rebootLoss(s, got = s.sleepGot) {
+    if (!got) return { stars: 0, ore: 0 };
+    const stars = Math.max(0, Math.min(s.stars || 0, (got.stars || 0) * REBOOT_LOSS));
+    const ore = Math.max(0, Math.min(s.minerals || 0, (got.ore || 0) * REBOOT_LOSS));
+    s.stars = (s.stars || 0) - stars;
+    s.minerals = (s.minerals || 0) - ore;
+    return { stars, ore };
+}
 /** What one sleep may bring at most, or null when nothing is capped. */
 export function sleepCap(s) {
     const inc = incomeOf(s);
@@ -1097,7 +1138,7 @@ export function tickDay(s, asleep = false) {
         // deep-fix2: asleep, only the culture vats grow people; and new beds fill a share at a time
         const rate = (asleep ? VAT_GROWTH[vatsLevel(s)] : 1) * GROWTH_PER_YEAR / DAYS_PER_YEAR;
         const mouthsToSpare = grown / FOOD_MARGIN - demand;
-        const room = capacity - s.humans;
+        const room = capacity * (asleep ? 1 + VAT_ROOM[vatsLevel(s)] : 1) - s.humans;
         // deep-grow: once the body grows, nobody is born the old way: the vats grow the body's people
         const bred = !(s.organs && s.organs.births === 0);
         if (rate > 0 && mouthsToSpare > 0 && !mourning(s) && bred) {

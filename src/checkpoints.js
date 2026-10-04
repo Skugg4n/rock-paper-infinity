@@ -303,8 +303,9 @@ export const CHECKPOINT_CRYO = { 'iv-long': CRYO[4], 'iv-graft': CRYO[3], 'iv-cr
  * deep-grow: a late colony at The question, laid out the way one built as it went is (every kind
  * of room on every floor), three floors deep. With `body` the movement is under way: 'all' is
  * every chamber and the machine; a list is those node ids (growth.js), `necrotic` among them dead.
+ * deep-pass4: exported for scripts/sim-phase4.mjs --from iv-grow (the brief's measure starts there).
  */
-function growColony({ body = null, necrotic = [], humans = 2400, organs = null, mass = null } = {}) {
+export function growColony({ body = null, necrotic = [], humans = 2400, organs = null, mass = null } = {}) {
     const deep = initialDeepState({ salvage: 1500, doom0: 85 });
     const pattern = ['mine', 'dorm', 'farm', 'generator'];
     const slots = [];
