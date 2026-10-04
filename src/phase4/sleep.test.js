@@ -8,7 +8,7 @@ import {
     FOOD_ALARM_DAYS, startBuild, launchProbe, probeOdds, PROBE_OUTCOMES,
     estimateNow, estimateOpensDay, habitableYear, END_YEAR, RESURFACE_AT, surface, cryoDeathRate,
     CRYO_DEATH_PER_YEAR, CRYO_DEATH_DORM, SLEEP_FOOD, repairTick, REPAIR_DAYS, darkenChamber,
-    scoutParty, levelCost, BED_FILL,
+    scoutParty, levelCost, BED_FILL, VAT_ROOM,
 } from './deep.js';
 import {
     alarmLine, alarmGlyph, scoutLine, scoutSentLine, troubleClause, DESCENT_LINE,
@@ -221,10 +221,13 @@ describe('people: the ice takes some, the scouts take some, the awake mend', () 
     test('a fed colony refills its pods: the ice costs food and a number on the strip', () => {
         const s = automated();
         const people = s.humans;
+        const beds = tickDay(JSON.parse(JSON.stringify(s)), false).capacity;
         const sum = sleep(s, 10 * DAYS_PER_YEAR);
         expect(sum.died).toBeGreaterThan(0);
-        // deep-fix2: the vats fill a share of the empty pods a day, so the count rests a hair under
-        expect(s.humans).toBeCloseTo(people, 2);
+        // deep-fix2: the vats fill a share of the empty pods a day, so the count rests a hair under;
+        // deep-pass4 (B416): and past the beds, into the vats' own places (VAT_ROOM of the beds)
+        expect(s.humans).toBeGreaterThanOrEqual(people - 0.01);
+        expect(s.humans).toBeCloseTo(beds * (1 + VAT_ROOM[s.vats || 0]), 1);
     });
 
     test('deep-fix2: without culture vats nobody is born asleep; the ice thins the sleepers and the sleep is still a handful of loops', () => {

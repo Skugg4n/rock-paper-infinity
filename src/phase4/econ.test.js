@@ -5,7 +5,7 @@
  * a graft shows what it did.
  */
 import {
-    initialDeepState, tickDay, sleep, CRYO, PRICE_BAND, SLEEP_CAP_SECONDS, setIncome, incomeOf, banded,
+    initialDeepState, tickDay, sleep, CRYO, PRICE_BAND, PRICE_AHEAD, SLEEP_CAP_SECONDS, setIncome, incomeOf, banded,
     cryoPrice, nextPrice, beginSleepYield, endSleepYield, sleepFull, levelCost, roundPrice, impliedFeed,
 } from './deep.js';
 import { rateText, FULL_TEXT } from './readout.js';
@@ -44,22 +44,23 @@ describe('prices follow income (B330)', () => {
         for (const id of ['seam', 'yield', 'output', 'beds', 'drill', 'feed', 'cryo-vi']) {
             const p = priceOf(s, id);
             if (!p) continue;
-            const secs = p.stars / inc;
+            // deep-pass4 (B412): set once, PRICE_AHEAD times the band
+            const secs = p.stars / inc / PRICE_AHEAD;
             expect(secs).toBeGreaterThanOrEqual(30 * 0.999);
             expect(secs).toBeLessThanOrEqual(100 * 1.1);
         }
         // a price never more than the high end, never less than the low end, two figures
-        expect(banded(s, 'cryo', 1e40)).toBe(roundPrice(PRICE_BAND.cryo[1] * inc));
-        expect(banded(s, 'level', 1)).toBe(roundPrice(PRICE_BAND.level[0] * inc));
+        expect(banded(s, 'cryo', 1e40)).toBe(roundPrice(PRICE_BAND.cryo[1] * PRICE_AHEAD * inc));
+        expect(banded(s, 'level', 1)).toBe(roundPrice(PRICE_BAND.level[0] * PRICE_AHEAD * inc));
         expect(String(roundPrice(123456789))).toBe('130000000');
     });
     test("Ola's save lands where it can buy again: Cryo VI is within reach, never ★ 3e17 against ★ 9.8e16", () => {
         const s = olas();
         setIncome(s);
         expect(cryoPrice(s, 5)).toBeLessThan(CRYO[5].cost);
-        expect(cryoPrice(s, 5)).toBeLessThanOrEqual(PRICE_BAND.cryo[1] * incomeOf(s).stars * 1.1);
+        expect(cryoPrice(s, 5)).toBeLessThanOrEqual(PRICE_BAND.cryo[1] * PRICE_AHEAD * incomeOf(s).stars * 1.1);
         // and the gifts follow too
-        expect(giftPrice(s, 'question')).toBeLessThanOrEqual(PRICE_BAND.gift[1] * incomeOf(s).stars * 1.1);
+        expect(giftPrice(s, 'question')).toBeLessThanOrEqual(PRICE_BAND.gift[1] * PRICE_AHEAD * incomeOf(s).stars * 1.1);
     });
     test('a long sleep brings at most SLEEP_CAP_SECONDS of income, and then the store is full', () => {
         const s = olas();

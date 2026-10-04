@@ -45,7 +45,7 @@ import {
     ORGANS, ORGAN_NAME, ORGAN_DOES, GAUGE_ORGAN, cheapOrgans, organOf, bodySums, pulseRatio, nerveRatio, massRate,
     paceOf, nerveSpeed, weakestOf, heartPump, beyondReach, fitsReach, takeMass, regrowMass, takeWork, pumpFill, trickleFill,
     migrateOrgans, fullFloors, nodeOf as organNode, PUMP_ON_BEAT, PUMP_OFF_BEAT, PUMP_MASS_S, gutRate, vatMass, surgeOf,
-    SURGE_MAX, SURGE_IDLE_S, LID_MASS, PUMP_MASS_FLAT,
+    SURGE_MAX, SURGE_IDLE_S, LID_MASS, PUMP_MASS_FLAT, finaleOf as organFinale, FINALE_TRICKLE,
 } from './organs.js';
 
 /* ------------------------------------------------------------------ the numbers */
@@ -120,9 +120,12 @@ export const START_MASS = 40;
 /** MASS counts the mass in hand plus this many seconds of the guts against the next price. */
 export const MASS_SECONDS = 12;
 /** The tape says DREAM when the next take is further off than this many seconds of mass. */
-export const DREAM_ADVISE_S = 25;
+/** deep-pass4 (B411): 90 (it was 25). A dream makes only DREAM_MASS times the mass now, so a pump to the guts
+ *  is the quicker way to a far organ; the tape says DREAM only for a long wait (a play pass that followed DREAM
+ *  at 25 s dreamt three minutes for two rooms). */
+export const DREAM_ADVISE_S = 90;
 /** deep-tension: dreaming, the guts make this many times the mass. */
-export const DREAM_MASS = 3;
+export const DREAM_MASS = 1.25;
 /** A dream lasts this many body seconds, times FLESH (between DREAM_NERVE). */
 export const DREAM_S = 30;
 export const DREAM_NERVE = [0.6, 1.6];
@@ -177,6 +180,11 @@ export function graphOf(layout) {
     return cached.graph;
 }
 const nodeOf = (graph, id) => organNode(graph, id);
+/** deep-pass4 (B410): the finale now, { floor, share, mass, work }, or null (organs.js finaleOf). */
+export function finaleOf(s, layout) {
+    if (!growOn(s)) return null;
+    return organFinale(graphOf(layout), bodyState(s.grow));
+}
 
 /* ------------------------------------------------------------------ the save */
 /** Is movement III under way (or over)? */
@@ -304,6 +312,7 @@ export function normalizeGrow(s, layout, report = null) {
     if (!Number.isFinite(G.mass)) G.mass = fresh ? Math.max(START_MASS, 2 * takeMass(graph, HEART, 'heart', G.taken)) : START_MASS;
     G.mass = Math.max(0, G.mass);
     for (const k of ['starve', 'revive', 'regrown']) G[k] = Number.isFinite(G[k]) ? G[k] : 0;
+    G.regrownIds = Array.isArray(G.regrownIds) ? G.regrownIds.filter((id) => G.body.includes(id)) : [];
     G.full = Array.isArray(G.full) ? G.full.filter((f) => Number.isInteger(f)) : [];
     const T = G.take;
     G.take = T && typeof T === 'object' && ids.has(T.id) && (ORGANS.includes(T.organ) || T.organ === 'hands') && Number(T.work) > 0
@@ -440,11 +449,12 @@ export function nextPrice(s, layout) {
     const G = s.grow;
     const graph = graphOf(layout);
     let best = Infinity;
+    const fin = finaleOf(s, layout);
     for (const id of reachableFrom(graph, bodyState(G)).keys()) {
         const n = nodeOf(graph, id);
         if (!n || n.kind === 'hub') continue;
         const organs = n.kind === 'machine' ? ['hands'] : ORGANS;
-        for (const o of organs) best = Math.min(best, takeMass(graph, id, o, G.taken));
+        for (const o of organs) best = Math.min(best, takeMass(graph, id, o, G.taken, fin));
     }
     return best;
 }
@@ -491,6 +501,7 @@ export function takeOffer(s, layout, id, { dream = false } = {}) {
     const n = nodeOf(graph, id);
     if (!n || n.kind === 'hub') return null;
     const busy = !!G.take;
+    const fin = finaleOf(s, layout);
     const row = (organ, mass) => {
         const cheap = n.kind === 'room' && cheapOrgans(n.type).includes(organ);
         const lack = mass - G.mass;
@@ -500,11 +511,11 @@ export function takeOffer(s, layout, id, { dream = false } = {}) {
     if (G.body.includes(id)) {
         if (n.kind !== 'room' || isNecrotic(bodyState(G), id)) return null;
         const now = G.organs[id];
-        return { id, regrow: now || null, organs: ORGANS.filter((o) => o !== now).map((o) => row(o, regrowMass(graph, id, o, G.taken))) };
+        return { id, regrow: now || null, organs: ORGANS.filter((o) => o !== now).map((o) => row(o, regrowMass(graph, id, o, G.taken, fin))) };
     }
     if (!inReach(s, layout).includes(id)) return null;
-    if (n.kind === 'machine') return { id, regrow: null, organs: [row('hands', takeMass(graph, id, 'hands', G.taken))] };
-    return { id, regrow: null, organs: ORGANS.map((o) => row(o, takeMass(graph, id, o, G.taken))) };
+    if (n.kind === 'machine') return { id, regrow: null, organs: [row('hands', takeMass(graph, id, 'hands', G.taken, fin))] };
+    return { id, regrow: null, organs: ORGANS.map((o) => row(o, takeMass(graph, id, o, G.taken, fin))) };
 }
 /** Can a take of `id` begin now, with the cheapest organ it offers? */
 export function canAfford(s, layout, id) {
@@ -524,7 +535,7 @@ export function startTake(s, layout, id, organ, { by = 'hand' } = {}) {
     const G = s.grow;
     const graph = graphOf(layout);
     G.mass -= row.mass;
-    const work = takeWork(graph, id, { regrow: !!offer.regrow });
+    const work = takeWork(graph, id, { regrow: !!offer.regrow, finale: finaleOf(s, layout) });
     G.take = { id, organ, work, done: 0, regrow: offer.regrow, by };
     return { id, organ, mass: row.mass, work, regrow: offer.regrow };
 }
@@ -548,6 +559,9 @@ function finishTake(s, layout, { by = 'hand' } = {}) {
     if (T.regrow) {
         G.organs = { ...G.organs, [T.id]: T.organ };
         G.regrown = (G.regrown || 0) + 1;
+        // deep-pass4: a room grown again is not offered for it again (the play pass grew one room into a heart and
+        // a minute later into a nerve: the tape undid its own advice)
+        G.regrownIds = [...new Set([...(G.regrownIds || []), T.id])];
         return { id: T.id, organ: T.organ, regrow: T.regrow, by, cascade: [], spine: [] };
     }
     const next = take(graph, bodyState(G), T.id);
@@ -625,7 +639,7 @@ export function takeTip(s, layout, id) {
     if (id === HEART) return { text: 'The heart. Click it to pump.', red: false };
     if (G.take && G.take.id === id) return { text: G.take.regrow ? `Growing into a ${ORGAN_NAME[G.take.organ].toLowerCase()}. Pump the heart.` : 'Taking it. Pump the heart.', red: false };
     if (G.body.includes(id)) {
-        if (isNecrotic(bodyState(G), id)) return { text: starveWords(s, layout), red: true };
+        if (isNecrotic(bodyState(G), id)) return { text: starveWords(s, layout, id), red: true };
         if (n.kind !== 'room') return none;
         const o = G.organs[id];
         const word = adviseGrow(s, layout);
@@ -644,6 +658,15 @@ export function takeTip(s, layout, id) {
     const marked = (G.marks || []).includes(id);
     // deep-pass3: "Marked. Click to unmark." (marked for what?)
     return { text: marked ? 'Marked. Pull DREAM and the body grows toward it.' : 'Mark it. The body grows here as it dreams.', red: false };
+}
+/** deep-pass4 (B411): the words over a chamber in a dream: a click sends the dream there. */
+export function dreamTip(s, layout, id) {
+    const none = { text: '', red: false };
+    if (!growOn(s) || risen(s) || !id || !dreaming(s)) return none;
+    const G = s.grow;
+    if (id === HEART || G.body.includes(id) || !nodeOf(graphOf(layout), id)) return none;
+    if (G.take && G.take.id === id) return { text: 'The dream is growing it.', red: false };
+    return { text: (G.marks || []).includes(id) ? 'The dream grows toward it.' : 'Click. The dream grows here next.', red: false };
 }
 /** The tip's words only (tests, older callers). */
 export const takeWords = (s, layout, id) => takeTip(s, layout, id).text;
@@ -682,6 +705,29 @@ export function markPick(s, layout) {
     const price = (id) => Math.min(...(takeOffer(s, layout, id, { dream: true })?.organs || [{ mass: Infinity }]).map((r) => r.mass));
     ids.sort((a, b) => (d.get(a) - d.get(b)) || (price(a) - price(b)) || nearFirst(graph)(a, b));
     return ids[0] || null;
+}
+/**
+ * deep-pass4 (B411): THE DREAM WITHOUT A MARK. The human pass pulled DREAM with nothing marked and the
+ * body only made mass ("a 10 s dream gave nothing"). Now it grows where the tape would point: the chamber
+ * in reach whose organ the body needs, the cheapest one first, nearest the heart on a tie.
+ * @returns {string|null}
+ */
+export function dreamPick(s, layout) {
+    if (!growOn(s)) return null;
+    const graph = graphOf(layout);
+    const ids = inReach(s, layout);
+    if (!ids.length) return null;
+    let best = null;
+    for (const id of ids) {
+        const organ = dreamOrgan(s, layout, id);
+        const offer = organ ? takeOffer(s, layout, id, { dream: true }) : null;
+        const r = offer && offer.organs.find((x) => x.organ === organ);
+        if (!r) continue;
+        // the machine house only when it is all there is (or the hands can be paid now)
+        const k = r.mass + (id === MACHINE && !r.ok ? 1e9 : 0);
+        if (!best || k < best.k || (k === best.k && nearFirst(graph)(id, best.id) < 0)) best = { id, k };
+    }
+    return best ? best.id : null;
 }
 /** For each mark, the body node its thread starts from (the nearest by the graph), for the view. */
 export function markThreads(s, layout) {
@@ -793,11 +839,12 @@ export function stepGrow(s, layout, secs = 1) {
             if (id) out.revived.push(id);
         }
     } else if (!G.necrotic.length) G.revive = 0;
-    // dreaming, the body begins a take toward the marks itself
+    // dreaming, the body begins a take toward the marks itself (deep-pass4, B411: with no mark, toward the
+    // chamber the tape would point at: a dream is never empty)
     if (G.dreaming) {
         G.dreamS = (G.dreamS || 0) + secs;
         if (!G.take) {
-            const id = markPick(s, layout);
+            const id = markPick(s, layout) || dreamPick(s, layout);
             const organ = id ? dreamOrgan(s, layout, id) : null;
             const t = organ ? startTake(s, layout, id, organ, { by: 'dream' }) : null;
             if (t) out.started.push(t);
@@ -806,12 +853,24 @@ export function stepGrow(s, layout, secs = 1) {
     // the take fills by itself: slowly awake, a little faster dreaming
     if (G.take) {
         const spread = Math.pow(SPREAD_STEP, G.lv.spread || 0);
-        const w = trickleFill({ pace: R.speed, dreaming: !!G.dreaming, spread }) * secs;
+        const fin = finaleOf(s, layout);
+        const k = fin && nodeOf(graph, G.take.id)?.floor === fin.floor ? FINALE_TRICKLE : 1;
+        const w = trickleFill({ pace: R.speed, dreaming: !!G.dreaming, spread }) * k * secs;
         const done = fillTake(s, layout, w);
         if (done) out.done.push(done);
     }
     out.seen = unlockBody(s, layout);
     return out;
+}
+/** deep-pass4 (B413): the dead room a pump would bring back now (the innermost the hearts reach), or null. */
+export function revivable(s, layout) {
+    const G = s.grow;
+    if (!G.necrotic.length || feedOf(s) <= 0) return null;
+    const graph = graphOf(layout);
+    const st = bodyState(G);
+    const sums = bodySums(graph, st);
+    const d = distances(graph, st);
+    return G.necrotic.slice().sort((a, b) => (d.get(a) ?? 1e9) - (d.get(b) ?? 1e9)).find((x) => fitsReach(graph, sums, x)) || null;
 }
 /** The innermost dead room that the hearts can reach comes back. */
 function reviveOne(s, layout) {
@@ -835,7 +894,13 @@ function reviveOne(s, layout) {
 export function pumpPath(s, layout, to) {
     if (!growOn(s) || !to) return [];
     const graph = graphOf(layout);
-    const body = new Set(s.grow.body);
+    // deep-pass4 (B413): the wave runs through the living flesh when it can (it ran through the dead, unsaid)
+    const dead = new Set(s.grow.necrotic || []);
+    const live = new Set(s.grow.body.filter((id) => !dead.has(id)));
+    const path = walk(graph, live, to);
+    return path.length > 1 || to === HEART ? path : walk(graph, new Set(s.grow.body), to);
+}
+function walk(graph, body, to) {
     const adj = new Map(graph.nodes.map((n) => [n.id, []]));
     for (const e of graph.edges) { adj.get(e.a)?.push(e.b); adj.get(e.b)?.push(e.a); }
     const prev = new Map([[HEART, null]]);
@@ -854,10 +919,13 @@ export function pumpPath(s, layout, to) {
     for (let id = to; id; id = prev.get(id)) out.unshift(id);
     return out;
 }
-/** Why a dead organ starves, in plain words: beyond the hearts' reach, or no people to eat. */
-export function starveWords(s, layout) {
-    const R = bodyRatios(s, layout);
-    return R.ratios.E < 1 || feedOf(s) > 0 ? 'Starving. The hearts do not reach it.' : 'Starving. There are no people to eat.';
+/** Why a dead organ starves, in plain words (deep-pass4, B413: what to do about it, too). */
+export const DEAD_WORDS = { heart: 'Dead. Grow a heart to reach it.', pump: 'Dead. Pump to bring it back.', vat: 'Dead. Grow a vat: there are no people to eat.' };
+export function starveWords(s, layout, id = null) {
+    if (feedOf(s) <= 0) return DEAD_WORDS.vat;
+    const graph = graphOf(layout);
+    if (id) return fitsReach(graph, bodySums(graph, bodyState(s.grow)), id) ? DEAD_WORDS.pump : DEAD_WORDS.heart;
+    return revivable(s, layout) ? DEAD_WORDS.pump : DEAD_WORDS.heart;
 }
 
 /* ------------------------------------------------------------------ the heart */
@@ -898,10 +966,13 @@ export function pump(s, layout, { beat = false } = {}) {
         out.done = fillTake(s, layout, out.fill);
         return out;
     }
-    if (G.necrotic.length && feedOf(s) > 0) {
-        const graph = graphOf(layout);
-        const d = distances(graph, bodyState(G));
-        out.to = [G.necrotic.slice().sort((a, b) => (d.get(a) ?? 1e9) - (d.get(b) ?? 1e9))[0]];
+    // deep-pass4 (B413): the blood goes to a dead room only when it can come back (the hearts reach it), and
+    // the view says so over it; else to the guts, as the tape says (the human pass: "ten beats gave one mass,
+    // the pumps went to the dead rooms, unsaid")
+    const back = revivable(s, layout);
+    if (back) {
+        out.to = [back];
+        out.reviving = back;
         G.revive = (G.revive || 0) + PUMP_REVIVE * k * surge;
         if (G.revive >= 1) { G.revive = 0; out.revived = reviveOne(s, layout); }
         return out;
@@ -1017,7 +1088,20 @@ export function growGauges(s, report, layout) {
 }
 
 /** The stamped word in GROW, without the prefix: always a thing the player can do now. */
-export const GROW_ADVICE = { take: 'TAKE A CHAMBER', pump: 'PUMP', rise: 'RISE', dream: 'DREAM' };
+export const GROW_ADVICE = { take: 'TAKE A CHAMBER', pump: 'PUMP', rise: 'RISE', dream: 'DREAM', hands: 'GROW THE HANDS' };
+/**
+ * deep-pass4 (B410): THE HANDS FIRST. Once the machine house is in reach the tape saves for it: GROW THE HANDS when
+ * the mass pays it, else PUMP ("The hands: ⧫ 12 to go."), a take in the meantime only while it leaves HANDS_KEEP of
+ * the price in hand (1: none; at a half the price grew with every room and stayed 30 to go). The play pass that
+ * followed the tape took every cheaper room and had no hands at 6:30; the sim's player saves (policy.js) too.
+ */
+export const HANDS_KEEP = 1;
+/** The hands' price while the machine house is in reach and not yet body, else Infinity. */
+export function handsPrice(s, layout) {
+    if (!growOn(s) || s.grow.body.includes(MACHINE) || !inReach(s, layout).includes(MACHINE)) return Infinity;
+    const o = takeOffer(s, layout, MACHINE, { dream: true });
+    return o && o.organs[0] ? o.organs[0].mass : Infinity;
+}
 /** The tape's words for growing an organ. */
 export const growWord = (organ) => `GROW A ${ORGAN_NAME[organ]}`;
 /** Is the body starving, or about to? */
@@ -1048,8 +1132,16 @@ export function adviseGrow(s, layout) {
         const far = (organPrice(s, layout, want) - G.mass) / Math.max(1e-9, R.massRate);
         return far > DREAM_ADVISE_S ? GROW_ADVICE.dream : GROW_ADVICE.pump;
     }
+    const hands = handsPrice(s, layout);
+    if (Number.isFinite(hands)) {
+        if (canAfford(s, layout, MACHINE)) return GROW_ADVICE.hands;
+        // saving: a cheaper room only while it leaves HANDS_KEEP of the hands' price in hand
+        const cheap = inReach(s, layout).filter((id) => id !== MACHINE && canAfford(s, layout, id))
+            .some((id) => G.mass - Math.min(...takeOffer(s, layout, id).organs.map((r) => r.mass)) >= HANDS_KEEP * hands);
+        return cheap ? GROW_ADVICE.take : GROW_ADVICE.pump;
+    }
     if (inReach(s, layout).some((id) => canAfford(s, layout, id))) return GROW_ADVICE.take;
-    if (G.necrotic.length && feedOf(s) > 0) return GROW_ADVICE.pump;
+    if (revivable(s, layout)) return GROW_ADVICE.pump;
     const wait = Number.isFinite(R.price) ? (R.price - G.mass) / Math.max(1e-9, R.massRate) : Infinity;
     return wait > DREAM_ADVISE_S ? GROW_ADVICE.dream : GROW_ADVICE.pump;
 }
@@ -1077,7 +1169,8 @@ export function growTarget(s, layout, word = adviseGrow(s, layout)) {
         }
         return pick ? pick.id : null;
     };
-    if (word === GROW_ADVICE.take) return best(inReach(s, layout));
+    if (word === GROW_ADVICE.hands) return MACHINE;
+    if (word === GROW_ADVICE.take) return best(inReach(s, layout).filter((id) => id !== MACHINE || !Number.isFinite(handsPrice(s, layout))));
     const organ = Object.keys(ORGAN_NAME).find((o) => word === growWord(o));
     if (!organ) return null;
     return best(inReach(s, layout), organ) || best(spareOrgans(s, layout, organ), organ);
@@ -1093,8 +1186,26 @@ export function growDoable(s, layout, word = adviseGrow(s, layout)) {
     if (word === GROW_ADVICE.rise) return riseReady(s, layout).ready;
     if (word === GROW_ADVICE.pump) return !s.grow.dreaming;
     if (word === GROW_ADVICE.dream) return !s.grow.dreaming;
+    if (word === GROW_ADVICE.hands) return canAfford(s, layout, MACHINE);
     if (word === GROW_ADVICE.take || Object.keys(ORGAN_NAME).some((o) => word === growWord(o))) return !!growTarget(s, layout, word);
     return false;
+}
+/**
+ * deep-pass4 (B410): THE RING'S HINT, when nothing is short: the organ on chamber `id` that gives most for its
+ * mass, its price weighed by how full its gauge already is (the sim's player chooses so). A play pass that took
+ * the cheap organ every time starved its mass and reached the hands a minute late.
+ * @returns {string|null}
+ */
+export function ringHint(s, layout, id) {
+    if (!growOn(s) || wantOrgan(s, layout)) return null;
+    const offer = takeOffer(s, layout, id);
+    if (!offer) return null;
+    const r = bodyRatios(s, layout).ratios;
+    const gauge = { gut: r.M, vat: r.F, heart: r.E, nerve: r.H };
+    const w = (o) => Math.max(0.6, Math.min(3, Number.isFinite(gauge[o]) ? gauge[o] : 3));
+    let best = null;
+    for (const x of offer.organs) if (gauge[x.organ] !== undefined && (!best || x.mass * w(x.organ) < best.mass * w(best.organ))) best = x;
+    return best ? best.organ : null;
 }
 /** deep-tension: the organ the body is short of now (dead flesh's fix, else the red gauge's), or null. */
 export function wantOrgan(s, layout) {
@@ -1132,13 +1243,19 @@ export function growNote(s, layout) {
         return `${label} is short.`;
     }
     if (G.take) return 'On the beat.';
+    // deep-pass4 (B413): the blood brings a dead room back: say so (it went there unsaid)
+    if (revivable(s, layout)) return 'The blood brings the dead back.';
+    const hands = handsPrice(s, layout);
+    if (Number.isFinite(hands) && !wantOrgan(s, layout)) return `The hands: ${MASS_SIGN} ${short(Math.max(1, Math.ceil(hands - G.mass)))} to go.`;
     const R = bodyRatios(s, layout);
     const fix = deadFix(s, layout);
     const want = fix || (R.ratios[R.weakest] < 1 ? GAUGE_ORGAN[R.weakest] : null);
     const price = want ? organPrice(s, layout, want) : R.price;
     const gap = Math.ceil(price - G.mass);
     if (!Number.isFinite(gap) || gap <= 0) return '';
-    return want ? `A ${ORGAN_NAME[want]}: ${MASS_SIGN} ${short(gap)} to go.` : `${MASS_SIGN} ${short(gap)} to go.`;
+    // deep-pass4: "PUMP. ⧫ 2 to go." (2 for what?): the next room
+    if (fix === 'heart') return `Dead rooms. A HEART reaches them: ${MASS_SIGN} ${short(gap)} to go.`;
+    return want ? `A ${ORGAN_NAME[want]}: ${MASS_SIGN} ${short(gap)} to go.` : `The next room: ${MASS_SIGN} ${short(gap)} to go.`;
 }
 /**
  * deep-organs: the organ that brings the dead back, or null: a VAT when there are no people to eat, a
@@ -1187,9 +1304,16 @@ export function canGrow(s, layout, organ) {
 export const REGROW_SPARE = 1.5;
 export function spareOrgans(s, layout, organ = null) {
     const G = s.grow;
+    // deep-pass4 (B413): THE DEAD BLOCK THE FRONT. Dead flesh does not spread: with the dead at both ends of
+    // a row and no heart in reach, nothing could be taken and nothing came back (a player who never grew a
+    // heart sat an hour on PUMP). Then any living organ may be grown into the heart that reaches them.
+    if (organ && organ === deadFix(s, layout) && !inReach(s, layout).length) {
+        return Object.keys(G.organs).filter((id) => G.organs[id] !== organ && !G.necrotic.includes(id));
+    }
     const R = bodyRatios(s, layout);
     const key = { gut: 'M', vat: 'F', heart: 'E', nerve: 'H' };
-    const ids = Object.keys(G.organs).filter((id) => G.organs[id] !== organ && !G.necrotic.includes(id) && (R.ratios[key[G.organs[id]]] ?? 0) >= REGROW_SPARE);
+    const again = new Set(G.regrownIds || []);
+    const ids = Object.keys(G.organs).filter((id) => G.organs[id] !== organ && !G.necrotic.includes(id) && !again.has(id) && (R.ratios[key[G.organs[id]]] ?? 0) >= REGROW_SPARE);
     // and its gauge still green without it (one kind checked once: the farthest of that kind first)
     const ok = {};
     return ids.filter((id) => {

@@ -725,3 +725,44 @@ Seeds 2 to 5: 31m49s to 35m36s (one colony of 61 chambers, SLEEP 16 min).
 **Not done here.** Wakes only for buying are 2.3 per six minutes of SLEEP (one a tier; the target was 2). The saves for
 the next tier in SLEEP have nothing to buy (the mind, the lamps and Surface fill them). accept-iv-cut.mjs not run. The
 big numbers (1e17) and "It gives 8 capacity and a word." untouched.
+
+## Built: pass 4 (deep-pass4)
+
+The third human pass of v1.84.0 (docs/playtests/2026-10-03-chapter-iv-human-pass-3.md): yes, with a warning, the end of
+GROW out of reach and mostly waiting. Built on the branch `deep-pass4` (B410 to B419); the play log
+docs/playtests/2026-10-04-pass4-play.md.
+
+**The rise in reach** (organs.js, grow.js, policy.js). `FLOOR_MOMENTUM` 1.1: every full floor multiplies every gut's mass
+(`bodySums().momentum`, in `gutRate`). The finale (`finaleOf`): once every floor above the deepest is full, a take there
+costs `FINALE_MASS` and `FINALE_WORK` (0.7) times `1 - FINALE_RAMP * share` (0.65: a third at the last room), its trickle
+`FINALE_TRICKLE` (3) times, and the deepest floor's rooms ask of PULSE and FLESH what the floor above asks (the finale
+is downhill). The view: `quake(k)` on the strata view, a crack term (`uQuake`) radiating from the crust and a small bow
+(`uRise`), k from 0.15 to 1 with the share; a jolt and a swell on each room, "BREAKING THROUGH" when it starts. THE HANDS
+FIRST: with the machine house in reach the tape is PUMP with "The hands: ⧫ n to go." until GROW THE HANDS can be paid
+(`HANDS_KEEP` 1: no cheaper take meanwhile; at a half the price grew with each take and never came). `ringHint`: with
+nothing short the ring rings in gold the organ with the lowest price weighed by its gauge (the sim's player's rule). A
+room grown again (`regrownIds`) is never offered for it again. `DREAM_ADVISE_S` 90. Chosen where the brief left room:
+momentum on the mass only (the floors' cascade on output was already there), and the sim's human profile is
+`--human` (a pump every 1.5 s, three in five on the beat, 1.5 s to choose): it rises at 9m36s from iv-grow, the hands at
+3m17s, a payoff at least every 20 s after them; a human reads slower than the sim, so this is the low end of 10 to 12.
+
+**Dreams** (grow.js, organs.js, index.js). `DREAM_TRICKLE` 3.5 (1), `DREAM_MASS` 1.25 (3): the sim's dreamer (never
+pumps) is the slowest player, the drummer the quickest. `dreamPick`: no mark, the chamber the tape would point at. A click
+in a dream marks (`dreamTip`), the chambers in reach glow in it.
+
+**Prices** (deep.js `banded`). A price is memoised on the state (`priceMemo`, key `kind:base`, the base being the item at
+its level) the first time it is asked for after the hall; `PRICE_AHEAD` 2 times the band, since it no longer follows the
+income up (at 1 the act ran away: stars ×1e14, eleven buys a wake, Cryo VII by 16 min).
+
+**Pumps** (grow.js). `revivable`: the dead room a pump brings back (the innermost the hearts reach), or null, and then the
+blood goes to the guts. `DEAD_WORDS` over a dead room. `pumpPath` through living flesh. `spareOrgans` returns every living
+organ when the dead block the front with nothing in reach.
+
+**The mind** (deep.js, watcher.js, instruments.js, index.js). `rebootLoss`: a restart takes `REBOOT_LOSS` (a half) of the
+sleep's yield, read before the wake ends it; `restartWord` "FAULT: LOST ★ 11 M", `WAKE_WHY.lost`. `snapShare`:
+(elapsed / `SNAP_COOLDOWN_MS`) ^ `SNAP_CURVE` (0.7), at least `SNAP_MIN_SHARE` (0.2).
+
+**Bugs.** `VAT_ROOM` (0, 0.25, 0.5, 1): asleep the vats grow people past the beds. `drawDive`: past the first months
+the counter is the calendar year (word YEAR, unit THE COLONY SLEEPS), what the clock and the ruler's top read. Ruler labels
+`LABEL_GAP_PX` 30 apart, `LABELS_SHOWN` 3 and YEAR 0, and 18 px clear of the counters. `openOrganRing` slides clear of
+`#deep-heart`. `#deep-act` lets clicks through its empty box.

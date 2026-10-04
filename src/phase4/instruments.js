@@ -506,19 +506,26 @@ export function wakeWord(alarm) {
     case 'stall': return a.why === 'fuel' ? 'POWER' : faultWord(FAULT_CAUSE[a.type] || '');
     case 'few': return faultWord('TOO FEW PEOPLE');
     case 'scouts': return faultWord('SCOUTS');
-    case 'reboot': return a.voice ? 'VOICE' : faultWord('THE MIND RESTARTED');
-    default: return a.rebooted ? faultWord('THE MIND RESTARTED') : 'AWAKE';
+    case 'reboot': return a.voice ? 'VOICE' : restartWord(a.lost);
+    default: return a.rebooted ? restartWord(a.lost) : 'AWAKE';
     }
+}
+/** deep-pass4 (B414): a restart says what it cost on the lamp ("FAULT: LOST ★ 11 M"); with nothing lost,
+ *  what happened. */
+export function restartWord(lost) {
+    return lost && lost.stars > 0 ? faultWord(`LOST ★ ${short(lost.stars)}`) : faultWord('THE MIND RESTARTED');
 }
 
 /** deep-pass3 (B400): the wakes that had no word on screen say why, once, low, on the wake (as a night
  *  missed is told). The FAULT of a restart says what it cost. */
 export const WAKE_WHY = {
     reboot: 'Nobody steadied the mind, so everyone woke.',
+    // deep-pass4 (B414): and what the restart cost
+    lost: 'Nobody steadied the mind. It restarted and lost half of this sleep.',
     first: 'The first sleep is short. The next ones go deeper.',
     look: 'Woke to look in on the colony.',
 };
-export const wakeWhy = (alarm, rebooted = false) => (rebooted ? WAKE_WHY.reboot : WAKE_WHY[(alarm && alarm.kind) || ''] || '');
+export const wakeWhy = (alarm, rebooted = false) => (rebooted ? (alarm && alarm.lost && alarm.lost.stars > 0 ? WAKE_WHY.lost : WAKE_WHY.reboot) : WAKE_WHY[(alarm && alarm.kind) || ''] || '');
 
 /* ---- THE MIND GOES ------------------------------------------------------------------------
    As the Watcher's stability falls in the sleep, the screen hallucinates. Each kind comes under

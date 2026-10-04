@@ -173,12 +173,27 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
          * @param {{organs:{organ:string, mass:number, ok:boolean, cheap:boolean, need:string}[], have:number,
          *          regrow?:string|null, onPick:(organ:string)=>void}} o
          */
-        openOrganRing(id, x, y, { organs, have = 0, regrow = null, want = null, short: shortWord = '', onPick }) {
+        openOrganRing(id, x, y, { organs, have = 0, regrow = null, want = null, hint = null, short: shortWord = '', onPick }) {
             closeRoomRing();
             closeOrganRing();
             oring = { id };
             const at = scene && typeof scene.screenOfNode === 'function' ? scene.screenOfNode(id) : null;
-            const px = at ? at.x : x, py = at ? at.y : y;
+            let px = at ? at.x : x, py = at ? at.y : y;
+            // deep-pass4 (B418): the ring never lies over the heart (its SURGE word and one of the ring's own
+            // prices were hidden on floor 2): slide it away from the heart until they are clear
+            const heart = typeof document !== 'undefined' ? document.getElementById('deep-heart') : null;
+            if (heart && !heart.hidden) {
+                const h = heart.getBoundingClientRect();
+                if (h.width > 0) {
+                    const hx = (h.left + h.right) / 2, hy = (h.top + h.bottom) / 2 + 10;   // the SURGE word is under it
+                    const clear = RING_R + 44 + Math.max(h.width, h.height) / 2 + 18;
+                    const dx = px - hx, dy = py - hy, d = Math.hypot(dx, dy);
+                    if (d < clear) {
+                        const ux = d > 1 ? dx / d : (px < window.innerWidth / 2 ? -1 : 1), uy = d > 1 ? dy / d : 0;
+                        px = hx + ux * clear; py = hy + uy * clear;
+                    }
+                }
+            }
             const mx = Math.max(RING_R + 40, Math.min(window.innerWidth - RING_R - 40, px));
             const my = Math.max(RING_R + 40, Math.min(window.innerHeight - RING_R - 50, py));
             ringHost.style.left = `${mx}px`;
@@ -194,7 +209,7 @@ export function createViewHooks(scene, { ringHost, isEmpty, onIcons, graph = () 
                 const a = n === 1 ? -Math.PI / 2 : -Math.PI / 2 + i * (2 * Math.PI / n) - (n === 4 ? Math.PI / 4 : 0);
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = `deep-ring-room deep-ring-organ${r.ok ? ' is-ok' : ''}${r.cheap ? ' is-cheap' : ''}${want === r.organ ? ' is-want' : ''}`;
+                b.className = `deep-ring-room deep-ring-organ${r.ok ? ' is-ok' : ''}${r.cheap ? ' is-cheap' : ''}${want === r.organ ? ' is-want' : ''}${!want && hint === r.organ ? ' is-hint' : ''}`;
                 b.dataset.organ = r.organ;
                 b.style.left = `${(RING_R * Math.cos(a)).toFixed(1)}px`;
                 b.style.top = `${(RING_R * Math.sin(a)).toFixed(1)}px`;

@@ -43,7 +43,7 @@ import {
     sleepTrouble, repairTick, MIN_SLEEPERS, RESURFACE_AT, resolveDueProbes,
     ordersDone, mourn, orderBuild, nextPrice, chambersAhead, isQueued, buildEta, QUEUE_MAX, queueRunsAsleep,
     cancelOrder, digSpare, nextCryo, CRYO_TOP, FEED_MAX, buildProgress,
-    setIncome, beginSleepYield, endSleepYield, sleepCap,
+    setIncome, beginSleepYield, endSleepYield, sleepCap, rebootLoss,
 } from './deep.js';
 import { pushFeed, alarmLine } from './advisor.js';
 import { short, span, cryoRoad, cryoNeed, ORE_SIGN, signHtml, rateText, FULL_TEXT } from './readout.js';
@@ -83,6 +83,7 @@ import {
     takeTip, toggleMark, markThreads, dreamStart, dreamWake, dreamEnd, dreaming, dreamDaysAt,
     pump, beatPhase, onBeat, PUMP_COOLDOWN_MS, peoplePerSecond, organMultiplier,
     takeOffer, startTake, taking, bodyRatios, pumpPath, ORGAN_NAME, HANDS_PULSE, handsGames, growNote, wantOrgan, GAUGE_ORGAN,
+    finaleOf, dreamTip, ringHint,
 } from './grow.js';
 import { surgeOf } from './organs.js';
 import { MASS_SIGN } from './readout.js';
@@ -375,11 +376,17 @@ export function init() {
         const slept = Math.max(0, day + diveOffset);
         // under two years the count is in months, so the first sleep is seen to move
         const months = slept < 2 * DAYS_PER_YEAR;
-        const text = stutter(group(Math.floor(months ? slept / 30 : slept / DAYS_PER_YEAR)));
+        // deep-pass4 (B417): asleep past the first months the counter is THE YEAR, the one the clock wakes to and
+        // the top of the ruler reads (it counted the years slept: "1 798 YEARS" over a newest layer of
+        // "YEAR 1 103", and the clock woke at 1 106)
+        const calendar = state.asleep && !months;
+        const n0 = Math.floor(calendar ? Math.max(0, day) / DAYS_PER_YEAR : months ? slept / 30 : slept / DAYS_PER_YEAR);
+        const text = stutter(group(n0));
         // deep-tension: "1 MONTHS" read wrong
-        const n0 = Math.floor(months ? slept / 30 : slept / DAYS_PER_YEAR);
-        const unit = months ? (n0 === 1 ? 'MONTH' : 'MONTHS') : (n0 === 1 ? 'YEAR' : 'YEARS');
+        const unit = calendar ? 'THE COLONY SLEEPS' : months ? (n0 === 1 ? 'MONTH' : 'MONTHS') : (n0 === 1 ? 'YEAR' : 'YEARS');
         if (ui.diveUnit.textContent !== unit) ui.diveUnit.textContent = unit;
+        const word = calendar ? 'YEAR' : state.asleep ? 'THE COLONY HAS SLEPT' : '';
+        if (word && ui.diveWord && ui.diveWord.textContent !== word) ui.diveWord.textContent = word;
         if (ui.diveYears.textContent !== text) {
             ui.diveYears.textContent = text;
             const n = text.replace(/\D/g, '').length;
@@ -1337,7 +1344,7 @@ export function init() {
         const v = viewOf(state, layout);
         const lone = loneGrafts(state);
         // deep-organs: the chambers in reach glow, and the living organs the tape asks to grow again
-        const reach = dreaming(state) ? [] : v.glow;
+        const reach = dreaming(state) ? v.reachable : v.glow;   // deep-pass4: in a dream a click sends it there
         const key = `g|${v.body.join(',')}|${v.necrotic.join(',')}|${reach.join(',')}|${lone.join(',')}`;
         if (key !== fleshKey) { fleshKey = key; hooks.setBody([...v.body, ...lone], v.necrotic, reach, lone); }
         // deep-organs: the organs in their chambers; the take in progress grows its organ in and its fill
@@ -1347,6 +1354,17 @@ export function init() {
         if (okey !== organKey) { organKey = okey; hooks.setOrgans?.(v.organs, { taking: t, dead: v.necrotic }); }
         hooks.setTaking?.(t);
         syncMarks();
+        // deep-pass4 (B410): the finale: the strata over the colony crack more with every room of the last floor
+        const fin = risen(state) ? null : finaleOf(state, layout);
+        const qk = fin ? 0.15 + 0.85 * fin.share : 0;
+        if (qk !== quakeShown) {
+            if (fin && quakeShown === 0 && !loadingBody) {
+                sound?.event('swell');
+                hooks.floatText('h0', 'BREAKING THROUGH', 'is-cascade');
+            }
+            quakeShown = qk;
+            hooks.quake?.(qk, { jolt: !loadingBody && qk > 0 });
+        }
         // the camera follows the front down, a floor at a time (never once the player holds it)
         const floorOf = (id) => Math.max(0, graphOf(layout).nodes.find((n) => n.id === id)?.floor ?? 0);
         const handsNow = v.body.includes('machine') && !handsShown;
@@ -1413,6 +1431,7 @@ export function init() {
         sound?.event('gift');
     }
     let handsShown = false;
+    let quakeShown = 0;                 // deep-pass4: the finale's cracks as last drawn
     let holdFocusUntil = 0;             // the camera stays on the hands this long
     let loadingBody = false;            // the first drawing after a load: the hands are hands already
     /** The panel, the drawer and the view go over to the body. */
@@ -1479,7 +1498,16 @@ export function init() {
     function takeAt(id) {
         if (busy || paused() || state.asleep) return false;
         if (!growOn(state)) return graftAt(id);
-        if (risen(state) || dreaming(state)) return false;
+        if (risen(state)) return false;
+        // deep-pass4 (B411): in a dream a click on a chamber sends the dream there (it grows toward it next)
+        if (dreaming(state)) {
+            if (id === 'h0' || state.grow.body.includes(id)) return false;
+            const on = toggleMark(state, layout, id);
+            if (on) sound?.event('ring');
+            afterChange();
+            showTip(id, tipAt.x, tipAt.y);
+            return on;
+        }
         if (id === 'h0') return pumpHeart();
         // deep-organs: the chamber being taken pumps too (the wave runs to it)
         const T = taking(state);
@@ -1490,8 +1518,11 @@ export function init() {
             showTip('', 0, 0);
             // deep-tension: the organ the body is short of, marked in the ring, its gauge named in the middle
             const want = wantOrgan(state, layout);
+            // deep-pass4 (B410): with nothing short the ring still rings, in gold, the organ of the lowest gauge (a
+            // play pass that took the cheap organ every time starved its mass and reached the hands a minute late)
+            const hint = want ? null : ringHint(state, layout, id);
             hooks.openOrganRing(id, tipAt.x, tipAt.y, {
-                organs: offer.organs, have: state.grow.mass, regrow: offer.regrow, want,
+                organs: offer.organs, have: state.grow.mass, regrow: offer.regrow, want, hint,
                 short: want ? `${GROW_GAUGES.find((g) => g.c === Object.keys(GAUGE_ORGAN).find((k) => GAUGE_ORGAN[k] === want))?.label} is short.` : '',
                 onPick: (organ) => chooseOrgan(id, organ),
             });
@@ -1538,7 +1569,7 @@ export function init() {
         // deep-tension: the ring of organs speaks for itself; no tip over it
         if (hooks.organRingAt) id = '';
         const t = !id ? { text: '', red: false }
-            : growOn(state) ? (dreaming(state) ? { text: '', red: false } : takeTip(state, layout, id))
+            : growOn(state) ? (dreaming(state) ? dreamTip(state, layout, id) : takeTip(state, layout, id))
                 : { text: !state.asleep ? (graftWords(state, layout, id) || graftedWords(id)) : '', red: false };
         const el = ui.takeTip;
         if (!el) return;
@@ -1609,6 +1640,7 @@ export function init() {
                     if (r.done) tookIt(r.done);
                     else if (r.take) { const T = taking(state); if (T) hooks.floatText(T.id, `${Math.round(100 * T.done / T.work)} %`, 'is-small is-fill'); }
                     if (r.revived) hooks.floatText(r.revived, 'BACK', 'is-small');
+                    else if (r.reviving) hooks.floatText(r.reviving, 'REVIVING', 'is-small');
                     if (r.mass > 0) hooks.floatText(to, `+${MASS_SIGN} ${r.mass < 10 ? (Math.round(r.mass * 10) / 10).toFixed(1) : formatCount(Math.round(r.mass))}`, 'is-small is-mass');
                     afterChange({ save: false });
                 },
@@ -1918,6 +1950,7 @@ export function init() {
         closeSurface(w);
         // deep-econ: the prices follow the income from this wake on; the cap counts again next sleep
         // (deep-pass3, B404: the drawer says so, and the tape wakes only for what the new prices still pay)
+        const got = state.sleepGot ? { ...state.sleepGot } : null;   // deep-pass4 (B414): what a restart loses
         endSleepYield(state);
         setIncome(state);
         // deep-econ (B335): a night that came in this sleep is said again, low, once the panel is back
@@ -1932,6 +1965,10 @@ export function init() {
         if (bodyWhole(w) && !w.gone) { await lastWakeUp(); return; }
         if (!['manual', 'debug', 'first', 'look'].includes(alarm.kind)) sound?.event('knock');
         const rebooted = alarm.kind !== 'reboot' && (alarmHit(w, alarm.kind) || !!alarm.rebooted);
+        // deep-pass4 (B414): a restart of the mind (not Surface's voice) loses half of what this sleep brought
+        if (rebooted || (alarm.kind === 'reboot' && !alarm.voice)) {
+            alarm = { ...alarm, lost: rebootLoss(state, got) };
+        }
         const said = alarm.kind === 'reboot' ? [alarmLine(alarm)] : watcherLines(w, [alarmLine(alarm)]);
         if (rebooted) said.push(alarmLine({ kind: 'reboot' }));
         logLines(said);
@@ -1952,9 +1989,10 @@ export function init() {
         recomputeGates();
         updateChrome();
         // the one lamp, and the panel's lights back on, while they walk out
-        panel.alarm(wakeWord(rebooted && alarm.kind !== 'reboot' ? { kind: 'reboot' } : alarm));
+        panel.alarm(wakeWord(rebooted && alarm.kind !== 'reboot' ? { kind: 'reboot', lost: alarm.lost } : alarm));
         alarmUntil = performance.now() + ALARM_LAMP_MS;
-        if (missed) recallNight(missed);
+        // deep-pass4 (B414): a restart that cost something says so first (the night's line was typed in the night)
+        if (missed && !(alarm.lost && alarm.lost.stars > 0)) recallNight(missed);
         else {
             // deep-pass3 (B400): a restart, the first sleep's end, a look: said once, low, with the lamp
             const why = wakeWhy(alarm, rebooted || (alarm.kind === 'reboot' && !alarm.voice));
@@ -2037,11 +2075,12 @@ export function init() {
     function snapBase() {
         // deep-econ (B337): the snap is the sleep's alone: awake (or in a dream) a click makes no sound
         if (!state.asleep || busy || dreaming(state)) return;
+        // deep-pass4 (B415): a click inside the cooldown counts too, a smaller share (watcher.js snapShare);
+        // the ring round the cursor shows the charge
         if (snapWait(state.watcher, Date.now()) > 0) {
             ui.snapRing?.classList.remove('is-nudged');
             void ui.snapRing?.offsetWidth;
             ui.snapRing?.classList.add('is-nudged');
-            return;
         }
         scene?.snap();
         clearUntil = performance.now() + SNAP_CLEAR_MS;
@@ -2094,7 +2133,7 @@ export function init() {
         const asleep = !!state.asleep;
         const over = !!pointer && !!scene && scene.hitsBase(pointer.x, pointer.y);
         const wait = asleep && !choosing ? snapWait(state.watcher, Date.now()) : 0;
-        ui.sceneHost.classList.toggle('is-over-base', asleep && over && wait <= 0);
+        ui.sceneHost.classList.toggle('is-over-base', asleep && over);
         // awake, the cursor is a hand over an empty chamber
         const emptyUnder = !asleep && over && !busy && hooks.emptyAt(pointer.x, pointer.y) >= 0;
         ui.sceneHost.classList.toggle('is-over-empty', emptyUnder);
@@ -2351,7 +2390,8 @@ export function init() {
         get organRingAt() { return hooks.organRingAt || ''; },
         get organRing() {
             return [...ui.ring.querySelectorAll('.deep-ring-organ')].map((b) => ({ organ: b.dataset.organ, ok: b.classList.contains('is-ok'),
-                cheap: b.classList.contains('is-cheap'), price: b.querySelector('.deep-ring-price').textContent.trim() }));
+                cheap: b.classList.contains('is-cheap'), want: b.classList.contains('is-want'), hint: b.classList.contains('is-hint'),
+                price: b.querySelector('.deep-ring-price').textContent.trim() }));
         },
         get organArt() { return hooks.organArt || []; },
         get ratios() { return growOn(state) ? bodyRatios(state, layout) : null; },

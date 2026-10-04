@@ -8,7 +8,7 @@ import {
     shouldGarble, garble, watcherLines, makePuzzle, puzzleDue, openPuzzle, armPuzzles,
     dismissPuzzle, sleepDays, driftYears, puzzleGapYears, puzzleStars,
     STABILITY_MAX, DRIFT_PER_SECOND, ALARM_DROP, ALARM_DROP_BAD, REBOOT_TO,
-    SNAP_COVERS, SNAP_SOFT_BONUS, snapGain, SNAP_COOLDOWN_MS, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST,
+    SNAP_COVERS, SNAP_SOFT_BONUS, snapGain, SNAP_COOLDOWN_MS, SNAP_MIN_SHARE, CAPACITY_K, CAPACITY_MAX, CAPACITY_PER_SECOND, PUZZLE_COST,
     GARBLE_BELOW, GARBLE_EVERY, WATCHER_NAMES, PUZZLE_STARS_MIN,
     beginSleep, firstSleep, snapWait, FIRST_SLEEP_DAYS, WATCHER_HELLO, openSurface,
 } from './watcher.js';
@@ -131,14 +131,25 @@ describe('the snap', () => {
         }
         expect(snapGain({ ...initialWatcher(), stability: 40 }, 3)).toBeGreaterThan(snapGain({ ...initialWatcher(), stability: 80 }, 3));
     });
-    test('at most once per cooldown of real time, capped at the top', () => {
+    test('a whole snap once per cooldown; deep-pass4 (B415): a quicker click counts for a share, capped at the top', () => {
         const w = initialWatcher();
         w.stability = 50;
         const g = snapGain(w, 2);
         expect(snap(w, 100000, 2)).toBeCloseTo(g, 9);
-        expect(snap(w, 100000 + SNAP_COOLDOWN_MS - 1, 2)).toBe(0);
-        expect(w.stability).toBeCloseTo(50 + g, 9);
-        expect(snap(w, 100000 + SNAP_COOLDOWN_MS, 2)).toBeGreaterThan(0);
+        // a click right after: never nothing (the human pass: eight quick clicks did nothing)
+        const g2 = snapGain(w, 2);
+        const quick = snap(w, 100000 + 100, 2);
+        expect(quick).toBeGreaterThan(0);
+        expect(quick).toBeCloseTo(g2 * SNAP_MIN_SHARE, 9);
+        // diminishing: four clicks a second for four seconds give more than one snap, less than three
+        const v = { ...initialWatcher(), stability: 40 };
+        snap(v, 1e6, 2);
+        const before = v.stability;
+        for (let k = 1; k <= 16; k++) snap(v, 1e6 + k * 250, 2);
+        const once = snapGain({ ...initialWatcher(), stability: before }, 2);
+        expect(v.stability - before).toBeGreaterThan(once);
+        expect(v.stability - before).toBeLessThan(3 * once * (1 + SNAP_SOFT_BONUS));
+        expect(snap(w, 100000 + 100 + SNAP_COOLDOWN_MS, 2)).toBeGreaterThan(0);
         w.stability = STABILITY_MAX - 1;
         expect(snap(w, 200000, 2)).toBeCloseTo(1, 9);
         expect(w.stability).toBe(STABILITY_MAX);

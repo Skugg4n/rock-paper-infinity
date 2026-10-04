@@ -31,7 +31,7 @@ import { cryoNeed, offerFor, lowPoint, stocks, nextOrePrice } from './readout.js
 import { buy as treeBuy, LEVEL_NODE, AUTO_NODE, cryoNode } from './tree.js';
 import {
     growOn, risen, riseReady, hungry, bodyPrice, buyBody, viewOf, graphOf, rise, bodySeen, bodyPays, toggleMark, dreamStart,
-    taking, takeOffer, startTake, bodyRatios, adviseGrow, deadFix, spareOrgans,
+    taking, takeOffer, startTake, bodyRatios, adviseGrow, deadFix, spareOrgans, growTarget, HANDS_KEEP,
 } from './grow.js';
 import { neededOrgan } from './organs.js';
 
@@ -206,6 +206,13 @@ export function pickTake(state, layout, style = 'balanced') {
     let best = null;
     if (style === 'naive') {
         for (const x of opts) if (!best || x.mass < best.mass) best = x;
+        // deep-pass4 (B413): with nothing in reach it does what the tape names (a heart for the dead)
+        if (!best && !reach.length) {
+            const id = growTarget(state, layout);
+            const word = adviseGrow(state, layout);
+            const organ = ['vat', 'gut', 'heart', 'nerve'].find((o) => word === `GROW A ${o.toUpperCase()}`);
+            if (id && organ) return { id, organ };
+        }
     } else {
         const R = bodyRatios(state, layout);
         const want = deadFix(state, layout) || (R.ratios[R.weakest] < 1 ? neededOrgan(R.ratios) : null);
@@ -229,7 +236,7 @@ export function pickTake(state, layout, style = 'balanced') {
     if (best && reach.includes('machine')) {
         // saving for the hands: a take in the meantime only while it leaves half the price in hand
         const m = takeOffer(state, layout, 'machine').organs[0];
-        if (state.grow.mass - best.mass < m.mass * 0.5) return null;
+        if (state.grow.mass - best.mass < m.mass * HANDS_KEEP) return null;
     }
     return best ? { id: best.id, organ: best.organ } : null;
 }

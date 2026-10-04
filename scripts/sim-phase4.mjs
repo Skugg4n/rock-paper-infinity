@@ -64,6 +64,7 @@ import { cryoRoad } from '../src/phase4/readout.js';
 import { placeGraft, graftOwed } from '../src/phase4/graft.js';
 // deep-swap: the body's graph follows the view the player sees (src/phase4/views.js)
 import { chosenView, placeFor } from '../src/phase4/views.js';
+import { growColony } from '../src/checkpoints.js';
 const viewArg = process.argv.indexOf('--view');
 const VIEW = chosenView(viewArg > 0 ? `?view=${process.argv[viewArg + 1]}` : '');
 setChamberPlace(placeFor(VIEW));
@@ -89,6 +90,25 @@ const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(s
 
 const s = initialDeepState();
 s.tree = initialTree();
+/* deep-pass4: --from iv-grow starts the run at the checkpoint the human passes play GROW from (the
+   question answered, 35 chambers on three floors), so the brief's numbers are the screen's. --human
+   pumps as a person does: once every HUMAN_PUMP_S, on the beat HUMAN_ON_BEAT of the time, and takes
+   HUMAN_CLICK_S to open a ring and choose after a take ends or a dream wakes. */
+const fromArg = process.argv.indexOf('--from');
+const FROM = fromArg > 0 ? process.argv[fromArg + 1] : null;
+const HUMAN = process.argv.includes('--human');
+/** --dreamer: never touches the heart; lies down to dream again the moment it wakes (B411's floor). */
+const DREAMER = process.argv.includes('--dreamer');
+const HUMAN_PUMP_S = 1.5, HUMAN_CLICK_S = 1.5;
+/** Three pumps in five land on the beat (60 %), spread the way a hand misses: on, on, off, on, off. */
+const humanBeat = (n) => [true, true, false, true, false][n % 5];
+let fromLayout = null;
+if (FROM === 'iv-grow') {
+  const { deep, layout } = growColony();
+  for (const k of Object.keys(s)) delete s[k];
+  Object.assign(s, deep);
+  fromLayout = layout;
+} else if (FROM) throw new Error(`sim: --from ${FROM}: only iv-grow`);
 // v1.46.0: the Watcher, REPORTED only (v1.48.0: its first sleep does not drift and ends after a year). The greedy player never clicks the base and never
 // solves a riddle, and a reboot does not wake this colony: the loop is the one the balance was
 // measured on. What it says is how an unattended Watcher would fare over the whole chapter.
@@ -418,11 +438,14 @@ function mixedLayout() {
 }
 function beginGrow() {
   if (growLayout) return;
-  growLayout = mixedLayout();
-  // the grafts go where rooms of their kind stand in the layout
-  const used = new Set();
-  s.graft = s.graft || { owed: 0, slots: [] };
-  s.graft.slots = graftTypes.map((t) => { const i = growLayout.slots.findIndex((x, k) => x === t && !used.has(k)); used.add(i); return `s${i}`; }).filter((id) => id !== 's-1');
+  if (fromLayout) growLayout = fromLayout;
+  else {
+    growLayout = mixedLayout();
+    // the grafts go where rooms of their kind stand in the layout
+    const used = new Set();
+    s.graft = s.graft || { owed: 0, slots: [] };
+    s.graft.slots = graftTypes.map((t) => { const i = growLayout.slots.findIndex((x, k) => x === t && !used.has(k)); used.add(i); return `s${i}`; }).filter((id) => id !== 's-1');
+  }
   normalizeGrow(s, growLayout, tickDay(JSON.parse(JSON.stringify(s)), false));
   growAt = real;
   lastProgress = real;
@@ -483,9 +506,18 @@ function growDay(days = 1) {
   for (const id of y.seen) seenAt[id] = real;
   return { r, y };
 }
+let handFreeAt = 0;                // --human: the next ring opens HUMAN_CLICK_S after a take or a wake
+const handsFree = () => !HUMAN || real >= handFreeAt;
+/* deep-pass4: after the hands, the longest stretch between two PAYOFFS (a room grown, a floor
+   cascading) and between two CHOICES (a ring opened: a take begun by hand, a dream pulled). */
+let lastPayoff = null, lastChoice = null, gapPay = [0, 0], gapChoice = [0, 0];
+function payoff() { if (handsAt !== null) { if (lastPayoff !== null && real - lastPayoff > gapPay[0]) gapPay = [real - lastPayoff, real]; lastPayoff = real; } }
+function choice() { if (handsAt !== null) { if (lastChoice !== null && real - lastChoice > gapChoice[0]) gapChoice = [real - lastChoice, real]; lastChoice = real; } }
 function afterTake(t) {
   if (!t) return;
   progressed();
+  payoff();
+  if (HUMAN) handFreeAt = real + HUMAN_CLICK_S;
   if (t.by === 'hand') grown.hand++; else grown.spread++;
   organsChosen[t.organ] = (organsChosen[t.organ] || 0) + 1;
   if (takeStartAt !== null && !t.regrow) { takeSecs.push(real - takeStartAt); takeStartAt = null; }
@@ -508,16 +540,17 @@ function afterGrowSecond(r) {
   if (real % 60 < 1) log.push({ min: Math.round(real / 60), year: +yr(s.day), humans: Math.round(s.humans), starsDay: +r.stars.toPrecision(3), flesh: +fleshShare(s, growLayout).toFixed(2), necrotic: s.grow.necrotic.length, stars: +s.stars.toPrecision(3) });
   noteStuck();
 }
-function growSecond() {
+async function growSecond() {
   if (s.grow.dreaming) { dreamSecond(); return; }
   // awake: a day a real second, and the player acts on it
   const { r } = growDay(1);
   real += 1;
   // the heart, at a human rate: a pump every PUMP_EVERY_S, on the beat half the time
   pumpClock += 1;
-  while (pumpClock >= PUMP_EVERY_S && !risen(s)) {
-    pumpClock -= PUMP_EVERY_S;
-    const beat = onBeatTurn(pumpTurn++);
+  const every = HUMAN ? HUMAN_PUMP_S : PUMP_EVERY_S;
+  while (pumpClock >= every && !risen(s) && !DREAMER) {
+    pumpClock -= every;
+    const beat = HUMAN ? humanBeat(pumpTurn++) : onBeatTurn(pumpTurn++);
     const p = pump(s, growLayout, { beat });
     if (!p) break;
     pumpLog.n++; if (beat) pumpLog.on++; pumpLog.fill += p.fill;
@@ -531,16 +564,21 @@ function growSecond() {
   for (let round = 0; round < TAKES_PER_SECOND + 4 && !s.grow.dreaming && !risen(s); round++) {
     let did = false;
     for (const a of decideGrow(s, growLayout, STYLE)) {
-      if (a.kind === 'take' && takes >= TAKES_PER_SECOND) break;
+      if (a.kind === 'take' && (takes >= TAKES_PER_SECOND || !handsFree())) break;
       if (a.kind === 'body' && boughtNow) continue;
       if (!pressGrow(s, growLayout, a, r.stars, r.minerals)) continue;
       did = true;
+      if (a.kind === 'take' || a.kind === 'dream') choice();
       if (a.kind === 'take') { takes++; takeStartAt = real; progressed(); decided(); choseOrgan(a.organ); }
       if (a.kind === 'body') { boughtNow = true; progressed(); grown.items.push(`${a.id} ${s.grow.lv[a.id]} ${fmt(real)}`); events.push({ real, day: s.day, e: `body ${a.id} ${s.grow.lv[a.id]}` }); }
       if (a.kind === 'rise') { progressed(); events.push({ real, day: s.day, e: 'RISE' }); }
       if (a.kind === 'dream') { dreams++; dreamInto = 0; real += DREAM_DOWN_SECONDS; events.push({ real, day: s.day, e: `dream toward ${s.grow.marks.join(', ')}` }); }
     }
     if (!did) break;
+  }
+  if (DREAMER && !s.grow.dreaming && !risen(s) && handsFree()) {
+    const { dreamStart } = await import('../src/phase4/grow.js');
+    if (dreamStart(s, growLayout)) { dreams++; dreamInto = 0; real += DREAM_DOWN_SECONDS; decided(); }
   }
   afterGrowSecond(r);
 }
@@ -553,6 +591,7 @@ function dreamSecond() {
     dreamEnd(s);
     dreamWoke[woke] = (dreamWoke[woke] || 0) + 1;
     real += DREAM_WAKE_SECONDS;
+    if (HUMAN) handFreeAt = real + HUMAN_CLICK_S;
     decided();
   }
   afterGrowSecond(r);
@@ -560,7 +599,7 @@ function dreamSecond() {
 while (real < REAL_CAP && !risen(s) && (WATCHER ? !bodyEnd : true)) {
   if (ringAt === null && canAscend(s)) ringAt = real;
   if (hallAt === null && s.cryo >= 0) hallAt = real;
-  if (answered()) { beginGrow(); growSecond(); continue; }
+  if (answered()) { beginGrow(); await growSecond(); continue; }
   completeBuilds(s);                    // nothing is instant: orders land on their day
   const r = tickDay(s, false);
   for (const l of resolveDueProbes(s, slots(), rng)) { if (l.outcome === 'lost') scoutsLost++; if (l.outcome === 'monster') monsters++; }
@@ -769,6 +808,7 @@ if (growAt !== null) {
   console.log(`  organs ${Object.entries(organsChosen).map(([k, v]) => `${k} ${v}`).join(', ')}  pumps ${pumpLog.n} (on the beat ${pumpLog.on})  a take by hand ${q(0.5)} s (median; ${q(0.1)} to ${q(0.9)})  pace ${(paceSum / Math.max(1, paceN)).toFixed(2)} on average  weakest ${Object.entries(weakSecs).map(([k, v]) => `${k} ${Math.round(100 * v / Math.max(1, paceN))} %`).join(' ')}`);
   console.log(`  dreams ${dreams} (${fmt(dreamReal)} dreaming; woke ${Object.entries(dreamWoke).map(([k, v]) => `${k} ${v}`).join(', ') || 'never'})  longest stuck ${Math.round(longestStuck)} s (ending at ${fmt(stuckAt)})  cascades ${cascadeAt.map((c) => `${c.f + 1}:${fmt(c.real)}`).join(' ') || 'none'}  the drawer: ${['vats', 'appetite', 'spread', 'muscle'].map((id) => `${id} ${seenAt[id] === undefined ? 'never' : fmt(seenAt[id])}`).join('  ')}`);
   console.log(`  body items  ${grown.items.join('  ') || 'none'}`);
+  if (handsAt !== null) console.log(`  after the hands (deep-pass4, target 30 s)  longest between payoffs ${Math.round(gapPay[0])} s (ending ${fmt(gapPay[1] - growAt)} into GROW)  between choices ${Math.round(gapChoice[0])} s (ending ${fmt(gapChoice[1] - growAt)})  |  the hands ${fmt(handsAt - growAt)} into GROW, the rise ${risen(s) ? fmt(real - growAt) : 'never'}  [${HUMAN ? 'human: a pump every 1.5 s, 60 % on the beat' : 'drummer'}${DREAMER ? ', dreams only' : ''}]`);
   const real3 = shortages.filter((x) => x.c !== 'M');
   const rec = real3.filter((x) => x.chose);
   const mass = shortages.filter((x) => x.c === 'M');

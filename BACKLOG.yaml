@@ -3293,3 +3293,96 @@ items:
     status: done
     resolved_in: deep-pass3 (version at merge)
     notes: "docs/playtests/2026-10-03-pass3-play.md, rebuild-shots/pass3-*.png."
+
+  - id: B410
+    added: 2026-10-04
+    source: "human pass 3 D1, D2 (deep-pass4 brief)"
+    request: |
+      The rise in reach: from iv-grow a human pumping once per 1.5 s, on the beat 60 % of the time, reaches the rise in
+      about 10 to 12 minutes, the hands around minute 3 to 4; after the hands a choice and a payoff every 30 s, each
+      floor its own cascade, the last floor a finale (the body accelerates, the strata crack).
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "organs.js FLOOR_MOMENTUM (every full floor: all guts x1.1), the finale (FINALE_MASS/WORK 0.7 down to a third, FINALE_TRICKLE, the deepest floor asks what the floor above does), strata-view quake (cracks from the crust), the ring hints the lowest gauge's organ in gold. sim --from iv-grow --human."
+
+  - id: B411
+    added: 2026-10-04
+    source: "human pass 3 D1 (deep-pass4 brief)"
+    request: |
+      DREAM: a dream grows toward a room you clicked within a few seconds; dreaming slower than good pumping, never idle.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "DREAM_TRICKLE 1 -> 3.5, DREAM_MASS 3 -> 1.25, dreamPick (no mark: the tape's chamber), a click in a dream marks, dreamTip. sim --dreamer is the slowest player."
+
+  - id: B412
+    added: 2026-10-04
+    source: "human pass 3 D3 (deep-pass4 brief)"
+    request: |
+      Prices: a cryo tier's price is fixed when the tier opens and never moves; the same for every drawer price.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "deep.js banded memo (state.priceMemo, kind:base), PRICE_AHEAD 2 so the act keeps its pace."
+
+  - id: B413
+    added: 2026-10-04
+    source: "human pass 3 D4 (deep-pass4 brief)"
+    request: |
+      Pumps never vanish into dead rooms; a dead room says "Dead. Grow a heart to reach it."; pumps go elsewhere.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "grow.js revivable, pump reviving/mass, DEAD_WORDS, the wave through living flesh, REVIVING float, any organ may become the heart when the dead block the front (a naive player sat an hour on PUMP)."
+
+  - id: B414
+    added: 2026-10-04
+    source: "human pass 3 D5 (deep-pass4 brief)"
+    request: |
+      Ignoring the mind: the restart costs something real, shown on the wake lamp.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "deep.js rebootLoss (half of the sleep's yield), lamp FAULT: LOST ★ ..., line WAKE_WHY.lost."
+
+  - id: B415
+    added: 2026-10-04
+    source: "human pass 3 D6 (deep-pass4 brief)"
+    request: |
+      Steady clicks are never ignored: a quick rhythm with diminishing returns instead of a 4 s cooldown.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "watcher.js snapShare (elapsed / 4 s) ^ 0.7, at least 0.2."
+
+  - id: B416
+    added: 2026-10-04
+    source: "human pass 3 F (deep-pass4 brief)"
+    request: |
+      CULTURE VATS visibly grow people while asleep.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "deep.js VAT_ROOM: asleep the vats grow people into places of their own (a quarter, half, all the beds again)."
+
+  - id: B417
+    added: 2026-10-04
+    source: "human pass 3 F (deep-pass4 brief)"
+    request: |
+      The sleep counter and the newest layer agree; the ruler's YEAR labels never stack nor sit under the counters.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "index.js drawDive: past the first months the counter is the year (YEAR · 7 363 · THE COLONY SLEEPS); strata-view labels 30 px apart, three at most and YEAR 0, a wider margin round the counters."
+
+  - id: B418
+    added: 2026-10-04
+    source: "human pass 3 F (deep-pass4 brief)"
+    request: |
+      The organ ring never covers the heart's SURGE word or its own prices.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "view-hooks.js openOrganRing slides the ring clear of the heart."
+
+  - id: B419
+    added: 2026-10-04
+    source: "deep-pass4 brief"
+    request: |
+      Sim before/after (act, hands and rise from iv-grow with a human profile, longest without a decision) and a
+      silent human-eyed play pass: GROW 10 min from iv-grow to the rise, SLEEP 3 min from iv-cryo.
+    status: done
+    resolved_in: deep-pass4 (version at merge)
+    notes: "docs/playtests/2026-10-04-pass4-play.md, rebuild-shots/pass4-*.png; src/phase4/pass4.test.js."

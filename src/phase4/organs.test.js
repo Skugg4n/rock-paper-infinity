@@ -3,7 +3,7 @@ import {
     ORGANS, CHEAP, cheapOrgans, takeMass, regrowMass, takeWork, pumpFill, trickleFill, bodySums, pulseRatio,
     nerveRatio, massRate, paceOf, weakestOf, heartPump, beyondReach, fitsReach, migrateOrgans, organOf, fullFloors,
     neededOrgan, PUMP_STEP, TAKE_FLOOR, WORK_FLOOR, PUMP_ON_BEAT, DEMAND_FLOOR, SUPPLY_FLOOR, FULL_FLOOR, PACE_MIN,
-    TRICKLE, DREAM_TRICKLE, LID_REACH, ORGAN_K, surgeOf, SURGE_MAX,
+    TRICKLE, DREAM_TRICKLE, LID_REACH, ORGAN_K, surgeOf, SURGE_MAX, TAKE_WORK,
 } from './organs.js';
 import { graphFromSlots, distances, HEART, MACHINE } from './growth.js';
 
@@ -54,10 +54,12 @@ describe('the pump', () => {
         expect(trickleFill({ spread: 2 })).toBe(2 * TRICKLE);
         // deep-tension: a pump a second, four in five on the beat, with the trickle under it
         const human = (4 * pumpFill({ beat: true }) + pumpFill({ beat: false })) / 5 + TRICKLE;
-        expect(human).toBeGreaterThan(1.8 * DREAM_TRICKLE);
         expect(human).toBeGreaterThan(4 * TRICKLE);
-        // a player who keeps the beat, a pump a second on it
-        expect(pumpFill({ beat: true, surge: surgeOf(SURGE_MAX) }) + TRICKLE).toBeGreaterThan(3.5 * DREAM_TRICKLE);
+        // deep-pass4 (B411): a dream grows a room of the first floor in a few seconds (it took 13), yet a player
+        // who keeps the beat, a pump a second on it with a heart or two, still fills faster than the dream
+        // (and the dream makes only DREAM_MASS times the mass: scripts/sim-phase4.mjs --dreamer is slowest)
+        expect(TAKE_WORK / DREAM_TRICKLE).toBeLessThan(5);
+        expect(pumpFill({ beat: true, surge: surgeOf(SURGE_MAX), hearts: 1.24 }) + TRICKLE).toBeGreaterThan(1.6 * DREAM_TRICKLE);
     });
 });
 
