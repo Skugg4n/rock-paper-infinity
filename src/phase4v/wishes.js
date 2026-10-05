@@ -163,6 +163,12 @@ export function stepWishes(s, sec) {
     }
 }
 
+/** One polite wish now (the stop that teaches the bubbles shows one at once). */
+export function spawnWish(s) {
+    s.wishes = normalizeWishes(s.wishes);
+    return spawn(s, pick(s, politeNow(s)));
+}
+
 /** A click on a bubble. Returns true when it popped. */
 export function popWish(s, id) {
     const w = s.wishes;

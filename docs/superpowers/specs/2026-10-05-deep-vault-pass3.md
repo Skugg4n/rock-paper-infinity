@@ -105,3 +105,24 @@ som dör ÄR Mr Hales stopp (E2). Därefter dör kapslar bara medan POWER är r�
 Checklistan visar varje organs effekt med ett ord: HEART · power, STOMACH · biomass, LUNGS · speed, SKIN · cost.
 TISSUE är kvar som utfyllnad. Ordningen man köper i ska ändra natten (hjärtat först tryggt och långsamt, magen först rikt men
 kapslar dör, lungorna först snabbt), och simuleringen ska visa tre tydligt olika nätter.
+
+## Byggt (v1.87.0)
+
+Kod: `src/phase4v/tutorial.js` (stoppen A och E, handen med kort, målraden; rent, testat i `tutorial.test.js`),
+`story.js` (rösterna: `speak`, bubblorna på kartan, loggen), `vault.js` (regler: kryobayen i natten, G1, G3, G4),
+`view.js` (rummen i människornas skala med namn, staden, slangen, fokusramen, pratbubblorna), `index.js` (stopprutan,
+målraden, inforutan vid rummet, dubbelklick, checklistan med effekter). Simuleringen spelar stoppen och tre ordningar
+(`node scripts/sim-vault.mjs --order=heart|stomach|lungs`).
+
+**Avsteg, och varför**
+- E5 och G4 krockar: E5 säger att bara HEART går att välja första gången, G4 att ordningen man köper i ska ändra natten.
+  G4 är Olas senare önskan, så E5 är ett stopp med rådet `Start with a heart.` och en markering, men inget lås.
+- E2 säger att kapslarna svälter, G3 att de bara dör när POWER är rött. Byggt så: Mr Hale dör alltid efter den lugna
+  starten (köttlabbet är tomt), därefter dör kapslar bara medan strömmen inte räcker, och kryobayens rad säger det
+  (`Not enough power. The pods are failing.`).
+- HEART vilar inte längre maskinen (G4 vill att strömmen HOPPAR när hjärtat är klart); maskinen nöts i natten ner till
+  10 %. En mage drar ström (6), vävnad gör ingen. Så hjärtat först är tryggt, magen först rikt men kapslar dör.
+- Sviterna behåller sitt fönsterrutnät (de boende syns som tända fönster); alla andra rum är omritade med figurer.
+- Kort som redan fanns i en gammal sparning eller checkpoint ligger i handen direkt.
+- Simuleringen landar på ca 18 min för hela akten (målet 20-25). En människa som läser stoppen och spelar på ▶ blir
+  längre; natten ca 6 min (målet 6-8).

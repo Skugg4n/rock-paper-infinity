@@ -374,7 +374,8 @@ export function init() {
         if (wish) { popWish(s, wish); afterAct(); return; }
         const i = view.slotAt(bx, by);
         if (armed && i >= 0 && V.canPlace(s, armed, i)) {
-            if (V.build(s, armed, i)) { armed = null; selected = i; }
+            // built: the box by the room closes, the room shows its building
+            if (V.build(s, armed, i)) { armed = null; selected = -1; }
             afterAct();
             return;
         }
@@ -405,7 +406,7 @@ export function init() {
         const st = s.tut && s.tut.stop;
         if (st && typeof st.focus === 'string' && st.focus.startsWith('card:') && st.focus !== `card:${k}`) return;
         // a place already picked: build right there
-        if (selected >= 0 && V.canPlace(s, k, selected)) { V.build(s, k, selected); armed = null; afterAct(); return; }
+        if (selected >= 0 && V.canPlace(s, k, selected)) { V.build(s, k, selected); armed = null; selected = -1; afterAct(); return; }
         armed = armed === k ? null : k;
         sound.event('click');
         afterAct();
@@ -414,6 +415,8 @@ export function init() {
         const b = e.target.closest('[data-act]');
         if (!b || b.disabled) return;
         V.act(s, b.dataset.act, selected);
+        // digging: the tile's box goes with it
+        if (b.dataset.act === 'dig') selected = -1;
         afterAct();
     }, { signal });
     root.querySelector('.v-time').addEventListener('click', (e) => {

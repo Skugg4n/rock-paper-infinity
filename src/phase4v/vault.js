@@ -583,7 +583,7 @@ function checkNight(s) {
         s.nextNightLineAt = NIGHT_FIRST_LINE_S;
         sfx(s, 'night');
         // the night and the goal: the one thing to do from here
-        moment(s, 'goal', GOAL_LINES);
+        if (!tutOn(s)) moment(s, 'goal', GOAL_LINES);
     }
 }
 /** The night's first dead: a name; then the pods are a count. */
@@ -1247,7 +1247,7 @@ export function describe(s, i) {
         }
         case 'suites': return 'Beds for 100.';
         case 'mine': return `Digs ${MINE_ORE[r.lvl - 1]} ore a day.`;
-        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(bayOccupants(s, i))} asleep here.${s.phase === 'night' && s.asleep > 0 && power(s).short && s.fallenCount > 0 ? ` ${PODS_STARVE}` : ''}`;
+        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(bayOccupants(s, i))} asleep here.${s.phase === 'night' && s.asleep > 0 && power(s).short && s.reclaimed > 0 ? ` ${PODS_STARVE}` : ''}`;
         case 'game': return r.lvl >= 2 ? `Game studio. They sell games to each other: ${GAME_STUDIO_ORE} ore a day.` : 'Screens and games.';
         case 'gym': return r.lvl === 2 ? 'Weights, a track and a pool.' : r.lvl === 3 ? 'Weights, a pool and a spa.' : 'Weights and a track.';
         default: return KINDS[r.kind].does;

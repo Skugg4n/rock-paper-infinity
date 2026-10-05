@@ -1845,7 +1845,7 @@ export function createVaultView(canvas, opts = {}) {
             const up = stack.get(b.slot) || 0;
             stack.set(b.slot, up + bh + 6);
             const cx = r.x + r.w / 2;
-            const x = Math.max(4, Math.min(W - bw - 4, cx - bw / 2)), y = r.y - 10 - bh - up;
+            const x = Math.max(geo.x0 - 12, Math.min(W - bw - 4, cx - bw / 2)), y = r.y - 10 - bh - up;
             ctx.globalAlpha = b.alpha;
             ctx.fillStyle = rgba(VT.steel, 0.95);
             ctx.beginPath(); ctx.roundRect(x, y, bw, bh, 7); ctx.fill();

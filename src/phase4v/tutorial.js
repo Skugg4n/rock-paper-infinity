@@ -12,6 +12,7 @@ import {
     yearsPerSecond, roomsOf, beds,
 } from './vault.js';
 import { story, moment, GOAL_LINES } from './story.js';
+import { spawnWish } from './wishes.js';
 
 // ------------------------------------------------------------------ the words (player text, verbatim)
 export const STOPS = {
@@ -141,7 +142,10 @@ export function stepTutorial(s, sec) {
         }
         if (d.suites && !d.bubbles && beds(s) > 200) {
             t.at.wishes = t.clock;
-            if (s.wishes) { s.wishes.next = s.wishes.clock; s.wishes.firstAt = s.wishes.clock; s.wishes.waveNext = s.wishes.clock + 120; }
+            if (s.wishes) { s.wishes.next = s.wishes.clock + FIRST_WISHES_S; s.wishes.firstAt = s.wishes.clock; s.wishes.waveNext = s.wishes.clock + 120; }
+            // the first bubble is there while the stop says what it is (it lives longer, the game is paused)
+            const b = spawnWish(s);
+            if (b) b.life = 30;
             open(s, 'bubbles', STOPS.bubbles);
             return true;
         }
