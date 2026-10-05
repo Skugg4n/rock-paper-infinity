@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (deep-vault)
+
+### v1.86.2: the vault after its second independent test (docs/playtests/2026-10-05-vault-human-test-2.md)
+
+- **The night shows where to act.** Rock that can take a Vat or a Cryo Bay is framed, rock the body can grow into has the gold dashed frame (rock had none); the Vat card lights its places; a card with no place is not shown in the night.
+- **The night is short of biomass and ore.** Vats grow 0.15 a year, the body 0.05 a room; GROW INTO 120 + 15 per room; TAKE ONE +100; CUT POWER always there in the night; sleepers taken with a Cryo Bay give 10 each. The engine burns 2 ore a year, the mines give 0.6 a year a level.
+- **Shorter growing.** 10 + 12 years per room (at most 150); a room at once per vat and one per full floor; a full floor pushes into the floor above by itself. Sim: first vat to RISE about 8 min, never more than about 30 s without a possible decision.
+- **Small.** The sofas wait 25 days and every request has a bar that runs down under the CRT; the spa wave says a gym at level 3 has one; a popped bubble floats a larger "+2 %" and the MOOD number flashes; one truth for power (Engine Room, Vat card); GROW INTO first in every info box; "What is that under the floor?" once.
+
 ## v1.86.1 - 2026-10-05 (chapter IV, the dig after its independent test)
 
 - After the independent test: the drone hovers under a ledge instead of bouncing, up + side turns into the first opening (250 ms buffer); dug tunnels stay faintly visible and a dotted way home shows when power is short; POWER reads as capacity ("62 / 90") and the bar grows with upgrades; the status line is only shown while true; ore glints, rubble looks like rock; surface ore worth more (300 m in about 2.5 min); a find pops its value; the heart takes four beats, is centred, the panel fades, RISE shows the red mass climbing through the city; bigger drone, larger workshop text, a pod strip in the panel.

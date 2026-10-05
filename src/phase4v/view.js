@@ -245,12 +245,14 @@ export function createVaultView(canvas, opts = {}) {
                 progress(x, y, w, h, 1 - r.job.left / r.job.total, '#c9b79a');
                 pickaxe(x + w / 2, y + h / 2, t);
             } else if (ui.diggable && ui.diggable.has(i)) {
+                // a place: rock that can be dug by day, or take a vat or a Cryo Bay in the night
                 ctx.setLineDash([3, 4]);
-                ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+                ctx.strokeStyle = s.phase === 'night' ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.12)';
                 ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
                 ctx.setLineDash([]);
             }
             if (can) glow(x, y, w, h, t);
+            if (wanted && !sel) outline(x, y, w, h, 'rgba(255,214,120,0.85)', true, t);
             if (sel) outline(x, y, w, h, '#f1efe8');
             return;
         }
@@ -733,7 +735,7 @@ export function createVaultView(canvas, opts = {}) {
         for (let k = effects.length - 1; k >= 0; k--) {
             const e = effects[k];
             const age = (now - e.t0) / 1000;
-            const life = e.type === 'wave' ? 1.6 : 0.9;
+            const life = e.type === 'wave' ? 2 : 1.4;
             if (age > life) { effects.splice(k, 1); continue; }
             const a = 1 - age / life;
             ctx.save();
@@ -749,10 +751,13 @@ export function createVaultView(canvas, opts = {}) {
                 ctx.fillStyle = '#7d8691'; ctx.fillRect(e.x - 3, e.y - 2, 1.5, 1.5); ctx.fillRect(e.x + 1.5, e.y - 2, 1.5, 1.5);
                 if (e.text) { ctx.fillStyle = '#ff8a70'; ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(e.text, e.x, e.y - 14 - age * 22); }
             } else {
+                if (!e.text) { ctx.restore(); continue; }
                 ctx.fillStyle = e.type === 'wave' ? '#ffd678' : '#bdf5c4';
-                ctx.font = `600 ${e.type === 'wave' ? 18 : 12}px system-ui, sans-serif`;
+                ctx.font = `700 ${e.type === 'wave' ? 20 : 16}px system-ui, sans-serif`;
                 ctx.textAlign = 'center';
-                ctx.fillText(e.text || '+1', e.x, e.y - age * 26);
+                ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 3;
+                ctx.strokeText(e.text, e.x, e.y - 6 - age * 30);
+                ctx.fillText(e.text, e.x, e.y - 6 - age * 30);
             }
             ctx.restore();
         }

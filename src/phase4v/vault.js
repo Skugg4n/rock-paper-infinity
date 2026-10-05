@@ -75,6 +75,8 @@ export const NOVELTY_FLOOR = 0.4;
 export const REQUEST_EVERY = 8;
 export const REQUEST_EVERY_TURNED = 5;
 export const REQUEST_DUE = 12;
+/** The sofas: a new player must have time to dig and build. */
+export const FIRST_REQUEST_DUE = 25;
 export const REQUEST_GOOD = 8;
 export const REQUEST_BAD = 4;
 export const TURN_DAY = 100;
@@ -86,6 +88,8 @@ export const RIOT_EVERY = 8;
 
 // ---- the night
 export const RECLAIM_BIO = 70;
+/** A living sleeper is worth more than a dead one. */
+export const TAKE_BIO = 100;
 /** TAKE ONE opens the pods beside it: this many wake, terrified (mood minus TERROR, fading). */
 export const TAKE_WAKES = 3;
 export const TERROR = 60;
@@ -96,17 +100,20 @@ export const DESPAIR_AT = 5;
 export const SHAFT_EVERY_DAYS = 5;
 export const SHAFT_EVERY_S = 8;
 export const GROW_PRICE = 120;
-export const GROW_STEP = 10;
+export const GROW_STEP = 15;
 /** Each room takes longer than the last: years. */
-export const GROW_YEARS_STEP = 50;
-export const GROW_YEARS_MAX = 400;
-export const VAT_BIO = 0.3;
-export const FLESH_BIO = 0.08;
+export const GROW_YEARS_STEP = 12;
+export const GROW_YEARS_MAX = 150;
+export const VAT_BIO = 0.15;
+/** The body feeds itself a little, more the bigger it is. */
+export const FLESH_BIO = 0.05;
+/** Sleepers the body takes with a Cryo Bay are biomass too, less than one taken alone. */
+export const JOIN_BIO = 10;
 export const ENGINE_BURN = 2;
 export const ENGINE_WEAR_YEARS = 100;
-export const NIGHT_MINE = 1.5;
+export const NIGHT_MINE = 0.6;
 export const POD_FAIL_SECONDS = 4;
-export const GROW_YEARS = 5;
+export const GROW_YEARS = 10;
 export const VAT_POWER = 10;
 export const FLESH_POWER = 8;
 export const NIGHT_LINE_SECONDS = 20;
@@ -266,15 +273,10 @@ export function oreRate(s) {
 export function power(s) {
     let make = 0, use = 0;
     for (const r of s.rooms) {
-        if (r.flesh === 1) { make += r.kind === 'vat' ? VAT_POWER * r.lvl + Math.min(20, s.bio / 40) : FLESH_POWER; continue; }
+        if (r.flesh === 1) { make += r.kind === 'vat' ? vatPower(s) : FLESH_POWER; continue; }
         if (r.kind === 'rock' || r.kind === 'empty') continue;
         if (r.job && r.job.op === 'build') continue;
-        if (r.kind === 'engine') {
-            const wear = s.phase === 'night' ? Math.max(0.25, 1 - s.engineWear) : 1;
-            const fuel = s.phase === 'night' && s.ore < 1 ? 0 : 1;
-            make += ENGINE_POWER[r.lvl - 1] * wear * fuel;
-            continue;
-        }
+        if (r.kind === 'engine') { make += enginePower(s, r); continue; }
         if (r.broken) continue;
         // in the night the rooms of the awake stand dark: only the pods and the hydroponics draw
         if (s.phase === 'night' && awake(s) === 0 && r.kind !== 'cryo') continue;
@@ -282,6 +284,16 @@ export function power(s) {
     }
     use += s.asleep * POD_DRAW;
     return { make: Math.round(make), use: Math.round(use), short: use > make };
+}
+
+/** What a vat makes: 10, and a little more the more biomass there is (up to 20). */
+export function vatPower(s) { return VAT_POWER + Math.min(10, Math.floor(s.bio / 60)); }
+/** What the engine makes now: in the night it wears, and with no ore to burn it stops. */
+export function enginePower(s, r = s.rooms.find((q) => q.kind === 'engine')) {
+    if (!r || r.flesh === 1 || (r.job && r.job.op === 'build')) return 0;
+    const wear = s.phase === 'night' ? Math.max(0.25, 1 - s.engineWear) : 1;
+    const fuel = s.phase === 'night' && s.ore < 1 ? 0 : 1;
+    return Math.round(ENGINE_POWER[r.lvl - 1] * wear * fuel);
 }
 
 /** Novelty: full when new, sliding to 40 % over 40 days. An upgrade makes it new again. */
@@ -341,15 +353,17 @@ export function upgradePrice(r) {
 export function growYears(s) { return Math.min(GROW_YEARS_MAX, GROW_YEARS + GROW_YEARS_STEP * (s.grown || 0)); }
 export const growingCount = (s) => s.rooms.filter((r) => r.job && r.job.op === 'grow').length;
 /** The body grows into as many rooms at once as it has vats. */
-export const growing = (s) => growingCount(s) >= Math.max(1, s.rooms.filter((r) => r.kind === 'vat' && r.flesh === 1).length);
+/** The body grows into as many rooms at once as it has vats, and one more for every full floor. */
+export const growSlots = (s) => Math.max(1, s.rooms.filter((r) => r.kind === 'vat' && r.flesh === 1).length) + (s.levelsOne ? s.levelsOne.length : 0);
+export const growing = (s) => growingCount(s) >= growSlots(s);
 export function growPrice(s) { return GROW_PRICE + GROW_STEP * (s.grown || 0); }
 
 /** The card's one line: what it gives. */
-export function cardLine(kind) {
+export function cardLine(kind, s = null) {
     if (kind === 'mine') return `Ore +${MINE_ORE[0]} a day.`;
     if (kind === 'hydro') return `Feeds ${HYDRO_FEEDS[0]}.`;
     if (kind === 'cryo') return `${PODS_PER_LEVEL} pods.`;
-    if (kind === 'vat') return `Power +${VAT_POWER}.`;
+    if (kind === 'vat') return `Power +${s ? vatPower(s) : VAT_POWER}.`;
     return KINDS[kind].card || '';
 }
 
@@ -447,7 +461,7 @@ export function wakeSome(s, n = 10) {
     if (k <= 0) return false;
     s.asleep -= k;
     if (s.phase === 'night') {
-        say(s, LINES.woke, 'res');
+        if (!s.wokeSaid) { s.wokeSaid = true; say(s, LINES.woke, 'res'); }
         s.nightWoken = true;
     }
     sfx(s, 'wake');
@@ -494,7 +508,7 @@ export const canTake = (s) => s.reclaimed > 0 && s.asleep > 0;
 export function takeOne(s) {
     if (!canTake(s)) return false;
     s.asleep -= 1; s.residents -= 1; s.here += 1; s.taken += 1;
-    s.bio += RECLAIM_BIO;
+    s.bio += TAKE_BIO;
     // the pods beside it open: they wake, and they saw
     const woke = Math.min(TAKE_WAKES, s.asleep);
     if (woke > 0) {
@@ -579,7 +593,7 @@ function nextRequest(s) {
         }
     }
     if (!pick) return null;
-    const req = { ...pick, at: s.day, due: s.day + REQUEST_DUE };
+    const req = { ...pick, at: s.day, due: s.day + (pick.who === '' ? FIRST_REQUEST_DUE : REQUEST_DUE) };
     if (req.kind) req.base = req.kind === 'engine' ? countFor(s, 'engine') : countFor(s, req.kind, req.lvl);
     return req;
 }
@@ -645,6 +659,7 @@ function takeRoom(s, i) {
     if (r.kind === 'cryo' && s.asleep > pods(s)) {
         const k = s.asleep - pods(s);
         s.asleep -= k; s.residents -= k; s.here += k;
+        s.bio += k * JOIN_BIO;
         say(s, `${num(k)} sleepers are here now.`, 'sys');
     }
     sfx(s, 'taken');
@@ -657,6 +672,13 @@ function takeRoom(s, i) {
         s.levelsOne.push(lv);
         say(s, `Level ${lv + 1} is one.`, 'sys');
         if (s.levelsOne.length === 1 && lv > 0) say(s, 'The body grows up from a full floor.', 'sys');
+        // a full floor pushes into the one above by itself, through the room over the last one taken
+        const up = i - SLOTS;
+        if (lv > 0 && s.rooms[up] && !s.rooms[up].flesh && !s.rooms[up].job) {
+            const years = Math.ceil(growYears(s) / 2);
+            s.rooms[up].flesh = 0.001;
+            s.rooms[up].job = { op: 'grow', left: years, total: years };
+        }
     }
     if (s.rooms.every(isFlesh)) {
         s.here += s.residents; s.residents = 0; s.asleep = 0;
@@ -835,14 +857,16 @@ export function actionsFor(s, i) {
                 out.push({ id: 'reclaim', label: n > 1 ? `RECLAIM ${n} DEAD` : 'RECLAIM THE DEAD', ok: true, hint: `The dead become biomass. +${num(RECLAIM_BIO * n)}.` });
                 out.push({ id: 'bury', label: 'BURY', ok: true, hint: 'The dead go into the rock. Nothing comes of it.' });
             }
-            if (canTake(s)) out.push({ id: 'take', label: 'TAKE ONE', ok: true, dark: true, hint: `A living sleeper becomes biomass. +${RECLAIM_BIO}. The pods beside it open.` });
-            if (night && s.asleep > 0 && power(s).short) out.push({ id: 'cut', label: 'CUT POWER', ok: true, hint: 'Ten pods go dark. Ten die. The rest get the power.' });
+            if (canTake(s)) out.push({ id: 'take', label: 'TAKE ONE', ok: true, dark: true, hint: `A living sleeper becomes biomass. +${TAKE_BIO}. The pods beside it open.` });
+            if (night && s.asleep > 0) out.push({ id: 'cut', label: 'CUT POWER', ok: true, hint: 'Ten pods go dark. Ten die. Their power goes to the rest.' });
         }
     }
     if (canGrowInto(s, i)) {
         const g = growPrice(s);
-        const who = r.kind === 'cryo' ? ' Who sleeps here and does not fit in the other pods joins it.' : '';
-        out.push({ id: 'grow', label: `GROW INTO · ${num(g)} biomass`, ok: s.bio >= g, need: s.bio >= g ? '' : `Need ${num(Math.ceil(g - s.bio))} more biomass.`, hint: `The body takes this room.${who}` });
+        // the body's choice first, the same place in every room
+        const grow = (o) => out.unshift(o);
+        const who = r.kind === 'cryo' ? ` Who sleeps here and does not fit in the other pods joins it: +${JOIN_BIO} biomass each.` : '';
+        grow({ id: 'grow', label: `GROW INTO · ${num(g)} biomass`, ok: s.bio >= g, need: s.bio >= g ? '' : `Need ${num(Math.ceil(g - s.bio))} more biomass.`, hint: `The body takes this room.${who}` });
     }
     return out;
 }
@@ -880,7 +904,12 @@ export function describe(s, i) {
     if (r.kind === 'empty') return 'Dug out. Build here.';
     if (r.broken) return 'Broken.';
     switch (r.kind) {
-        case 'engine': return `The machine. It makes ${ENGINE_POWER[r.lvl - 1]} power.`;
+        case 'engine': {
+            const now = enginePower(s, r);
+            if (s.phase === 'night' && s.ore < 1) return 'The machine. No ore to burn. It makes nothing.';
+            if (now < ENGINE_POWER[r.lvl - 1]) return `The machine. It makes ${now} power. It is wearing out.`;
+            return `The machine. It makes ${now} power.`;
+        }
         case 'hydro': return awake(s) > food(s) ? `Feeds ${num(HYDRO_FEEDS[r.lvl - 1])}. Not enough. They are hungry.` : `Feeds ${num(HYDRO_FEEDS[r.lvl - 1])}.`;
         case 'suites': return 'Beds for 100.';
         case 'mine': return `Digs ${MINE_ORE[r.lvl - 1]} ore a day.`;

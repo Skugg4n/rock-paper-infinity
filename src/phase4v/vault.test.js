@@ -208,3 +208,49 @@ describe('after the human test', () => {
         expect(s.dead).toBeGreaterThan(0);
     });
 });
+
+describe('after the second human test', () => {
+    test('the sofas wait 25 days; the others 12', () => {
+        const s = V.newVault();
+        V.advance(s, 0.25, 1);
+        expect(s.request.due - s.request.at).toBe(V.FIRST_REQUEST_DUE);
+    });
+    test('one truth for power: the engine says what the gauge counts; the vat card says what a vat makes', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        s.engineWear = 0.9;
+        const now = V.enginePower(s);
+        expect(V.describe(s, 1)).toBe(`The machine. It makes ${now} power. It is wearing out.`);
+        expect(V.cardLine('vat', s)).toBe(`Power +${V.vatPower(s)}.`);
+        const vats = s.rooms.filter((r) => r.kind === 'vat' && r.flesh === 1).length;
+        const flesh = s.rooms.filter((r) => r.flesh === 1 && r.kind !== 'vat').length;
+        expect(V.power(s).make).toBe(Math.round(now + vats * V.vatPower(s) + flesh * V.FLESH_POWER));
+    });
+    test('GROW INTO comes first in every room, the Cryo Bay too; the woken line comes once', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        const cryo = s.rooms.findIndex((r) => r.kind === 'cryo');
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2) r.flesh = 1; });
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 1 && i !== cryo && Math.abs(i - cryo) !== 1) r.flesh = 1; });
+        s.rooms[cryo - 1].flesh = 1;
+        expect(V.actionsFor(s, cryo)[0].id).toBe('grow');
+        V.wakeSome(s, 10); V.wakeSome(s, 10);
+        expect(s.out.filter((o) => o.text === V.LINES.woke)).toHaveLength(1);
+    });
+    test('the night is short of biomass: a vat makes a little a year, growing costs more each room', () => {
+        expect(V.VAT_BIO).toBeLessThan(0.5);
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        const a = V.growPrice(s);
+        s.grown += 1;
+        expect(V.growPrice(s)).toBe(a + V.GROW_STEP);
+    });
+    test('a full floor pushes into the one above by itself, and gives one more room at once', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2 && i !== V.slotIndex(2, 7)) r.flesh = 1; });
+        const slots = V.growSlots(s);
+        s.bio = 1000;
+        V.growInto(s, V.slotIndex(2, 7));
+        for (let t = 0; t < 30; t += 0.25) V.advance(s, 0.25, 2);
+        expect(V.growSlots(s)).toBe(slots + 1);
+        const above = s.rooms[V.slotIndex(1, 7)];
+        expect(above.flesh === 1 || (above.job && above.job.op === 'grow')).toBe(true);
+    });
+});

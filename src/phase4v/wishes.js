@@ -23,7 +23,7 @@ export const MISS_MOOD = 2;
 /** The icons, what they say on hover, where they float, what a wave of them asks for. */
 export const ICONS = {
     drink: { text: 'Drink to room {n}.', at: ['suites'], wave: { line: 'Overwhelming wishes for a better bar.', kind: 'bar' } },
-    hand: { text: 'Human #{n} wants a backrub.', at: ['suites', 'common', 'gym'], wave: { line: 'Overwhelming wishes for a spa.', kind: 'gym' } },
+    hand: { text: 'Human #{n} wants a backrub.', at: ['suites', 'common', 'gym'], wave: { line: 'Overwhelming wishes for a spa. A gym at level 3 has one.', kind: 'gym' } },
     food: { text: 'Room {n} wants breakfast in bed.', at: ['suites'], wave: { line: 'Overwhelming wishes for fresh fruit.', kind: 'hydro' } },
     music: { text: 'Human #{n} wants the music louder.', at: ['common', 'bar', 'cinema'], wave: { line: 'Overwhelming wishes for a better cinema.', kind: 'cinema' } },
     towel: { text: 'More towels to room {n}.', at: ['suites', 'gym'], wave: { line: 'Overwhelming wishes for a garden to sit in.', kind: 'garden' } },
@@ -103,6 +103,7 @@ export function stepWishes(s, sec) {
             s.favour -= MISS_MOOD;
             w.missed++;
             fx(s, { type: 'miss', slot: b.slot, fx: b.fx, text: `-${MISS_MOOD} %` });
+            s.sfx?.push('miss');
         }
     }
     w.list = w.list.filter((b) => w.clock - b.born < b.life);
