@@ -33,6 +33,12 @@ body.in-vault #pause-btn { display: none; }
 .v-bar > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: #8fd0ff; transition: width 300ms ease, background 300ms ease; }
 .v-bar > b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #f1efe8; opacity: 0.7; }
 .v-gauge.is-red .val { color: #ff6b5a; }
+.v-gauge.flash-up .val { animation: v-up 700ms ease-out; }
+.v-gauge.flash-down .val { animation: v-down 700ms ease-out; }
+@keyframes v-up { 0% { color: #bdf5c4; transform: translateY(-3px) scale(1.12); } 100% { transform: none; } }
+@keyframes v-down { 0% { color: #ff8a70; transform: translateY(2px) scale(0.94); } 100% { transform: none; } }
+.v-req { height: 4px; margin-top: -8px; border-radius: 2px; background: #0a0d11; overflow: hidden; position: relative; }
+.v-req > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; transition: width 300ms linear; }
 .v-rows { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 .v-rows .r { display: flex; justify-content: space-between; align-items: center; }
 .v-rows .r .val { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 22px; letter-spacing: 0.05em; color: #f1efe8; }

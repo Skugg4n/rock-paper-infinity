@@ -309,3 +309,43 @@ First buy at once (the dig for the sofas); something new affordable at least eve
    a plate for food).
 8. RISE takes the BUILD bar's place (no card under it); "Here" is "In the body"; at the end the RESIDENTS row goes and
    IN THE BODY stays. The fun rooms stand dark in the night (they gave mood to the woken).
+
+**After the second human test** (docs/playtests/2026-10-05-vault-human-test-2.md, ALMOST; v1.86.2):
+1. The night shows where to act: bare rock that can take a Vat or a Cryo Bay has a dashed frame, rock the body can
+   grow into the gold dashed one (rock was drawn without frames); the Vat card lights its places. A card with no place
+   left is not shown in the night (never "Dig a place" there).
+2. The night is short: a vat grows 0.15 biomass a year, the body 0.05 a room; GROW INTO 120 + 15 per room; TAKE ONE
+   +100 (a living one, more than a dead one's 70); CUT POWER always there in the night; sleepers taken with a Cryo Bay
+   give 10 each. Ore matters: the engine burns 2 a year, the mines give 0.6 a year a level; with no ore the engine stops.
+3. Shorter growing: 10 + 12 years per room taken (at most 150); a room at once per vat and one more per full floor; a
+   full floor pushes into the room above the last one taken by itself.
+4. The sofas wait 25 days, and every request has a bar under the CRT that runs down. The spa wave says "A gym at level 3
+   has one." A popped bubble floats a larger "+2 %" and the MOOD number flashes; a missed one "-2 %". One truth for
+   power (the Engine Room says what it makes now, worn or without ore; the Vat card the number a vat makes). GROW INTO
+   first in every info box. "What is that under the floor?" once.
+
+The sim after these (one line a minute in scripts/sim-vault.mjs):
+
+| min | phase | day/year | residents/asleep | ore | power make/use | mood/body | bio | bought | request |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | palace | day 0 | 216/0 | 241 | 40/20 | mood 70% | 0 | dig | 16 of us are sleeping on sofas. |
+| 1 | palace | day 15 | 217/0 | 93 | 40/26 | mood 68% | 0 | mine+ suites dig cinema | I want to watch films. |
+| 2 | palace | day 27 | 219/0 | 12 | 40/42 | mood 78% | 0 | dig cinema dig bar dig gym | Where can I train? |
+| 3 | palace | day 39 | 220/0 | 53 | 40/52 | mood 93% | 0 | dig game dig garden | My children have never seen a tree. |
+| 4 | palace | day 52 | 221/0 | 201 | 80/64 | mood 93% | 0 | dig mine engine+ | A pool. I was promised a pool. |
+| 5 | palace | day 66 | 223/0 | 216 | 80/72 | mood 90% | 0 | gym+ bar+ mine+ | The light in the garden is wrong. |
+| 6 | palace | day 78 | 224/0 | 93 | 80/80 | mood 100% | 0 | cinema+ cinema+ game+ garden+ | - |
+| 7 | palace | day 91 | 226/0 | 207 | 80/89 | mood 71% | 0 | dig suites dig suites bar+ | A sauna. Is that too much? |
+| 8 | palace | day 107 | 227/0 | 126 | 80/97 | mood 63% | 0 | gym+ cinema+ cinema+ | Why is the water cold? |
+| 9 | palace | day 119 | 227/100 | 170 | 80/128 | mood 53% | 0 | dig cryo dig cryo dig sleep50 cryo dig sleep50 | We paid for this. |
+| 10 | night | year 35 | 224/221 | 36 | 64/164 | body 4% | 81 | cryo sleep50 dig cryo dig sleep50 SLEEP ALL reclaim vat take sleep all take grow | - |
+| 11 | night | year 142 | 200/200 | 79 | 61/56 | body 17% | 437 | sleep all reclaim grow reclaim reclaim reclaim grow reclaim reclaim reclaim reclaim reclaim grow | - |
+| 12 | night | year 297 | 50/50 | 141 | 88/14 | body 29% | 1412 | grow grow grow | - |
+| 13 | night | year 500 | 0/0 | 54 | 112/0 | body 42% | 1297 | grow grow grow | - |
+| 14 | night | year 751 | 0/0 | 0 | 119/0 | body 58% | 305 | grow grow grow grow | - |
+| 15 | night | year 1 118 | 0/0 | 0 | 151/0 | body 75% | 312 | grow | - |
+| 16 | night | year 1 641 | 0/0 | 0 | 156/0 | body 79% | 146 | grow grow | - |
+| 17 | night | year 2 348 | 0/0 | 0 | 180/0 | body 92% | 176 | grow grow | - |
+
+wishes 151, popped 101; night: first vat 9:52, longest stretch without a possible decision 32 s, takes 2, cuts 0
+first buy 0:00; longest gap between buys in act I 23 s (at 0:07); turn 7:30; cold 8:12; night 9:38; everyone here 17:50; risen 17:50

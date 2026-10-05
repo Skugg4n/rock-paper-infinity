@@ -48,6 +48,7 @@ export function init() {
       <canvas class="v-cut"></canvas>
       <div class="v-panel">
         <div class="v-crt" data-v="crt"></div>
+        <div class="v-req" data-v="req" hidden><i data-v="req-bar"></i></div>
         <div class="v-gauge" data-v="g-power"><div class="row"><span class="dymo">Power</span><span class="val" data-v="power"></span></div><div class="v-bar"><i data-v="power-bar"></i></div><div class="sub" data-v="power-sub"></div></div>
         <div class="v-gauge" data-v="g-ore"><div class="row"><span class="dymo">Ore</span><span class="val" data-v="ore"></span></div><div class="sub" data-v="ore-sub"></div></div>
         <div class="v-gauge" data-v="g-bio" hidden><div class="row"><span class="dymo">Biomass</span><span class="val" data-v="bio"></span></div><div class="sub" data-v="bio-sub"></div></div>
@@ -94,6 +95,8 @@ export function init() {
         s.out.length = 0;
         for (const e of s.sfx) {
             sound.event(e);
+            // a bubble answered or missed: the mood gauge flashes with it
+            if (e === 'pop' || e === 'miss') { const g = $('g-mood'); g.classList.remove('flash-up', 'flash-down'); void g.offsetWidth; g.classList.add(e === 'pop' ? 'flash-up' : 'flash-down'); }
             // they bang on the screen: it shakes
             if (e === 'bang') { const c = $('crt'); c.classList.remove('bang'); void c.offsetWidth; c.classList.add('bang'); }
         }
@@ -171,6 +174,16 @@ export function init() {
         $('time-label').textContent = s.phase === 'palace' ? 'Day' : 'Year';
         $('time').textContent = s.phase === 'palace' ? V.num(Math.floor(s.day)) : V.num(Math.floor(s.year));
         for (const b of root.querySelectorAll('[data-speed]')) b.classList.toggle('on', Number(b.dataset.speed) === speed);
+        // the request's time: a bar under the screen that runs down
+        const q = s.request;
+        $('req').hidden = !(q && q.kind && s.phase === 'palace');
+        if (q && q.kind) {
+            const left = Math.max(0, (q.due - s.day) / (q.due - q.at));
+            const bar = $('req-bar');
+            bar.style.width = `${left * 100}%`;
+            bar.style.background = left < 0.3 ? '#ff8a70' : '#e8c45a';
+            $('req').title = `${Math.ceil(q.due - s.day)} days to answer`;
+        }
         $('rise').hidden = !V.riseReady(s);
     }
 
@@ -188,7 +201,8 @@ export function init() {
         $('build-btn').classList.toggle('on', buildOpen);
         const want = s.request && s.request.kind && !(s.request.lvl > 1) ? s.request.kind : null;
         const wave = waveKind(s);
-        const parts = V.cards(s).map((k) => {
+        // in the night a card with no place left is not shown (nobody can dig)
+        const parts = V.cards(s).filter((k) => s.phase !== 'night' || placeable(k).size > 0).map((k) => {
             const K = V.KINDS[k];
             const needOre = Math.max(0, Math.ceil(K.price - s.ore));
             const needBio = K.bio ? Math.max(0, Math.ceil(K.bio - s.bio)) : 0;
@@ -201,7 +215,7 @@ export function init() {
             return `<button type="button" class="v-card${need ? ' off' : ''}${armed === k ? ' armed' : ''}" data-card="${k}">
                 ${want === k || wave === k ? '<span class="mark"></span>' : ''}
                 <span class="top"><i data-lucide="${ICONS[k]}" style="width:15px;height:15px"></i><span class="p">${price}</span></span>
-                <span class="n">${K.name}</span><span class="d">${V.cardLine(k)}</span>${need ? `<span class="need">${need}</span>` : ''}</button>`;
+                <span class="n">${K.name}</span><span class="d">${V.cardLine(k, s)}</span>${need ? `<span class="need">${need}</span>` : ''}</button>`;
         }).join('');
         if (host.__html !== parts) { host.innerHTML = parts; host.__html = parts; icons(); }
     }
@@ -226,6 +240,8 @@ export function init() {
     function uiState() {
         const ui = { selected, placeable: armed ? placeable(armed) : null, diggable: new Set(), wanted: new Set(), trouble: new Set(), complain: new Map() };
         s.rooms.forEach((r, i) => { if (V.canDig(s, i)) ui.diggable.add(i); });
+        // in the night nobody digs: the places are the rock a vat or a Cryo Bay can go into
+        if (s.phase === 'night') V.cards(s).forEach((k) => placeable(k).forEach((i) => ui.diggable.add(i)));
         if (s.phase === 'night' && V.hasVat(s) && !V.growing(s)) s.rooms.forEach((r, i) => { if (V.canGrowInto(s, i)) ui.wanted.add(i); });
         const q = s.request;
         if (q && q.kind && (q.lvl > 1 || q.kind === 'engine')) {

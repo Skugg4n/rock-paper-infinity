@@ -14,6 +14,7 @@ const buys = [];          // { t, what }
 const events = [];
 let lastReq = '';
 let turnAt = null, coldAt = null, nightAt = null, endAt = null, firstBuyAt = null;
+let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0, cuts = 0;
 let lastActAt = 0;
 
 const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -91,7 +92,11 @@ function nightMove() {
     }
     const g = slotsWhere((r, i) => V.canGrowInto(s, i));
     if (g.length && s.bio >= V.growPrice(s)) { V.growInto(s, g[0]); note('grow'); return true; }
-    if (g.length && s.bio < V.growPrice(s) && V.canTake(s) && !s.rooms.some((r) => r.job && r.job.op === 'grow') && t - lastActAt > 3) { V.takeOne(s); note('take'); return true; }
+    if (g.length && s.bio < V.growPrice(s) && V.canTake(s) && t - lastActAt > 2) { V.takeOne(s); takes++; note('take'); return true; }
+    // short of biomass with nothing growing: a dark choice (CUT POWER when the power is red, else TAKE ONE)
+    if (g.length && !V.growingCount(s) && s.bio < V.growPrice(s) && s.asleep > 20 && t - lastActAt > 3) {
+        if (V.power(s).short) { V.cutPower(s); cuts++; note('cut'); return true; }
+    }
     if (V.riseReady(s)) { V.rise(s); note('RISE'); return true; }
     return false;
 }
@@ -103,6 +108,12 @@ while (t < 40 * 60 && !s.risen) {
     if (Math.round(t / DT) % 2 === 0) {
         const moved = s.phase === 'night' ? nightMove() : palaceMove();
         if (moved) lastActAt = t;
+        if (vatAt == null && V.hasVat(s)) { vatAt = t; lastDecision = t; }
+        if (vatAt != null && !s.risen) {
+            // a decision is possible when a grow, a take or a reclaim could be done
+            const could = s.fallen.length || s.rooms.some((r, i) => V.canGrowInto(s, i)) || V.awake(s) > 0;
+            if (could || moved) { maxNightGap = Math.max(maxNightGap, t - lastDecision); lastDecision = t; }
+        }
     }
     // ▶▶ when there is nothing to do for a while
     // the wishes: a human clicks most of them, 1 to 5 s after they show
@@ -143,5 +154,5 @@ for (const r of rows) console.log(r);
 console.log('');
 for (const e of events) console.log(e);
 console.log('');
-console.log(`wishes ${wished}, popped ${popped}`);
+console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, longest stretch without a possible decision ${Math.round(maxNightGap)} s, takes ${takes}, cuts ${cuts}`);
 console.log(`first buy ${fmt(firstBuyAt ?? 0)}; longest gap between buys in act I ${Math.round(maxGap)} s (at ${fmt(gapAt)}); turn ${turnAt != null ? fmt(turnAt) : '-'}; cold ${coldAt != null ? fmt(coldAt) : '-'}; night ${nightAt != null ? fmt(nightAt) : '-'}; everyone here ${endAt != null ? fmt(endAt) : '-'}; risen ${s.risen ? fmt(t) : '-'}`);
