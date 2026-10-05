@@ -18,6 +18,7 @@ import { initialWatcher, puzzleGapYears } from './phase4/watcher.js';
 import { initialSurface } from './phase4/surface.js';
 import { startGrow, graphOf, organsOf, settleFloors } from './phase4/grow.js';
 import { LADDER } from './phase4/watcher.js';
+import { preparedState, serialize as serializeDig, SAVE_KEY as DIG_KEY } from './phase4d/dig.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
 const P4 = PHASE4_CONSTANTS.SAVE_KEY;
@@ -306,7 +307,21 @@ export const CHECKPOINTS = [
             set(VAULT_SAVE_KEY, serializeVault(VAULT_CHECKPOINTS[id]()));
             set(PHASE_KEY, 'DEEP');
         } })),
+    // the dig (src/phase4d): jumping there chooses that version of chapter IV
+    { id: 'iv-dig-start', label: 'IV · dig: start', apply: () => digJump({ row: -1 }) },
+    { id: 'iv-dig-war', label: 'IV · dig: 300 m', apply: () => digJump({ row: 58, levels: { drill: 2, battery: 1, cargo: 1, lamp: 1 }, parts: 20, time: 240, found: 3, at: true }) },
+    { id: 'iv-dig-machine', label: 'IV · dig: 700 m', apply: () => digJump({ row: 138, levels: { drill: 3, battery: 2, cargo: 2, lamp: 2, hull: 1, radar: 2 }, parts: 60, time: 660, found: 5, at: true }) },
+    { id: 'iv-dig-flesh', label: 'IV · dig: the flesh', apply: () => digJump({ row: 320, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, radar: 3 }, grafts: 1, bio: 3, parts: 150, time: 1200, found: 9, at: true }) },
+    { id: 'iv-dig-heart', label: 'IV · dig: 1 990 m', apply: () => digJump({ row: 397, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, radar: 3 }, grafts: 3, bio: 10, parts: 300, time: 1400, found: 11, at: true }) },
 ];
+function digJump({ at = false, ...opts }) {
+    clearAll();
+    const s = preparedState(opts);
+    if (at) { s.y = opts.row; s.x = 11; }
+    set(DIG_KEY, serializeDig(s));
+    set(DEEP_VERSION_KEY, 'dig');
+    set(PHASE_KEY, 'DEEP');
+}
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
 export const CHECKPOINT_CRYO = { 'iv-long': CRYO[4], 'iv-graft': CRYO[3], 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
 
@@ -403,7 +418,7 @@ export function jumpTo(id) {
     window.__rpiSkipSave = true;   // the phases save on unload; not this time
     cp.apply();
     // a jump into chapter IV picks the version it belongs to
-    if (id.startsWith('iv-')) set(DEEP_VERSION_KEY, id.startsWith('iv-vault') ? 'vault' : 'colony');
+    if (id.startsWith('iv-')) set(DEEP_VERSION_KEY, id.startsWith('iv-vault') ? 'vault' : id.startsWith('iv-dig') ? 'dig' : 'colony');
     try { sessionStorage.removeItem('rpi-recovered'); } catch { /* ignore */ }
     location.reload();
 }

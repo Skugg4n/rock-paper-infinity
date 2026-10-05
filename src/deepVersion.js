@@ -21,3 +21,8 @@ export function currentDeep() {
     try { stored = localStorage.getItem(DEEP_VERSION_KEY); } catch { /* ignore */ }
     return chosenDeep(typeof location !== 'undefined' ? location.search : '', stored);
 }
+
+/** The URL without ?deep=, so the stored choice decides after a switch. */
+export function urlWithoutDeep(href) {
+    try { const u = new URL(href); u.searchParams.delete('deep'); return u.toString(); } catch { return href; }
+}

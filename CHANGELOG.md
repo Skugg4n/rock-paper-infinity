@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased (deep-vault)
+## v1.86.0 - 2026-10-05 (chapter IV: two new versions beside the old one, the vault and the dig)
 
-### v1.86.0: chapter IV as the vault, a parallel version (docs/superpowers/specs/2026-10-05-deep-vault.md)
+Both are chosen with `?deep=vault` / `?deep=dig` or ☰ → Debug → "Deep: colony / vault / dig". The old act stays the default.
+
+### The vault (docs/superpowers/specs/2026-10-05-deep-vault.md)
 
 A new chapter IV beside the old one, chosen with `?deep=vault` or ☰ → Debug → "Deep · vault / colony" (kept under `rpi-deep-version`; the old act stays the default and is untouched). Fallout Shelter for billionaires that slides into the body.
 
@@ -13,6 +15,14 @@ A new chapter IV beside the old one, chosen with `?deep=vault` or ☰ → Debug 
 - **Wiring.** src/deepVersion.js (colony / vault / dig, tested; the ☰ → Debug item cycles "Deep: colony / vault / dig", a version not in the build falls back to the colony), src/gamePhase.js loads src/phase4/ or src/phase4v/, the descent from III lands in the chosen one. Checkpoints iv-vault-start, -turn, -cold, -night, -flesh (a jump sets the version; the old iv-* set colony). `rpi-deep-version` kept across jumps. Own save `rpi-deep-vault`. Sound through src/audio.js only: the shared words, a quiet CRT tick, a low drone in the night and a slow pulse once the body grows; silent when paused or hidden; teardown stops everything.
 - **After the independent human test** (docs/playtests/2026-10-05-vault-human-test.md, ALMOST): TAKE ONE wakes three beside it ("3 woke. They saw."), terrified; at 0 % they bang on the screen and try the shaft; RECLAIM only for the dead (quiet), TAKE ONE the dark button. SLEEP 50 and SLEEP ALL. A plain line under every night button. A Cryo Bay on bare rock in the night; "The body grows up from a full floor." Bubbles +2 % / -2 %, shown floating, free. A 5 s rise before the card. One meaning per marker (gold dashed = grow here, red pulse = pods in trouble, a yellow tab = a room complaining). RISE has the build bar's place; "In the body". src/phase4v/index.test.js checks the screen in jsdom.
 - **Sim and play.** scripts/sim-vault.mjs (a plausible player, a line a minute); scripts/play-vault.mjs drives headless Chrome with real clicks for the play pass (docs/playtests/2026-10-05-vault-build.md, shots in docs/playtests/vault-shots/).
+
+### The dig (docs/superpowers/specs/2026-10-05-deep-dig.md)
+- New src/phase4d: a Motherload-style digging game. The drone digs down from the base under the ruins, mines ROCK, PAPER and SCISSORS ore, flies home through its own shaft, delivers piece by piece into PARTS and the colony's reserve; 216 pods go dark one by one when the reserve is empty.
+- Workshop with six rows (DRILL, BATTERY, CARGO, LAMP, HULL, RADAR), three levels each, and GRAFT (bone drill, healing cell, skin) once biomass comes home. Gates: hard rock at 300 m (DRILL 2), basalt at 700 m (DRILL 3), pressure at 500 and 900 m (HULL 1 and 2), heat at 1 200 m (HULL 3), sinew over the heart (bone).
+- Six layers that tell the game's history, twelve finds with a line each, ghost ore and a voice below 700 m, flesh that pulses, the heart at 2 000 m: "Woke: everyone is here.", the pods empty, a red band down the shaft, RISE, then V · UNITY.
+- The POWER bar carries a "home" mark: the battery it takes to fly back. Keyboard (arrows, WASD) and mouse (hold beside the drone).
+- src/deepVersion.js picks the version (colony, vault, dig); gamePhase.js loads it; checkpoints iv-dig-start, -war, -machine, -flesh, -heart; rpi-deep-version kept across jumps.
+- scripts/sim-dig.mjs (a plausible player) and scripts/play-dig.mjs (headless Chrome, muted, screenshots).
 
 ## v1.85.0 - 2026-10-04 (chapter IV, the rise in reach)
 
