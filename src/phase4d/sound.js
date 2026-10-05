@@ -49,7 +49,7 @@ export function createDigSound() {
             else if (e.type === 'deliver') audio.pling();
             else if (e.type === 'buy' || e.type === 'graft') audio.thunk();
             else if (e.type === 'find' || e.type === 'record' || e.type === 'layer') audio.rise();
-            else if (e.type === 'dead' || e.type === 'pod' || e.type === 'gate') audio.knock();
+            else if (e.type === 'dead' || e.type === 'pod' || e.type === 'gate' || e.type === 'warn') audio.knock();
             else if (e.type === 'heart') thump(1, 40);
         },
         /** Each frame: the depth in metres and the seconds since the last. */

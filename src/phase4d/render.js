@@ -192,7 +192,7 @@ export function createRenderer(canvas) {
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);
             const g = ctx.createRadialGradient(dx, dy, rad * 0.35, dx, dy, rad);
             g.addColorStop(0, 'rgba(0,0,0,0)');
-            g.addColorStop(1, `rgba(0,0,0,${(0.97 * under).toFixed(3)})`);
+            g.addColorStop(1, `rgba(0,0,0,${(0.995 * under).toFixed(3)})`);
             ctx.fillStyle = g;
             const top = Math.max(0, groundY);
             ctx.fillRect(0, top, vw, vh - top);

@@ -57,6 +57,12 @@ describe('the rules', () => {
         expect(s.reserve).toBeLessThanOrEqual(40);
         expect(s.line.text).toBe('Recovered. The cargo is gone.');
     });
+    test('once a dive, when the battery is just enough to fly home: Turn back.', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.battery = 20;
+        step(s, 0.05, {});
+        expect(s.line.text).toBe('Turn back. Just enough power to fly home.');
+    });
     test('the colony at 0 %: a pod goes dark every three seconds', () => {
         const s = newState(7);
         s.reserve = 0;

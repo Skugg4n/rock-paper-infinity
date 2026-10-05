@@ -71,6 +71,28 @@ try {
         await ev(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(cp)}); return true; })`);
         await sleep(2500);
     };
+    if (process.argv.includes('--long')) {
+        // a long session from the start: the hand is the autopilot's choice, sent as real key presses
+        // and real clicks on the workshop; a screenshot every 30 s
+        await jump('iv-dig-start');
+        await ev(`import('/src/phase4d/autopilot.js').then((m) => { window.__pilot = m; window.__mem = {}; return true; })`);
+        const MIN = Number(process.argv[process.argv.indexOf('--long') + 1]) || 4;
+        let held = null, next = 30, t0 = Date.now();
+        while ((Date.now() - t0) / 1000 < MIN * 60) {
+            const st = await ev(`(() => { const s = window.rpiDig.state; if (s.y === -1 && !s.cargo.length) { const b = [...document.querySelectorAll('.dig-buy')].find((x) => !x.disabled && !x.hidden); if (b) { const r = b.getBoundingClientRect(); return { buy: { x: r.left + 30, y: r.top + 12 } }; } }
+                const d = s.act ? (window.__last || null) : window.__pilot.decide({ ...s, events: [] }, window.__mem).dir; window.__last = d; return { dir: d }; })()`);
+            if (st.buy) { if (held) { await send('Input.dispatchKeyEvent', { type: 'keyUp', key: held, code: held, windowsVirtualKeyCode: VK[held] }); held = null; } await click(st.buy.x, st.buy.y); await sleep(150); continue; }
+            const key = st.dir ? { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }[st.dir] : null;
+            if (key !== held) {
+                if (held) await send('Input.dispatchKeyEvent', { type: 'keyUp', key: held, code: held, windowsVirtualKeyCode: VK[held] });
+                if (key) await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: VK[key] });
+                held = key;
+            }
+            if ((Date.now() - t0) / 1000 >= next) { await shot(`long-${String(next).padStart(3, '0')}s`); next += 30; }
+            await sleep(40);
+        }
+    }
+    if (!process.argv.includes('--long')) {
     // 1. the start: dig down, mine sideways, come home, buy
     await jump('iv-dig-start');
     await shot('01-start');
@@ -111,6 +133,7 @@ try {
     // teardown leaves nothing behind: back to the colony version
     const td = await ev(`import('/src/gamePhase.js').then(async (m) => { localStorage.setItem('rpi-deep-version', 'colony'); return true; })`);
     console.log('teardown check', td);
+    }
 } finally {
     console.log(errors.length ? `ERRORS:\n${errors.join('\n')}` : 'no page errors');
     try { chrome.kill('SIGTERM'); } catch { /* gone */ }

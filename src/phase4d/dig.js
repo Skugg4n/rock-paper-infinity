@@ -267,6 +267,7 @@ export function step(s, dt, input = {}) {
         }
     } else s.podT = 0;
     const cap = batteryCap(s);
+    if (isHome(s)) s.warned = false;
     if (isHome(s) && !s.act) {
         s.battery = Math.min(cap, s.battery + cap * CHARGE_RATE * dt);
         if (s.cargo.length) {
@@ -283,6 +284,8 @@ export function step(s, dt, input = {}) {
             }
         } else s.unloadT = 0;
     } else if (s.y >= 0) {
+        // once a dive: the moment the battery is just enough to fly home
+        if (!s.warned && s.y > 2 && s.battery < homeCost(s) * 1.15 + 3) { s.warned = true; say(s, 'Turn back. Just enough power to fly home.', 'alarm', 0); s.events.push({ type: 'warn' }); }
         let drain = IDLE_DRAIN;
         if (depthOf(s.y) > HEAT_FROM && s.grafts < 3) drain += HEAT_DRAIN;
         s.battery -= drain * dt;
