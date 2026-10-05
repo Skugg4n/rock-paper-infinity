@@ -74,6 +74,8 @@ body.in-vault #pause-btn { display: none; }
 .v-gauge.flash-down .val { animation: v-down 700ms ease-out; }
 @keyframes v-up { 0% { color: #bdf5c4; transform: translateY(-3px) scale(1.12); } 100% { transform: none; } }
 @keyframes v-down { 0% { color: var(--v-danger); transform: translateY(2px) scale(0.94); } 100% { transform: none; } }
+.v-log { margin-top: -6px; font-size: 11px; line-height: 14px; color: var(--v-mist); opacity: 0.75; min-height: 42px; }
+.v-log > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-req { height: 4px; margin-top: -8px; border-radius: 2px; background: var(--v-ink); overflow: hidden; position: relative; }
 .v-req > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; transition: width 300ms linear; }
 .v-check { display: flex; flex-direction: column; gap: 6px; }

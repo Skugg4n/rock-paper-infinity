@@ -152,7 +152,7 @@ export function stepWishes(s, sec) {
             const { line, kind } = ICONS[icon].wave;
             const slot = w.list.find((b) => b.icon === icon).slot;
             w.wave = { icon, kind, base: builtScore(s, kind), slot };
-            s.out?.push({ text: line, who: 'res' });
+            s.out?.push({ text: line, who: 'sys' });
         }
     }
 }

@@ -72,7 +72,8 @@ export const MOMENTS = ['first-request', 'meatlab', 'turn', 'cold', 'first-dead'
 
 /**
  * Says `lines` as a moment: once per key, amber on the CRT (`mark`), a pling (`moment`), and time slows.
- * Returns false when this moment has been had.
+ * Returns false when this moment has been had. A moment with no lines only slows and plings (the request
+ * that is one is a marked bubble on the map).
  */
 export function moment(s, key, lines, who = 'sys') {
     const st = story(s);
@@ -82,6 +83,41 @@ export function moment(s, key, lines, who = 'sys') {
     s.slow = SLOW_S;
     s.sfx.push('moment');
     return true;
+}
+
+// ------------------------------------------------------------------ the residents' voice: bubbles on the map
+/** A spoken line stays this long (real seconds), a little longer the longer it is. */
+export const TALK_LIFE_S = 4;
+export const LOG_LINES = 3;
+/**
+ * A resident says `text` over room `slot` (a speech bubble on the map, gone after a few seconds) and it
+ * goes into the small grey log under the SYSTEM box. `opts`: { sour, computer, mark, log } (log: what the
+ * log says instead, e.g. "They broke the bar." while the bubble says "Good.").
+ */
+export function speak(s, text, slot, opts = {}) {
+    const now = clock(s);
+    s.talk = (s.talk || []).filter((b) => now - b.born < b.life);
+    s.talkId = (s.talkId || 0) + 1;
+    s.talk.push({ id: s.talkId, text, slot: slot ?? peopleSlot(s), born: now, life: TALK_LIFE_S + text.length * 0.04, sour: !!opts.sour, computer: !!opts.computer, mark: !!opts.mark });
+    logLine(s, opts.log || text);
+}
+/** The log of what people said, the newest last, three lines. */
+export function logLine(s, text) { s.log = [...(s.log || []), text].slice(-LOG_LINES); }
+/** Bubbles that have had their time go. */
+export function stepTalk(s) {
+    if (!s.talk || !s.talk.length) return;
+    const now = clock(s);
+    s.talk = s.talk.filter((b) => now - b.born < b.life);
+}
+const PEOPLE = ['suites', 'common', 'bar', 'cinema', 'gym', 'garden', 'game', 'meatlab'];
+/** A room where people are (of `kinds` if there is one), for a voice to come from. */
+export function peopleSlot(s, kinds = PEOPLE) {
+    const ok = (r) => r.flesh !== 1 && !(r.job && r.job.op === 'build');
+    const list = [];
+    s.rooms.forEach((r, i) => { if (kinds.includes(r.kind) && ok(r)) list.push(i); });
+    if (!list.length) s.rooms.forEach((r, i) => { if (PEOPLE.includes(r.kind) && ok(r)) list.push(i); });
+    if (!list.length) s.rooms.forEach((r, i) => { if (r.kind !== 'rock' && r.kind !== 'empty' && ok(r)) list.push(i); });
+    return list.length ? list[Math.floor(rnd(s) * list.length)] : 0;
 }
 
 // ------------------------------------------------------------------ the story's own state
@@ -124,7 +160,7 @@ export function computerSays(s, why, kind = null) {
         st.tooks = (st.tooks || 0) + 1;
         if (st.tooks % 3 !== 1) return false;
         st.compNext = now + COMPUTER_EVERY_TURNED_S;
-        s.out.push({ text: COMPUTER.took, who: 'res', computer: true });
+        speak(s, COMPUTER.took, peopleSlot(s, ['cryo']), { computer: true });
         return true;
     }
     if (now < st.compNext) return false;
@@ -142,7 +178,7 @@ export function computerSays(s, why, kind = null) {
         st.recentComputer = [...recent, text].slice(-4);
     }
     st.compNext = now + (s.turned ? COMPUTER_EVERY_TURNED_S : COMPUTER_EVERY_S);
-    s.out.push({ text, who: 'res', computer: true });
+    speak(s, text, why === 'build' ? null : peopleSlot(s), { computer: true });
     return true;
 }
 

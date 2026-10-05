@@ -7,7 +7,8 @@ import * as S from './story.js';
 import { VAULT_CHECKPOINTS } from './checkpoints.js';
 
 const run = (s, sec, speed = 1) => { for (let t = 0; t < sec; t += 0.25) V.advance(s, 0.25, speed); };
-const texts = (s) => s.out.map((o) => o.text);
+/** Everything said: the SYSTEM box's lines, the bubbles on the map and the small log. */
+const texts = (s) => [...s.out.map((o) => o.text), ...(s.talk || []).map((b) => b.text), ...(s.log || [])];
 const put = (s, i, kind, extra = {}) => Object.assign(s.rooms[i], { kind, lvl: 1, job: null, broken: false, flesh: 0, born: s.day, ...extra });
 /** The palace after its first five wishes: the next request is the steak. */
 function beforeSteak() {
@@ -23,8 +24,11 @@ describe('the steak (act I)', () => {
         expect(V.cards(s)).not.toContain('meatlab');
         V.stepDays(s, 1);
         expect(s.request.text).toBe('I want real steak.');
-        const o = s.out.find((x) => x.text === 'Mr Hale: I want real steak.');
-        expect(o.mark).toBe(true);
+        // a request is a bubble on the map (not a SYSTEM line), marked, and it goes into the log
+        expect(s.request.mark).toBe(true);
+        expect(s.request.slot).toBeGreaterThanOrEqual(0);
+        expect(s.log).toContain('Mr Hale: I want real steak.');
+        expect(s.out.some((x) => x.text === 'Mr Hale: I want real steak.')).toBe(false);
         expect(V.cards(s)).toContain('meatlab');
         expect(V.cardLine('meatlab')).toBe('Real steak. Mood +6.');
         expect(V.KINDS.meatlab.price).toBe(160);
@@ -276,8 +280,12 @@ describe('Computer', () => {
     test('missed bubbles: now and then a resident shouts at the Computer, never two at once', () => {
         const s = V.newVault();
         S.story(s).moments['first-request'] = true;
-        run(s, 240);
-        const said = s.out.filter((o) => o.computer).map((o) => o.text);
+        const said = [];
+        const seen = new Set();
+        for (let t = 0; t < 240; t += 0.25) {
+            V.advance(s, 0.25, 1);
+            for (const b of s.talk || []) if (b.computer && !seen.has(b.id)) { seen.add(b.id); said.push(b.text); }
+        }
         expect(said.length).toBeGreaterThan(0);
         for (const t of said) expect(S.COMPUTER.missed).toContain(t);
         expect(said.length).toBeLessThan(240 / S.COMPUTER_EVERY_S + 1);
@@ -299,7 +307,7 @@ describe('Computer', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-turn']();
         s.turned = true;
         const pool = new Set();
-        for (let k = 0; k < 200; k++) { S.story(s).compNext = 0; if (S.computerSays(s, 'miss')) pool.add(s.out[s.out.length - 1].text); }
+        for (let k = 0; k < 200; k++) { S.story(s).compNext = 0; if (S.computerSays(s, 'miss')) pool.add(s.talk[s.talk.length - 1].text); }
         expect([...pool].some((t) => S.COMPUTER.turned.includes(t))).toBe(true);
     });
     test('TAKE ONE in the night: "Computer? Computer, what is that?" the first time', () => {

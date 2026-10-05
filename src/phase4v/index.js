@@ -50,7 +50,7 @@ export function init() {
       <canvas class="v-cut"></canvas>
       <div class="v-panel">
         <div class="v-crt" data-v="crt"></div>
-        <div class="v-req" data-v="req" hidden><i data-v="req-bar"></i></div>
+        <div class="v-log" data-v="log"></div>
         <div class="v-gauge" data-v="g-power"><div class="row"><span class="dymo">Power</span><span class="val" data-v="power"></span></div><div class="v-bar"><i data-v="power-bar"></i></div><div class="sub" data-v="power-sub"></div></div>
         <div class="v-gauge" data-v="g-ore"><div class="row"><span class="dymo">Ore</span><span class="val" data-v="ore"></span></div><div class="sub" data-v="ore-sub"></div></div>
         <div class="v-gauge" data-v="g-bio" hidden><div class="row"><span class="dymo">Biomass</span><span class="val" data-v="bio"></span></div><div class="sub" data-v="bio-sub"></div></div>
@@ -199,16 +199,9 @@ export function init() {
         $('time-label').textContent = s.phase === 'palace' ? 'Day' : 'Year';
         $('time').textContent = s.phase === 'palace' ? V.num(Math.floor(s.day)) : V.num(Math.floor(s.year));
         for (const b of root.querySelectorAll('[data-speed]')) b.classList.toggle('on', Number(b.dataset.speed) === speed);
-        // the request's time: a bar under the screen that runs down
-        const q = s.request;
-        $('req').hidden = !(q && q.kind && s.phase === 'palace');
-        if (q && q.kind) {
-            const left = Math.max(0, (q.due - s.day) / (q.due - q.at));
-            const bar = $('req-bar');
-            bar.style.width = `${left * 100}%`;
-            bar.style.background = left < 0.3 ? VT.danger : VT.amber;
-            $('req').title = `${Math.ceil(q.due - s.day)} days to answer`;
-        }
+        // what people said, for whoever missed a bubble: three small grey lines
+        const log = (s.log || []).map((l) => `<div>${esc(l)}</div>`).join('');
+        if ($('log').__html !== log) { $('log').innerHTML = log; $('log').__html = log; }
         $('rise').hidden = !V.riseReady(s);
         if (V.riseReady(s) && $('rise').textContent !== V.riseLabel(s)) $('rise').textContent = V.riseLabel(s);
         // the goal's checklist, from the moment the goal is said

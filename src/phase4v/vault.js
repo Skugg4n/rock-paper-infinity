@@ -16,7 +16,7 @@
 import { stepWishes, normalizeWishes } from './wishes.js';
 import {
     STEAK, HYDRO_FAILING, GOAL_LINES, ORGANS, ORGAN_ORDER, REQUIRED, CHECKLIST, NEEDS_HEART,
-    SLOW_RATE, moment, story, computerSays, stepWeighing,
+    SLOW_RATE, moment, story, computerSays, stepWeighing, speak, stepTalk, peopleSlot, logLine,
 } from './story.js';
 
 export const LEVELS = 3;
@@ -535,7 +535,7 @@ export function wakeSome(s, n = 10) {
     if (k <= 0) return false;
     s.asleep -= k;
     if (s.phase === 'night') {
-        if (!s.wokeSaid) { s.wokeSaid = true; say(s, LINES.woke, 'res'); }
+        if (!s.wokeSaid) { s.wokeSaid = true; speak(s, LINES.woke, peopleSlot(s, ['cryo'])); }
         s.nightWoken = true;
     }
     sfx(s, 'wake');
@@ -774,6 +774,14 @@ function nextRequest(s) {
     return req;
 }
 function line(req, text) { return req.who ? `${req.who}: ${text}` : text; }
+/** Where a request is said: over the room it wants more of, or where they live. */
+function requestSlot(s, q) {
+    if (q.kind && q.kind !== 'suites' && (q.lvl > 1 || q.kind === 'engine')) {
+        const i = s.rooms.findIndex((r) => r.kind === q.kind && r.flesh !== 1);
+        if (i >= 0) return i;
+    }
+    return peopleSlot(s, ['suites', 'common']);
+}
 
 function stepRequests(s) {
     const req = s.request;
@@ -781,7 +789,7 @@ function stepRequests(s) {
         if (wantMet(s, req)) {
             s.favour += REQUEST_GOOD;
             const t = LINES.thanks[Math.floor(rand(s) * LINES.thanks.length)];
-            say(s, line(req, req.thanks || (req.who ? t : (s.thanked ? t : 'Thank you. Finally.'))), 'res');
+            speak(s, line(req, req.thanks || (req.who ? t : (s.thanked ? t : 'Thank you. Finally.'))), req.slot);
             s.thanked = true;
             s.request = null;
             s.nextRequestDay = s.day + (s.turned ? REQUEST_EVERY_TURNED : REQUEST_EVERY) * 0.5;
@@ -791,7 +799,7 @@ function stepRequests(s) {
         if (s.day >= req.due || (!req.kind && s.day >= req.at + 2)) {
             // a complaint with no answer only hurts; an unanswered want sours
             s.favour -= req.kind ? REQUEST_BAD : 3;
-            if (req.kind) say(s, line(req, LINES.sour[Math.floor(rand(s) * LINES.sour.length)]), 'res');
+            if (req.kind) speak(s, line(req, LINES.sour[Math.floor(rand(s) * LINES.sour.length)]), req.slot, { sour: true });
             s.request = null;
             s.nextRequestDay = s.day + (s.turned ? REQUEST_EVERY_TURNED : REQUEST_EVERY) * 0.5;
         }
@@ -803,9 +811,12 @@ function stepRequests(s) {
         if (!q) return;
         s.request = q;
         // the first request, and the steak that opens the MEAT LAB, are moments that matter
-        if (q.who === '') moment(s, 'first-request', line(q, q.text), 'res');
-        else if (q.text === STEAK.ask.text) { s.meatOpen = true; moment(s, 'meatlab', line(q, q.text), 'res'); }
-        else say(s, line(q, q.text), 'res');
+        // the request is a bubble on the map over the room it is about (or where they live), its ring the time left
+        q.slot = requestSlot(s, q);
+        logLine(s, line(q, q.text));
+        // the first request, and the steak that opens the MEAT LAB, are moments that matter
+        if (q.who === '') { q.mark = moment(s, 'first-request', []); }
+        else if (q.text === STEAK.ask.text) { s.meatOpen = true; q.mark = moment(s, 'meatlab', []); }
         sfx(s, 'request');
     }
 }
@@ -916,7 +927,7 @@ export function stepDays(s, dt) {
         s.residents += 1;
         const suites = roomsOf(s, 'suites');
         const where = suites[Math.floor(rand(s) * suites.length)]?.name || 'Suites A';
-        say(s, `A child was born in ${where}.`, 'res');
+        speak(s, `A child was born in ${where}.`, s.rooms.indexOf(suites.find((r) => r.name === where) || suites[0]));
     }
     if (awake(s) > 0 && m < RIOT_BELOW && s.day - s.lastRiotDay >= RIOT_EVERY) {
         const fun = s.rooms.filter((r) => FUN.includes(r.kind) && working(r));
@@ -924,7 +935,8 @@ export function stepDays(s, dt) {
             const r = fun[Math.floor(rand(s) * fun.length)];
             r.broken = true;
             s.lastRiotDay = s.day;
-            say(s, `They broke the ${KINDS[r.kind].name.toLowerCase()}.`, 'res');
+            // the room shows it broken; someone there is glad
+            speak(s, 'Good.', s.rooms.indexOf(r), { sour: true, log: `They broke the ${KINDS[r.kind].name.toLowerCase()}.` });
             sfx(s, 'riot');
         }
     }
@@ -945,7 +957,7 @@ export function stepDays(s, dt) {
     }
     if (s.steakDay != null && s.day >= s.steakDay) {
         s.steakDay = null;
-        if (awake(s) > 0) say(s, STEAK.different, 'res');
+        if (awake(s) > 0) speak(s, STEAK.different, peopleSlot(s, ['meatlab', 'common']));
     }
     if (s.turned && !s.coldOpen && (m < COLD_MOOD || s.day >= (s.turnDay ?? TURN_DAY) + COLD_AFTER_TURN || s.day >= COLD_DAY)) {
         s.coldOpen = true;
@@ -958,13 +970,13 @@ export function stepDays(s, dt) {
 function despairs(s) {
     if (!s.banged) {
         s.banged = true;
-        say(s, 'They are banging on the screen.', 'res');
+        say(s, 'They are banging on the screen.', 'sys');
         sfx(s, 'bang');
         return;
     }
     s.residents -= 1; s.dead += 1;
     if (s.phase === 'night') s.fallen.push('Someone');
-    if (!firstDead(s, 'Someone tried the shaft. They fell.', 'res')) say(s, 'Someone tried the shaft. They fell.', 'res');
+    if (!firstDead(s, 'Someone tried the shaft. They fell.', 'sys')) say(s, 'Someone tried the shaft. They fell.', 'sys');
     sfx(s, 'bang');
 }
 
@@ -1022,6 +1034,7 @@ export function advance(s, sec, speed = 1) {
     if (s.ended || s.risen) return;
     // the small wishes run in real seconds, the same at ▶ and ▶▶
     stepWishes(s, sec);
+    stepTalk(s);
     stepWeighing(s);
     if (s.terror) { s.terror *= Math.pow(0.5, sec / TERROR_HALF_S); if (s.terror < 0.5) s.terror = 0; }
     if (s.phase === 'palace') {

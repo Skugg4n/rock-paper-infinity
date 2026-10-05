@@ -144,6 +144,7 @@ export function createVaultView(canvas, opts = {}) {
         drawOrgans(s, t);
         drawWalkers(s, t);
         drawWishes(s, t);
+        drawTalk(s);
         drawEffects(t);
         drawDescent(t);
         drawRise(s, t);
@@ -1611,6 +1612,76 @@ export function createVaultView(canvas, opts = {}) {
             ctx.fillText(text, bx + 6, by + 14);
         }
     }
+    // ---------------------------------------------------------------- the residents' voice (story.js speak)
+    /** Words wrapped to a width. */
+    function wrap(text, maxW) {
+        const words = text.split(' ');
+        const lines = [];
+        let cur = '';
+        for (const w of words) {
+            const next = cur ? `${cur} ${w}` : w;
+            if (cur && ctx.measureText(next).width > maxW) { lines.push(cur); cur = w; } else cur = next;
+        }
+        if (cur) lines.push(cur);
+        return lines;
+    }
+    /**
+     * People speak where they are: a speech bubble over the room. A named request stays until it is met or
+     * its ring (the time left) has gone round; thanks, sour words and "Computer!" pass after a few seconds.
+     */
+    function drawTalk(s) {
+        const list = [];
+        const q = s.request;
+        if (q && q.slot != null && s.phase === 'palace') {
+            const left = Math.max(0, Math.min(1, (q.due - s.day) / Math.max(0.001, q.due - q.at)));
+            list.push({ slot: q.slot, text: q.who ? `${q.who}: ${q.text}` : q.text, ring: left, mark: q.mark, alpha: 1, req: true });
+        }
+        const now = s.wishes ? s.wishes.clock : 0;
+        for (const b of s.talk || []) {
+            const age = now - b.born;
+            if (age < 0 || age > b.life) continue;
+            list.push({ ...b, alpha: Math.min(1, age / 0.15, (b.life - age) / 0.6) });
+        }
+        if (!list.length) return;
+        ctx.save();
+        ctx.font = '12px system-ui, -apple-system, sans-serif';
+        const stack = new Map();
+        for (const b of list) {
+            const r = geo.slots[b.slot];
+            if (!r) continue;
+            ctx.font = `${b.computer ? '700 ' : ''}12px system-ui, -apple-system, sans-serif`;
+            const ring = b.ring != null ? 22 : 0;
+            const lines = wrap(b.text, 190);
+            const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+            const bw = tw + 16 + ring, bh = lines.length * 15 + 9;
+            const up = stack.get(b.slot) || 0;
+            stack.set(b.slot, up + bh + 6);
+            const cx = r.x + r.w / 2;
+            const x = Math.max(4, Math.min(W - bw - 4, cx - bw / 2)), y = r.y - 10 - bh - up;
+            ctx.globalAlpha = b.alpha;
+            ctx.fillStyle = rgba(VT.steel, 0.95);
+            ctx.beginPath(); ctx.roundRect(x, y, bw, bh, 7); ctx.fill();
+            if (!up) { ctx.beginPath(); ctx.moveTo(cx - 5, y + bh); ctx.lineTo(cx, y + bh + 7); ctx.lineTo(cx + 5, y + bh); ctx.fill(); }
+            ctx.strokeStyle = b.mark ? VT.amber : b.computer ? rgba(VT.danger, 0.8) : rgba(VT.mist, 0.35);
+            ctx.lineWidth = b.mark ? 1.5 : 1;
+            ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, bw - 1, bh - 1, 7); ctx.stroke();
+            if (b.ring != null) {
+                // the ring is the time left to answer
+                const rx = x + 13, ry = y + bh / 2;
+                ctx.strokeStyle = rgba(VT.mist, 0.25); ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(rx, ry, 7, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = b.ring < 0.3 ? VT.danger : VT.amber;
+                ctx.beginPath(); ctx.arc(rx, ry, 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * b.ring); ctx.stroke();
+                ctx.fillStyle = VT.paper; ctx.fillRect(rx - 0.75, ry - 4, 1.5, 5); ctx.fillRect(rx - 0.75, ry + 2.5, 1.5, 1.5);
+            }
+            ctx.fillStyle = b.sour ? VT.mist : VT.paper;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+            lines.forEach((l, k) => ctx.fillText(l, x + 8 + ring, y + 16 + k * 15));
+        }
+        ctx.restore();
+        ctx.lineWidth = 1;
+    }
+
     /** White line icons, about 14 px, drawn around (0, 0). */
     function icon(name, t) {
         ctx.strokeStyle = VT.paper; ctx.fillStyle = VT.paper; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';

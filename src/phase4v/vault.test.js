@@ -21,7 +21,7 @@ describe('the palace', () => {
         run(s, 0.5);
         expect(s.request.text).toBe('16 of us are sleeping on sofas.');
         // the first request is a moment: marked, and time slows for 3 s
-        expect(s.out.find((o) => o.text === s.request.text).mark).toBe(true);
+        expect(s.request.mark).toBe(true);
         expect(s.slow).toBeGreaterThan(0);
         run(s, 3);
         expect(s.slow).toBe(0);
@@ -74,7 +74,8 @@ describe('the palace', () => {
         s.despair = 200; s.day = 1;
         V.stepDays(s, 1);
         expect(s.rooms[i].broken).toBe(true);
-        expect(s.out.some((o) => o.text === 'They broke the bar.')).toBe(true);
+        expect(s.log).toContain('They broke the bar.');
+        expect(s.talk.some((b) => b.text === 'Good.' && b.slot === i)).toBe(true);
         s.ore = 100;
         expect(V.actionsFor(s, i)[0].label).toBe('REPAIR · 80 ore');
         expect(V.repair(s, i)).toBe(true);
@@ -244,7 +245,7 @@ describe('after the second human test', () => {
         s.rooms[cryo - 1].flesh = 1;
         expect(V.actionsFor(s, cryo)[0].id).toBe('grow');
         V.wakeSome(s, 10); V.wakeSome(s, 10);
-        expect(s.out.filter((o) => o.text === V.LINES.woke)).toHaveLength(1);
+        expect(s.log.filter((t) => t === V.LINES.woke)).toHaveLength(1);
     });
     test('the night is short of biomass: a vat makes a little a year, growing costs more each room', () => {
         expect(V.VAT_BIO).toBeLessThan(0.5);
