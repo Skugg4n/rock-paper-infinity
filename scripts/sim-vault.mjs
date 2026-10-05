@@ -1,5 +1,6 @@
 // Chapter IV, the vault: a headless run of a plausible human player.
-//   node scripts/sim-vault.mjs [--quiet]
+//   node scripts/sim-vault.mjs [--stomachs=N] [--pop=0.75] [--trace]
+// --stomachs: how many stomachs the night player grows (default 2); --trace: every night move on stderr.
 // Prints one line a minute (and the moments that matter), then the summary the spec asks for.
 import * as V from '../src/phase4v/vault.js';
 import { popWish } from '../src/phase4v/wishes.js';
@@ -16,9 +17,17 @@ let lastReq = '';
 let turnAt = null, coldAt = null, nightAt = null, endAt = null, firstBuyAt = null;
 let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0, cuts = 0;
 let lastActAt = 0;
+let waitFrom = null, waitTotal = 0, gapEndAt = 0, maxCouldGap = 0, lastCould = 0;
+const waits = [];
+const organAt = {};
 
 const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
-const note = (what) => { bought.push(what); if (bought.length > 14) bought.splice(0, bought.length - 14); buys.push({ t, what }); if (firstBuyAt == null) firstBuyAt = t; };
+const TRACE = process.argv.includes('--trace');
+const note = (what) => {
+    if (TRACE && s.phase === 'night' && !/sleep all/.test(what)) {
+        console.error(`${fmt(t)} ${what.padEnd(8)} bio ${Math.floor(s.bio)} (+${(V.bioRate(s) * V.yearsPerSecond(s.nightSec)).toFixed(1)}/s) tissue ${V.growPrice(s)} growing ${V.growingCount(s)}/${V.growSlots(s)} reach ${slotsWhere((r, i) => V.canGrowInto(s, i)).length} inside ${s.here}/${s.here + s.residents} next ${V.growYears(s)} y`);
+    }
+    bought.push(what); if (bought.length > 14) bought.splice(0, bought.length - 14); buys.push({ t, what }); if (firstBuyAt == null) firstBuyAt = t; };
 
 function slotsWhere(pred) { return s.rooms.map((r, i) => (pred(r, i) ? i : -1)).filter((i) => i >= 0); }
 function placeFor(kind) {
@@ -72,7 +81,7 @@ function palaceMove() {
     }
     if (count('mine') < 2 && s.day > 15 && tryBuild('mine')) return true;
     if (V.homeless(s) > 0 && count('suites') < 4 && tryBuild('suites')) return true;
-    for (const k of V.FUN) if (count(k) === 0 && s.day > 20 && tryBuild(k)) return true;
+    for (const k of V.FUN) if (V.cards(s).includes(k) && count(k) === 0 && s.day > 20 && tryBuild(k)) return true;
     if (tryUpgrade('mine')) return true;
     // stale rooms: upgrade the most bored
     const stale = slotsWhere((r) => V.FUN.includes(r.kind) && !r.job && !r.broken && V.novelty(s, r) < 0.6 && V.upgradePrice(r) != null);
@@ -80,24 +89,43 @@ function palaceMove() {
     return false;
 }
 
+/** What the night player wants the next room of the body to be, for slot i. */
+function wantOrgan(i) {
+    const have = (o) => V.hasOrgan(s, o) || s.rooms.some((r) => r.job && r.job.op === 'grow' && r.organ === o);
+    const stomachs = s.rooms.filter((r) => r.organ === 'stomach' && (r.flesh === 1 || (r.job && r.job.op === 'grow'))).length;
+    if (V.levelOf(i) === 0 && !have('skin') && V.organAllowed(s, 'skin', i)) return 'skin';
+    if (stomachs < STOMACHS) return 'stomach';
+    if (!have('heart')) return 'heart';
+    if (!have('lungs') && V.organAllowed(s, 'lungs', i)) return 'lungs';
+    return 'tissue';
+}
+const STOMACHS = Number((process.argv.find((a) => a.startsWith('--stomachs=')) || '--stomachs=2').slice(11));
+let wantPrice = 0;
+
 function nightMove() {
+    wantPrice = 0;
     if (s.fallen.length) { V.reclaim(s); note('reclaim'); return true; }
     // the woken saw: back to sleep (a human takes a second or two to do it)
     if (V.awake(s) > 0 && t - lastActAt > 1.5 && V.canSleepAll(s)) { V.sleepAll(s); note('sleep all'); return true; }
+    if (V.riseReady(s)) { V.rise(s); note('RISE'); return true; }
     const p = V.power(s);
-    const vats = count('vat');
-    if (s.reclaimed > 0 && (vats < 2 || (p.short && vats < 4)) && s.ore >= 150 && s.bio >= 70) {
+    const vats = s.rooms.filter((r) => r.kind === 'vat').length;
+    if (s.reclaimed > 0 && (vats < 1 || (p.short && vats < 3)) && s.ore >= 150 && s.bio >= 70) {
         const i = slotsWhere((r, j) => V.canPlace(s, 'vat', j)).sort((a, b) => b - a)[0];
         if (i != null && V.build(s, 'vat', i)) { note('vat'); return true; }
     }
     const g = slotsWhere((r, i) => V.canGrowInto(s, i));
-    if (g.length && s.bio >= V.growPrice(s)) { V.growInto(s, g[0]); note('grow'); return true; }
-    if (g.length && s.bio < V.growPrice(s) && V.canTake(s) && t - lastActAt > 2) { V.takeOne(s); takes++; note('take'); return true; }
-    // short of biomass with nothing growing: a dark choice (CUT POWER when the power is red, else TAKE ONE)
-    if (g.length && !V.growingCount(s) && s.bio < V.growPrice(s) && s.asleep > 20 && t - lastActAt > 3) {
-        if (V.power(s).short) { V.cutPower(s); cuts++; note('cut'); return true; }
+    // skin wants a top-level room; otherwise the lowest room there is
+    g.sort((a, b) => (wantOrgan(a) === 'skin' ? -1 : 0) - (wantOrgan(b) === 'skin' ? -1 : 0) || b - a);
+    if (g.length) {
+        const organ = wantOrgan(g[0]);
+        const price = V.organPrice(s, organ);
+        wantPrice = price;
+        if (s.bio >= price) { V.growInto(s, g[0], organ); note(organ === 'tissue' ? 'grow' : organ); return true; }
+        // short: who do I take? (a human hesitates a few seconds first)
+        if (V.canTake(s) && t - lastActAt > 3) { V.takeOne(s); takes++; note('take'); return true; }
+        if (!V.growingCount(s) && s.asleep > 20 && V.power(s).short && t - lastActAt > 3) { V.cutPower(s); cuts++; note('cut'); return true; }
     }
-    if (V.riseReady(s)) { V.rise(s); note('RISE'); return true; }
     return false;
 }
 
@@ -108,11 +136,17 @@ while (t < 40 * 60 && !s.risen) {
     if (Math.round(t / DT) % 2 === 0) {
         const moved = s.phase === 'night' ? nightMove() : palaceMove();
         if (moved) lastActAt = t;
-        if (vatAt == null && V.hasVat(s)) { vatAt = t; lastDecision = t; }
+        if (vatAt == null && V.hasVat(s)) { vatAt = t; lastDecision = t; lastCould = t; }
         if (vatAt != null && !s.risen) {
-            // a decision is possible when a grow, a take or a reclaim could be done
-            const could = s.fallen.length || s.rooms.some((r, i) => V.canGrowInto(s, i)) || V.awake(s) > 0;
-            if (could || moved) { maxNightGap = Math.max(maxNightGap, t - lastDecision); lastDecision = t; }
+            // a decision is one the player made: a grow, a take, a reclaim, a vat
+            if (moved) { if (t - lastDecision > maxNightGap) { maxNightGap = t - lastDecision; gapEndAt = t; } lastDecision = t; }
+            // a decision is possible: something could be grown and paid, a sleeper taken, the dead reclaimed
+            const could = moved || s.fallen.length || V.canTake(s) || s.rooms.some((r, i) => V.canGrowInto(s, i) && s.bio >= V.growPrice(s));
+            if (could) { maxCouldGap = Math.max(maxCouldGap, t - lastCould); lastCould = t; }
+            // waiting for biomass: a room could be grown, the price is not there yet
+            const waiting = wantPrice > 0 && s.bio < wantPrice;
+            if (waiting) { if (waitFrom == null) waitFrom = t; waitTotal += DT * 2; }
+            else if (waitFrom != null) { waits.push(t - waitFrom); waitFrom = null; }
         }
     }
     // ▶▶ when there is nothing to do for a while
@@ -126,7 +160,7 @@ while (t < 40 * 60 && !s.risen) {
     V.advance(s, DT, speed);
     for (const o of s.out) {
         if (o.text === lastReq) continue;
-        if (/^(SURFACE|CRYO BAY|Woke|Level|POD 41)/.test(o.text)) events.push(`${fmt(t)}  ${o.text}`);
+        if (o.mark || /^(Level|Computer|COMPUTER|Is this|Who prog|Sleeper|The hydro|The steak|Mr Hale: Finally)/.test(o.text)) events.push(`${fmt(t)}  ${o.mark ? '* ' : '  '}${o.text}`);
     }
     s.out.length = 0; s.sfx.length = 0;
     if (s.turned && turnAt == null) turnAt = t;
@@ -137,7 +171,9 @@ while (t < 40 * 60 && !s.risen) {
     if (minute !== lastMinute) {
         lastMinute = minute;
         const when = s.phase === 'palace' ? `day ${Math.floor(s.day)}` : `year ${V.num(s.year)}`;
-        const mb = V.hasVat(s) ? `body ${Math.round(V.bodyShare(s) * 100)}%` : `mood ${V.mood(s)}%`;
+        const gl = V.goal(s);
+        const organs = ['heart', 'lungs', 'skin', 'stomach'].map((o) => (gl[o] ? o[0].toUpperCase() : '-')).join('');
+        const mb = V.hasVat(s) ? `body ${Math.round(V.bodyShare(s) * 100)}% ${organs} in ${gl.inside}/${gl.total}` : `mood ${V.mood(s)}%`;
         const p = V.power(s);
         rows.push(`| ${minute} | ${s.phase} | ${when} | ${s.residents}/${s.asleep} | ${Math.floor(s.ore)} | ${p.make}/${p.use} | ${mb} | ${Math.floor(s.bio)} | ${bought.join(' ') || '-'} | ${s.request ? s.request.text : '-'} |`);
         bought = [];
@@ -154,5 +190,9 @@ for (const r of rows) console.log(r);
 console.log('');
 for (const e of events) console.log(e);
 console.log('');
-console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, longest stretch without a possible decision ${Math.round(maxNightGap)} s, takes ${takes}, cuts ${cuts}`);
-console.log(`first buy ${fmt(firstBuyAt ?? 0)}; longest gap between buys in act I ${Math.round(maxGap)} s (at ${fmt(gapAt)}); turn ${turnAt != null ? fmt(turnAt) : '-'}; cold ${coldAt != null ? fmt(coldAt) : '-'}; night ${nightAt != null ? fmt(nightAt) : '-'}; everyone here ${endAt != null ? fmt(endAt) : '-'}; risen ${s.risen ? fmt(t) : '-'}`);
+const riseAt = s.risen ? t : null;
+// waiting for biomass = a room could be grown and the price is not there yet (the player may take one meanwhile)
+console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, first vat to RISE ${riseAt != null && vatAt != null ? fmt(riseAt - vatAt) : '-'}, longest gap between night decisions ${Math.round(maxNightGap)} s (ending ${fmt(gapEndAt)}), without a possible one ${Math.round(maxCouldGap)} s, takes ${takes}, cuts ${cuts}`);
+waits.sort((a, b) => b - a);
+console.log(`waiting for biomass: ${waits.length} times, ${Math.round(waitTotal)} s in all, longest ${Math.round(waits[0] || 0)} s, median ${Math.round(waits[Math.floor(waits.length / 2)] || 0)} s`);
+console.log(`first buy ${fmt(firstBuyAt ?? 0)}; longest gap between buys in act I ${Math.round(maxGap)} s (at ${fmt(gapAt)}); turn ${turnAt != null ? fmt(turnAt) : '-'}; cold ${coldAt != null ? fmt(coldAt) : '-'}; night ${nightAt != null ? fmt(nightAt) : '-'}; RISE ready ${endAt != null ? fmt(endAt) : '-'}; risen ${s.risen ? fmt(t) : '-'}`);

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (deep-vault-story)
+
+Will be v1.86.5 (after the graphics pass, v1.86.4). Phase A: the rules, words and balance of the vault's story pass (docs/superpowers/specs/2026-10-05-deep-vault-story.md); the screen comes in phase B.
+
+- **The steak.** After the first five requests: "Mr Hale: I want real steak." opens the MEAT LAB card (160 ore, level 2 or 3, "Grows real meat in vats. Mood +6."). It feeds (120 / 200 / 300, with the hydroponics) and gives mood like a room of fun. "More steak. Everyone wants steak." asks for level 2. A steak bubble and a steak wave once the lab stands.
+- **The turn bites.** Three days after the report "The hydroponics are failing. The lamps are old.": they feed half, the meat lab the rest. The first to die in the palace, with a lab: the next day "The steak tastes different tonight." In the cold the system weighs a sleeper every 20 s ("Sleeper 41. 72 kg.").
+- **The night has a goal.** When all sleep: "THE SURFACE WILL NOT RECOVER. ... GOAL: GET THEM TO THE SURFACE." A checklist (HEART, LUNGS, SKIN, STOMACH, INSIDE n / total) in the rules for the panel. RISE when the body has a heart, lungs and skin and everyone who lives is inside.
+- **The organs.** GROW INTO is a choice: TISSUE (as before), STOMACH 150 (+1 biomass a year), HEART 250 (+40 power, the engine rests and burns no ore), LUNGS 350 and SKIN 350 (both need a heart; skin only on level 1). Plain tissue can still be made an organ. RECLAIM and TAKE ONE go to the meat lab: the first wakes it as the body's first vat, or builds one for nothing. The Vat card: "The meat lab, grown up."
+- **Moments that matter** (the first request, the steak, the turn, the Cryo Bay, the first dead, the goal, the first organ of each kind, the first full floor, RISE ready): the CRT lines carry `mark`, time runs at a quarter for 3 s (even from ▶▶), and a `moment` sound event.
+- **"Computer".** Missed bubbles now and then get "Computer! My drink!" and the like, a slow build "Computer, how long does a cinema take?" (once a kind), ruder lines after the turn, and in the night "Computer? Computer, what is that?" when TAKE ONE wakes three.
+- **Balance.** Sleepers taken with a Cryo Bay give 1 biomass each (was 10: it flooded the organs). Sim: the steak at 3:30, the night from the first vat to RISE 5:28 (two stomachs) to 6:05 (one), at most 31 to 32 s between night decisions.
+
 ## v1.86.3 - 2026-10-05 (chapter IV, the dig after its second independent test)
 
 ### The dig after its second independent test (docs/playtests/2026-10-05-dig-human-test-2.md)

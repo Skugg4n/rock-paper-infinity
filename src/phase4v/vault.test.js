@@ -20,6 +20,11 @@ describe('the palace', () => {
         const s = V.newVault();
         run(s, 0.5);
         expect(s.request.text).toBe('16 of us are sleeping on sofas.');
+        // the first request is a moment: marked, and time slows for 3 s
+        expect(s.out.find((o) => o.text === s.request.text).mark).toBe(true);
+        expect(s.slow).toBeGreaterThan(0);
+        run(s, 3);
+        expect(s.slow).toBe(0);
         const i = firstDiggable(s, (j) => V.levelOf(j) === 0);
         expect(V.dig(s, i)).toBe(true);
         run(s, 11);
@@ -131,11 +136,13 @@ describe('the night', () => {
         run(s, 30);
         expect(V.isFlesh(s.rooms[next])).toBe(true);
     });
-    test('when every room is body: "Woke: everyone is here." and RISE', () => {
+    test('when every room is body and it has a heart, lungs and skin: "Woke: everyone is here." and RISE', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
         s.rooms.forEach((r, i) => { if (i !== 0) r.flesh = 1; });
+        s.rooms[V.slotIndex(2, 3)].organ = 'heart';
+        s.rooms[V.slotIndex(2, 4)].organ = 'lungs';
         s.bio = 1e4;
-        expect(V.growInto(s, 0) || V.canGrowInto(s, 0) === false).toBe(true);
+        expect(V.growInto(s, 0, 'skin')).toBe(true);
         run(s, 120, 2);
         expect(s.ended).toBe(true);
         expect(s.out.some((o) => o.text === 'Woke: everyone is here.')).toBe(true);
@@ -188,7 +195,7 @@ describe('after the human test', () => {
         expect(by.take.dark).toBe(true);
         for (const id of ['bury', 'reclaim', 'take', 'cut', 'wake']) expect(by[id].hint).toMatch(/\.$/);
         const g = s.rooms.findIndex((r, i) => V.canGrowInto(s, i));
-        expect(V.actionsFor(s, g).find((a) => a.id === 'grow').hint).toMatch(/^The body takes this room\./);
+        expect(V.actionsFor(s, g).find((a) => a.id === 'grow').hint).toBe('Just more of the body.');
     });
     test('in the night a Cryo Bay goes on bare rock (nobody digs); a full floor says how the body climbs', () => {
         const { s } = night();
@@ -220,7 +227,7 @@ describe('after the second human test', () => {
         s.engineWear = 0.9;
         const now = V.enginePower(s);
         expect(V.describe(s, 1)).toBe(`The machine. It makes ${now} power. It is wearing out.`);
-        expect(V.cardLine('vat', s)).toBe(`Power +${V.vatPower(s)}.`);
+        expect(V.cardLine('vat', s)).toBe(`The meat lab, grown up. Power +${V.vatPower(s)}.`);
         const vats = s.rooms.filter((r) => r.kind === 'vat' && r.flesh === 1).length;
         const flesh = s.rooms.filter((r) => r.flesh === 1 && r.kind !== 'vat').length;
         expect(V.power(s).make).toBe(Math.round(now + vats * V.vatPower(s) + flesh * V.FLESH_POWER));

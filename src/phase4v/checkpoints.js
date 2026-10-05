@@ -3,6 +3,10 @@
  * Pure: each returns a fresh state built through the rules' own constructors.
  */
 import { newVault, slotIndex, mood, START_RESIDENTS, PODS_PER_LEVEL, TURN_DAY } from './vault.js';
+import { story, moment, GOAL_LINES } from './story.js';
+
+/** The moments a checkpoint has already had (they are not marked again). */
+function had(s, ...keys) { for (const k of keys) story(s).moments[k] = true; }
 
 function put(s, i, kind, extra = {}) {
     Object.assign(s.rooms[i], { kind, lvl: 1, job: null, broken: false, flesh: 0, born: s.day, ...extra });
@@ -28,6 +32,9 @@ function palace(s) {
     s.ore = 260;
     s.out = [];
     s.bored = { cinema1: true, bar1: true };
+    // Mr Hale asked for his steak long ago: the card is there
+    s.meatOpen = true;
+    had(s, 'first-request', 'meatlab');
     return s;
 }
 
@@ -43,6 +50,8 @@ export const VAULT_CHECKPOINTS = {
     'iv-vault-cold': () => {
         const s = palace(newVault());
         s.day = 120; s.turned = true; s.coldOpen = true; s.despair = 0;
+        s.turnDay = TURN_DAY; s.hydroSaid = true;
+        had(s, 'turn', 'cold');
         put(s, slotIndex(1, 6), 'cryo', { lvl: 3 });
         s.asleep = 100;
         s.favour = 25;
@@ -56,8 +65,12 @@ export const VAULT_CHECKPOINTS = {
         put(s, slotIndex(1, 7), 'cryo', { lvl: 2 });
         s.rooms[1].lvl = 3;
         s.asleep = s.residents = Math.min(s.residents, 4 * PODS_PER_LEVEL);
-        s.phase = 'night'; s.year = 1; s.nightSec = 0; s.request = null; s.nextNightLineAt = 1;
+        s.phase = 'night'; s.year = 1; s.nightSec = 0; s.request = null; s.nextNightLineAt = 14;
         s.ore = 300;
+        s.turnDay = TURN_DAY; s.hydroSaid = true;
+        had(s, 'turn', 'cold');
+        // the night begins here: the goal is said as it is in play
+        moment(s, 'goal', GOAL_LINES);
         return s;
     },
     'iv-vault-flesh': () => {
@@ -70,6 +83,8 @@ export const VAULT_CHECKPOINTS = {
         s.reclaimed = 3; s.dead = 3; s.residents -= 3; s.asleep -= 3; s.fallenCount = 3;
         s.bio = 90;
         s.ore = 160;
+        had(s, 'first-dead');
+        s.out = []; s.sfx = []; s.slow = 0;
         return s;
     },
 };

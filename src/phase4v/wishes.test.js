@@ -2,12 +2,15 @@
 import * as V from './vault.js';
 import * as W from './wishes.js';
 import { VAULT_CHECKPOINTS } from './checkpoints.js';
+import { story } from './story.js';
 
 const run = (s, sec, speed = 1) => { for (let t = 0; t < sec; t += 0.25) V.advance(s, 0.25, speed); };
+/** A new vault without the first request's slow seconds, so the clock here is plain real time. */
+const fresh = () => { const s = V.newVault(); story(s).moments['first-request'] = true; return s; };
 
 describe('the small wishes', () => {
     test('act I: one every 6 to 8 s; a click pops it for +2 % mood, shown floating, and costs nothing', () => {
-        const s = V.newVault();
+        const s = fresh();
         run(s, 3.25);
         expect(s.wishes.list.length).toBe(1);
         const at = s.wishes.clock;
@@ -23,7 +26,7 @@ describe('the small wishes', () => {
         expect(at).toBeGreaterThan(0);
     });
     test('missed after 10 s: it bursts grey and costs a point of mood', () => {
-        const s = V.newVault();
+        const s = fresh();
         run(s, 3.25);
         const fav = s.favour;
         run(s, 10.5);
