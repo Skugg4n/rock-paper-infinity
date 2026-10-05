@@ -7,6 +7,7 @@ import { initPerf } from './src/perf.js';
 import { CHECKPOINTS, jumpTo, snapshot, restore, slotInfo } from './src/checkpoints.js';
 import { MODULE_PATHS } from './src/modules.js';
 import { audio } from './src/audio.js';
+import { DEEP_VERSION_KEY, currentDeep, otherDeep } from './src/deepVersion.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -94,7 +95,34 @@ function setDebugVisible(on) {
     if (p2DebugMenu) p2DebugMenu.style.display = '';
   }
   document.getElementById('test-menu')?.classList.toggle('hidden', !on);
+  mountDeepItem(on);
   if (on) renderTestMenu();
+}
+
+// Debug: which chapter IV is played, the colony (the old act) or the vault (src/deepVersion.js).
+// Built like chapter IV's "View" item; a click keeps the other one and, in chapter IV, reloads.
+function mountDeepItem(on) {
+  document.getElementById('deep-version-toggle')?.remove();
+  if (!on) return;
+  const menu = document.getElementById('menu-dropdown');
+  if (!menu) return;
+  const kind = currentDeep();
+  const b = document.createElement('button');
+  b.id = 'deep-version-toggle';
+  b.type = 'button';
+  b.className = 'block w-full text-left px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap border-b border-slate-100';
+  b.textContent = `Deep · ${kind}`;
+  b.title = `Play chapter IV as the ${otherDeep(kind)}`;
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const next = otherDeep(kind);
+    try { localStorage.setItem(DEEP_VERSION_KEY, next); } catch { /* ignore */ }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('deep');
+    if ((localStorage.getItem(PHASE_KEY) || '') === 'DEEP') window.location.assign(url.toString());
+    else mountDeepItem(true);
+  });
+  menu.insertBefore(b, document.getElementById('reset-btn'));
 }
 
 // Test menu: checkpoints and snapshot slots (src/checkpoints.js)
@@ -180,7 +208,8 @@ async function bootstrap() {
   const isFreshPlayer =
     !localStorage.getItem(PHASE1_CONSTANTS.SAVE_KEY) &&
     !localStorage.getItem(PHASE2_CONSTANTS.SAVE_KEY) &&
-    !localStorage.getItem(PHASE4_CONSTANTS.SAVE_KEY);
+    !localStorage.getItem(PHASE4_CONSTANTS.SAVE_KEY) &&
+    !localStorage.getItem('rpi-deep-vault');
 
   if (isFreshPlayer) {
     await playChapterCard({ roman: 'I', title: 'TRIVIAL' });

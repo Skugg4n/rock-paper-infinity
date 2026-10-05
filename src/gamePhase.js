@@ -1,4 +1,5 @@
 import { PHASE_KEY } from './constants.js';
+import { currentDeep, deepModule } from './deepVersion.js';
 
 export const phases = {
   INDUSTRY: 'INDUSTRY',
@@ -24,6 +25,9 @@ export async function setPhase(phase) {
     [phases.CITY]: 'phase-city',
     [phases.DEEP]: 'phase-deep',
   };
+  // the vault (the new chapter IV) builds its own screen; the old act's container stays hidden
+  const deep = phase === phases.DEEP ? currentDeep() : null;
+  if (deep === 'vault') delete containerMap[phases.DEEP];
   const containerId = containerMap[phase];
   if (containerId) {
     document.getElementById(containerId)?.classList.remove('hidden');
@@ -40,7 +44,7 @@ export async function setPhase(phase) {
       currentModule = await import('./phase2/index.js');
       return currentModule.init();
     case phases.DEEP:
-      currentModule = await import('./phase4/index.js');
+      currentModule = await import(deepModule(deep));
       return currentModule.init();
     case phases.WAR:
     case phases.ESCAPE:

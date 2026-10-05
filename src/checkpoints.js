@@ -7,6 +7,9 @@
  * field is added there, add it here too (missing fields fall back to defaults).
  */
 
+import { DEEP_VERSION_KEY } from './deepVersion.js';
+import { VAULT_CHECKPOINTS } from './phase4v/checkpoints.js';
+import { SAVE_KEY as VAULT_SAVE_KEY, serialize as serializeVault } from './phase4v/vault.js';
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
 import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays, impliedFeed, tickDay } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
@@ -295,6 +298,14 @@ export const CHECKPOINTS = [
         set(P4, serializeDeep(deep, layout));
         set(PHASE_KEY, 'DEEP');
     } },
+    // the vault (docs/superpowers/specs/2026-10-05-deep-vault.md): a jump here chooses the vault
+    ...Object.entries({ 'iv-vault-start': 'IV vault · arrival', 'iv-vault-turn': 'IV vault · the turn', 'iv-vault-cold': 'IV vault · the cold', 'iv-vault-night': 'IV vault · the night', 'iv-vault-flesh': 'IV vault · the flesh' })
+        .map(([id, label]) => ({ id, label, apply: () => {
+            clearAll();
+            set(DEEP_VERSION_KEY, 'vault');
+            set(VAULT_SAVE_KEY, serializeVault(VAULT_CHECKPOINTS[id]()));
+            set(PHASE_KEY, 'DEEP');
+        } })),
 ];
 /** The cryo tier each late checkpoint sits on, so the labels cannot drift from the ladder. */
 export const CHECKPOINT_CRYO = { 'iv-long': CRYO[4], 'iv-graft': CRYO[3], 'iv-cryo': CRYO[0], 'iv-late': CRYO[4], 'iv-watcher': CRYO[3], 'iv-surface': CRYO[3], 'iv-grow': CRYO[5], 'iv-body': CRYO[5], 'iv-rise': CRYO[5] };
@@ -356,7 +367,7 @@ const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 function set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
 /** deep-tension: the player's own settings survive a jump: the sound (a muted player got the music back),
  *  the debug flag and the chosen view of chapter IV. */
-export const KEEP_KEYS = ['rpi-audio', 'rpi-debug', 'rpi-deep-view'];
+export const KEEP_KEYS = ['rpi-audio', 'rpi-debug', 'rpi-deep-view', DEEP_VERSION_KEY];
 function clearAll() {
     try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && !KEEP_KEYS.includes(k)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
 }
@@ -391,6 +402,8 @@ export function jumpTo(id) {
     if (!cp) return;
     window.__rpiSkipSave = true;   // the phases save on unload; not this time
     cp.apply();
+    // a jump into chapter IV picks the version it belongs to
+    if (id.startsWith('iv-')) set(DEEP_VERSION_KEY, id.startsWith('iv-vault') ? 'vault' : 'colony');
     try { sessionStorage.removeItem('rpi-recovered'); } catch { /* ignore */ }
     location.reload();
 }

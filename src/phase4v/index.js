@@ -1,0 +1,356 @@
+/* global lucide */
+/**
+ * Chapter IV · THE DEEP, the vault (docs/superpowers/specs/2026-10-05-deep-vault.md): the phase.
+ * Builds its own screen (a cutaway canvas, the instrument panel with the CRT, the BUILD bar, the
+ * info box, the time buttons), runs the clock and saves. The rules are in vault.js.
+ */
+import * as V from './vault.js';
+import { createVaultView } from './view.js';
+import { VAULT_CSS } from './style.js';
+import { createVaultSound } from './sound.js';
+import { audio } from '../audio.js';
+import { playChapterCard } from '../chapterCard.js';
+import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from '../constants.js';
+
+/** The arrival: nothing to do, something to see. */
+export const INTRO_MS = 8000;
+/** Letters typed on the CRT, ms each. */
+export const TYPE_MS = 26;
+export const CRT_LINES = 4;
+const SAVE_EVERY_MS = 4000;
+const ICONS = { suites: 'bed-double', mine: 'pickaxe', hydro: 'sprout', cinema: 'film', gym: 'dumbbell', bar: 'wine', garden: 'trees', game: 'gamepad-2', cryo: 'snowflake', vat: 'droplet' };
+
+let root = null, styleEl = null, rafId = 0, abort = null, sound = null, saveTimer = null, beforeUnload = null, view = null;
+let savingEnabled = true;
+let timers = [];
+
+export function init() {
+    abort = new AbortController();
+    const signal = abort.signal;
+    savingEnabled = true;
+    document.body.classList.add('in-vault');
+    styleEl = document.createElement('style');
+    styleEl.textContent = VAULT_CSS;
+    document.head.appendChild(styleEl);
+
+    let s = null;
+    try { s = V.deserialize(localStorage.getItem(V.SAVE_KEY)); } catch { /* ignore */ }
+    const fresh = !s;
+    if (!s) s = V.newVault();
+
+    root = document.createElement('div');
+    root.id = 'phase-vault';
+    root.className = 'phase-container';
+    root.innerHTML = `
+      <canvas class="v-cut"></canvas>
+      <div class="v-panel">
+        <div class="v-crt" data-v="crt"></div>
+        <div class="v-gauge" data-v="g-power"><div class="row"><span class="dymo">Power</span><span class="val" data-v="power"></span></div><div class="v-bar"><i data-v="power-bar"></i></div><div class="sub" data-v="power-sub"></div></div>
+        <div class="v-gauge" data-v="g-ore"><div class="row"><span class="dymo">Ore</span><span class="val" data-v="ore"></span></div><div class="sub" data-v="ore-sub"></div></div>
+        <div class="v-gauge" data-v="g-bio" hidden><div class="row"><span class="dymo">Biomass</span><span class="val" data-v="bio"></span></div><div class="sub" data-v="bio-sub"></div></div>
+        <div class="v-gauge" data-v="g-mood"><div class="row"><span class="dymo" data-v="mood-label">Mood</span><span class="val" data-v="mood"></span></div><div class="v-bar"><i data-v="mood-bar"></i></div></div>
+        <div class="v-rows">
+          <div class="r" data-v="r-res"><span class="dymo">Residents</span><span class="val" data-v="res"></span></div>
+          <div class="r" data-v="r-asleep" hidden><span class="dymo">Asleep</span><span class="val" data-v="asleep"></span></div>
+          <div class="r" data-v="r-here" hidden><span class="dymo">Here</span><span class="val" data-v="here"></span></div>
+          <div class="r" data-v="r-time"><span class="dymo" data-v="time-label">Day</span><span class="val" data-v="time"></span></div>
+        </div>
+      </div>
+      <div class="v-time" data-v="speed">
+        <button type="button" data-speed="0" aria-label="Pause">II</button>
+        <button type="button" data-speed="1" aria-label="Play">&#9654;</button>
+        <button type="button" data-speed="2" aria-label="Fast">&#9654;&#9654;</button>
+      </div>
+      <div class="v-build">
+        <button type="button" class="v-build-btn on" data-v="build-btn"><i data-lucide="hammer"></i><span class="dymo">Build</span></button>
+        <div class="v-cards" data-v="cards"></div>
+      </div>
+      <div class="v-info" data-v="info" hidden></div>
+      <button type="button" class="v-rise" data-v="rise" hidden>RISE</button>`;
+    document.body.appendChild(root);
+    const $ = (k) => root.querySelector(`[data-v="${k}"]`);
+    const canvas = root.querySelector('canvas');
+    const infoEl = $('info');
+    view = createVaultView(canvas, {
+        insetLeft: () => 300,
+        insetRight: () => 270,
+    });
+    sound = createVaultSound(audio);
+
+    let speed = s.speed ?? 1;
+    let selected = -1;
+    let armed = null;           // a card picked: its kind
+    let buildOpen = true;
+    const crt = { lines: [], queue: [], typing: null };
+    let introUntil = 0;
+
+    // ---------------------------------------------------------------- the CRT
+    function pushLines() {
+        for (const o of s.out) crt.queue.push(o);
+        s.out.length = 0;
+        for (const e of s.sfx) sound.event(e);
+        s.sfx.length = 0;
+    }
+    function stepCrt(now) {
+        if (!crt.typing && crt.queue.length) {
+            const o = crt.queue.shift();
+            crt.typing = { ...o, shown: 0, at: now };
+            crt.lines.push(crt.typing);
+            if (crt.lines.length > CRT_LINES) crt.lines.splice(0, crt.lines.length - CRT_LINES);
+        }
+        if (crt.typing) {
+            const per = crt.queue.length > 3 ? TYPE_MS / 3 : TYPE_MS;
+            const n = Math.min(crt.typing.text.length, Math.floor((now - crt.typing.at) / per));
+            if (n !== crt.typing.shown) { crt.typing.shown = n; sound.tick(); }
+            if (n >= crt.typing.text.length) { crt.typing.done = true; crt.typing = null; }
+        }
+        const el = $('crt');
+        const html = crt.lines.map((l, k) => {
+            const text = l.done ? l.text : l.text.slice(0, l.shown);
+            const cls = `l ${l.who}${k === crt.lines.length - 1 ? ' new' : ''}`;
+            return `<div class="${cls}">${esc(text)}${!l.done && l === crt.typing ? '<span class="cur"></span>' : ''}</div>`;
+        }).join('');
+        if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
+    }
+
+    // ---------------------------------------------------------------- the panel
+    function paintPanel() {
+        const night = s.phase !== 'palace';
+        root.classList.toggle('is-night', night);
+        const p = V.power(s);
+        $('power').textContent = V.num(p.make);
+        $('power-sub').textContent = `${V.num(p.use)} in use`;
+        const pb = $('power-bar');
+        pb.style.width = `${Math.min(100, p.make ? (p.use / p.make) * 100 : 100)}%`;
+        pb.style.background = p.short ? '#ff6b5a' : '#8fd0ff';
+        $('g-power').classList.toggle('is-red', p.short);
+        $('ore').textContent = V.num(Math.floor(s.ore));
+        const oreRate = s.phase === 'palace' ? V.oreRate(s) : null;
+        $('ore-sub').textContent = oreRate != null ? `+${V.num(oreRate)} a day` : '';
+        const showBio = s.reclaimed > 0 || s.bio > 0 || V.hasVat(s);
+        $('g-bio').hidden = !showBio;
+        if (showBio) {
+            $('bio').textContent = V.num(Math.floor(s.bio));
+            const br = V.bioRate(s);
+            $('bio-sub').textContent = br > 0 ? `+${br < 10 ? br.toFixed(1) : V.num(br)} a year` : '';
+        }
+        const body = V.hasVat(s);
+        $('mood-label').textContent = body ? 'Body' : 'Mood';
+        const m = body ? Math.round(V.bodyShare(s) * 100) : V.mood(s);
+        const asleepAll = !body && V.awake(s) === 0;
+        $('mood').textContent = asleepAll ? '-' : `${m} %`;
+        const mb = $('mood-bar');
+        mb.style.width = `${asleepAll ? 0 : m}%`;
+        mb.style.background = body ? '#a8132c' : m > 75 ? '#7fd38a' : m >= 40 ? '#e8c45a' : '#ff6b5a';
+        $('g-mood').classList.toggle('is-red', !body && !asleepAll && m < 40);
+        $('res').textContent = V.num(s.residents);
+        $('r-asleep').hidden = !(s.asleep > 0);
+        $('asleep').textContent = V.num(s.asleep);
+        $('r-here').hidden = !(s.here > 0);
+        $('here').textContent = V.num(s.here);
+        $('time-label').textContent = s.phase === 'palace' ? 'Day' : 'Year';
+        $('time').textContent = s.phase === 'palace' ? V.num(Math.floor(s.day)) : V.num(Math.floor(s.year));
+        for (const b of root.querySelectorAll('[data-speed]')) b.classList.toggle('on', Number(b.dataset.speed) === speed);
+        $('rise').hidden = !V.riseReady(s);
+    }
+
+    // ---------------------------------------------------------------- the BUILD bar
+    function placeable(kind) {
+        const out = new Set();
+        s.rooms.forEach((r, i) => { if (V.canPlace(s, kind, i)) out.add(i); });
+        return out;
+    }
+    function paintCards() {
+        const host = $('cards');
+        host.hidden = !buildOpen;
+        $('build-btn').classList.toggle('on', buildOpen);
+        const want = s.request && s.request.kind && !(s.request.lvl > 1) ? s.request.kind : null;
+        const parts = V.cards(s).map((k) => {
+            const K = V.KINDS[k];
+            const needOre = Math.max(0, Math.ceil(K.price - s.ore));
+            const needBio = K.bio ? Math.max(0, Math.ceil(K.bio - s.bio)) : 0;
+            const spots = placeable(k).size;
+            let need = '';
+            if (needOre) need = `Need ${V.num(needOre)} more ore.`;
+            else if (needBio) need = `Need ${V.num(needBio)} more biomass.`;
+            else if (!spots) need = K.deep ? 'Dig a place on level 2 or 3.' : 'Dig a place first.';
+            const price = K.bio ? `${K.price} ore · ${K.bio} bio` : `${K.price} ore`;
+            return `<button type="button" class="v-card${need ? ' off' : ''}${armed === k ? ' armed' : ''}" data-card="${k}">
+                ${want === k ? '<span class="mark"></span>' : ''}
+                <span class="top"><i data-lucide="${ICONS[k]}" style="width:15px;height:15px"></i><span class="p">${price}</span></span>
+                <span class="n">${K.name}</span><span class="d">${V.cardLine(k)}</span>${need ? `<span class="need">${need}</span>` : ''}</button>`;
+        }).join('');
+        if (host.__html !== parts) { host.innerHTML = parts; host.__html = parts; icons(); }
+    }
+
+    // ---------------------------------------------------------------- the info box
+    function paintInfo() {
+        if (selected < 0) { if (!infoEl.hidden) { infoEl.hidden = true; view.resize(); } return; }
+        const r = s.rooms[selected];
+        const acts = V.actionsFor(s, selected);
+        const lvl = !['rock', 'empty'].includes(r.kind) && !r.flesh && r.kind !== 'vat' ? `Level ${r.lvl}` : '';
+        const html = `<div class="t"><span class="dymo">${esc(V.nameOf(s, selected))}</span><span class="lv">${lvl}</span></div>
+            <div class="desc">${esc(V.describe(s, selected))}</div>
+            <div class="acts">${acts.map((a) => `<button type="button" class="a${['grow', 'take', 'reclaim'].includes(a.id) ? ' flesh' : ''}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}`).join('')}</div>`;
+        if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
+        if (infoEl.hidden) { infoEl.hidden = false; view.resize(); }
+    }
+
+    function uiState() {
+        const ui = { selected, placeable: armed ? placeable(armed) : null, diggable: new Set(), wanted: new Set() };
+        s.rooms.forEach((r, i) => { if (V.canDig(s, i)) ui.diggable.add(i); });
+        const q = s.request;
+        if (q && q.kind && (q.lvl > 1 || q.kind === 'engine')) {
+            s.rooms.forEach((r, i) => { if (r.kind === q.kind && !r.flesh && (q.kind === 'engine' || r.lvl < q.lvl)) ui.wanted.add(i); });
+        }
+        if (s.phase === 'night' && V.hasVat(s) && !V.growing(s)) s.rooms.forEach((r, i) => { if (V.canGrowInto(s, i)) ui.wanted.add(i); });
+        // what is short shows on the room that makes it: the engine when dark, the farm when hungry
+        if (s.phase === 'palace' && V.awake(s) > 0) {
+            if (V.power(s).short) s.rooms.forEach((r, i) => { if (r.kind === 'engine') ui.wanted.add(i); });
+            if (V.awake(s) > V.food(s)) s.rooms.forEach((r, i) => { if (r.kind === 'hydro' && !r.flesh) ui.wanted.add(i); });
+        }
+        // the dead wait in the Cryo Bay
+        if (s.fallen.length) s.rooms.forEach((r, i) => { if (r.kind === 'cryo' && !r.flesh) ui.wanted.add(i); });
+        return ui;
+    }
+
+    // ---------------------------------------------------------------- input
+    canvas.addEventListener('click', (e) => {
+        if (performance.now() < introUntil) return;
+        const rect = canvas.getBoundingClientRect();
+        const i = view.slotAt(e.clientX - rect.left, e.clientY - rect.top);
+        if (armed && i >= 0 && V.canPlace(s, armed, i)) {
+            if (V.build(s, armed, i)) { armed = null; selected = i; }
+            afterAct();
+            return;
+        }
+        armed = null;
+        selected = i;
+        if (i >= 0) sound.event('click');
+        afterAct();
+    }, { signal });
+    root.querySelector('.v-build').addEventListener('click', (e) => {
+        const card = e.target.closest('[data-card]');
+        if (e.target.closest('[data-v="build-btn"]')) { buildOpen = !buildOpen; armed = null; afterAct(); return; }
+        if (!card || card.classList.contains('off')) return;
+        const k = card.dataset.card;
+        // a place already picked: build right there
+        if (selected >= 0 && V.canPlace(s, k, selected)) { V.build(s, k, selected); armed = null; afterAct(); return; }
+        armed = armed === k ? null : k;
+        sound.event('click');
+        afterAct();
+    }, { signal });
+    infoEl.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-act]');
+        if (!b || b.disabled) return;
+        V.act(s, b.dataset.act, selected);
+        afterAct();
+    }, { signal });
+    root.querySelector('.v-time').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-speed]');
+        if (!b) return;
+        speed = Number(b.dataset.speed);
+        s.speed = speed;
+        sound.event('click');
+        paintPanel();
+    }, { signal });
+    $('rise').addEventListener('click', () => { riseUp(); }, { signal });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { armed = null; selected = -1; afterAct(); } }, { signal });
+    window.addEventListener('resize', () => view.resize(), { signal });
+    // a hidden tab is silent (the frame loop that sets the sound stops with it)
+    document.addEventListener('visibilitychange', () => { if (document.hidden) sound?.set(false, false); }, { signal });
+    document.getElementById('reset-btn')?.addEventListener('click', () => {
+        if (!confirm('Reset all progress? This cannot be undone.')) return;
+        savingEnabled = false;
+        try {
+            for (const k of [V.SAVE_KEY, PHASE4_CONSTANTS.SAVE_KEY, PHASE2_CONSTANTS.SAVE_KEY, PHASE1_CONSTANTS.SAVE_KEY, PHASE_KEY]) localStorage.removeItem(k);
+        } catch { /* ignore */ }
+        location.reload();
+    }, { signal });
+
+    function afterAct() {
+        pushLines();
+        paintPanel(); paintCards(); paintInfo();
+    }
+
+    async function riseUp() {
+        if (!V.rise(s)) return;
+        pushLines();
+        save();
+        $('rise').hidden = true;
+        $('cards').hidden = true;
+        selected = -1; paintInfo();
+        await view.rise(3200);
+        playChapterCard({ roman: 'V', title: 'UNITY', mode: 'to-come', dark: true });
+    }
+
+    // ---------------------------------------------------------------- save
+    function save() {
+        if (!savingEnabled || window.__rpiSkipSave) return;
+        try { localStorage.setItem(V.SAVE_KEY, V.serialize(s)); } catch { /* full */ }
+    }
+    saveTimer = setInterval(save, SAVE_EVERY_MS);
+    beforeUnload = () => save();
+    window.addEventListener('beforeunload', beforeUnload);
+
+    // ---------------------------------------------------------------- the frame
+    let last = performance.now();
+    let slowAt = 0;
+    function frame(now) {
+        rafId = requestAnimationFrame(frame);
+        const dt = Math.min(0.25, (now - last) / 1000);
+        last = now;
+        const held = window.__rpiPaused || now < introUntil || document.querySelector('#chapter-card.is-active');
+        if (!held && !s.risen) V.advance(s, dt, speed);
+        if (s.out.length || s.sfx.length) pushLines();
+        stepCrt(now);
+        view.frame(s, uiState(), now, held ? 0 : dt);
+        if (now - slowAt > 200) {
+            slowAt = now;
+            paintPanel(); paintCards(); paintInfo();
+            sound.set(s.phase === 'night', V.hasVat(s) && !s.risen);
+        }
+    }
+
+    // ---------------------------------------------------------------- the arrival
+    if (s.risen) {
+        playChapterCard({ roman: 'V', title: 'UNITY', mode: 'to-come', dark: true });
+    } else if (fresh || !s.introDone) {
+        introUntil = performance.now() + INTRO_MS;
+        s.introDone = true;
+        if (!s.out.length && !crt.queue.length) crt.queue.push(...V.LINES.online.map((text) => ({ text, who: 'sys' })));
+        view.startDescent(INTRO_MS * 0.8);
+        const parts = [...root.querySelectorAll('.v-panel > *, .v-build, .v-time')];
+        parts.forEach((p) => p.classList.add('v-lamp-off'));
+        parts.forEach((p, k) => timers.push(setTimeout(() => p.classList.remove('v-lamp-off'), 600 + k * 650)));
+    }
+    pushLines();
+    afterAct();
+    icons();
+    rafId = requestAnimationFrame(frame);
+
+    // for the playtest and the checkpoints
+    window.rpiVault = { get state() { return s; }, view, act: (id, i) => { V.act(s, id, i); afterAct(); }, setSpeed: (v) => { speed = v; }, select: (i) => { selected = i; afterAct(); } };
+}
+
+function icons() {
+    try { lucide.createIcons(); } catch { /* the CDN is not there */ }
+}
+function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+
+export function teardown() {
+    try { if (savingEnabled && !window.__rpiSkipSave && window.rpiVault) localStorage.setItem(V.SAVE_KEY, V.serialize(window.rpiVault.state)); } catch { /* ignore */ }
+    abort?.abort(); abort = null;
+    cancelAnimationFrame(rafId); rafId = 0;
+    clearInterval(saveTimer); saveTimer = null;
+    timers.forEach(clearTimeout); timers = [];
+    if (beforeUnload) window.removeEventListener('beforeunload', beforeUnload);
+    beforeUnload = null;
+    try { sound?.stop(); } catch { /* gone */ }
+    sound = null;
+    root?.remove(); root = null;
+    styleEl?.remove(); styleEl = null;
+    view = null;
+    document.body.classList.remove('in-vault');
+    delete window.rpiVault;
+}
