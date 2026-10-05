@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (deep-dig)
+## v1.86.3 - 2026-10-05 (chapter IV, the dig after its second independent test)
 
-### v1.86.3: the dig after its second independent test (docs/playtests/2026-10-05-dig-human-test-2.md)
+### The dig after its second independent test (docs/playtests/2026-10-05-dig-human-test-2.md)
 - **No pendulum in corners.** Up with a side climbs while the way up is open and turns only at a ceiling; a buffered side press turns once. Hanging under a ledge costs almost nothing (0.03 a second). The POWER bar blinks when it drains fast.
 - **Ore right above can be dug from below** (slower, costlier); other rock still only from below, and the hint names the way up and goes when the drone moves.
 - **A gentler start.** The first three recoveries cost only the cargo; the colony starts drinking at the first purchase and its drain grows slowly.
