@@ -22,5 +22,5 @@ export const MODULE_PATHS = [
   'src/phase4/readout.js', 'src/phase4/replay.js', 'src/phase4/scene.js', 'src/phase4/sound.js', 'src/phase4/strata.js',
   'src/phase4/strata-view.js', 'src/phase4/surface.js',
   'src/phase4/tree-view.js', 'src/phase4/tree.js', 'src/phase4/view-hooks.js', 'src/phase4/views.js', 'src/phase4/watcher.js',
-  'src/phase4v/checkpoints.js', 'src/phase4v/index.js', 'src/phase4v/sound.js', 'src/phase4v/style.js', 'src/phase4v/vault.js', 'src/phase4v/view.js',
+  'src/phase4v/checkpoints.js', 'src/phase4v/index.js', 'src/phase4v/sound.js', 'src/phase4v/style.js', 'src/phase4v/vault.js', 'src/phase4v/view.js', 'src/phase4v/wishes.js',
 ];

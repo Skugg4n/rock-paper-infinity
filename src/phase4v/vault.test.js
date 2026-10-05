@@ -66,7 +66,7 @@ describe('the palace', () => {
     test('a riot breaks a room of fun under 25 %, and REPAIR mends it', () => {
         const s = V.newVault();
         const i = 5; Object.assign(s.rooms[i], { kind: 'bar', born: 0 });
-        s.favour = -200; s.day = 1;
+        s.despair = 200; s.day = 1;
         V.stepDays(s, 1);
         expect(s.rooms[i].broken).toBe(true);
         expect(s.out.some((o) => o.text === 'They broke the bar.')).toBe(true);
@@ -100,9 +100,11 @@ describe('the cold', () => {
 function slotFor(s) { return s.rooms.findIndex((r) => r.kind === 'rock' && V.levelOf(s.rooms.indexOf(r)) === 2); }
 
 describe('the night', () => {
-    test('the power fails within about half a minute and the first to die has a name', () => {
+    test('the power fails within the first minute and the first to die has a name', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-night']();
-        run(s, 40);
+        run(s, 15);
+        expect(V.power(s).short).toBe(false);
+        run(s, 45);
         expect(V.power(s).short).toBe(true);
         expect(s.out.some((o) => o.text === 'POD 41 FAILED. MR HALE IS DEAD.')).toBe(true);
         const cryo = s.rooms.findIndex((r) => r.kind === 'cryo');

@@ -5,6 +5,7 @@
  * info box, the time buttons), runs the clock and saves. The rules are in vault.js.
  */
 import * as V from './vault.js';
+import { popWish, waveKind } from './wishes.js';
 import { createVaultView } from './view.js';
 import { VAULT_CSS } from './style.js';
 import { createVaultSound } from './sound.js';
@@ -117,6 +118,8 @@ export function init() {
     function paintPanel() {
         const night = s.phase !== 'palace';
         root.classList.toggle('is-night', night);
+        // the night: half the panel goes dark (the people's half)
+        for (const k of ['r-res', 'r-asleep', 'r-here']) $(k).classList.toggle('v-dim', night);
         const p = V.power(s);
         $('power').textContent = V.num(p.make);
         $('power-sub').textContent = `${V.num(p.use)} in use`;
@@ -165,6 +168,7 @@ export function init() {
         host.hidden = !buildOpen;
         $('build-btn').classList.toggle('on', buildOpen);
         const want = s.request && s.request.kind && !(s.request.lvl > 1) ? s.request.kind : null;
+        const wave = waveKind(s);
         const parts = V.cards(s).map((k) => {
             const K = V.KINDS[k];
             const needOre = Math.max(0, Math.ceil(K.price - s.ore));
@@ -176,7 +180,7 @@ export function init() {
             else if (!spots) need = K.deep ? 'Dig a place on level 2 or 3.' : 'Dig a place first.';
             const price = K.bio ? `${K.price} ore · ${K.bio} bio` : `${K.price} ore`;
             return `<button type="button" class="v-card${need ? ' off' : ''}${armed === k ? ' armed' : ''}" data-card="${k}">
-                ${want === k ? '<span class="mark"></span>' : ''}
+                ${want === k || wave === k ? '<span class="mark"></span>' : ''}
                 <span class="top"><i data-lucide="${ICONS[k]}" style="width:15px;height:15px"></i><span class="p">${price}</span></span>
                 <span class="n">${K.name}</span><span class="d">${V.cardLine(k)}</span>${need ? `<span class="need">${need}</span>` : ''}</button>`;
         }).join('');
@@ -218,7 +222,11 @@ export function init() {
     canvas.addEventListener('click', (e) => {
         if (performance.now() < introUntil) return;
         const rect = canvas.getBoundingClientRect();
-        const i = view.slotAt(e.clientX - rect.left, e.clientY - rect.top);
+        const bx = e.clientX - rect.left, by = e.clientY - rect.top;
+        // a wish first: it floats over the room
+        const wish = view.bubbleAt(s, bx, by);
+        if (wish) { popWish(s, wish); afterAct(); return; }
+        const i = view.slotAt(bx, by);
         if (armed && i >= 0 && V.canPlace(s, armed, i)) {
             if (V.build(s, armed, i)) { armed = null; selected = i; }
             afterAct();
@@ -229,6 +237,13 @@ export function init() {
         if (i >= 0) sound.event('click');
         afterAct();
     }, { signal });
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        view.setPointer(x, y);
+        canvas.style.cursor = view.bubbleAt(s, x, y) || view.slotAt(x, y) >= 0 ? 'pointer' : 'default';
+    }, { signal });
+    canvas.addEventListener('mouseleave', () => view.setPointer(-1, -1), { signal });
     root.querySelector('.v-build').addEventListener('click', (e) => {
         const card = e.target.closest('[data-card]');
         if (e.target.closest('[data-v="build-btn"]')) { buildOpen = !buildOpen; armed = null; afterAct(); return; }

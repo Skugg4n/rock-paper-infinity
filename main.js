@@ -7,7 +7,7 @@ import { initPerf } from './src/perf.js';
 import { CHECKPOINTS, jumpTo, snapshot, restore, slotInfo } from './src/checkpoints.js';
 import { MODULE_PATHS } from './src/modules.js';
 import { audio } from './src/audio.js';
-import { DEEP_VERSION_KEY, currentDeep, otherDeep } from './src/deepVersion.js';
+import { DEEP_VERSION_KEY, currentDeep, nextDeep } from './src/deepVersion.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -99,8 +99,8 @@ function setDebugVisible(on) {
   if (on) renderTestMenu();
 }
 
-// Debug: which chapter IV is played, the colony (the old act) or the vault (src/deepVersion.js).
-// Built like chapter IV's "View" item; a click keeps the other one and, in chapter IV, reloads.
+// Debug: which chapter IV is played, colony (the old act), vault or dig (src/deepVersion.js).
+// Built like chapter IV's "View" item; a click keeps the next one and, in chapter IV, reloads.
 function mountDeepItem(on) {
   document.getElementById('deep-version-toggle')?.remove();
   if (!on) return;
@@ -111,11 +111,11 @@ function mountDeepItem(on) {
   b.id = 'deep-version-toggle';
   b.type = 'button';
   b.className = 'block w-full text-left px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap border-b border-slate-100';
-  b.textContent = `Deep · ${kind}`;
-  b.title = `Play chapter IV as the ${otherDeep(kind)}`;
+  b.textContent = `Deep: ${kind}`;
+  b.title = `Play chapter IV as ${nextDeep(kind)}`;
   b.addEventListener('click', (e) => {
     e.stopPropagation();
-    const next = otherDeep(kind);
+    const next = nextDeep(kind);
     try { localStorage.setItem(DEEP_VERSION_KEY, next); } catch { /* ignore */ }
     const url = new URL(window.location.href);
     url.searchParams.delete('deep');

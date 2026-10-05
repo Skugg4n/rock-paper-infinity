@@ -13,6 +13,8 @@
  * the screen drains both.
  */
 
+import { stepWishes, normalizeWishes } from './wishes.js';
+
 export const LEVELS = 3;
 export const SLOTS = 8;
 export const START_ORE = 300;
@@ -62,6 +64,9 @@ export const PODS_PER_LEVEL = 50;
 export const POD_DRAW = 0.2;
 
 export const MOOD_BASE = 50;
+/** Thanks and pops are remembered, fading: this much is kept a day, never over the cap. */
+export const FAVOUR_KEEP = 0.94;
+export const FAVOUR_CAP = 25;
 export const COMMON_MOOD = 6;
 export const NOVELTY_DAYS = 40;
 export const NOVELTY_FLOOR = 0.4;
@@ -83,11 +88,12 @@ export const GROW_PRICE = 120;
 export const GROW_STEP = 10;
 /** Each room takes longer than the last: years. */
 export const GROW_YEARS_STEP = 50;
+export const GROW_YEARS_MAX = 400;
 export const VAT_BIO = 0.3;
 export const FLESH_BIO = 0.08;
 export const ENGINE_BURN = 2;
-export const ENGINE_WEAR_YEARS = 50;
-export const NIGHT_MINE = 3;
+export const ENGINE_WEAR_YEARS = 100;
+export const NIGHT_MINE = 1.5;
 export const POD_FAIL_SECONDS = 4;
 export const GROW_YEARS = 5;
 export const VAT_POWER = 10;
@@ -205,8 +211,10 @@ export function newVault({ seed = 7 } = {}) {
         levelsOne: [],
         ended: false,
         risen: false,
+        wishes: normalizeWishes(),
         out: [],
         sfx: [],
+        fx: [],
     };
     say(s, LINES.online, 'sys');
     return s;
@@ -315,7 +323,7 @@ export function upgradePrice(r) {
     return Math.round(KINDS[r.kind].price * UPGRADE_MULT[r.lvl - 1]);
 }
 /** The body grows into one room at a time; each takes longer than the last. */
-export function growYears(s) { return GROW_YEARS + GROW_YEARS_STEP * (s.grown || 0); }
+export function growYears(s) { return Math.min(GROW_YEARS_MAX, GROW_YEARS + GROW_YEARS_STEP * (s.grown || 0)); }
 export const growingCount = (s) => s.rooms.filter((r) => r.job && r.job.op === 'grow').length;
 /** The body grows into as many rooms at once as it has vats. */
 export const growing = (s) => growingCount(s) >= Math.max(1, s.rooms.filter((r) => r.kind === 'vat' && r.flesh === 1).length);
@@ -333,7 +341,8 @@ export function cardLine(kind) {
 /** Which cards the BUILD bar shows now. */
 export function cards(s) {
     return CARD_ORDER.filter((k) => {
-        if (k === 'cryo') return s.coldOpen;
+        if (k === 'cryo') return s.coldOpen && s.phase !== 'risen';
+        if (s.phase === 'risen') return false;
         if (k === 'vat') return s.reclaimed > 0;
         if (s.phase === 'night') return false;
         return true;
@@ -641,7 +650,7 @@ export function stepDays(s, dt) {
     // a want met is thanked at once
     if (s.request && wantMet(s, s.request)) stepRequests(s);
     s.ore += oreRate(s) * dt;
-    s.favour *= Math.pow(0.97, dt);
+    s.favour = clamp(s.favour * Math.pow(FAVOUR_KEEP, dt), -FAVOUR_CAP, FAVOUR_CAP);
     if (s.turned) s.despair += DESPAIR_PER_DAY * dt;
     // the CRT says when a room has gone stale, once per kind
     for (const r of s.rooms) {
@@ -684,7 +693,7 @@ export function stepDays(s, dt) {
 }
 
 /** The night's speed: 1 year a second, slowly faster, never over 20 a second. */
-export function yearsPerSecond(nightSec) { return Math.min(20, 1 + nightSec / 50); }
+export function yearsPerSecond(nightSec) { return Math.min(20, 1 + nightSec / 75); }
 
 /** Years of the night. */
 export function stepYears(s, dy) {
@@ -725,6 +734,8 @@ function stepPods(s, t) {
  */
 export function advance(s, sec, speed = 1) {
     if (!speed || s.ended || s.risen) return;
+    // the small wishes run in real seconds, the same at ▶ and ▶▶
+    stepWishes(s, sec);
     if (s.phase === 'palace') {
         stepDays(s, sec / DAY_SECONDS[speed]);
     } else if (s.phase === 'night') {
@@ -836,14 +847,15 @@ export function nameOf(s, i) {
 // ------------------------------------------------------------------ save
 export const SAVE_KEY = 'rpi-deep-vault';
 export function serialize(s) {
-    const { out: _o, sfx: _s, ...rest } = s;
+    const { out: _o, sfx: _s, fx: _f, ...rest } = s;
     return JSON.stringify(rest);
 }
 export function deserialize(raw) {
     try {
         const s = JSON.parse(raw);
         if (!s || s.v !== 1 || !Array.isArray(s.rooms)) return null;
-        s.out = []; s.sfx = [];
+        s.out = []; s.sfx = []; s.fx = [];
+        s.wishes = normalizeWishes(s.wishes);
         return s;
     } catch { return null; }
 }

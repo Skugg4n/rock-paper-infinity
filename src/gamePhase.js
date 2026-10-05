@@ -25,9 +25,9 @@ export async function setPhase(phase) {
     [phases.CITY]: 'phase-city',
     [phases.DEEP]: 'phase-deep',
   };
-  // the vault (the new chapter IV) builds its own screen; the old act's container stays hidden
+  // the new chapter IVs (vault, dig) build their own screens; the old act's container stays hidden
   const deep = phase === phases.DEEP ? currentDeep() : null;
-  if (deep === 'vault') delete containerMap[phases.DEEP];
+  if (deep && deep !== 'colony') delete containerMap[phases.DEEP];
   const containerId = containerMap[phase];
   if (containerId) {
     document.getElementById(containerId)?.classList.remove('hidden');
@@ -44,7 +44,15 @@ export async function setPhase(phase) {
       currentModule = await import('./phase2/index.js');
       return currentModule.init();
     case phases.DEEP:
-      currentModule = await import(deepModule(deep));
+      try {
+        currentModule = await import(deepModule(deep));
+      } catch (e) {
+        // a version that is not in this build (or failed to load) falls back to the old act
+        if (deep === 'colony') throw e;
+        console.warn(`chapter IV "${deep}" could not load; the colony instead`, e);
+        document.getElementById('phase-deep')?.classList.remove('hidden');
+        currentModule = await import('./phase4/index.js');
+      }
       return currentModule.init();
     case phases.WAR:
     case phases.ESCAPE:

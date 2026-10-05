@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (deep-vault)
+
+### v1.86.0: chapter IV as the vault, a parallel version (docs/superpowers/specs/2026-10-05-deep-vault.md)
+
+A new chapter IV beside the old one, chosen with `?deep=vault` or ☰ → Debug → "Deep · vault / colony" (kept under `rpi-deep-version`; the old act stays the default and is untouched). Fallout Shelter for billionaires that slides into the body.
+
+- **The palace** (src/phase4v/vault.js). A cutaway on a 2D canvas: the surface city in the storm, the shaft, the palace's eight places on level 1, levels 2 and 3 of rock to dig. 216 residents, 300 ore. BUILD cards (grey with "Need N more ore." when out of reach), a fixed info box on a room (UPGRADE, DIG, REPAIR and the Cryo Bay's buttons), II ▶ ▶▶. Requests by name on the CRT with a mark on the card or room; answered: a thank you and mood; ignored: a sour line. Mood with novelty that fades to 40 % in 40 days, cabin fever that grows faster and faster, homeless, hunger, dark. Births. Riots under 25 % break a room (REPAIR · 80 ore).
+- **The turn and the cold.** Day 100: SURFACE REPORT: NOT RECOVERING. Complaints come faster; mood falls faster than it can be built. The Cryo Bay opens (mood under 45 % or day 110): SLEEP 10, WAKE 10, SLEEP ALL; the windows of the suites turn blue.
+- **The night.** Years instead of days, 1 a second and slowly faster (never over 20). The engine wears, the power goes red, a pod fails: POD 41 FAILED. MR HALE IS DEAD. BURY or RECLAIM; then TAKE ONE and CUT POWER, the Vat, GROW INTO from the bottom up (one room at a time per vat, each taking longer than the last). BIOMASS in the panel; MOOD becomes BODY. Sediment over the city every thousand years, the city erodes by the year. The Watcher's lines on the CRT. When every room is body: "Woke: everyone is here." and RISE, into the same V · UNITY card as the old act.
+- **Wiring.** src/deepVersion.js (the choice, tested), src/gamePhase.js loads src/phase4/ or src/phase4v/, the descent from III lands in the chosen one. Checkpoints iv-vault-start, -turn, -cold, -night, -flesh (a jump sets the version; the old iv-* set colony). `rpi-deep-version` kept across jumps. Own save `rpi-deep-vault`. Sound through src/audio.js only: the shared words, a quiet CRT tick, a low drone in the night and a slow pulse once the body grows; silent when paused or hidden; teardown stops everything.
+- **Sim and play.** scripts/sim-vault.mjs (a plausible player, a line a minute); scripts/play-vault.mjs drives headless Chrome with real clicks for the play pass (docs/playtests/2026-10-05-vault-build.md, shots in docs/playtests/vault-shots/).
+
 ## v1.85.0 - 2026-10-04 (chapter IV, the rise in reach)
 
 ### Chapter IV: the rise in reach, quicker dreams, fixed prices, honest pumps, a mind that matters, bugs (B410 to B419)

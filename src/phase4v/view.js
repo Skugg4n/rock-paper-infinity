@@ -20,6 +20,8 @@ export function createVaultView(canvas, opts = {}) {
     const walkers = [];
     let descent = null;     // the arrival: { t0 }
     let riseAnim = null;    // the end: { t0, done }
+    const pointer = { x: -1, y: -1 };
+    const effects = [];     // pops, misses, wave bumps: { type, x, y, t0, text }
 
     function resize() {
         dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -97,6 +99,8 @@ export function createVaultView(canvas, opts = {}) {
         drawShaft(s);
         for (let i = 0; i < s.rooms.length; i++) drawSlot(s, i, ui, t);
         drawWalkers(s, t);
+        drawWishes(s, t);
+        drawEffects(t);
         drawDescent(t);
         drawRise(s, t);
     }
@@ -169,7 +173,7 @@ export function createVaultView(canvas, opts = {}) {
             const w = 26 + hash(k + 3) * 18;
             if (stage === 2) h *= 0.8;
             if (stage === 3) h = 8 + hash(k + 4) * 20;
-            ctx.fillStyle = stage >= 3 ? '#15130f' : '#0a0c10';
+            ctx.fillStyle = stage >= 3 ? '#1b1813' : '#13161c';
             if (stage === 3) {
                 ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w * 0.3, gy - h); ctx.lineTo(x + w * 0.6, gy - h * 0.6); ctx.lineTo(x + w, gy); ctx.fill();
                 continue;
@@ -180,7 +184,7 @@ export function createVaultView(canvas, opts = {}) {
                 if (k % 5 === 1) { ctx.beginPath(); ctx.moveTo(x, gy - h); ctx.lineTo(x + w / 2, gy - h - 16); ctx.lineTo(x + w, gy - h); ctx.fill(); }
             } else {
                 // broken tops
-                ctx.fillStyle = '#05060a';
+                ctx.fillStyle = s.phase === 'palace' ? '#1b2029' : '#090a0e';
                 ctx.beginPath(); ctx.moveTo(x + w * 0.2, gy - h); ctx.lineTo(x + w * 0.5, gy - h + 10 + hash(k) * 14); ctx.lineTo(x + w * 0.85, gy - h); ctx.fill();
             }
             // windows: lit in the palace's first years, broken after
@@ -571,7 +575,130 @@ export function createVaultView(canvas, opts = {}) {
         if (k >= 1 && !riseAnim.done) { riseAnim.done = true; riseAnim.resolve?.(); }
     }
 
+    // ---------------------------------------------------------------- the small wishes (wishes.js)
+    const R = 12;
+    function bubblePos(s, b) {
+        const r = geo.slots[b.slot];
+        if (!r) return null;
+        return { x: r.x + 10 + (r.w - 20) * b.fx, y: r.y + R + 6 };
+    }
+    function bubbleAt(s, px, py) {
+        const list = (s.wishes && s.wishes.list) || [];
+        for (let k = list.length - 1; k >= 0; k--) {
+            const b = list[k];
+            if (b.ghost) continue;
+            const p = bubblePos(s, b);
+            if (p && (px - p.x) ** 2 + (py - p.y) ** 2 <= (R + 4) ** 2) return b.id;
+        }
+        return 0;
+    }
+    function drawWishes(s, t) {
+        const w = s.wishes;
+        if (!w || !w.list.length) return;
+        let hover = null;
+        for (const b of w.list) {
+            const p = bubblePos(s, b);
+            if (!p) continue;
+            const age = w.clock - b.born;
+            if (age < 0) continue;
+            const left = Math.max(0, 1 - age / b.life);
+            const grow = Math.min(1, age / 0.18);
+            const bob = Math.sin(t * 2.2 + b.id) * 1.5;
+            const x = p.x, y = p.y + bob;
+            ctx.save();
+            ctx.globalAlpha = b.ghost ? 0.38 * Math.min(1, left * 3) * Math.min(1, age * 2) : 1;
+            ctx.translate(x, y);
+            ctx.scale(grow, grow);
+            // the bubble and its tail
+            ctx.fillStyle = b.icon === 'bell' || b.icon === 'finger' ? '#2a1414' : '#11151b';
+            ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(-4, R - 2); ctx.lineTo(0, R + 6); ctx.lineTo(4, R - 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.stroke();
+            // the time left: a thin ring that runs down
+            if (!b.ghost) {
+                ctx.strokeStyle = left < 0.3 ? '#ff8a70' : '#f1efe8';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(0, 0, R + 2.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left); ctx.stroke();
+            }
+            icon(b.icon, t);
+            ctx.restore();
+            if (!b.ghost && (pointer.x - x) ** 2 + (pointer.y - y) ** 2 <= (R + 4) ** 2) hover = { b, x, y };
+        }
+        if (hover) {
+            const text = hover.b.text + (hover.b.cost ? ` ${hover.b.cost} ore.` : '');
+            ctx.font = '11px system-ui, sans-serif';
+            const tw = ctx.measureText(text).width;
+            const bx = Math.min(W - tw - 20, hover.x + R + 8), by = hover.y - 10;
+            ctx.fillStyle = 'rgba(11,12,14,0.92)';
+            ctx.fillRect(bx, by, tw + 12, 20);
+            ctx.fillStyle = '#f1efe8';
+            ctx.textAlign = 'left';
+            ctx.fillText(text, bx + 6, by + 14);
+        }
+    }
+    /** White line icons, about 14 px, drawn around (0, 0). */
+    function icon(name, t) {
+        ctx.strokeStyle = '#f1efe8'; ctx.fillStyle = '#f1efe8'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        switch (name) {
+            case 'drink': ctx.moveTo(-5, -6); ctx.lineTo(5, -6); ctx.lineTo(0, 0); ctx.closePath(); ctx.moveTo(0, 0); ctx.lineTo(0, 5); ctx.moveTo(-3, 5); ctx.lineTo(3, 5); ctx.moveTo(3, -6); ctx.lineTo(6, -9); break;
+            case 'hand': ctx.moveTo(-4, 6); ctx.lineTo(-4, -1); ctx.moveTo(-4, 1); ctx.lineTo(-4, -5); ctx.moveTo(-1.5, 0); ctx.lineTo(-1.5, -7); ctx.moveTo(1, 0); ctx.lineTo(1, -6.5); ctx.moveTo(3.5, 1); ctx.lineTo(3.5, -5); ctx.moveTo(-4, 6); ctx.lineTo(3.5, 6); ctx.lineTo(3.5, 1); ctx.moveTo(-4, 2); ctx.lineTo(-7, -1); break;
+            case 'food': ctx.ellipse(0, 4, 7, 2, 0, 0, Math.PI * 2); ctx.moveTo(-5, 3); ctx.arc(0, 3, 5, Math.PI, 0); ctx.moveTo(0, -2); ctx.lineTo(0, -4); break;
+            case 'music': ctx.moveTo(-2, 4); ctx.lineTo(-2, -6); ctx.lineTo(5, -8); ctx.lineTo(5, 2); ctx.stroke(); ctx.beginPath(); ctx.arc(-4, 4, 2.2, 0, Math.PI * 2); ctx.arc(3, 2, 2.2, 0, Math.PI * 2); ctx.fill(); return;
+            case 'towel': ctx.rect(-6, -5, 12, 10); ctx.moveTo(-6, -1); ctx.lineTo(6, -1); ctx.moveTo(-6, 2); ctx.lineTo(6, 2); break;
+            case 'pool': ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, Math.PI * 2); ctx.fill(); return;
+            case 'bell': {
+                const sw = Math.sin(t * 18) * 0.35;
+                ctx.rotate(sw);
+                ctx.moveTo(-6, 4); ctx.quadraticCurveTo(-5, -7, 0, -7); ctx.quadraticCurveTo(5, -7, 6, 4); ctx.closePath(); ctx.moveTo(0, -7); ctx.lineTo(0, -9); ctx.moveTo(-1.5, 6); ctx.lineTo(1.5, 6);
+                break;
+            }
+            case 'finger': ctx.moveTo(-7, 0); ctx.lineTo(5, 0); ctx.moveTo(-7, 0); ctx.lineTo(-7, 5); ctx.lineTo(0, 5); ctx.quadraticCurveTo(2, 3, 0, 2); ctx.moveTo(-3, 5); ctx.lineTo(-3, 2); break;
+            default: ctx.arc(0, 0, 3, 0, Math.PI * 2);
+        }
+        ctx.stroke();
+    }
+    function takeEffects(s) {
+        if (!s.fx || !s.fx.length) return;
+        for (const e of s.fx) {
+            const r = geo.slots[e.slot];
+            if (!r) continue;
+            effects.push({ ...e, x: r.x + 10 + (r.w - 20) * (e.fx ?? 0.5), y: r.y + R + 6, t0: performance.now() });
+        }
+        s.fx.length = 0;
+    }
+    function drawEffects() {
+        const now = performance.now();
+        for (let k = effects.length - 1; k >= 0; k--) {
+            const e = effects[k];
+            const age = (now - e.t0) / 1000;
+            const life = e.type === 'wave' ? 1.6 : 0.9;
+            if (age > life) { effects.splice(k, 1); continue; }
+            const a = 1 - age / life;
+            ctx.save();
+            ctx.globalAlpha = a;
+            if (e.type === 'miss') {
+                // a grey burst and a small scowl
+                ctx.strokeStyle = '#7d8691'; ctx.lineWidth = 1.5;
+                for (let q = 0; q < 8; q++) {
+                    const ang = q * Math.PI / 4, r0 = 6 + age * 18, r1 = r0 + 5;
+                    ctx.beginPath(); ctx.moveTo(e.x + Math.cos(ang) * r0, e.y + Math.sin(ang) * r0); ctx.lineTo(e.x + Math.cos(ang) * r1, e.y + Math.sin(ang) * r1); ctx.stroke();
+                }
+                ctx.beginPath(); ctx.arc(e.x, e.y + 4, 3.5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+                ctx.fillStyle = '#7d8691'; ctx.fillRect(e.x - 3, e.y - 2, 1.5, 1.5); ctx.fillRect(e.x + 1.5, e.y - 2, 1.5, 1.5);
+            } else {
+                ctx.fillStyle = e.type === 'wave' ? '#ffd678' : '#bdf5c4';
+                ctx.font = `600 ${e.type === 'wave' ? 18 : 12}px system-ui, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(e.text || '+1', e.x, e.y - age * 26);
+            }
+            ctx.restore();
+        }
+    }
+
     function frame(s, ui, now, dt) {
+        takeEffects(s);
         syncWalkers(s);
         stepWalkers(s, dt);
         draw(s, ui, now);
@@ -580,6 +707,8 @@ export function createVaultView(canvas, opts = {}) {
     resize();
     return {
         resize, frame, slotAt, slotRect,
+        bubbleAt: (s, x, y) => bubbleAt(s, x, y),
+        setPointer: (x, y) => { pointer.x = x; pointer.y = y; },
         startDescent: (ms) => { descent = { t0: performance.now(), ms }; },
         rise: (ms = 3200) => new Promise((resolve) => { riseAnim = { t0: performance.now(), ms, resolve }; }),
         get geo() { return geo; },

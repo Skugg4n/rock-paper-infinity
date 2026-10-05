@@ -191,6 +191,19 @@ Woke: everyone is here.
 ```
 Spaken `RISE` tänds. Drag → kroppen fyller schaktet och bryter igenom ytan → kapitelkortet `V · UNITY` (samma som den gamla aktens slut).
 
+## Pluppar (Olas tillägg 2026-10-05)
+
+De boende är jobbiga. Utöver de långa projekten (bygga, uppgradera, de namngivna begärandena på CRT) poppar små ÖNSKNINGAR upp PÅ KARTAN som pratbubblor med en ikon över ett rum, och spelaren klickar på dem.
+
+- En bubbla lever cirka 10 s (en tunn ring runt den räknar ner). Klick: den spricker, ett litet "+1" flyter upp, ett mjukt pling. Vissa kostar lite (en drink: 1 malm). Missad: den spricker grå, Mood −1, en liten sur min.
+- Akt I: en var 6–8:e sekund. Efter vändningen: tätare och påstridigare (två eller tre åt gången, ohyfsade ikoner: pekfinger, ringklocka). Sovande gör inga, och det är en del av varför det känns som en lättnad att söva dem.
+- Vågor: när 4+ bubblor med samma ikon syns samtidigt säger CRT en gång motsvarande rad ("Overwhelming wishes for a pool table.") och BUILD-kortet den pekar på får markeringen; att bygga (eller uppgradera) det avslutar vågen och ger en stor Mood-knuff (+10).
+- I NATTEN, när alla sover, kommer bubblor fortfarande, svagt, över kryokapslarna. Klick gör ingenting; de bleknar. Ingen är vaken. (Maskinen håller på att bli galen.) Ingen Mood-effekt.
+- Ikoner ritade enkelt på canvas (glas, hand, tallrik, not, handduk, biljardboll, ringklocka, pekfinger), vit linje på mörk bubbla. Texten (t.ex. "Human #46 wants a backrub.") syns bara vid hover över bubblan, liten, bredvid; ikonen ensam ska gå att läsa.
+- "Något uppnått var 30:e sekund" har nu detta som golv: det finns alltid en bubbla att klicka i akt I och II.
+
+Byggt i src/phase4v/wishes.js (regler, testade i wishes.test.js); tider i riktiga sekunder (samma vid ▶ och ▶▶).
+
 ## Spara, checkpoints, val av version
 
 - Sparnyckel egen: `rpi-deep-vault` (rör inte den gamla `rpi-p4`/vad den heter).

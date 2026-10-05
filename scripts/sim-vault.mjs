@@ -2,6 +2,9 @@
 //   node scripts/sim-vault.mjs [--quiet]
 // Prints one line a minute (and the moments that matter), then the summary the spec asks for.
 import * as V from '../src/phase4v/vault.js';
+import { popWish } from '../src/phase4v/wishes.js';
+const POP = Number((process.argv.find((a) => a.startsWith('--pop=')) || '--pop=0.75').slice(6));
+let popped = 0, seen = new Set(), wished = 0;
 
 const DT = 0.25;
 const s = V.newVault();
@@ -100,6 +103,12 @@ while (t < 40 * 60 && !s.risen) {
         if (moved) lastActAt = t;
     }
     // ▶▶ when there is nothing to do for a while
+    // the wishes: a human clicks most of them, 1 to 5 s after they show
+    for (const b of [...(s.wishes?.list || [])]) {
+        if (b.ghost) continue;
+        if (!seen.has(b.id)) { seen.add(b.id); wished++; b.simAt = (Math.sin(b.id * 91.7) * 0.5 + 0.5) < POP ? 1 + ((b.id * 37) % 40) / 10 : 99; }
+        if (s.wishes.clock - b.born >= b.simAt && popWish(s, b.id)) popped++;
+    }
     speed = s.phase === 'night' ? (s.rooms.some((r) => r.job && r.job.op === 'grow') || s.fallen.length || t - lastActAt < 10 ? 1 : 2) : (t - lastActAt > 20 ? 2 : 1);
     V.advance(s, DT, speed);
     for (const o of s.out) {
@@ -132,4 +141,5 @@ for (const r of rows) console.log(r);
 console.log('');
 for (const e of events) console.log(e);
 console.log('');
+console.log(`wishes ${wished}, popped ${popped}`);
 console.log(`first buy ${fmt(firstBuyAt ?? 0)}; longest gap between buys in act I ${Math.round(maxGap)} s (at ${fmt(gapAt)}); turn ${turnAt != null ? fmt(turnAt) : '-'}; cold ${coldAt != null ? fmt(coldAt) : '-'}; night ${nightAt != null ? fmt(nightAt) : '-'}; everyone here ${endAt != null ? fmt(endAt) : '-'}; risen ${s.risen ? fmt(t) : '-'}`);
