@@ -25,9 +25,10 @@ export async function setPhase(phase) {
     [phases.CITY]: 'phase-city',
     [phases.DEEP]: 'phase-deep',
   };
-  // the new chapter IVs (vault, dig) build their own screens; the old act's container stays hidden
+  // the vault builds its own screen on the body, so the old act's container stays hidden; the dig
+  // builds its layer inside #phase-deep (and hides the old act's pieces itself)
   const deep = phase === phases.DEEP ? currentDeep() : null;
-  if (deep && deep !== 'colony') delete containerMap[phases.DEEP];
+  if (deep === 'vault') delete containerMap[phases.DEEP];
   const containerId = containerMap[phase];
   if (containerId) {
     document.getElementById(containerId)?.classList.remove('hidden');
