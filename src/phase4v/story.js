@@ -9,7 +9,7 @@
 export const STEAK = {
     ask: { who: 'Mr Hale', text: 'I want real steak.', kind: 'meatlab', thanks: 'Finally. Real steak.' },
     more: { who: 'Mrs Vance', text: 'More steak. Everyone wants steak.', kind: 'meatlab', lvl: 2 },
-    card: 'Grows real meat in vats. Mood +6.',
+    card: 'Real steak. Mood +6.',
     info: 'Real meat, grown in vats. Nobody asks from what.',
     vatCard: 'The meat lab, grown up.',
     different: 'The steak tastes different tonight.',
@@ -68,7 +68,7 @@ export const NEEDS_HEART = 'Needs a heart first.';
 export const SLOW_S = 3;
 export const SLOW_RATE = 0.25;
 /** The only moments that are marked (spec, section 5). */
-export const MOMENTS = ['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise'];
+export const MOMENTS = ['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'reclaim-hint', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise'];
 
 /**
  * Says `lines` as a moment: once per key, amber on the CRT (`mark`), a pling (`moment`), and time slows.

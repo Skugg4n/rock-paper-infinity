@@ -64,7 +64,7 @@ export function init() {
           <div class="c in"><span class="dymo">Inside</span><span class="val" data-v="chk-inside"></span></div>
         </div>
         <div class="v-rows">
-          <div class="r" data-v="r-res"><span class="dymo">Residents</span><span class="val" data-v="res"></span></div>
+          <div class="r" data-v="r-res"><span class="dymo" data-v="res-label">Residents</span><span class="val" data-v="res"></span></div>
           <div class="r" data-v="r-asleep" hidden><span class="dymo">Asleep</span><span class="val" data-v="asleep"></span></div>
           <div class="r" data-v="r-here" hidden><span class="dymo">In the body</span><span class="val" data-v="here"></span></div>
           <div class="r" data-v="r-time"><span class="dymo" data-v="time-label">Day</span><span class="val" data-v="time"></span></div>
@@ -100,7 +100,16 @@ export function init() {
 
     // ---------------------------------------------------------------- the CRT
     function pushLines() {
-        for (const o of s.out) crt.queue.push(o);
+        for (const o of s.out) {
+            // a tally (PODS FAILED: n.) is one line that counts: it replaces its own last line instead of adding one
+            if (o.tally) {
+                const queued = crt.queue.find((q) => q.tally === o.tally);
+                if (queued) { queued.text = o.text; continue; }
+                const shown = [...crt.lines].reverse().find((l) => l.tally === o.tally && l.done);
+                if (shown) { shown.text = o.text; continue; }
+            }
+            crt.queue.push(o);
+        }
         s.out.length = 0;
         for (const e of s.sfx) {
             sound.event(e);
@@ -179,8 +188,10 @@ export function init() {
             $('body-bar').style.width = `${b}%`;
         }
         // at the end nobody is a resident: the row goes, IN THE BODY stays
-        $('r-res').hidden = s.residents === 0 && s.here > 0;
-        $('res').textContent = V.num(s.residents);
+        // in the night the row counts who is awake (RESIDENTS 0 read as all dead)
+        $('res-label').textContent = night ? 'Awake' : 'Residents';
+        $('res').textContent = V.num(night ? V.awake(s) : s.residents);
+        $('r-res').hidden = !night && s.residents === 0 && s.here > 0;
         $('r-asleep').hidden = !(s.asleep > 0);
         $('asleep').textContent = V.num(s.asleep);
         $('r-here').hidden = !(s.here > 0);

@@ -26,7 +26,7 @@ describe('the steak (act I)', () => {
         const o = s.out.find((x) => x.text === 'Mr Hale: I want real steak.');
         expect(o.mark).toBe(true);
         expect(V.cards(s)).toContain('meatlab');
-        expect(V.cardLine('meatlab')).toBe('Grows real meat in vats. Mood +6.');
+        expect(V.cardLine('meatlab')).toBe('Real steak. Mood +6.');
         expect(V.KINDS.meatlab.price).toBe(160);
     });
     test('the lab goes on level 2 or 3; built: "Mr Hale: Finally. Real steak."; its info box line', () => {
@@ -171,18 +171,18 @@ describe('the night: the goal and the organs', () => {
     test('GROW INTO is a choice of organ; only what can be paid and is allowed lights', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
         const i = V.slotIndex(2, 3);
-        s.bio = 200;
+        s.bio = V.organPrice(s, 'stomach') + 1;
         const acts = V.actionsFor(s, i).filter((a) => a.group === 'grow');
         expect(acts.map((a) => a.organ)).toEqual(['tissue', 'stomach', 'heart', 'lungs', 'skin']);
         const by = Object.fromEntries(acts.map((a) => [a.organ, a]));
         expect(by.tissue.id).toBe('grow');
         expect(by.stomach.ok).toBe(true);
         expect(by.heart.ok).toBe(false);
-        expect(by.heart.need).toBe('Need 50 more biomass.');
+        expect(by.heart.need).toBe(`Need ${V.organPrice(s, 'heart') - s.bio} more biomass.`);
         expect(by.lungs.ok).toBe(false);
         expect(by.lungs.need).toBe('Needs a heart first.');
         expect(by.skin.ok).toBe(false);
-        expect(by.stomach.label).toBe('STOMACH · 150 biomass');
+        expect(by.stomach.label).toBe(`STOMACH · ${V.organPrice(s, 'stomach')} biomass`);
         expect(by.stomach.hint).toBe('Eats the rock. More biomass every year.');
         expect(by.heart.hint).toBe('Power for everything. The engine can rest.');
         expect(by.lungs.hint).toBe('To breathe up there.');
@@ -192,7 +192,7 @@ describe('the night: the goal and the organs', () => {
     test('a stomach eats the rock: +1 biomass a year; its first one is a moment with its line', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
         const i = V.slotIndex(2, 3);
-        s.bio = 150;
+        s.bio = 400;
         const rate = V.bioRate(s);
         expect(V.act(s, 'grow-stomach', i)).toBe(true);
         s.out = [];
@@ -242,10 +242,16 @@ describe('the night: the goal and the organs', () => {
         s.rooms.forEach((r, i) => { if (!bays.includes(i) && i !== V.slotIndex(0, 3) && !r.flesh) Object.assign(r, { flesh: 1, organ: 'tissue' }); });
         s.rooms[V.slotIndex(2, 3)].organ = 'heart';
         s.rooms[V.slotIndex(2, 4)].organ = 'lungs';
-        // skin waits for a full floor under it: the Cryo Bays first, and the last one takes everyone
+        // skin waits for a full floor under it: the Cryo Bays first; the last one's sleepers the body will not take
         expect(V.growInto(s, V.slotIndex(0, 3), 'skin')).toBe(false);
         expect(V.goal(s).inside).toBeLessThan(V.goal(s).total);
-        for (const b of bays) { s.bio = 1e4; expect(V.growInto(s, b)).toBe(true); run(s, 40, 2); }
+        s.bio = 1e4; expect(V.growInto(s, bays[0])).toBe(true); run(s, 40, 2);
+        const last = bays[1];
+        expect(V.canGrowInto(s, last)).toBe(false);
+        expect(V.describe(s, last)).toMatch(/The body will not take the last sleepers\. You must\.$/);
+        // the dark choice: CUT POWER until nobody sleeps, the dead to the meat lab
+        while (s.asleep > 0) { V.cutPower(s); V.reclaim(s); if (V.awake(s)) V.sleepAll(s); }
+        s.bio = 1e4; expect(V.growInto(s, last)).toBe(true); run(s, 40, 2);
         expect(s.residents).toBe(0);
         expect(V.riseReady(s)).toBe(false);
         s.bio = 1e4;
@@ -310,6 +316,62 @@ describe('the words', () => {
         expect(all).not.toMatch(new RegExp(String.fromCharCode(0x2014)));
     });
     test('only the moments of the spec are marked', () => {
-        expect(S.MOMENTS).toEqual(['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise']);
+        expect(S.MOMENTS).toEqual(['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'reclaim-hint', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise']);
+    });
+});
+
+describe('after the third test', () => {
+    test('the night stays short: stomachs share the rock and each costs more; organs grow dearer with the body', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        const first = V.organPrice(s, 'stomach');
+        s.rooms[V.slotIndex(2, 2)].organ = 'stomach';
+        expect(V.stomachBio(s)).toBeCloseTo(V.STOMACH_BIO);
+        expect(V.organPrice(s, 'stomach')).toBe(first + V.STOMACH_STEP);
+        s.rooms[V.slotIndex(2, 0)].kind = 'rock'; s.rooms[V.slotIndex(2, 0)].organ = 'stomach';
+        expect(V.stomachBio(s)).toBeCloseTo(V.STOMACH_BIO * Math.sqrt(2));
+        const heart = V.organPrice(s, 'heart');
+        s.grown += 4;
+        expect(V.organPrice(s, 'heart')).toBeGreaterThan(heart);
+    });
+    test('the last Cryo Bay: the body will not take its sleepers, the system must (a dark choice before RISE)', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        const bays = s.rooms.map((r, i) => (r.kind === 'cryo' ? i : -1)).filter((i) => i >= 0);
+        s.rooms[bays[0]].flesh = 1;
+        expect(V.lastSleepers(s, bays[1])).toBe(true);
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2) r.flesh = 1; });
+        expect(V.canGrowInto(s, bays[1])).toBe(false);
+        V.cutPower(s);
+        expect(V.fallenBio(s)).toBe(10 * V.CUT_BIO);
+    });
+    test('the first pod of the night: the way is pointed out once, marked; later failures are one counting line', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-night']();
+        run(s, 120);
+        const hint = s.out.filter((o) => o.text === V.RECLAIM_HINT);
+        expect(hint).toHaveLength(1);
+        expect(hint[0].mark).toBe(true);
+        const tallies = s.out.filter((o) => o.tally === 'pods').map((o) => o.text);
+        expect(tallies.length).toBeGreaterThan(0);
+        expect(tallies[tallies.length - 1]).toBe(`PODS FAILED: ${s.podsFailed}.`);
+        expect(s.out.some((o) => /^POD \d+ FAILED\.$/.test(o.text))).toBe(false);
+    });
+    test('the Cryo Bay opens with the turn (when mood first falls under 60), not a week of riots later', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-turn']();
+        s.favour = 40;
+        run(s, 2 * 5);
+        expect(s.turned).toBe(true);
+        run(s, (V.COLD_AFTER_TURN + 1) * 5);
+        expect(s.coldOpen).toBe(true);
+        expect(s.day).toBeLessThan(V.TURN_DAY + V.COLD_AFTER_TURN + 2);
+    });
+    test('a Cryo Bay in the night shows four buttons at most, the likeliest first', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        const cryo = s.rooms.findIndex((r) => r.kind === 'cryo');
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2) r.flesh = 1; });
+        s.rooms[cryo - 1].flesh = 1;
+        s.fallen = ['Pod'];
+        s.bio = 1000;
+        const acts = V.actionsFor(s, cryo);
+        expect(acts.length).toBeLessThanOrEqual(4);
+        expect(acts.map((a) => a.id)).toEqual(['reclaim', 'grow', 'grow-heart', 'take']);
     });
 });

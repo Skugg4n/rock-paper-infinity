@@ -33,7 +33,9 @@ function rgba(hex, a) {
 /** The breath and the heart (as src/phase4/flesh.js). */
 const BREATH_RATE = 0.9;
 const BEAT = 1.7;
-const PAD = 6;              // the tissue is drawn this much larger than its room, so it can swell
+const PAD = 6;
+/** After the rise, the risen body stays on screen this long before the chapter card. */
+export const RISE_HOLD_MS = 1800;              // the tissue is drawn this much larger than its room, so it can swell
 
 export function createVaultView(canvas, opts = {}) {
     const ctx = canvas.getContext('2d');
@@ -1536,10 +1538,11 @@ export function createVaultView(canvas, opts = {}) {
                 }
                 ctx.stroke();
             }
-            if (m > 0.85) { ctx.fillStyle = `rgba(0,0,0,${(m - 0.85) / 0.15})`; ctx.fillRect(0, 0, W, H); }
+            // no cut to black: the risen body holds the screen until the card comes
         }
         ctx.lineWidth = 1;
-        if (k >= 1 && !riseAnim.done) { riseAnim.done = true; riseAnim.resolve?.(); }
+        // hold the risen body a moment, then the card
+        if (t * 1000 - riseAnim.t0 >= riseAnim.ms + RISE_HOLD_MS && !riseAnim.done) { riseAnim.done = true; riseAnim.resolve?.(); }
     }
 
     // ---------------------------------------------------------------- the small wishes (wishes.js)

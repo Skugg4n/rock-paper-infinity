@@ -193,7 +193,10 @@ describe('after the human test', () => {
         const by = Object.fromEntries(acts.map((a) => [a.id, a]));
         expect(by.reclaim.label).toBe('RECLAIM 2 DEAD');
         expect(by.take.dark).toBe(true);
-        for (const id of ['bury', 'reclaim', 'take', 'cut', 'wake']) expect(by[id].hint).toMatch(/\.$/);
+        for (const id of ['bury', 'reclaim', 'take', 'cut']) expect(by[id].hint).toMatch(/\.$/);
+        // a Cryo Bay in the night shows four at most, the likeliest first
+        expect(acts.length).toBeLessThanOrEqual(V.NIGHT_CRYO_MAX);
+        expect(acts[0].id).toBe('reclaim');
         const g = s.rooms.findIndex((r, i) => V.canGrowInto(s, i));
         expect(V.actionsFor(s, g).find((a) => a.id === 'grow').hint).toBe('Just more of the body.');
     });

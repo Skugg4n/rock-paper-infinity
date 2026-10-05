@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.86.6 - 2026-10-05 (chapter IV, the vault after the third test)
+
+After the third independent test (docs/playtests/2026-10-05-vault-human-test-3.md, worth playing):
+- **The night stays short of biomass to RISE.** Stomachs share the rock (n stomachs give 1 x sqrt(n) a year) and each one more costs 120 more; organs grow dearer with the body (half of what tissue has gone up). The last Cryo Bay: "The body will not take the last sleepers. You must." Before RISE the system has to empty it (CUT POWER, TAKE ONE). The cold dead of CUT POWER give 5 each when reclaimed. Sim: the most biomass after the heart is about 550 to 630 (the test saw 8 400); a stomach-everywhere player is no faster.
+- **Night 1 points the way.** At the first dead pod, once and marked: "The dead can feed the meat lab. Open the Cryo Bay." (the bay pulses red). The pods after Mr Hale are one counting line, "PODS FAILED: 5.", updated in place on the CRT; no pod numbers, so no pod reported twice.
+- **The Cryo Bay opens with the turn**: when mood first falls under 60 after the report (at most four days on), so the riots push toward it instead of being a wait.
+- **Small.** A Cryo Bay in the night shows four buttons at most, the likeliest first (RECLAIM, SLEEP ALL, TISSUE, the organ still missing, TAKE ONE, CUT POWER, BURY; WAKE only when nothing else). In the night the panel says AWAKE n, not RESIDENTS 0. Build card lines wrap to two lines, and the Meat Lab card says "Real steak. Mood +6." (the spec's longer line did not fit). RISE holds the risen body 1.8 s with no cut to black, then V · UNITY.
+
 ## v1.86.5 - 2026-10-05 (chapter IV, the vault: the steak, the goal, the organs)
 
 The vault's story pass (docs/superpowers/specs/2026-10-05-deep-vault-story.md): rules, words and balance (phase A), then the screen (phase B).

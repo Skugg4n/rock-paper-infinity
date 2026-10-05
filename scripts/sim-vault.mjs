@@ -17,6 +17,7 @@ let lastReq = '';
 let turnAt = null, coldAt = null, nightAt = null, endAt = null, firstBuyAt = null;
 let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0, cuts = 0;
 let lastActAt = 0;
+let maxBioAfterHeart = 0;
 let waitFrom = null, waitTotal = 0, gapEndAt = 0, maxCouldGap = 0, lastCould = 0;
 const waits = [];
 const organAt = {};
@@ -95,10 +96,13 @@ function wantOrgan(i) {
     const stomachs = s.rooms.filter((r) => r.organ === 'stomach' && (r.flesh === 1 || (r.job && r.job.op === 'grow'))).length;
     if (V.levelOf(i) === 0 && !have('skin') && V.organAllowed(s, 'skin', i)) return 'skin';
     if (stomachs < STOMACHS) return 'stomach';
+    // the third tester: a stomach wherever one can be had
+    if (GREEDY && have('heart') && s.bio >= V.organPrice(s, 'stomach')) return 'stomach';
     if (!have('heart')) return 'heart';
     if (!have('lungs') && V.organAllowed(s, 'lungs', i)) return 'lungs';
     return 'tissue';
 }
+const GREEDY = process.argv.includes('--greedy');
 const STOMACHS = Number((process.argv.find((a) => a.startsWith('--stomachs=')) || '--stomachs=2').slice(11));
 let wantPrice = 0;
 
@@ -126,6 +130,9 @@ function nightMove() {
         if (V.canTake(s) && t - lastActAt > 3) { V.takeOne(s); takes++; note('take'); return true; }
         if (!V.growingCount(s) && s.asleep > 20 && V.power(s).short && t - lastActAt > 3) { V.cutPower(s); cuts++; note('cut'); return true; }
     }
+    // the last sleepers: the body will not take them; the system must (CUT POWER, a row at a time)
+    const last = slotsWhere((r, i) => V.lastSleepers(s, i) && s.rooms.some((q, j) => q.flesh === 1 && (Math.abs(j - i) === 1 || Math.abs(j - i) === V.SLOTS)));
+    if (!g.length && last.length && !V.growingCount(s) && t - lastActAt > 2) { V.cutPower(s); cuts++; note('cut'); return true; }
     return false;
 }
 
@@ -143,6 +150,7 @@ while (t < 40 * 60 && !s.risen) {
             // a decision is possible: something could be grown and paid, a sleeper taken, the dead reclaimed
             const could = moved || s.fallen.length || V.canTake(s) || s.rooms.some((r, i) => V.canGrowInto(s, i) && s.bio >= V.growPrice(s));
             if (could) { maxCouldGap = Math.max(maxCouldGap, t - lastCould); lastCould = t; }
+            if (V.hasOrgan(s, 'heart')) maxBioAfterHeart = Math.max(maxBioAfterHeart, s.bio);
             // waiting for biomass: a room could be grown, the price is not there yet
             const waiting = wantPrice > 0 && s.bio < wantPrice;
             if (waiting) { if (waitFrom == null) waitFrom = t; waitTotal += DT * 2; }
@@ -194,5 +202,6 @@ const riseAt = s.risen ? t : null;
 // waiting for biomass = a room could be grown and the price is not there yet (the player may take one meanwhile)
 console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, first vat to RISE ${riseAt != null && vatAt != null ? fmt(riseAt - vatAt) : '-'}, longest gap between night decisions ${Math.round(maxNightGap)} s (ending ${fmt(gapEndAt)}), without a possible one ${Math.round(maxCouldGap)} s, takes ${takes}, cuts ${cuts}`);
 waits.sort((a, b) => b - a);
+console.log(`most biomass after the heart: ${Math.round(maxBioAfterHeart)}`);
 console.log(`waiting for biomass: ${waits.length} times, ${Math.round(waitTotal)} s in all, longest ${Math.round(waits[0] || 0)} s, median ${Math.round(waits[Math.floor(waits.length / 2)] || 0)} s`);
 console.log(`first buy ${fmt(firstBuyAt ?? 0)}; longest gap between buys in act I ${Math.round(maxGap)} s (at ${fmt(gapAt)}); turn ${turnAt != null ? fmt(turnAt) : '-'}; cold ${coldAt != null ? fmt(coldAt) : '-'}; night ${nightAt != null ? fmt(nightAt) : '-'}; RISE ready ${endAt != null ? fmt(endAt) : '-'}; risen ${s.risen ? fmt(t) : '-'}`);

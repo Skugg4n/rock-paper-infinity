@@ -105,8 +105,8 @@ body.in-vault #pause-btn { display: none; }
 .v-card .top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .v-card .n { font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-card .p { font-size: 11px; color: var(--v-steel3); white-space: nowrap; }
-.v-card .d { font-size: 11px; color: var(--v-slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v-card .need { font-size: 11px; color: #8a3a2a; }
+.v-card .d { font-size: 11px; line-height: 13px; color: var(--v-slate); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.v-card .need { font-size: 11px; line-height: 13px; color: #8a3a2a; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .v-card.off { background: var(--v-steel3); color: var(--v-mist); cursor: default; }
 .v-card.off .p, .v-card.off .d { color: var(--v-mist); }
 .v-card.off .need { color: var(--v-danger); }

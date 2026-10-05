@@ -133,6 +133,15 @@ export const NIGHT_FIRST_LINE_S = 14;
 export const HEART_POWER = 40;
 /** A stomach eats the rock: biomass a year, per stomach. */
 export const STOMACH_BIO = 1;
+/** Each stomach more costs this much more, and they share the rock: n stomachs give STOMACH_BIO x sqrt(n). */
+export const STOMACH_STEP = 120;
+/** The dead of CUT POWER died cold in the dark: less of them is any use. */
+export const CUT_BIO = 5;
+/** Organs grow dearer with the body: this share of what tissue has gone up by. */
+export const ORGAN_SCALE = 0.5;
+/** The Cryo Bay opens this many days after the turn at the latest (sooner when mood first falls under COLD_MOOD). */
+export const COLD_AFTER_TURN = 4;
+export const COLD_MOOD = 60;
 /** The days after the turn before the hydroponics fail. */
 export const HYDRO_FAIL_DAYS = 3;
 
@@ -396,7 +405,18 @@ export function growPrice(s) { return GROW_PRICE + GROW_STEP * (s.grown || 0); }
 /** What an organ costs: its own price, never less than plain tissue. */
 export function organPrice(s, organ) {
     const t = growPrice(s);
-    return ORGANS[organ].price == null ? t : Math.max(ORGANS[organ].price, t);
+    if (ORGANS[organ].price == null) return t;
+    // organs grow dearer with the body, as tissue does; every stomach more costs more again
+    const more = organ === 'stomach' ? STOMACH_STEP * stomachCount(s) : 0;
+    return ORGANS[organ].price + Math.round(ORGAN_SCALE * (t - GROW_PRICE)) + more;
+}
+/** Stomachs grown or growing. */
+export const stomachCount = (s) => s.rooms.filter((r) => r.organ === 'stomach' && (r.flesh === 1 || (r.job && r.job.op === 'grow'))).length
+    + s.rooms.filter((r) => r.job && r.job.op === 'shape' && r.job.organ === 'stomach').length;
+/** What the stomachs eat a year, all of them: they share the rock. */
+export function stomachBio(s) {
+    const n = s.rooms.filter((r) => organOf(r) === 'stomach').length;
+    return n ? STOMACH_BIO * Math.sqrt(n) : 0;
 }
 
 /** The card's one line: what it gives. */
@@ -522,17 +542,25 @@ function checkNight(s) {
         moment(s, 'goal', GOAL_LINES);
     }
 }
-/** The night's first dead: a name; then the pods are numbers. */
+/** The night's first dead: a name; then the pods are a count. */
+export const RECLAIM_HINT = 'The dead can feed the meat lab. Open the Cryo Bay.';
 const FALLEN_NAMES = ['Mr Hale'];
 function podFails(s) {
     if (s.asleep <= 0) return;
     s.asleep -= 1; s.residents -= 1; s.dead += 1;
-    const pod = 11 + Math.floor(rand(s) * 140);
     const name = FALLEN_NAMES[s.fallenCount || 0];
     s.fallenCount = (s.fallenCount || 0) + 1;
-    s.fallen.push(name || `Pod ${pod}`);
-    const text = name ? `POD 41 FAILED. ${name.toUpperCase()} IS DEAD.` : `POD ${pod} FAILED.`;
-    if (!firstDead(s, text, 'sys')) say(s, text, 'sys');
+    s.fallen.push(name || 'Pod');
+    s.podsFailed = (s.podsFailed || 0) + 1;
+    if (name) {
+        const text = `POD 41 FAILED. ${name.toUpperCase()} IS DEAD.`;
+        if (!firstDead(s, text, 'sys')) say(s, text, 'sys');
+    } else {
+        // one line that counts, so the story is not pushed off the screen (the CRT merges a tally)
+        s.out.push({ text: `PODS FAILED: ${num(s.podsFailed)}.`, who: 'sys', tally: 'pods' });
+    }
+    // the first dead of the night: point at the way, once
+    if (!s.reclaimed) moment(s, 'reclaim-hint', RECLAIM_HINT);
     sfx(s, 'fail');
 }
 /** The first to die is a moment that matters. Returns true when it said the line as one. */
@@ -567,9 +595,11 @@ export function bury(s) {
     sfx(s, 'click');
     return true;
 }
+/** What the dead waiting in the pods are worth: the cold ones of CUT POWER less. */
+export const fallenBio = (s) => s.fallen.reduce((a, f) => a + (f === 'Cut' ? CUT_BIO : RECLAIM_BIO), 0);
 export function reclaim(s) {
     if (!s.fallen.length) return false;
-    s.bio += RECLAIM_BIO * s.fallen.length;
+    s.bio += fallenBio(s);
     s.reclaimed += s.fallen.length;
     s.fallen = [];
     if (s.phase === 'night') wakeMeatLab(s);
@@ -598,17 +628,26 @@ export function cutPower(s) {
     const k = Math.min(10, s.asleep);
     if (k <= 0 || s.phase !== 'night') return false;
     s.asleep -= k; s.residents -= k; s.dead += k;
-    for (let n = 0; n < k; n++) s.fallen.push('Pod');
+    for (let n = 0; n < k; n++) s.fallen.push('Cut');
     if (!story(s).moments['first-dead']) firstDead(s, `${k} PODS WENT DARK.`, 'sys');
     sfx(s, 'fail');
     return true;
 }
 
 /** The body's neighbours: beside a vat or flesh on the same level, or under/over one. */
+/** The last Cryo Bay with anyone asleep in it: the body will not take them. The system must. */
+export function lastSleepers(s, i) {
+    const r = s.rooms[i];
+    if (!r || r.kind !== 'cryo' || r.flesh || s.asleep <= 0) return false;
+    return !s.rooms.some((q, j) => j !== i && q.kind === 'cryo' && q.flesh !== 1 && !(q.job && q.job.op === 'grow'));
+}
+export const LAST_SLEEPERS = 'The body will not take the last sleepers. You must.';
+
 export function canGrowInto(s, i) {
     const r = s.rooms[i];
     if (!r || r.flesh || r.job || s.phase !== 'night' || growing(s)) return false;
     if (!hasVat(s)) return false;
+    if (lastSleepers(s, i)) return false;
     const lv = levelOf(i), ix = idxOf(i);
     // the body grows from below: a level is taken only when the one under it is all body
     if (lv < LEVELS - 1 && !s.rooms.slice((lv + 1) * SLOTS, (lv + 2) * SLOTS).every(isFlesh)) return false;
@@ -882,7 +921,7 @@ export function stepDays(s, dt) {
         s.steakDay = null;
         if (awake(s) > 0) say(s, STEAK.different, 'res');
     }
-    if (s.turned && !s.coldOpen && (m < 45 || s.day >= COLD_DAY)) {
+    if (s.turned && !s.coldOpen && (m < COLD_MOOD || s.day >= (s.turnDay ?? TURN_DAY) + COLD_AFTER_TURN || s.day >= COLD_DAY)) {
         s.coldOpen = true;
         moment(s, 'cold', LINES.cold);
         sfx(s, 'turn');
@@ -927,9 +966,9 @@ export function bioRate(s) {
     let grow = 0;
     for (const r of s.rooms) {
         if (r.flesh !== 1) continue;
-        grow += isVatRoom(r) ? VAT_BIO : organOf(r) === 'stomach' ? STOMACH_BIO : FLESH_BIO;
+        grow += isVatRoom(r) ? VAT_BIO : organOf(r) === 'stomach' ? 0 : FLESH_BIO;
     }
-    return grow;
+    return grow + stomachBio(s);
 }
 
 /** Pods fail while the power is short: one every few seconds of the night's clock. */
@@ -1014,7 +1053,7 @@ export function actionsFor(s, i) {
             if (s.asleep > 0) out.push({ id: 'wake', label: 'WAKE 10', ok: true, hint: night ? 'Ten wake up. They will see what is down here.' : 'Ten wake up.' });
             if (s.fallen.length) {
                 const n = s.fallen.length;
-                out.push({ id: 'reclaim', label: n > 1 ? `RECLAIM ${n} DEAD` : 'RECLAIM THE DEAD', ok: true, hint: `The dead become biomass. +${num(RECLAIM_BIO * n)}.` });
+                out.push({ id: 'reclaim', label: n > 1 ? `RECLAIM ${n} DEAD` : 'RECLAIM THE DEAD', ok: true, hint: `The dead become biomass. +${num(fallenBio(s))}.` });
                 out.push({ id: 'bury', label: 'BURY', ok: true, hint: 'The dead go into the rock. Nothing comes of it.' });
             }
             if (canTake(s)) out.push({ id: 'take', label: 'TAKE ONE', ok: true, dark: true, hint: `A living sleeper becomes biomass. +${TAKE_BIO}. The pods beside it open.` });
@@ -1023,7 +1062,18 @@ export function actionsFor(s, i) {
     }
     // the body's choice first, the same place in every room: what this room becomes
     if (canGrowInto(s, i)) out.unshift(...organButtons(s, i, ORGAN_ORDER));
+    // a Cryo Bay in the night: only what applies now, the likeliest first, four at most
+    if (r.kind === 'cryo' && s.phase === 'night') return nightCryo(s, out);
     return out;
+}
+export const NIGHT_CRYO_MAX = 4;
+function nightCryo(s, out) {
+    const need = !hasOrgan(s, 'heart') ? 'grow-heart' : !hasOrgan(s, 'lungs') ? 'grow-lungs' : 'grow-stomach';
+    const order = ['reclaim', 'sleepall', 'sleep', 'grow', need, 'take', 'cut', 'bury', 'wake'];
+    const by = new Map(out.map((a) => [a.id, a]));
+    const picked = order.filter((id) => by.has(id)).map((id) => by.get(id));
+    // WAKE only when nothing else applies
+    return picked.filter((a) => a.id !== 'wake' || picked.length === 1).slice(0, NIGHT_CRYO_MAX);
 }
 
 /**
@@ -1095,7 +1145,7 @@ export function describe(s, i) {
         }
         case 'suites': return 'Beds for 100.';
         case 'mine': return `Digs ${MINE_ORE[r.lvl - 1]} ore a day.`;
-        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(s.asleep)} asleep in all.`;
+        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(s.asleep)} asleep in all.${s.phase === 'night' && lastSleepers(s, i) && hasVat(s) ? ` ${LAST_SLEEPERS}` : ''}`;
         case 'game': return r.lvl >= 2 ? `Game studio. They sell games to each other: ${GAME_STUDIO_ORE} ore a day.` : 'Screens and games.';
         case 'gym': return r.lvl === 2 ? 'Weights, a track and a pool.' : r.lvl === 3 ? 'Weights, a pool and a spa.' : 'Weights and a track.';
         default: return KINDS[r.kind].does;
@@ -1115,7 +1165,7 @@ export function nameOf(s, i) {
 /** The info box of a room of the body: what it does. */
 const ORGAN_DOES = {
     tissue: 'It is part of the body now.',
-    stomach: `It eats the rock. Biomass +${STOMACH_BIO} a year.`,
+    stomach: 'It eats the rock. The stomachs share it.',
     heart: `It beats. It makes ${HEART_POWER} power.`,
     lungs: 'It breathes. For the air up there.',
     skin: 'It holds. For the storms up there.',
