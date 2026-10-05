@@ -46,7 +46,7 @@ Act I ran to the turn in about 8 minutes of play, as the spec wants.
 | n12 | year 3 579 | the last rooms took 1 004 years each at 20 years a second: a minute of nothing | **no** | capped at 400 years |
 | n-rise-ready, n-rising | year 4 583 | RISE | yes: the red button, the body fills the shaft and breaks the surface | the BUILD cards came back after the rise; now none |
 | n-unity | | V · UNITY, to come | yes | |
-| g01 to g08 | from the night checkpoint | Mr Hale after about 40 s, reclaim, two vats, takes, growing three rooms at once | yes | the CRT was silent after the eight night lines: three Watcher lines now come with the body (a quarter, a half, three quarters) |
+| g01 to g08 | from the night checkpoint | Mr Hale after about 40 s, reclaim, two vats, takes, then a room at a time where the level allows | yes | the CRT was silent after the eight night lines: three Watcher lines now come with the body (a quarter, a half, three quarters) |
 
 ## The wiring
 
