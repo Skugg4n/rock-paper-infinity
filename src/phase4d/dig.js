@@ -16,7 +16,7 @@ export const SLEEPERS = 216;
 export const HOME_X = 11;
 
 // ---- the workshop -----------------------------------------------------------------------------
-export const PRICES = [25, 90, 260];
+export const PRICES = [25, 100, 400];
 export const ROWS = ['drill', 'battery', 'cargo', 'lamp', 'hull', 'radar'];
 export const DRILL_MULT = [1, 0.7, 0.5, 0.36];
 export const BATTERY_CAP = [40, 90, 180, 340];
@@ -47,10 +47,10 @@ export const DIG_COST = { [T.SOIL]: 0.8, [T.STONE]: 1.3, [T.HARD]: 1.8, [T.BASAL
 const ORE_TIME = [0.28, 0.4, 0.6, 0.8, 0.95, 0.5];
 const ORE_COST = [0.8, 1.1, 1.3, 1.8, 2.2, 1];
 export const MOVE_TIME = 0.13, MOVE_COST = 0.3;
-export const UP_TIME = 0.075, UP_COST = 0.6;
+export const UP_TIME = 0.075, UP_MIN = 0.03, UP_COST = 0.6;
 export const IDLE_DRAIN = 0.1;          // per second below the surface
 export const HEAT_FROM = 1200;          // metres
-export const HEAT_DRAIN = 0.8;          // per second in the heat, without SKIN
+export const HEAT_DRAIN = 0.4;          // per second in the heat, without SKIN
 export const HEAL_RATE = 0.6;           // per second below, with the HEALING CELL
 export const CHARGE_RATE = 0.6;         // share of the battery per second, at home
 export const UNLOAD_EVERY = 0.08;       // seconds a piece
@@ -230,7 +230,8 @@ function tryDir(s, dir) {
     const t = tileAt(s, tx, ty);
     if (t === -1) return false;
     if (t === T.AIR) {
-        if (dy === -1) { s.act = { kind: 'up', tx, ty, t: 0, dur: UP_TIME, cost: UP_COST }; return true; }
+        // flying up speeds up over a long climb, so the way home is quick
+        if (dy === -1) { s.act = { kind: 'up', tx, ty, t: 0, dur: Math.max(UP_MIN, UP_TIME - 0.004 * (s.upStreak || 0)), cost: UP_COST }; return true; }
         if (dy === 1) { s.act = { kind: 'fall', tx, ty, t: 0, dur: 0.1, cost: 0 }; return true; }
         s.act = { kind: 'move', tx, ty, t: 0, dur: MOVE_TIME, cost: MOVE_COST };
         return true;
@@ -310,6 +311,7 @@ export function step(s, dt, input = {}) {
             else {
                 arrive(s, a.tx, a.ty);
                 if (a.kind === 'fall') { s.fallStreak++; if (isHome(s)) s.fallStreak = 0; } else s.fallStreak = 0;
+                s.upStreak = a.kind === 'up' ? (s.upStreak || 0) + 1 : 0;
             }
             if (s.ended) return;
             if (s.battery <= 0) { die(s); return; }

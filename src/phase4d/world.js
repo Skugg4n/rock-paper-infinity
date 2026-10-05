@@ -101,7 +101,7 @@ export function makeWorld(seed = 1) {
             else if (li === 1) t = u < (0.62 - 0.3 * (m - 60) / 240) ? T.SOIL : T.STONE;
             else if (li === 2) t = u < 0.8 ? T.STONE : T.HARD;
             else if (li === 3) t = u < 0.55 ? T.STONE : u < 0.88 ? T.HARD : T.BASALT;
-            else if (li === 4) t = u < 0.15 ? T.STONE : u < 0.6 ? T.HARD : T.BASALT;
+            else if (li === 4) t = u < 0.3 ? T.STONE : u < 0.72 ? T.HARD : T.BASALT;
             else t = T.FLESH;
             // the ore, in veins: richer beside ore of the same kind
             const v = r();
@@ -115,10 +115,10 @@ export function makeWorld(seed = 1) {
                 if (m > 100 && pick(T.PAPER, 0.05)) t = T.PAPER;
                 else if (r() < 0.07 * ((left === T.ROCK ? 2.5 : 1) * (up === T.ROCK ? 2 : 1))) t = T.ROCK;
             } else if (li === 2) {
-                if (m > 400 && pick(T.SCISSORS, 0.03)) t = T.SCISSORS;
-                else if (r() < 0.06 * ((left === T.PAPER ? 2.5 : 1) * (up === T.PAPER ? 2 : 1))) t = T.PAPER;
+                if (m > 400 && pick(T.SCISSORS, 0.04)) t = T.SCISSORS;
+                else if (r() < 0.08 * ((left === T.PAPER ? 2.5 : 1) * (up === T.PAPER ? 2 : 1))) t = T.PAPER;
             } else if (li === 3 || li === 4) {
-                if (pick(T.SCISSORS, li === 3 ? 0.05 : 0.065)) t = T.SCISSORS;
+                if (pick(T.SCISSORS, li === 3 ? 0.07 : 0.08)) t = T.SCISSORS;
                 else if (r() < 0.035) t = T.GHOST;
             } else {
                 if (pick(T.BIO, 0.06)) t = T.BIO;

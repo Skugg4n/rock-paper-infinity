@@ -55,6 +55,9 @@ function wanted(s, x, y, t) {
     if (t === T.FIND) return lit || (s.levels.radar >= 3 && onRadar);
     if (t === T.GHOST) return lit && !onRadar;        // the radar shows it is not there
     if (!isOre(t)) return false;
+    // with nothing left to buy, parts are only worth it for the colony
+    const maxed = ['drill', 'battery', 'cargo', 'lamp', 'hull', 'radar'].every((r) => s.levels[r] >= 3);
+    if (maxed && t !== T.BIO && s.reserve > 50) return false;
     return lit || onRadar;
 }
 
@@ -121,8 +124,17 @@ function blocker(s) {
 const USEFUL = ['drill', 'cargo', 'battery', 'radar', 'lamp', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
+/** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
+const GATES = [[300, 'drill', 2], [500, 'hull', 1], [700, 'drill', 3], [900, 'hull', 2], [1200, 'hull', 3]];
+function nextGate(s) {
+    const best = (s.record + 1) * 5;
+    for (const [m, row, lv] of GATES) if (s.levels[row] < lv && best >= m - 120) return row;
+    return null;
+}
+
 export function shop(s, mem) {
     const bought = [];
+    if (!mem.need) mem.need = nextGate(s);
     for (let guard = 0; guard < 12; guard++) {
         if (graftShown(s) && GRAFTS[s.grafts] && s.bio >= GRAFTS[s.grafts].price && buyGraft(s)) { bought.push('graft'); continue; }
         const want = mem.need && mem.need !== 'graft' ? mem.need : null;
@@ -171,8 +183,13 @@ export function decide(s, mem) {
     s.__explore = saving;
     if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < (saving ? 90 : 6) ? { x: tgt.x, y: tgt.y } : null; }
     if (tgt && tgt.cost < (saving ? 90 : 6)) return { dir: tgt.dir };
-    // nothing in sight: down
+    // nothing in sight: down; at the bottom, toward the heart
     const below = tileAt(s, s.x, s.y + 1);
+    if (below === -1 || (s.y >= 393 && below !== T.HEART)) {
+        if (s.x < 11) return { dir: 'right' };
+        if (s.x > 12) return { dir: 'left' };
+        return { dir: 'down' };
+    }
     if (below === T.HEART) return { dir: 'down' };
     const g = below > 0 ? gateOf(s, below, s.y + 1) : null;
     if (!g) return { dir: 'down' };
