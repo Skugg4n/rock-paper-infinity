@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased (deep-vault)
-
-### v1.86.4 - 2026-10-05 (chapter IV, the vault: graphics pass)
+## v1.86.4 - 2026-10-05 (chapter IV, the vault: graphics pass)
 - **One palette** for the vault (`VT` in src/phase4v/style.js, also as CSS variables): cutaway, panel, CRT, cards and info box share it; each accent has one meaning.
 - **The cutaway as a sibling of the strata view**: veined stone, speckled sediment, every room the same frame with a lamp and a cone of light and one pale motif; the surface city is act II's tiles gone to ruin; the Engine Room is the locked RPS machine (caged tube, cog, smoke, cables with a pulse).
 - **The shaft in the middle**, four rooms on each side; the body climbs it as it takes the vault.
