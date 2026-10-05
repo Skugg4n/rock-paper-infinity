@@ -962,6 +962,8 @@ export function advance(s, sec, speed = 1) {
     if (s.phase === 'palace') {
         stepDays(s, sec / DAY_SECONDS[speed]);
     } else if (s.phase === 'night') {
+        // a night that has not had its goal said (an old save, a checkpoint): say it now
+        if (!story(s).moments.goal) moment(s, 'goal', GOAL_LINES);
         const k = speed === 2 ? NIGHT_FAST : 1;
         const t = sec * k;
         stepYears(s, yearsPerSecond(s.nightSec) * t);

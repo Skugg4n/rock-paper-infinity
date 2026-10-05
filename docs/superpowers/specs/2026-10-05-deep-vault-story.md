@@ -162,3 +162,16 @@ spelaren köper i stort sett direkt när det går, och tar en sovande när det i
 (sent i natten finns bara vävnad att köpa medan kroppen klättrar mot nivå 1). Jag provade långsammare år, billigare vävnad,
 kortare växttid, att kroppen når vidare från halvvuxna rum, och att de som är inne föder kroppen: längre natt gav alltid
 längre glapp. För att få båda behövs fler beslut sent i natten (något nytt att köpa eller välja), det är ett designbeslut.
+
+## Byggt, fas B (skärmen, v1.86.5)
+
+Köttlabbet ritat (rent labb: ståltankar med en röd bit i varje, stek på ståbord under lampan, en bit på krok; i natten
+två av kroppens tankar under lampan), stekbubbla (T-bone). Organen i köttstilen, i ett eget lager ovanför senorna:
+HJÄRTA slår (spiralmuskel, båge av stora kärl, kranskärl med pulsen, ljus på slaget), LUNGOR andas (två svampiga lober,
+benvit luftstrupe), HUD spänd över hela rummet (veck, porer, senor i hörnen), MAGE en J av muskel som vrider sig med en
+klämvåg. Ett rum som växer eller ändras visar organet som bildas. GROW INTO som ett val i inforutan, checklistan i panelen
+från målet, viktiga rader i bärnsten med understrykning som blinkar två gånger och håller skärmen 1,6 s, bilden dämpas
+medan tiden går på en fjärdedel, en klocka (ljud av/på respekteras), Computer-raderna feta med röd `>>`.
+Fixar: CRT:n växer så de sex senaste raderna syns hela; staden står på grus och mörka huskroppar; senorna böjer sig och
+är benvita; grannrum i kroppen delar vävnad (ingen mörk kant) och kärl löper från det ena in i det andra.
+Målet sägs nu på nattens första tick om det inte sagts (checkpoints och gamla sparningar). Bilder: docs/playtests/vault-story/.

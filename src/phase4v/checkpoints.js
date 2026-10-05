@@ -3,7 +3,7 @@
  * Pure: each returns a fresh state built through the rules' own constructors.
  */
 import { newVault, slotIndex, mood, START_RESIDENTS, PODS_PER_LEVEL, TURN_DAY } from './vault.js';
-import { story, moment, GOAL_LINES } from './story.js';
+import { story } from './story.js';
 
 /** The moments a checkpoint has already had (they are not marked again). */
 function had(s, ...keys) { for (const k of keys) story(s).moments[k] = true; }
@@ -69,8 +69,7 @@ export const VAULT_CHECKPOINTS = {
         s.ore = 300;
         s.turnDay = TURN_DAY; s.hydroSaid = true;
         had(s, 'turn', 'cold');
-        // the night begins here: the goal is said as it is in play
-        moment(s, 'goal', GOAL_LINES);
+        // the night begins here: the goal is said on the first tick, as in play
         return s;
     },
     'iv-vault-flesh': () => {
@@ -83,7 +82,7 @@ export const VAULT_CHECKPOINTS = {
         s.reclaimed = 3; s.dead = 3; s.residents -= 3; s.asleep -= 3; s.fallenCount = 3;
         s.bio = 90;
         s.ore = 160;
-        had(s, 'first-dead');
+        had(s, 'first-dead', 'goal');
         s.out = []; s.sfx = []; s.slow = 0;
         return s;
     },

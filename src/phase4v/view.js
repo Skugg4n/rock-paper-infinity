@@ -14,7 +14,7 @@
  * redrawn when its key changes. Per frame: sky, rain, the rooms' small motifs, pulses, people.
  */
 
-import { LEVELS, SLOTS, levelOf, idxOf, KINDS, awake, isFlesh, PODS_PER_LEVEL, SUITE_BEDS, roomsOf } from './vault.js';
+import { LEVELS, SLOTS, levelOf, idxOf, KINDS, awake, isFlesh, isVatRoom, organOf, PODS_PER_LEVEL, SUITE_BEDS, roomsOf } from './vault.js';
 import { VT } from './style.js';
 
 /** Seeded noise for the stone and the city, the same every frame. */
@@ -139,6 +139,7 @@ export function createVaultView(canvas, opts = {}) {
         drawSpine(s, t);
         for (let i = 0; i < s.rooms.length; i++) drawSlot(s, i, ui, t);
         drawBridges(s, t);
+        drawOrgans(s, t);
         drawWalkers(s, t);
         drawWishes(s, t);
         drawEffects(t);
@@ -248,6 +249,34 @@ export function createVaultView(canvas, opts = {}) {
         const n = Math.ceil(W / step) + 1;
         g.save();
         g.beginPath(); g.rect(0, 0, W, gy); g.clip();
+        // the ruined skyline stands on something: the buildings' dark cores behind their tiles
+        for (let k = 0; k < n; k++) {
+            if (hash(k * 1.7 + 0.3) < 0.28) continue;
+            const x0 = k * step + 3 + (hash(k) - 0.5) * 4;
+            let tall = 1 + Math.floor(hash(k + 9) * 3) + (k % 7 === 3 ? 3 : 0) + (k % 11 === 5 ? 1 : 0);
+            if (stage === 2) tall = Math.max(1, Math.ceil(tall / 2));
+            if (stage === 3) tall = 1;
+            const coreTop = stage === 3 ? gy - T * 0.5 : gy - tall * (T + GAP) + T * 0.35;
+            g.fillStyle = VT.stone;
+            g.beginPath();
+            // a broken top edge, sloping where the floors fell
+            g.moveTo(x0 - 2, gy);
+            g.lineTo(x0 - 2, coreTop + (hash(k * 3) - 0.5) * 6);
+            g.lineTo(x0 + T * 0.5, coreTop + (stage >= 1 ? hash(k * 5) * 8 : 0));
+            g.lineTo(x0 + T + 2, coreTop + (hash(k * 7) - 0.5) * 6);
+            g.lineTo(x0 + T + 2, gy);
+            g.fill();
+            g.fillStyle = rgba(VT.mist, 0.06);
+            g.fillRect(x0 - 2, coreTop, 1, gy - coreTop);
+        }
+        // the ground they stand on: a band of rubble, higher as the city falls
+        const heap = 4 + stage * 3;
+        g.fillStyle = VT.stone;
+        g.beginPath(); g.moveTo(0, gy);
+        for (let x = 0; x <= W + 8; x += 8) g.lineTo(x, gy - heap * (0.4 + hash(x * 0.37) * 0.8));
+        g.lineTo(W, gy); g.closePath(); g.fill();
+        g.fillStyle = rgba(VT.mist, 0.1);
+        for (let x = hash(stage) * 7; x < W; x += 6 + hash(x) * 10) g.fillRect(x, gy - heap * 0.4 - hash(x * 3) * heap * 0.6, 2, 1);
         for (let k = 0; k < n; k++) {
             if (hash(k * 1.7 + 0.3) < 0.28) continue;     // a gap between the blocks
             const x0 = k * step + 3 + (hash(k) - 0.5) * 4;
@@ -610,6 +639,7 @@ export function createVaultView(canvas, opts = {}) {
                 ctx.restore();
                 break;
             }
+            case 'meatlab': meatLab(x, y, w, h, t, r); break;
             case 'cryo': {
                 const cols = 5 * r.lvl, rows = 2;
                 const pw = (w - 10) / cols, ph = (h - 16) / rows;
@@ -625,6 +655,56 @@ export function createVaultView(canvas, opts = {}) {
             default: break;
         }
         ctx.globalAlpha = 1;
+    }
+
+    /**
+     * The Meat Lab, in the palace: a clean white lab, comic and tidy. Steel vats with a red slab
+     * floating in each, a lamp over a steel table with a steak on it, a hook with a cut hanging.
+     * The meat is the only red; it does not glow (only the body does).
+     */
+    function meatLab(x, y, w, h, t, r) {
+        const floor = y + h - 2;
+        const P = VT.plate, M = VT.mist, S = VT.slate;
+        // the lamp over the table, and its cone
+        const lx = x + w * 0.68;
+        ctx.fillStyle = M; ctx.fillRect(lx - 0.5, y, 1, h * 0.22);
+        ctx.fillStyle = P; ctx.beginPath(); ctx.moveTo(lx - 7, y + h * 0.22 + 5); ctx.lineTo(lx - 3, y + h * 0.22); ctx.lineTo(lx + 3, y + h * 0.22); ctx.lineTo(lx + 7, y + h * 0.22 + 5); ctx.fill();
+        ctx.fillStyle = rgba(VT.lamp, 0.12);
+        ctx.beginPath(); ctx.moveTo(lx - 7, y + h * 0.22 + 5); ctx.lineTo(lx - w * 0.22, floor - 12); ctx.lineTo(lx + w * 0.22, floor - 12); ctx.lineTo(lx + 7, y + h * 0.22 + 5); ctx.fill();
+        // the steel table and the steak on it (fat rim, a bone)
+        ctx.fillStyle = S; ctx.fillRect(lx - w * 0.2, floor - 13, w * 0.4, 3);
+        ctx.fillStyle = M; ctx.fillRect(lx - w * 0.2, floor - 13, w * 0.4, 1);
+        ctx.fillRect(lx - w * 0.17, floor - 10, 2, 9); ctx.fillRect(lx + w * 0.17 - 2, floor - 10, 2, 9);
+        ctx.fillStyle = VT.fBone; ctx.beginPath(); ctx.ellipse(lx, floor - 16, 9, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = VT.fCore; ctx.beginPath(); ctx.ellipse(lx - 0.5, floor - 16.3, 7.6, 2.7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,170,175,0.35)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(lx - 5, floor - 17); ctx.quadraticCurveTo(lx, floor - 18.5, lx + 5, floor - 17); ctx.stroke();
+        // the vats: steel tanks, a slab of red turning slowly in each
+        const n = r.lvl >= 2 ? 3 : 2;
+        const vw = Math.min(14, w * 0.15), vh = h * 0.5;
+        for (let k = 0; k < n; k++) {
+            const vx = x + 6 + k * (vw + 4), vy = floor - 4 - vh;
+            ctx.fillStyle = '#161c24'; ctx.beginPath(); ctx.roundRect(vx, vy, vw, vh, 3); ctx.fill();
+            ctx.save(); ctx.beginPath(); ctx.roundRect(vx + 1, vy + 1, vw - 2, vh - 2, 2); ctx.clip();
+            const bob = Math.sin(t * 0.9 + k * 1.7) * 2;
+            ctx.fillStyle = VT.fCore;
+            ctx.beginPath(); ctx.ellipse(vx + vw / 2, vy + vh * 0.55 + bob, vw * 0.32, vh * 0.2, Math.sin(t * 0.4 + k) * 0.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = rgba(VT.fBone, 0.6);
+            ctx.fillRect(vx + vw / 2 - vw * 0.2, vy + vh * 0.5 + bob, vw * 0.4, 1);
+            ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(vx + 2, vy + 3, 2, vh - 6);
+            ctx.restore();
+            ctx.strokeStyle = rgba(M, 0.6); ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.roundRect(vx + 0.5, vy + 0.5, vw - 1, vh - 1, 3); ctx.stroke();
+            ctx.fillStyle = S; ctx.fillRect(vx - 1, vy - 3, vw + 2, 3); ctx.fillRect(vx - 1, floor - 4, vw + 2, 3);
+            ctx.fillStyle = M; ctx.fillRect(vx + vw / 2 - 0.5, y + 2, 1, vy - 3 - y - 2);
+        }
+        // a cut on a hook, swinging a little
+        const hx = x + w - 9, sw = Math.sin(t * 1.3) * 0.08;
+        ctx.save(); ctx.translate(hx, y + 4); ctx.rotate(sw);
+        ctx.strokeStyle = M; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 8); ctx.arc(-2, 8, 2, 0, Math.PI); ctx.stroke();
+        ctx.fillStyle = VT.fCore; ctx.beginPath(); ctx.ellipse(0, 16, 3.6, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = rgba(VT.fBone, 0.7); ctx.fillRect(-0.5, 10, 1, 4);
+        ctx.restore();
     }
 
     /**
@@ -699,7 +779,7 @@ export function createVaultView(canvas, opts = {}) {
      * core, a wet edge), and a separate layer of wet glints. `reach` holds only the vessels and the
      * mycelium: what runs ahead of the flesh over a room it is taking.
      */
-    function makeTissue(w, h, seed) {
+    function makeTissue(w, h, seed, mask = '') {
         const W2 = w + PAD * 2, H2 = h + PAD * 2;
         const base = offscreen(W2, H2), glint = offscreen(W2, H2), reach = offscreen(W2, H2);
         const R = rng(seed + 0.137);
@@ -739,25 +819,21 @@ export function createVaultView(canvas, opts = {}) {
             g.fillStyle = sh; g.fillRect(-W2, -12, W2 * 2, 24);
             g.restore();
         }
-        // sinew: a pale tendon stretched across, striated, with a sag
-        const bands = 1 + (R() < 0.5 ? 1 : 0);
+        // sinew: a bone-pale tendon that curves across (an S, not a ruler line), striated, wet on top
+        const bands = R() < 0.7 ? 1 : 0;
         for (let b = 0; b < bands; b++) {
-            const yA = R() * H2, yB = R() * H2, sag = (R() - 0.3) * 18, bw = 6 + R() * 6;
-            const mid = (yA + yB) / 2 + sag;
-            g.fillStyle = 'rgba(12,4,7,0.45)';
-            g.beginPath(); g.moveTo(-2, yA - bw / 2 - 1); g.quadraticCurveTo(W2 / 2, mid - bw / 2 - 1, W2 + 2, yB - bw / 2 - 1);
-            g.lineTo(W2 + 2, yB + bw / 2 + 2); g.quadraticCurveTo(W2 / 2, mid + bw / 2 + 2, -2, yA + bw / 2 + 2); g.fill();
-            g.fillStyle = rgba(VT.fBone, 0.1);
-            g.beginPath(); g.moveTo(-2, yA - bw / 2); g.quadraticCurveTo(W2 / 2, mid - bw / 2, W2 + 2, yB - bw / 2);
-            g.lineTo(W2 + 2, yB + bw / 2); g.quadraticCurveTo(W2 / 2, mid + bw / 2, -2, yA + bw / 2); g.fill();
-            for (let s2 = 1; s2 < 6; s2++) {
-                const off = (s2 / 6 - 0.5) * bw;
-                g.strokeStyle = rgba(VT.fBone, 0.1 + R() * 0.12);
-                g.lineWidth = 0.7;
-                g.beginPath(); g.moveTo(-2, yA + off); g.quadraticCurveTo(W2 / 2, mid + off, W2 + 2, yB + off); g.stroke();
+            const yA = R() * H2, yB = R() * H2, bw = 4 + R() * 4;
+            const c1 = yA + (R() - 0.5) * H2 * 0.9, c2 = yB + (R() - 0.5) * H2 * 0.9;
+            const curve = (gg, off) => { gg.beginPath(); gg.moveTo(-2, yA + off); gg.bezierCurveTo(W2 * 0.33, c1 + off, W2 * 0.66, c2 + off, W2 + 2, yB + off); };
+            g.lineCap = 'round';
+            curve(g, 1.5); g.strokeStyle = 'rgba(12,4,7,0.55)'; g.lineWidth = bw + 3; g.stroke();
+            curve(g, 0); g.strokeStyle = rgba(VT.fBone, 0.32); g.lineWidth = bw; g.stroke();
+            for (let s2 = 1; s2 < 5; s2++) {
+                curve(g, (s2 / 5 - 0.5) * bw);
+                g.strokeStyle = s2 % 2 ? rgba(VT.fBone, 0.55 + R() * 0.2) : 'rgba(60,20,28,0.35)';
+                g.lineWidth = 0.7; g.stroke();
             }
-            g.strokeStyle = 'rgba(255,235,235,0.18)'; g.lineWidth = 0.8;
-            g.beginPath(); g.moveTo(-2, yA - bw * 0.3); g.quadraticCurveTo(W2 / 2, mid - bw * 0.3, W2 + 2, yB - bw * 0.3); g.stroke();
+            curve(g, -bw * 0.3); g.strokeStyle = 'rgba(255,235,235,0.3)'; g.lineWidth = 0.8; g.stroke();
         }
         // mycelium: pale hairs, branching (into the reach too)
         for (const gg of [g, reach.g]) gg.lineWidth = 0.6;
@@ -815,16 +891,30 @@ export function createVaultView(canvas, opts = {}) {
             glint.g.fillStyle = 'rgba(255,220,225,0.7)';
             glint.g.fillRect(p[0] - v.wid * 0.3, p[1] - v.wid * 0.4, 1.5, 1.2);
         }
-        // a dark vignette at the edges: the tissue swells out of the frame
-        const vg = g.createRadialGradient(W2 / 2, H2 / 2, Math.min(W2, H2) * 0.3, W2 / 2, H2 / 2, Math.max(W2, H2) * 0.75);
-        vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(6,2,3,0.55)');
-        g.fillStyle = vg; g.fillRect(0, 0, W2, H2);
+        // a dark edge where the body ends; none where it runs on into a neighbour (no seam)
+        const edge = (x0, y0, x1, y1, rx, ry, rw, rh) => {
+            const lg = g.createLinearGradient(x0, y0, x1, y1);
+            lg.addColorStop(0, 'rgba(6,2,3,0.6)'); lg.addColorStop(1, 'rgba(6,2,3,0)');
+            g.fillStyle = lg; g.fillRect(rx, ry, rw, rh);
+        };
+        const ew = Math.min(W2, H2) * 0.3;
+        if (!mask.includes('l')) edge(0, 0, ew, 0, 0, 0, ew, H2);
+        if (!mask.includes('r')) edge(W2, 0, W2 - ew, 0, W2 - ew, 0, ew, H2);
+        if (!mask.includes('u')) edge(0, 0, 0, ew, 0, 0, W2, ew);
+        if (!mask.includes('d')) edge(0, H2, 0, H2 - ew, 0, H2 - ew, W2, ew);
         return { base: base.c, glint: glint.c, reach: reach.c, vessels, W2, H2 };
     }
-    function tissueFor(i, w, h) {
-        const key = `${w}x${h}|${dpr}`;
+    /** Which sides of room i run on into body: l, r (not across the shaft), u, d. */
+    function bodyMask(s, i) {
+        const ix = idxOf(i), lv = levelOf(i);
+        const f = (j) => j >= 0 && j < s.rooms.length && isFlesh(s.rooms[j]);
+        return (ix > 0 && ix !== geo.half && f(i - 1) ? 'l' : '') + (ix < SLOTS - 1 && ix !== geo.half - 1 && f(i + 1) ? 'r' : '')
+            + (lv > 0 && f(i - SLOTS) ? 'u' : '') + (lv < LEVELS - 1 && f(i + SLOTS) ? 'd' : '');
+    }
+    function tissueFor(i, w, h, mask = '') {
+        const key = `${w}x${h}|${dpr}|${mask}`;
         let c = tissues.get(i);
-        if (!c || c.key !== key) { c = { key, ...makeTissue(w, h, i * 7.31 + 3) }; tissues.set(i, c); }
+        if (!c || c.key !== key) { c = { key, ...makeTissue(w, h, i * 7.31 + 3, mask) }; tissues.set(i, c); }
         return c;
     }
     /** The heartbeat: a sharp rise and a slow fall every BEAT seconds. */
@@ -864,13 +954,14 @@ export function createVaultView(canvas, opts = {}) {
 
     /** The flesh in one room: k = 0..1 grown. Taken rooms breathe; growing ones creep. */
     function flesh(s, x, y, w, h, k, t, i, r) {
-        const T2 = tissueFor(i, w, h);
+        const T2 = tissueFor(i, w, h, k >= 1 ? bodyMask(s, i) : '');
         const breath = Math.sin(t * BREATH_RATE * 2 + i * 0.7);
         const hb = beat(t + i * 0.05);
         const ox = x - PAD, oy = y - PAD;
         if (k >= 1) {
             // the old room sinking under the tissue: its drawing pushed down and darkened
-            const ghost = r.kind !== 'rock' && r.kind !== 'vat' && r.kind !== 'empty';
+            const organ = organOf(r);
+            const ghost = r.kind !== 'rock' && !isVatRoom(r) && r.kind !== 'empty' && (!organ || organ === 'tissue');
             ctx.save();
             const sx = 1 + 0.018 * breath, sy = 1 + 0.03 * breath;
             ctx.translate(x + w / 2, y + h);
@@ -896,6 +987,14 @@ export function createVaultView(canvas, opts = {}) {
             pulses(T2.vessels, ox, oy, t + i * 0.13, 0.6 + 0.4 * hb);
             ctx.restore();
             if (r.kind === 'vat') vat(x, y, w, h, t, i, breath);
+            // the meat lab grown: the same lab, its vats become two of the body's tanks under the lamp
+            if (r.kind === 'meatlab' && isVatRoom(r)) {
+                vat(x - w * 0.22, y, w * 0.9, h, t, i, breath);
+                vat(x + w * 0.3, y, w * 0.9, h, t + 0.6, i + 3, breath);
+                ctx.fillStyle = VT.plate; ctx.fillRect(x + w / 2 - 4, y + 2, 8, 2);
+                ctx.fillStyle = rgba(VT.lamp, 0.08);
+                ctx.beginPath(); ctx.moveTo(x + w / 2 - 4, y + 4); ctx.lineTo(x + 4, y + h - 4); ctx.lineTo(x + w - 4, y + h - 4); ctx.lineTo(x + w / 2 + 4, y + 4); ctx.fill();
+            }
             ctx.restore();
             return;
         }
@@ -913,6 +1012,12 @@ export function createVaultView(canvas, opts = {}) {
         ctx.drawImage(T2.glint, ox, oy, T2.W2, T2.H2);
         ctx.globalAlpha = 1;
         ctx.restore();
+        if (r.organ && r.organ !== 'tissue') {
+            ctx.save();
+            frontPath(x, y, w, h, k, t, i, 2); ctx.clip();
+            organArt(r.organ, x, y, w, h, t, i, k);
+            ctx.restore();
+        }
         ctx.save();
         frontPath(x, y, w, h, reachK, t, i, 2); ctx.clip();
         pulses(T2.vessels, ox, oy, t, 0.5 + 0.5 * hb);
@@ -989,6 +1094,247 @@ export function createVaultView(canvas, opts = {}) {
     }
 
     /**
+     * The organs, drawn over a room's tissue in the same flesh: wet muscle, vessels with the pulse,
+     * glints. `form` 0..1: how far it has formed (a growing or changing room shows it forming).
+     * HEART beats, LUNGS breathe (two lobes), SKIN is stretched taut across the room, STOMACH churns.
+     */
+    function organArt(kind, x, y, w, h, t, i, form) {
+        if (form <= 0.02) return;
+        const hb = beat(t + i * 0.05);
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, form * 1.4);
+        const grow = 0.55 + 0.45 * form;
+        if (kind !== 'skin') {
+            const hg = ctx.createRadialGradient(x + w / 2, y + h * 0.55, 4, x + w / 2, y + h * 0.55, Math.max(w, h) * 0.6);
+            hg.addColorStop(0, 'rgba(6,2,3,0.65)'); hg.addColorStop(1, 'rgba(6,2,3,0)');
+            ctx.fillStyle = hg; ctx.fillRect(x, y, w, h);
+        }
+        if (kind === 'heart') heartArt(x, y, w, h, t, hb, grow);
+        else if (kind === 'lungs') lungsArt(x, y, w, h, t, hb, grow, i);
+        else if (kind === 'skin') skinArt(x, y, w, h, t, hb, form, i);
+        else if (kind === 'stomach') stomachArt(x, y, w, h, t, hb, grow, i);
+        ctx.restore();
+        ctx.lineWidth = 1;
+    }
+    /** The organs of the body's rooms, over the sinews and vessels between rooms; a changing room shows its organ forming. */
+    function drawOrgans(s, t) {
+        for (let i = 0; i < s.rooms.length; i++) {
+            const r = s.rooms[i];
+            if (r.flesh !== 1) continue;
+            const shaping = r.job && r.job.op === 'shape';
+            const kind = shaping ? r.job.organ : organOf(r);
+            if (!kind || kind === 'tissue') continue;
+            const { x, y, w, h } = geo.slots[i];
+            ctx.save(); ctx.beginPath(); ctx.rect(x - 2, y - 2, w + 4, h + 4); ctx.clip();
+            organArt(kind, x, y, w, h, t, i, shaping ? 1 - r.job.left / r.job.total : 1);
+            ctx.restore();
+        }
+    }
+    /** A wet tube: dark wall, red core, a pale wet edge; with the pulse running if `p` is given. */
+    function tube(pts, wid, hb) {
+        const path = () => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]); };
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        path(); ctx.strokeStyle = VT.fArtery; ctx.lineWidth = wid + 2; ctx.stroke();
+        path(); ctx.strokeStyle = VT.fCore; ctx.lineWidth = wid; ctx.stroke();
+        path(); ctx.strokeStyle = rgba(VT.pulse, 0.25 + 0.6 * hb); ctx.lineWidth = Math.max(1, wid * 0.45); ctx.stroke();
+        ctx.save(); ctx.translate(-wid * 0.25, -wid * 0.3);
+        path(); ctx.strokeStyle = 'rgba(255,170,175,0.22)'; ctx.lineWidth = Math.max(0.6, wid * 0.22); ctx.stroke();
+        ctx.restore();
+    }
+    function heartArt(x, y, w, h, t, hb, grow) {
+        const cx = x + w * 0.5, cy = y + h * 0.56;
+        const R = Math.min(w * 0.46, h * 0.46) * grow;
+        const sc = 1 + 0.1 * hb;
+        // the great vessels first, behind: an arch up into the ceiling
+        tube([[cx + R * 0.05, cy - R * 0.45], [cx + R * 0.1, cy - R * 0.95], [cx + R * 0.45, y + 4], [cx + R * 0.7, y - 4]], R * 0.22, hb);
+        tube([[cx - R * 0.3, cy - R * 0.45], [cx - R * 0.45, cy - R * 0.9], [cx - R * 0.7, y + 2]], R * 0.14, hb * 0.7);
+        ctx.save();
+        ctx.translate(cx, cy); ctx.rotate(-0.35); ctx.scale(sc, sc * (1 - 0.04 * hb));
+        // the muscle: two chambers on top, the ventricle tapering to the apex
+        const body = () => {
+            ctx.beginPath();
+            ctx.moveTo(R * 0.05, R * 0.95);
+            ctx.bezierCurveTo(-R * 0.95, R * 0.45, -R * 1.0, -R * 0.45, -R * 0.42, -R * 0.62);
+            ctx.bezierCurveTo(-R * 0.18, -R * 0.7, -R * 0.02, -R * 0.52, R * 0.08, -R * 0.5);
+            ctx.bezierCurveTo(R * 0.55, -R * 0.82, R * 1.0, -R * 0.2, R * 0.05, R * 0.95);
+            ctx.closePath();
+        };
+        const fg = ctx.createRadialGradient(-R * 0.2, -R * 0.15, R * 0.1, 0, 0, R * 1.1);
+        fg.addColorStop(0, rgba(VT.pulse, 0.55 + 0.4 * hb)); fg.addColorStop(0.45, VT.fCore); fg.addColorStop(1, VT.fArtery);
+        body(); ctx.fillStyle = fg; ctx.fill();
+        // fibre wound round it, the way heart muscle spirals
+        ctx.save(); body(); ctx.clip();
+        ctx.lineCap = 'round';
+        for (let k = 0; k < 9; k++) {
+            ctx.strokeStyle = k % 2 ? 'rgba(16,6,9,0.45)' : 'rgba(150,52,64,0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-R, -R * 0.6 + k * R * 0.2); ctx.quadraticCurveTo(0, -R * 0.2 + k * R * 0.22, R, -R * 0.9 + k * R * 0.2); ctx.stroke();
+        }
+        ctx.restore();
+        // the coronary vessels over it, the pulse in them
+        tube([[R * 0.05, -R * 0.5], [-R * 0.1, -R * 0.1], [-R * 0.05, R * 0.35], [R * 0.05, R * 0.8]], R * 0.07, hb);
+        tube([[-R * 0.1, -R * 0.1], [-R * 0.5, R * 0.15], [-R * 0.55, R * 0.4]], R * 0.05, hb);
+        // wet
+        ctx.strokeStyle = 'rgba(255,220,225,0.45)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(-R * 0.45, -R * 0.3, R * 0.3, Math.PI * 1.1, Math.PI * 1.5); ctx.stroke();
+        ctx.beginPath(); ctx.arc(R * 0.35, -R * 0.35, R * 0.2, Math.PI * 1.2, Math.PI * 1.6); ctx.stroke();
+        ctx.restore();
+        // its light, on the beat
+        const lg = ctx.createRadialGradient(cx, cy, 2, cx, cy, R * 1.6);
+        lg.addColorStop(0, rgba(VT.pulse, 0.3 * hb)); lg.addColorStop(1, rgba(VT.pulse, 0));
+        ctx.fillStyle = lg; ctx.fillRect(x, y, w, h);
+    }
+    function lungsArt(x, y, w, h, t, hb, grow, i) {
+        const br = Math.sin(t * Math.PI * 2 / 4.2 + i);          // a slow breath, in and out
+        const cx = x + w / 2, top = y + 6;
+        const lw = w * 0.22 * grow * (1 + 0.08 * br), lh = h * 0.36 * grow * (1 + 0.06 * br);
+        for (const side of [-1, 1]) {
+            const lx = cx + side * w * 0.2, ly = y + h * 0.55;
+            ctx.save();
+            ctx.translate(lx, ly);
+            const lobe = () => {
+                ctx.beginPath();
+                ctx.moveTo(-side * lw * 0.55, -lh * 0.85);
+                ctx.bezierCurveTo(side * lw * 0.9, -lh * 1.1, side * lw * 1.15, lh * 0.6, side * lw * 0.3, lh * 0.95);
+                ctx.bezierCurveTo(-side * lw * 0.2, lh * 1.05, -side * lw * 0.75, lh * 0.5, -side * lw * 0.6, 0);
+                ctx.closePath();
+            };
+            const fg = ctx.createRadialGradient(side * lw * 0.2, -lh * 0.2, 2, 0, 0, lh * 1.2);
+            fg.addColorStop(0, rgba(VT.pulse, 0.45 + 0.2 * Math.max(0, br))); fg.addColorStop(0.5, VT.fCore); fg.addColorStop(1, VT.fArtery);
+            lobe(); ctx.fillStyle = fg; ctx.fill();
+            // spongy: the small dark cells, swelling with the breath
+            ctx.save(); lobe(); ctx.clip();
+            for (let k = 0; k < 46; k++) {
+                const px = (hash(k * 3 + side) - 0.5) * lw * 2.2, py = (hash(k * 7 + side * 5) - 0.5) * lh * 2;
+                ctx.fillStyle = k % 3 ? 'rgba(16,6,9,0.45)' : 'rgba(150,52,64,0.35)';
+                ctx.beginPath(); ctx.arc(px, py, 1.2 + hash(k) * 1.6 + 0.4 * br, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore();
+            ctx.strokeStyle = 'rgba(255,220,225,0.4)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(side * lw * 0.15, -lh * 0.35, lw * 0.5, Math.PI * (side > 0 ? 1.3 : 1.4), Math.PI * (side > 0 ? 1.7 : 1.8)); ctx.stroke();
+            ctx.restore();
+        }
+        // the windpipe and its branches: bone-pale rings
+        const ty = y + h * 0.42;
+        const pipe = (pts, wid) => {
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]);
+            ctx.strokeStyle = 'rgba(12,4,7,0.6)'; ctx.lineWidth = wid + 2; ctx.stroke();
+            ctx.strokeStyle = rgba(VT.fBone, 0.75); ctx.lineWidth = wid; ctx.stroke();
+        };
+        pipe([[cx, top - 8], [cx, ty]], 5);
+        for (let k = 0; k < 4; k++) { ctx.strokeStyle = 'rgba(60,20,28,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - 3, top + k * 6); ctx.lineTo(cx + 3, top + k * 6); ctx.stroke(); }
+        for (const side of [-1, 1]) {
+            pipe([[cx, ty], [cx + side * w * 0.12, ty + h * 0.08], [cx + side * w * 0.2, ty + h * 0.18]], 3);
+            pipe([[cx + side * w * 0.12, ty + h * 0.08], [cx + side * w * 0.26, ty + h * 0.12]], 1.6);
+            pipe([[cx + side * w * 0.2, ty + h * 0.18], [cx + side * w * 0.17, ty + h * 0.32]], 1.4);
+        }
+        // the vessels into them, the pulse
+        tube([[cx - 4, y - 4], [cx - w * 0.12, ty + 4], [cx - w * 0.2, y + h * 0.7]], 1.8, hb);
+        tube([[cx + 4, y - 4], [cx + w * 0.12, ty + 6], [cx + w * 0.22, y + h * 0.72]], 1.8, hb);
+    }
+    function skinArt(x, y, w, h, t, hb, form, i) {
+        // a membrane stretched across the whole room, pinned at the corners by tendons, pulled taut
+        const sag = 3 + Math.sin(t * 0.8 + i) * 1.5;
+        const mx = 4, top = y + 6, bot = y + h - 6;
+        const span = (x + mx) + (w - mx * 2) * form;
+        const shape = () => {
+            ctx.beginPath();
+            ctx.moveTo(x + mx, top);
+            ctx.quadraticCurveTo((x + span) / 2, top + sag, span, top);
+            ctx.lineTo(span, bot);
+            ctx.quadraticCurveTo((x + span) / 2, bot - sag, x + mx, bot);
+            ctx.closePath();
+        };
+        const fg = ctx.createLinearGradient(0, top, 0, bot);
+        fg.addColorStop(0, VT.fMuscle); fg.addColorStop(0.5, VT.fCore); fg.addColorStop(1, VT.fBruise);
+        shape(); ctx.fillStyle = fg; ctx.fill();
+        ctx.save(); shape(); ctx.clip();
+        // creases: pulled lines running along the stretch, a little wavy
+        for (let k = 0; k < 7; k++) {
+            const cy = top + (k + 0.5) * (bot - top) / 7;
+            ctx.strokeStyle = k % 2 ? 'rgba(16,6,9,0.5)' : 'rgba(150,52,64,0.32)';
+            ctx.lineWidth = k % 2 ? 1.2 : 0.8;
+            ctx.beginPath(); ctx.moveTo(x, cy);
+            for (let px = x; px <= x + w; px += 8) ctx.lineTo(px, cy + Math.sin(px * 0.08 + k * 1.3) * 1.6 + (k - 3) * 0.15 * Math.sin(t * 0.8 + i));
+            ctx.stroke();
+        }
+        // pores
+        ctx.fillStyle = 'rgba(10,3,6,0.7)';
+        for (let k = 0; k < 70; k++) {
+            const px = x + 6 + hash(k * 3 + i) * (w - 12), py = top + 4 + hash(k * 5 + i * 7) * (bot - top - 8);
+            ctx.beginPath(); ctx.ellipse(px, py, 1.1, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        // the sheen of a surface under strain, brighter on the beat
+        const sh = ctx.createLinearGradient(0, top, 0, top + (bot - top) * 0.4);
+        sh.addColorStop(0, `rgba(255,170,175,${0.08 + 0.1 * hb})`); sh.addColorStop(1, 'rgba(255,170,175,0)');
+        ctx.fillStyle = sh; ctx.fillRect(x, top, w, bot - top);
+        ctx.restore();
+        // the edge rolled thick, and the tendons that hold it at the corners
+        shape(); ctx.strokeStyle = 'rgba(12,4,7,0.8)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.lineCap = 'round';
+        for (const [ax, ay, bx, by] of [[x + mx, top, x, y], [span, top, x + w, y], [x + mx, bot, x, y + h], [span, bot, x + w, y + h]]) {
+            ctx.strokeStyle = 'rgba(12,4,7,0.6)'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax + bx) / 2 + 3, (ay + by) / 2 - 2, bx, by); ctx.stroke();
+            ctx.strokeStyle = rgba(VT.fBone, 0.7); ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax + bx) / 2 + 3, (ay + by) / 2 - 2, bx, by); ctx.stroke();
+        }
+    }
+    function stomachArt(x, y, w, h, t, hb, grow, i) {
+        // a sac of muscle bent like a J: a wide top on the left, down and round, narrowing up to the right;
+        // it twists a little and a wave of squeezing runs along it
+        const twist = Math.sin(t * 0.5 + i) * 0.05;
+        const cx = x + w / 2, cy = y + h / 2;
+        const key = [[-0.2, -0.36], [-0.27, -0.05], [-0.18, 0.24], [0.04, 0.34], [0.24, 0.24], [0.31, 0.02], [0.3, -0.22]];
+        const spine = [];
+        for (let k = 0; k <= 24; k++) {
+            const u = k / 24, f = u * (key.length - 1), j = Math.min(key.length - 2, Math.floor(f)), v = f - j;
+            const ax = key[j][0] + (key[j + 1][0] - key[j][0]) * v, ay = key[j][1] + (key[j + 1][1] - key[j][1]) * v;
+            const rx = ax * Math.cos(twist) - ay * Math.sin(twist), ry = ax * Math.sin(twist) + ay * Math.cos(twist);
+            spine.push([cx + rx * w * grow, cy + ry * h * grow * 1.05, u]);
+        }
+        const width = (u) => (h * 0.21 * grow) * (1 - 0.62 * u) * Math.min(1, 0.45 + u * 6) * (1 + 0.14 * Math.sin(u * 13 - t * 3.2)) + 2.5;
+        const left = [], right = [];
+        for (let k = 0; k < spine.length; k++) {
+            const a = spine[Math.max(0, k - 1)], b = spine[Math.min(spine.length - 1, k + 1)];
+            let nx = -(b[1] - a[1]), ny = b[0] - a[0];
+            const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+            const wd = width(spine[k][2]);
+            left.push([spine[k][0] + nx * wd, spine[k][1] + ny * wd]);
+            right.push([spine[k][0] - nx * wd, spine[k][1] - ny * wd]);
+        }
+        const last = spine.length - 1;
+        // the gullet in from above and the gut out
+        tube([[spine[0][0] + 4, y - 4], [spine[1][0] + 4, spine[1][1]]], 5, hb * 0.5);
+        tube([[spine[last][0], spine[last][1]], [spine[last][0] + 4, y - 4]], 3.5, hb * 0.5);
+        const sac = () => { ctx.beginPath(); left.forEach((p, k) => (k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); for (let k = right.length - 1; k >= 0; k--) ctx.lineTo(right[k][0], right[k][1]); ctx.closePath(); };
+        const fg = ctx.createLinearGradient(x, y, x + w, y + h);
+        fg.addColorStop(0, VT.fMuscle); fg.addColorStop(0.5, VT.fCore); fg.addColorStop(1, VT.fArtery);
+        sac(); ctx.fillStyle = fg; ctx.fill();
+        ctx.save(); sac(); ctx.clip();
+        // folds along its length, and the squeezing rings
+        ctx.lineCap = 'round';
+        for (const off of [-0.5, 0, 0.5]) {
+            ctx.strokeStyle = 'rgba(16,6,9,0.5)'; ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            spine.forEach((p, k) => { const q = [p[0] + (left[k][0] - p[0]) * off, p[1] + (left[k][1] - p[1]) * off + Math.sin(k * 1.3 + t) * 0.8]; if (k) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); });
+            ctx.stroke();
+        }
+        for (let k = 1; k < spine.length - 1; k++) {
+            const wave = Math.sin(spine[k][2] * 14 - t * 3.2);
+            if (wave < 0.75) continue;
+            ctx.strokeStyle = rgba(VT.pulse, 0.5 * wave); ctx.lineWidth = 2.2;
+            ctx.beginPath(); ctx.moveTo(left[k][0], left[k][1]); ctx.lineTo(right[k][0], right[k][1]); ctx.stroke();
+        }
+        ctx.restore();
+        sac(); ctx.strokeStyle = 'rgba(12,4,7,0.75)'; ctx.lineWidth = 1.5; ctx.stroke();
+        // vessels over it, the pulse; and the wet
+        tube(spine.slice(4, 18).map((p, k) => [p[0] + (left[k + 4][0] - p[0]) * 0.6, p[1] + (left[k + 4][1] - p[1]) * 0.6]), 1.6, hb);
+        ctx.strokeStyle = 'rgba(255,220,225,0.4)'; ctx.lineWidth = 1;
+        ctx.beginPath(); right.slice(6, 12).forEach((p, k) => { const q = [p[0] + (spine[k + 6][0] - p[0]) * 0.3, p[1] + (spine[k + 6][1] - p[1]) * 0.3]; if (k) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); }); ctx.stroke();
+    }
+
+    /**
      * Sinews and vessels stretched between body rooms: across the gap to a neighbour that is body
      * too, and down through the rock between levels. Cached by which rooms are body.
      */
@@ -1005,11 +1351,14 @@ export function createVaultView(canvas, opts = {}) {
             const strand = (x1, y1, x2, y2, sag, kind) => {
                 const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 + sag;
                 if (kind === 'sinew') {
-                    for (let q = 0; q < 4; q++) {
-                        const off = (q - 1.5) * 1.3;
-                        g.strokeStyle = q === 0 ? 'rgba(58,16,26,0.95)' : rgba(VT.fBone, 0.2 + R() * 0.16);
-                        g.lineWidth = q === 0 ? 5 : 0.9;
-                        g.beginPath(); g.moveTo(x1, y1 + off); g.quadraticCurveTo(mx, my + off, x2, y2 + off); g.stroke();
+                    // a tendon: bone-pale, curving (an S through two pulls), striated
+                    const c1x = x1 + (x2 - x1) * 0.3 + (R() - 0.5) * 14, c1y = y1 + (y2 - y1) * 0.3 + sag * 1.6;
+                    const c2x = x1 + (x2 - x1) * 0.7 + (R() - 0.5) * 14, c2y = y1 + (y2 - y1) * 0.7 - sag * 0.8;
+                    for (let q = 0; q < 5; q++) {
+                        const off = (q - 2) * 1.1;
+                        g.strokeStyle = q === 0 ? 'rgba(30,8,14,0.9)' : q === 1 ? rgba(VT.fBone, 0.55) : rgba(VT.fBone, 0.6 + R() * 0.25);
+                        g.lineWidth = q === 0 ? 6 : q === 1 ? 4 : 0.8;
+                        g.beginPath(); g.moveTo(x1, y1 + (q > 1 ? off : 0)); g.bezierCurveTo(c1x, c1y + (q > 1 ? off : 0), c2x, c2y + (q > 1 ? off : 0), x2, y2 + (q > 1 ? off : 0)); g.stroke();
                     }
                 } else {
                     const pts = [];
@@ -1024,7 +1373,30 @@ export function createVaultView(canvas, opts = {}) {
                 if (!isFlesh(s.rooms[i])) continue;
                 const a = geo.slots[i];
                 const ix = idxOf(i);
-                if (ix < SLOTS - 1 && isFlesh(s.rooms[i + 1])) {
+                // neighbours on one floor (not across the shaft): one body, no seam. The gap is filled
+                // with the same deep red, and vessels run on from deep in one room into the other.
+                if (ix < SLOTS - 1 && ix !== geo.half - 1 && isFlesh(s.rooms[i + 1])) {
+                    const b = geo.slots[i + 1];
+                    const gx0 = a.x + a.w - 14, gx1 = b.x + 14;
+                    const sg = g.createLinearGradient(gx0, 0, gx1, 0);
+                    sg.addColorStop(0, 'rgba(46,12,21,0)'); sg.addColorStop(0.4, 'rgba(46,12,21,0.6)'); sg.addColorStop(0.6, 'rgba(46,12,21,0.6)'); sg.addColorStop(1, 'rgba(46,12,21,0)');
+                    g.fillStyle = sg; g.fillRect(gx0, a.y - 2, gx1 - gx0, a.h + 4);
+                    for (let q = 0; q < 3; q++) {
+                        const x1 = a.x + a.w * (0.45 + R() * 0.2), y1 = a.y + 10 + R() * (a.h - 20);
+                        const x2 = b.x + b.w * (0.15 + R() * 0.25), y2 = a.y + 10 + R() * (a.h - 20);
+                        const pts = [];
+                        for (let k2 = 0; k2 <= 12; k2++) {
+                            const u = k2 / 12;
+                            pts.push([x1 + (x2 - x1) * u, y1 + (y2 - y1) * u + Math.sin(u * Math.PI * 2 + q) * 5]);
+                        }
+                        const wid = q === 0 ? 3 : 1.8;
+                        g.strokeStyle = VT.fArtery; g.lineWidth = wid + 2;
+                        g.beginPath(); pts.forEach((p, k2) => (k2 ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); g.stroke();
+                        g.strokeStyle = VT.fCore; g.lineWidth = wid; g.stroke();
+                        vessels.push({ pts, wid, delay: R() });
+                    }
+                }
+                if (ix === geo.half - 1 && isFlesh(s.rooms[i + 1])) {
                     const b = geo.slots[i + 1];
                     for (let q = 0; q < 2; q++) {
                         const y1 = a.y + 8 + R() * (a.h - 16), y2 = b.y + 8 + R() * (b.h - 16);
@@ -1250,6 +1622,12 @@ export function createVaultView(canvas, opts = {}) {
                 break;
             }
             case 'finger': ctx.moveTo(-7, 0); ctx.lineTo(5, 0); ctx.moveTo(-7, 0); ctx.lineTo(-7, 5); ctx.lineTo(0, 5); ctx.quadraticCurveTo(2, 3, 0, 2); ctx.moveTo(-3, 5); ctx.lineTo(-3, 2); break;
+            case 'steak': {
+                // a T-bone: the cut's outline, the fat rim, the bone through it
+                ctx.moveTo(-7, -1); ctx.bezierCurveTo(-7, -7, 3, -8, 6, -4); ctx.bezierCurveTo(9, 0, 5, 6, -1, 6); ctx.bezierCurveTo(-5, 6, -7, 3, -7, -1);
+                ctx.moveTo(-1, -6); ctx.lineTo(1, 5); ctx.moveTo(-3, -1); ctx.lineTo(3, -2);
+                break;
+            }
             default: ctx.arc(0, 0, 3, 0, Math.PI * 2);
         }
         ctx.stroke();

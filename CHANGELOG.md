@@ -1,8 +1,19 @@
 # Changelog
 
-## Unreleased (deep-vault-story)
+## v1.86.5 - 2026-10-05 (chapter IV, the vault: the steak, the goal, the organs)
 
-Will be v1.86.5 (after the graphics pass, v1.86.4). Phase A: the rules, words and balance of the vault's story pass (docs/superpowers/specs/2026-10-05-deep-vault-story.md); the screen comes in phase B.
+The vault's story pass (docs/superpowers/specs/2026-10-05-deep-vault-story.md): rules, words and balance (phase A), then the screen (phase B).
+
+### The screen
+- **Meat Lab art.** In the palace a clean lab: steel vats with a red slab in each, a steak on a steel table under a lamp, a cut on a hook. In the night the same lab grown: two of the body's tanks under the lamp. A T-bone bubble.
+- **The organs, in the flesh.** HEART beats (spiralled muscle, an arch of great vessels, coronaries with the pulse, light on the beat), LUNGS breathe (two spongy lobes swelling, a bone-pale windpipe and bronchi), SKIN is stretched taut across the room (creases, pores, a strained sheen, tendons at the corners), STOMACH churns (a J of muscle twisting, folds, a squeeze running along it). A growing or changing room shows its organ forming.
+- **GROW INTO in the info box** as one choice: a heading, five organ buttons with their lines; the ones that cannot be had are dim with "Need N more biomass." or "Needs a heart first.".
+- **The checklist** in the panel (HEART, LUNGS, SKIN, STOMACH with tick boxes, INSIDE n / m) from the goal moment.
+- **Moments that matter**: the CRT line in amber with a thin underline that blinks twice, held a little longer; the picture dims while time runs at a quarter; a soft bell (Sound on/off respected).
+- **Computer lines** are shouted: bold, a red ">>" in front, a small shake.
+- **Fixes.** The CRT grows to keep the newest six lines whole; the ruined city stands on rubble and dark building cores (no floating tiles); tendons curve and are bone-pale; neighbouring body rooms share one tissue (no dark seams) and vessels run from one into the other.
+
+### The rules (phase A)
 
 - **The steak.** After the first five requests: "Mr Hale: I want real steak." opens the MEAT LAB card (160 ore, level 2 or 3, "Grows real meat in vats. Mood +6."). It feeds (120 / 200 / 300, with the hydroponics) and gives mood like a room of fun. "More steak. Everyone wants steak." asks for level 2. A steak bubble and a steak wave once the lab stands.
 - **The turn bites.** Three days after the report "The hydroponics are failing. The lamps are old.": they feed half, the meat lab the rest. The first to die in the palace, with a lab: the next day "The steak tastes different tonight." In the cold the system weighs a sleeper every 20 s ("Sleeper 41. 72 kg.").

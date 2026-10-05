@@ -7,6 +7,8 @@
 
 export const DRONE_HZ = 36.7;        // a low D
 export const PULSE_S = 1.7;
+/** The moment's bell: an A. */
+export const MOMENT_HZ = 880;
 
 /** Which shared word plays for a rules event (pure, tested). */
 export function wordFor(name) {
@@ -52,9 +54,26 @@ export function createVaultSound(audio) {
         }
     }
 
+    /** A moment that matters: a soft bell, two notes a fifth apart, on the sfx bus (the Sound choice). */
+    function moment() {
+        const g = audio.graph();
+        if (!g) return;
+        const { ctx, sfxBus } = g;
+        const t = ctx.currentTime;
+        for (const [dt, hz] of [[0, MOMENT_HZ], [0.14, MOMENT_HZ * 1.5]]) {
+            const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = hz;
+            const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz * 2.76;
+            const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t + dt); e.gain.linearRampToValueAtTime(0.16, t + dt + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + dt + 1.4);
+            const e2 = ctx.createGain(); e2.gain.value = 0.18;
+            o.connect(e); o2.connect(e2); e2.connect(e); e.connect(sfxBus);
+            o.start(t + dt); o2.start(t + dt); o.stop(t + dt + 1.5); o2.stop(t + dt + 1.5);
+        }
+    }
+
     return {
         event(name) {
             if (quiet()) return;
+            if (name === 'moment') { moment(); return; }
             const w = wordFor(name);
             if (w && typeof audio[w] === 'function') audio[w]();
         },

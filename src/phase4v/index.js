@@ -21,7 +21,9 @@ export const CRT_LINES = 6;
 /** The rise: the body fills the shaft, breaks the crust and the city, before the card. */
 export const RISE_MS = 5200;
 const SAVE_EVERY_MS = 4000;
-const ICONS = { suites: 'bed-double', mine: 'pickaxe', hydro: 'sprout', cinema: 'film', gym: 'dumbbell', bar: 'wine', garden: 'trees', game: 'gamepad-2', cryo: 'snowflake', vat: 'droplet' };
+const ICONS = { suites: 'bed-double', mine: 'pickaxe', hydro: 'sprout', cinema: 'film', gym: 'dumbbell', bar: 'wine', garden: 'trees', game: 'gamepad-2', cryo: 'snowflake', vat: 'droplet', meatlab: 'beef' };
+/** A marked line (a moment that matters) holds the CRT this long after it is typed. */
+export const MARK_HOLD_MS = 1600;
 
 let root = null, styleEl = null, rafId = 0, abort = null, sound = null, saveTimer = null, beforeUnload = null, view = null;
 let savingEnabled = true;
@@ -59,6 +61,7 @@ export function init() {
           <div class="c" data-v="chk-lungs"><i class="box"></i><span class="dymo">Lungs</span></div>
           <div class="c" data-v="chk-skin"><i class="box"></i><span class="dymo">Skin</span></div>
           <div class="c" data-v="chk-stomach"><i class="box"></i><span class="dymo">Stomach</span></div>
+          <div class="c in"><span class="dymo">Inside</span><span class="val" data-v="chk-inside"></span></div>
         </div>
         <div class="v-rows">
           <div class="r" data-v="r-res"><span class="dymo">Residents</span><span class="val" data-v="res"></span></div>
@@ -92,7 +95,7 @@ export function init() {
     let selected = -1;
     let armed = null;           // a card picked: its kind
     let buildOpen = true;
-    const crt = { lines: [], queue: [], typing: null };
+    const crt = { lines: [], queue: [], typing: null, holdUntil: 0 };
     let introUntil = 0;
 
     // ---------------------------------------------------------------- the CRT
@@ -109,7 +112,7 @@ export function init() {
         s.sfx.length = 0;
     }
     function stepCrt(now) {
-        if (!crt.typing && crt.queue.length) {
+        if (!crt.typing && crt.queue.length && now >= crt.holdUntil) {
             const o = crt.queue.shift();
             crt.typing = { ...o, shown: 0, at: now };
             crt.lines.push(crt.typing);
@@ -119,12 +122,17 @@ export function init() {
             const per = crt.queue.length > 3 ? TYPE_MS / 3 : TYPE_MS;
             const n = Math.min(crt.typing.text.length, Math.floor((now - crt.typing.at) / per));
             if (n !== crt.typing.shown) { crt.typing.shown = n; sound.tick(); }
-            if (n >= crt.typing.text.length) { crt.typing.done = true; crt.typing = null; }
+            if (n >= crt.typing.text.length) {
+                crt.typing.done = true;
+                // a moment's last marked line stays alone on the screen a little longer
+                if (crt.typing.mark && !(crt.queue[0] && crt.queue[0].mark)) crt.holdUntil = now + MARK_HOLD_MS;
+                crt.typing = null;
+            }
         }
         const el = $('crt');
         const html = crt.lines.map((l, k) => {
             const text = l.done ? l.text : l.text.slice(0, l.shown);
-            const cls = `l ${l.who}${k === crt.lines.length - 1 ? ' new' : ''}`;
+            const cls = `l ${l.who}${k === crt.lines.length - 1 ? ' new' : ''}${l.mark ? ' mark' : ''}${l.computer ? ' comp' : ''}`;
             return `<div class="${cls}">${esc(text)}${!l.done && l === crt.typing ? '<span class="cur"></span>' : ''}</div>`;
         }).join('');
         if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
@@ -191,6 +199,15 @@ export function init() {
             $('req').title = `${Math.ceil(q.due - s.day)} days to answer`;
         }
         $('rise').hidden = !V.riseReady(s);
+        // the goal's checklist, from the moment the goal is said
+        const goal = V.goal(s);
+        $('checklist').hidden = !(goal.shown && s.phase !== 'palace');
+        if (goal.shown) {
+            for (const o of ['heart', 'lungs', 'skin', 'stomach']) $(`chk-${o}`).classList.toggle('done', !!goal[o]);
+            $('chk-inside').textContent = `${V.num(goal.inside)} / ${V.num(goal.total)}`;
+        }
+        // a moment that matters: time runs slow for a few seconds
+        root.classList.toggle('is-slow', s.slow > 0);
     }
 
     // ---------------------------------------------------------------- the BUILD bar
@@ -234,7 +251,12 @@ export function init() {
         const lvl = !['rock', 'empty'].includes(r.kind) && !r.flesh && r.kind !== 'vat' ? `Level ${r.lvl}` : '';
         const html = `<div class="t"><span class="dymo">${esc(V.nameOf(s, selected))}</span><span class="lv">${lvl}</span></div>
             <div class="desc">${esc(V.describe(s, selected))}</div>
-            <div class="acts">${acts.map((a) => `<button type="button" class="a${a.id === 'grow' ? ' flesh' : a.dark ? ' dark' : a.id === 'reclaim' || a.id === 'bury' ? ' quiet' : ''}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}${a.hint ? `<div class="hint">${esc(a.hint)}</div>` : ''}`).join('')}</div>`;
+            <div class="acts">${acts.map((a, k) => {
+                // GROW INTO is one choice: a heading over its organ buttons
+                const head = a.group === 'grow' && (k === 0 || acts[k - 1].group !== 'grow') ? '<div class="grp"><span class="dymo">Grow into</span></div>' : '';
+                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.dark ? ' dark' : a.id === 'reclaim' || a.id === 'bury' ? ' quiet' : '';
+                return `${head}<button type="button" class="a${cls}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}${a.hint ? `<div class="hint">${esc(a.hint)}</div>` : ''}`;
+            }).join('')}</div>`;
         if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
         if (infoEl.hidden) { infoEl.hidden = false; view.resize(); }
     }
