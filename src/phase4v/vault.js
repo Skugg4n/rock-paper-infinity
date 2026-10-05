@@ -145,7 +145,7 @@ export const STOMACH_STEP = 120;
 /** G3: the night opens calm; the first pod (Mr Hale) fails after this many seconds of the night's clock. */
 export const CALM_S = 45;
 /** Warm pods (once the body is warm) draw this much power each. */
-export const POD_DRAW_WARM = 0.12;
+export const POD_DRAW_WARM = 0.05;
 /** G4: a stomach digests: it draws power. Tissue makes none (only a heart makes power in the body). */
 export const STOMACH_DRAW = 6;
 /** In the night the engine wears down to this share. */

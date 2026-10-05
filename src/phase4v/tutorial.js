@@ -145,7 +145,7 @@ export function stepTutorial(s, sec) {
             if (s.wishes) { s.wishes.next = s.wishes.clock + FIRST_WISHES_S; s.wishes.firstAt = s.wishes.clock; s.wishes.waveNext = s.wishes.clock + 120; }
             // the first bubble is there while the stop says what it is (it lives longer, the game is paused)
             const b = spawnWish(s);
-            if (b) b.life = 30;
+            if (b) { b.life = 30; b.born -= 0.5; }    // already grown in: the clock stands while the stop is open
             open(s, 'bubbles', STOPS.bubbles);
             return true;
         }
