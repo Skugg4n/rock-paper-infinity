@@ -42,10 +42,10 @@ export const VAULT_CHECKPOINTS = {
     },
     'iv-vault-cold': () => {
         const s = palace(newVault());
-        s.day = 120; s.turned = true; s.coldOpen = true; s.despair = 20;
+        s.day = 120; s.turned = true; s.coldOpen = true; s.despair = 0;
         put(s, slotIndex(1, 6), 'cryo', { lvl: 3 });
         s.asleep = 100;
-        s.favour = 0;
+        s.favour = 25;
         s.ore = 400;
         return s;
     },

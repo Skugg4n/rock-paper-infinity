@@ -119,6 +119,8 @@ export const LINES = {
     woke: 'What is that under the floor?',
     end: 'Woke: everyone is here.',
     estimate: 'Year 3 000. The surface did not recover.',
+    /** The Watcher, as the body grows: at a quarter, a half and three quarters. */
+    body: ['It is warm down here now.', 'I do not count them any more.', 'We are almost one.'],
 };
 
 /** The requests of movement I, in order; then drawn at random. `n` = a new one; `lvl` = a level. */
@@ -626,6 +628,10 @@ function takeRoom(s, i) {
         say(s, `${num(k)} sleepers are here now.`, 'sys');
     }
     sfx(s, 'taken');
+    const share = bodyShare(s);
+    const said = s.bodySaid || 0;
+    const due = share >= 0.75 ? 3 : share >= 0.5 ? 2 : share >= 0.25 ? 1 : 0;
+    if (due > said && !s.rooms.every(isFlesh)) { s.bodySaid = due; say(s, LINES.body[due - 1], 'sys'); }
     const lv = levelOf(i);
     if (s.rooms.slice(lv * SLOTS, (lv + 1) * SLOTS).every(isFlesh) && !s.levelsOne.includes(lv)) {
         s.levelsOne.push(lv);

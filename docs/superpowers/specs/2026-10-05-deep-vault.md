@@ -223,3 +223,63 @@ natten: en låg drone. Köttet: en långsam puls. Inget får spela när fliken �
 
 Korta meningar. Ingen "A: B"-matte, inga odds, inga internord. En text per sak: i inforutan ELLER på CRT, aldrig båda.
 Plånboken (ORE, och BIOMASS i natten) syns alltid i panelen.
+
+## Built (deep-vault)
+
+v1.86.0, branch deep-vault. Code in src/phase4v/ (vault.js the rules, wishes.js the bubbles, view.js the cutaway,
+index.js the screen and the clock, sound.js, style.js, checkpoints.js), src/deepVersion.js (colony / vault / dig).
+Play notes: docs/playtests/2026-10-05-vault-build.md.
+
+**The sim** (`node scripts/sim-vault.mjs`): a plausible player who answers the requests, keeps power and food up,
+builds the fun rooms and upgrades the bored ones, clicks about two thirds of the bubbles a second or so after they
+show, sleeps ten when mood is under 50 %, reclaims every dead, builds two vats (four when the power is short), grows
+whenever it can and takes a sleeper when the biomass is short. ▶▶ after 20 s with nothing to do by day, after 10 s
+at night. One line a minute:
+
+| min | phase | day/year | residents/asleep | ore | power make/use | mood/body | bio | bought | request |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | palace | day 0 | 216/0 | 241 | 40/20 | mood 70% | 0 | dig | 16 of us are sleeping on sofas. |
+| 1 | palace | day 15 | 217/0 | 92 | 40/26 | mood 67% | 0 | mine+ suites dig cinema | I want to watch films. |
+| 2 | palace | day 27 | 219/0 | 8 | 40/42 | mood 75% | 0 | dig cinema dig bar dig gym | Where can I train? |
+| 3 | palace | day 39 | 220/0 | 43 | 40/52 | mood 83% | 0 | dig game dig garden | My children have never seen a tree. |
+| 4 | palace | day 52 | 221/0 | 177 | 80/64 | mood 85% | 0 | dig mine engine+ | A pool. I was promised a pool. |
+| 5 | palace | day 65 | 223/0 | 193 | 80/72 | mood 96% | 0 | gym+ bar+ cinema+ | The light in the garden is wrong. |
+| 6 | palace | day 78 | 224/0 | 17 | 80/80 | mood 93% | 0 | mine+ cinema+ game+ garden+ | - |
+| 7 | palace | day 91 | 226/0 | 125 | 80/89 | mood 66% | 0 | dig suites dig suites bar+ | A sauna. Is that too much? |
+| 8 | palace | day 107 | 226/0 | 37 | 80/97 | mood 52% | 0 | cinema+ gym+ cinema+ | I want to speak to whoever runs this place. |
+| 9 | palace | day 119 | 226/0 | 263 | 80/108 | mood 26% | 0 | dig cryo dig cryo dig | Why is the water cold? |
+| 10 | night | year 4 | 226/226 | 210 | 77/65 | mood 0% | 0 | sleep10 cryo dig sleep10 sleep10 sleep10 cryo sleep10 dig sleep10 sleep10 sleep10 sleep10 SLEEP ALL | - |
+| 11 | night | year 104 | 216/216 | 309 | 66/63 | body 13% | 358 | reclaim vat take vat take take grow take take grow reclaim reclaim reclaim reclaim | - |
+| 12 | night | year 247 | 150/150 | 880 | 73/42 | body 21% | 179 | grow grow | - |
+| 13 | night | year 438 | 100/100 | 1643 | 81/28 | body 25% | 185 | grow | - |
+| 14 | night | year 675 | 50/50 | 2592 | 92/14 | body 29% | 241 | grow | - |
+| 15 | night | year 960 | 0/0 | 3356 | 96/0 | body 33% | 166 | grow grow | - |
+| 16 | night | year 1 293 | 0/0 | 3689 | 111/0 | body 42% | 136 | grow grow | - |
+| 17 | night | year 1 675 | 0/0 | 3825 | 129/0 | body 50% | 176 | grow grow | - |
+| 18 | night | year 2 104 | 0/0 | 2966 | 151/0 | body 58% | 309 | grow grow | - |
+| 19 | night | year 2 581 | 0/0 | 2012 | 180/0 | body 67% | 557 | grow grow | - |
+| 20 | night | year 3 107 | 0/0 | 961 | 188/0 | body 75% | 940 | grow grow | - |
+| 21 | night | year 3 680 | 0/0 | 0 | 220/0 | body 92% | 846 | grow grow grow grow | - |
+
+First buy at once (the dig for the sofas); something new affordable at least every 23 s in act I (and a bubble every
+6 to 8 s between); the turn 7:35; the Cryo Bay 8:09; the night 9:57; Mr Hale 10:10; level 3 one at 14:34, level 2 at
+18:37, everyone here and RISE at 21:33. A player who uses ▶▶ less lands later (the spec's 22 to 26 min).
+
+**Changed from the spec, and why**
+- A Mine on level 2 from the start (beside the shaft). Without an ore income at start the first purchase (dig and
+  Suites, 240 of the 300 ore) left the player with 60 ore and nothing that makes more: a dead end. Mine output
+  20 / 32 / 44 a day (the spec's 4 / 9 / 16 made one purchase every two minutes at ▶).
+- Hydroponics feeds 250 / 400 / 600 (150 with 216 residents meant hunger from the first second).
+- Mood: base 50, the Common Room +6, fun ×(1 + 0.5 per level) instead of ×level (×level put mood at 100 % for
+  minutes), favour from thanks and bubbles fades 6 % a day and is capped at ±25. Cabin fever (day/5) × (1 + (day − 30)/50),
+  softened by the share awake; after the turn a despair of 1 a day. Births every 8 days (6 filled the CRT).
+- Cryo Bay 50 pods a level (as the spec), up to level 3.
+- The night: the engine wears over about 100 years and burns 2 ore a year; the mines give 1.5 ore a year a level;
+  a pod fails every 4 s of the night's clock while the power is short (per year it killed hundreds at 20 years a second).
+  Years a second 1 + night seconds / 75, never over 20; ▶▶ runs the night's clock three times as fast.
+- GROW INTO costs 120 + 10 per room taken, and takes 5 + 50 years per room taken (at most 400): with the
+  accelerating years a fixed 5 years made the whole body in two minutes. The body grows into as many rooms at once as
+  it has vats. A vat may also be built on bare rock on level 2 or 3 (in the night nobody is awake to dig).
+- A Cryo Bay taken by the body: the sleepers who no longer fit in the pods left are "here" ("146 sleepers are here now.").
+- New lines in the same voice: "Year 3 000. The surface did not recover.", and at a quarter, a half and three quarters
+  of the body "It is warm down here now.", "I do not count them any more.", "We are almost one."
