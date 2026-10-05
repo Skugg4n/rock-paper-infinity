@@ -239,31 +239,31 @@ at night. One line a minute:
 | min | phase | day/year | residents/asleep | ore | power make/use | mood/body | bio | bought | request |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | palace | day 0 | 216/0 | 241 | 40/20 | mood 70% | 0 | dig | 16 of us are sleeping on sofas. |
-| 1 | palace | day 15 | 217/0 | 92 | 40/26 | mood 67% | 0 | mine+ suites dig cinema | I want to watch films. |
-| 2 | palace | day 27 | 219/0 | 8 | 40/42 | mood 75% | 0 | dig cinema dig bar dig gym | Where can I train? |
-| 3 | palace | day 39 | 220/0 | 43 | 40/52 | mood 83% | 0 | dig game dig garden | My children have never seen a tree. |
-| 4 | palace | day 52 | 221/0 | 177 | 80/64 | mood 85% | 0 | dig mine engine+ | A pool. I was promised a pool. |
-| 5 | palace | day 65 | 223/0 | 193 | 80/72 | mood 96% | 0 | gym+ bar+ cinema+ | The light in the garden is wrong. |
-| 6 | palace | day 78 | 224/0 | 17 | 80/80 | mood 93% | 0 | mine+ cinema+ game+ garden+ | - |
-| 7 | palace | day 91 | 226/0 | 125 | 80/89 | mood 66% | 0 | dig suites dig suites bar+ | A sauna. Is that too much? |
-| 8 | palace | day 107 | 226/0 | 37 | 80/97 | mood 52% | 0 | cinema+ gym+ cinema+ | I want to speak to whoever runs this place. |
-| 9 | palace | day 119 | 226/0 | 263 | 80/108 | mood 26% | 0 | dig cryo dig cryo dig | Why is the water cold? |
-| 10 | night | year 4 | 226/226 | 210 | 77/65 | mood 0% | 0 | sleep10 cryo dig sleep10 sleep10 sleep10 cryo sleep10 dig sleep10 sleep10 sleep10 sleep10 SLEEP ALL | - |
-| 11 | night | year 104 | 216/216 | 309 | 66/63 | body 13% | 358 | reclaim vat take vat take take grow take take grow reclaim reclaim reclaim reclaim | - |
-| 12 | night | year 247 | 150/150 | 880 | 73/42 | body 21% | 179 | grow grow | - |
-| 13 | night | year 438 | 100/100 | 1643 | 81/28 | body 25% | 185 | grow | - |
-| 14 | night | year 675 | 50/50 | 2592 | 92/14 | body 29% | 241 | grow | - |
-| 15 | night | year 960 | 0/0 | 3356 | 96/0 | body 33% | 166 | grow grow | - |
-| 16 | night | year 1 293 | 0/0 | 3689 | 111/0 | body 42% | 136 | grow grow | - |
-| 17 | night | year 1 675 | 0/0 | 3825 | 129/0 | body 50% | 176 | grow grow | - |
-| 18 | night | year 2 104 | 0/0 | 2966 | 151/0 | body 58% | 309 | grow grow | - |
-| 19 | night | year 2 581 | 0/0 | 2012 | 180/0 | body 67% | 557 | grow grow | - |
-| 20 | night | year 3 107 | 0/0 | 961 | 188/0 | body 75% | 940 | grow grow | - |
-| 21 | night | year 3 680 | 0/0 | 0 | 220/0 | body 92% | 846 | grow grow grow grow | - |
+| 1 | palace | day 15 | 217/0 | 93 | 40/26 | mood 68% | 0 | mine+ suites dig cinema | I want to watch films. |
+| 2 | palace | day 27 | 219/0 | 12 | 40/42 | mood 78% | 0 | dig cinema dig bar dig gym | Where can I train? |
+| 3 | palace | day 39 | 220/0 | 53 | 40/52 | mood 93% | 0 | dig game dig garden | My children have never seen a tree. |
+| 4 | palace | day 52 | 221/0 | 201 | 80/64 | mood 93% | 0 | dig mine engine+ | A pool. I was promised a pool. |
+| 5 | palace | day 66 | 223/0 | 216 | 80/72 | mood 90% | 0 | gym+ bar+ mine+ | The light in the garden is wrong. |
+| 6 | palace | day 78 | 224/0 | 93 | 80/80 | mood 100% | 0 | cinema+ cinema+ game+ garden+ | - |
+| 7 | palace | day 91 | 226/0 | 207 | 80/89 | mood 71% | 0 | dig suites dig suites bar+ | A sauna. Is that too much? |
+| 8 | palace | day 107 | 227/0 | 126 | 80/97 | mood 63% | 0 | gym+ cinema+ cinema+ | Why is the water cold? |
+| 9 | palace | day 119 | 227/100 | 170 | 80/128 | mood 53% | 0 | dig cryo dig cryo dig sleep50 cryo dig sleep50 | We paid for this. |
+| 10 | night | year 35 | 225/225 | 9 | 63/65 | body 4% | 2 | cryo sleep50 dig cryo dig sleep50 SLEEP ALL reclaim vat take sleep all vat | - |
+| 11 | night | year 142 | 200/200 | 437 | 68/56 | body 17% | 245 | take sleep all take reclaim grow sleep all take grow reclaim reclaim sleep all reclaim reclaim grow | - |
+| 12 | night | year 297 | 150/150 | 1057 | 75/42 | body 21% | 219 | grow | - |
+| 13 | night | year 502 | 100/100 | 1876 | 84/28 | body 25% | 242 | grow | - |
+| 14 | night | year 755 | 50/50 | 2890 | 96/14 | body 29% | 319 | grow | - |
+| 15 | night | year 1 055 | 0/0 | 3441 | 101/0 | body 33% | 266 | grow grow | - |
+| 16 | night | year 1 403 | 0/0 | 3789 | 117/0 | body 42% | 269 | grow grow | - |
+| 17 | night | year 1 798 | 0/0 | 3588 | 137/0 | body 50% | 345 | grow grow | - |
+| 18 | night | year 2 242 | 0/0 | 2700 | 162/0 | body 58% | 519 | grow grow | - |
+| 19 | night | year 2 734 | 0/0 | 1717 | 192/0 | body 67% | 814 | grow grow | - |
+| 20 | night | year 3 274 | 0/0 | 637 | 196/0 | body 83% | 647 | grow grow grow grow | - |
+| 21 | night | year 3 861 | 0/0 | 0 | 220/0 | body 92% | 1237 | grow grow | - |
 
 First buy at once (the dig for the sofas); something new affordable at least every 23 s in act I (and a bubble every
-6 to 8 s between); the turn 7:35; the Cryo Bay 8:09; the night 9:57; Mr Hale 10:10; level 3 one at 14:34, level 2 at
-18:37, everyone here and RISE at 21:33. A player who uses ▶▶ less lands later (the spec's 22 to 26 min).
+6 to 8 s between); the turn 7:30; the Cryo Bay 8:12; the night 9:38; Mr Hale 9:57; level 3 one at 14:23, level 2 at
+18:26, everyone here and RISE at 21:15. A player who uses ▶▶ less lands later (the spec's 22 to 26 min).
 
 **Changed from the spec, and why**
 - A Mine on level 2 from the start (beside the shaft). Without an ore income at start the first purchase (dig and
@@ -283,3 +283,29 @@ First buy at once (the dig for the sofas); something new affordable at least eve
 - A Cryo Bay taken by the body: the sleepers who no longer fit in the pods left are "here" ("146 sleepers are here now.").
 - New lines in the same voice: "Year 3 000. The surface did not recover.", and at a quarter, a half and three quarters
   of the body "It is warm down here now.", "I do not count them any more.", "We are almost one."
+
+**After the independent human test** (docs/playtests/2026-10-05-vault-human-test.md, verdict ALMOST):
+1. TAKE ONE costs: the pods beside it open, three wake ("3 woke. They saw."), terrified (mood -60, halving every 30 s
+   of the night's clock). The MOOD gauge comes back while anyone is awake, rude bubbles come, and at 0 % they bang on
+   the screen and then one tries the shaft every 8 s ("Someone tried the shaft. They fell."). Deal with them: SLEEP ALL,
+   or take them too. RECLAIM is only for the dead ("RECLAIM 2 DEAD", quiet grey); TAKE ONE is the dark button (black,
+   red, throbbing).
+2. SLEEP 50 (a bay's worth) in one click, SLEEP ALL whenever everyone awake fits in the pods.
+3. A plain line under every night button: BURY "The dead go into the rock. Nothing comes of it.", RECLAIM "The dead
+   become biomass. +70.", TAKE ONE "A living sleeper becomes biomass. +70. The pods beside it open.", CUT POWER "Ten pods
+   go dark. Ten die. The rest get the power.", WAKE 10 "Ten wake up. They will see what is down here.", GROW INTO "The
+   body takes this room." (on a Cryo Bay: "Who sleeps here and does not fit in the other pods joins it."), SLEEP 50
+   "They sleep in the pods. They stop asking.", SLEEP ALL "Everyone sleeps. The night begins." / "Everyone back to sleep."
+4. In the night a Cryo Bay may go on bare rock (as a vat). The first full floor: "The body grows up from a full floor."
+   on the CRT; a rock the body cannot reach yet says the same in the info box.
+5. A bubble clicked: +2 % mood, floating "+2 %"; missed: -2 %, floating "-2 %" with the grey burst; they cost nothing.
+   Mood 0 % has a consequence: "They are banging on the screen." (the CRT shakes), then every 5 days one tries the
+   shaft and falls (a resident fewer). The gauge says it underneath: "Under 25 % they break things." / "They are
+   breaking things." / "At 0 % they try to leave." After the turn despair grows 1.8 a day (the bubbles hold mood up).
+6. RISE: 5.2 s before the card: the body fills the shaft, the crust bulges and cracks, the mass breaks through and
+   swells over the ruined city until it is the sky, the screen quakes and the panel fades; then V · UNITY.
+7. One meaning per marker: gold dashed frame = the body can grow in here; red pulse = pods in trouble (dead waiting,
+   power short at night); a small yellow tab with an icon on a room = it is complaining (! a request, a bolt for power,
+   a plate for food).
+8. RISE takes the BUILD bar's place (no card under it); "Here" is "In the body"; at the end the RESIDENTS row goes and
+   IN THE BODY stays. The fun rooms stand dark in the night (they gave mood to the woken).

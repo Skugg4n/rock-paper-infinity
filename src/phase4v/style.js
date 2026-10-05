@@ -71,6 +71,14 @@ body.in-vault #pause-btn { display: none; }
 .v-info button.a.flesh { background: #a8132c; color: #f6e6e8; }
 .v-info button.a:disabled { background: #3a414b; color: #7d8691; cursor: default; }
 .v-info .need { font-size: 11px; color: #e0a090; margin-top: -3px; }
+.v-info .hint { font-size: 11px; line-height: 15px; color: #9aa3ad; margin-top: -3px; margin-bottom: 2px; }
+.v-info button.a.quiet { background: #2a2f37; color: #d5dbe3; box-shadow: inset 0 0 0 1px #4a2a30; }
+.v-info button.a.dark { background: #1a0306; color: #ff4d5e; box-shadow: inset 0 0 0 2px #a8132c, 0 0 14px rgba(168,19,44,0.45); animation: v-throb 1.7s ease-in-out infinite; }
+.v-crt.bang { animation: v-bang 420ms linear; }
+@keyframes v-bang { 10%, 50%, 90% { transform: translate(-4px, 1px); } 30%, 70% { transform: translate(4px, -1px); } }
+#phase-vault.is-rising canvas.v-cut { animation: v-quake 260ms linear infinite; }
+@keyframes v-quake { 25% { transform: translate(2px, -1px); } 75% { transform: translate(-2px, 1px); } }
+#phase-vault.is-rising .v-panel, #phase-vault.is-rising .v-build, #phase-vault.is-rising .v-time { opacity: 0.15; transition: opacity 1.5s ease; }
 .v-rise { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 8; border: 0; border-radius: 10px; padding: 14px 44px; background: #a8132c; color: #f6e6e8;
   font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 34px; letter-spacing: 0.3em; cursor: pointer; box-shadow: 0 0 40px rgba(168,19,44,0.7); animation: v-throb 1.7s ease-in-out infinite; }
 .v-rise[hidden] { display: none; }

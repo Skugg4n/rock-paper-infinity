@@ -18,6 +18,8 @@ export const INTRO_MS = 8000;
 /** Letters typed on the CRT, ms each. */
 export const TYPE_MS = 26;
 export const CRT_LINES = 4;
+/** The rise: the body fills the shaft, breaks the crust and the city, before the card. */
+export const RISE_MS = 5200;
 const SAVE_EVERY_MS = 4000;
 const ICONS = { suites: 'bed-double', mine: 'pickaxe', hydro: 'sprout', cinema: 'film', gym: 'dumbbell', bar: 'wine', garden: 'trees', game: 'gamepad-2', cryo: 'snowflake', vat: 'droplet' };
 
@@ -49,11 +51,12 @@ export function init() {
         <div class="v-gauge" data-v="g-power"><div class="row"><span class="dymo">Power</span><span class="val" data-v="power"></span></div><div class="v-bar"><i data-v="power-bar"></i></div><div class="sub" data-v="power-sub"></div></div>
         <div class="v-gauge" data-v="g-ore"><div class="row"><span class="dymo">Ore</span><span class="val" data-v="ore"></span></div><div class="sub" data-v="ore-sub"></div></div>
         <div class="v-gauge" data-v="g-bio" hidden><div class="row"><span class="dymo">Biomass</span><span class="val" data-v="bio"></span></div><div class="sub" data-v="bio-sub"></div></div>
-        <div class="v-gauge" data-v="g-mood"><div class="row"><span class="dymo" data-v="mood-label">Mood</span><span class="val" data-v="mood"></span></div><div class="v-bar"><i data-v="mood-bar"></i></div></div>
+        <div class="v-gauge" data-v="g-mood"><div class="row"><span class="dymo">Mood</span><span class="val" data-v="mood"></span></div><div class="v-bar"><i data-v="mood-bar"></i></div><div class="sub" data-v="mood-sub"></div></div>
+        <div class="v-gauge" data-v="g-body" hidden><div class="row"><span class="dymo">Body</span><span class="val" data-v="body"></span></div><div class="v-bar"><i data-v="body-bar" style="background:#a8132c"></i></div></div>
         <div class="v-rows">
           <div class="r" data-v="r-res"><span class="dymo">Residents</span><span class="val" data-v="res"></span></div>
           <div class="r" data-v="r-asleep" hidden><span class="dymo">Asleep</span><span class="val" data-v="asleep"></span></div>
-          <div class="r" data-v="r-here" hidden><span class="dymo">Here</span><span class="val" data-v="here"></span></div>
+          <div class="r" data-v="r-here" hidden><span class="dymo">In the body</span><span class="val" data-v="here"></span></div>
           <div class="r" data-v="r-time"><span class="dymo" data-v="time-label">Day</span><span class="val" data-v="time"></span></div>
         </div>
       </div>
@@ -89,7 +92,11 @@ export function init() {
     function pushLines() {
         for (const o of s.out) crt.queue.push(o);
         s.out.length = 0;
-        for (const e of s.sfx) sound.event(e);
+        for (const e of s.sfx) {
+            sound.event(e);
+            // they bang on the screen: it shakes
+            if (e === 'bang') { const c = $('crt'); c.classList.remove('bang'); void c.offsetWidth; c.classList.add('bang'); }
+        }
         s.sfx.length = 0;
     }
     function stepCrt(now) {
@@ -137,15 +144,25 @@ export function init() {
             const br = V.bioRate(s);
             $('bio-sub').textContent = br > 0 ? `+${br < 10 ? br.toFixed(1) : V.num(br)} a year` : '';
         }
+        // MOOD is the awake's: it shows while someone is awake (the woken in the night too); BODY from the first vat
         const body = V.hasVat(s);
-        $('mood-label').textContent = body ? 'Body' : 'Mood';
-        const m = body ? Math.round(V.bodyShare(s) * 100) : V.mood(s);
-        const asleepAll = !body && V.awake(s) === 0;
-        $('mood').textContent = asleepAll ? '-' : `${m} %`;
+        const anyAwake = V.awake(s) > 0;
+        $('g-mood').hidden = s.phase !== 'palace' && !anyAwake;
+        const m = V.mood(s);
+        $('mood').textContent = anyAwake ? `${m} %` : '-';
         const mb = $('mood-bar');
-        mb.style.width = `${asleepAll ? 0 : m}%`;
-        mb.style.background = body ? '#a8132c' : m > 75 ? '#7fd38a' : m >= 40 ? '#e8c45a' : '#ff6b5a';
-        $('g-mood').classList.toggle('is-red', !body && !asleepAll && m < 40);
+        mb.style.width = `${anyAwake ? m : 0}%`;
+        mb.style.background = m > 75 ? '#7fd38a' : m >= 40 ? '#e8c45a' : '#ff6b5a';
+        $('g-mood').classList.toggle('is-red', anyAwake && m < 40);
+        $('mood-sub').textContent = !anyAwake ? '' : m <= V.DESPAIR_AT ? 'At 0 % they try to leave.' : m < V.RIOT_BELOW ? 'They are breaking things.' : m < 40 ? 'Under 25 % they break things.' : '';
+        $('g-body').hidden = !body;
+        if (body) {
+            const b = Math.round(V.bodyShare(s) * 100);
+            $('body').textContent = `${b} %`;
+            $('body-bar').style.width = `${b}%`;
+        }
+        // at the end nobody is a resident: the row goes, IN THE BODY stays
+        $('r-res').hidden = s.residents === 0 && s.here > 0;
         $('res').textContent = V.num(s.residents);
         $('r-asleep').hidden = !(s.asleep > 0);
         $('asleep').textContent = V.num(s.asleep);
@@ -165,7 +182,9 @@ export function init() {
     }
     function paintCards() {
         const host = $('cards');
-        host.hidden = !buildOpen;
+        // at the end there is nothing to build: the RISE lever has the place
+        host.hidden = !buildOpen || s.risen || V.riseReady(s);
+        $('build-btn').hidden = s.risen || V.riseReady(s);
         $('build-btn').classList.toggle('on', buildOpen);
         const want = s.request && s.request.kind && !(s.request.lvl > 1) ? s.request.kind : null;
         const wave = waveKind(s);
@@ -195,26 +214,32 @@ export function init() {
         const lvl = !['rock', 'empty'].includes(r.kind) && !r.flesh && r.kind !== 'vat' ? `Level ${r.lvl}` : '';
         const html = `<div class="t"><span class="dymo">${esc(V.nameOf(s, selected))}</span><span class="lv">${lvl}</span></div>
             <div class="desc">${esc(V.describe(s, selected))}</div>
-            <div class="acts">${acts.map((a) => `<button type="button" class="a${['grow', 'take', 'reclaim'].includes(a.id) ? ' flesh' : ''}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}`).join('')}</div>`;
+            <div class="acts">${acts.map((a) => `<button type="button" class="a${a.id === 'grow' ? ' flesh' : a.dark ? ' dark' : a.id === 'reclaim' || a.id === 'bury' ? ' quiet' : ''}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}${a.hint ? `<div class="hint">${esc(a.hint)}</div>` : ''}`).join('')}</div>`;
         if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
         if (infoEl.hidden) { infoEl.hidden = false; view.resize(); }
     }
 
+    /**
+     * One meaning per marker: the gold dashed frame = the body can grow in here; a red pulse = pods in
+     * trouble (the dead waiting, the power short); a small tab with an icon = a room complaining.
+     */
     function uiState() {
-        const ui = { selected, placeable: armed ? placeable(armed) : null, diggable: new Set(), wanted: new Set() };
+        const ui = { selected, placeable: armed ? placeable(armed) : null, diggable: new Set(), wanted: new Set(), trouble: new Set(), complain: new Map() };
         s.rooms.forEach((r, i) => { if (V.canDig(s, i)) ui.diggable.add(i); });
+        if (s.phase === 'night' && V.hasVat(s) && !V.growing(s)) s.rooms.forEach((r, i) => { if (V.canGrowInto(s, i)) ui.wanted.add(i); });
         const q = s.request;
         if (q && q.kind && (q.lvl > 1 || q.kind === 'engine')) {
-            s.rooms.forEach((r, i) => { if (r.kind === q.kind && !r.flesh && (q.kind === 'engine' || r.lvl < q.lvl)) ui.wanted.add(i); });
+            s.rooms.forEach((r, i) => { if (r.kind === q.kind && !r.flesh && (q.kind === 'engine' || r.lvl < q.lvl)) ui.complain.set(i, 'ask'); });
         }
-        if (s.phase === 'night' && V.hasVat(s) && !V.growing(s)) s.rooms.forEach((r, i) => { if (V.canGrowInto(s, i)) ui.wanted.add(i); });
         // what is short shows on the room that makes it: the engine when dark, the farm when hungry
         if (s.phase === 'palace' && V.awake(s) > 0) {
-            if (V.power(s).short) s.rooms.forEach((r, i) => { if (r.kind === 'engine') ui.wanted.add(i); });
-            if (V.awake(s) > V.food(s)) s.rooms.forEach((r, i) => { if (r.kind === 'hydro' && !r.flesh) ui.wanted.add(i); });
+            if (V.power(s).short) s.rooms.forEach((r, i) => { if (r.kind === 'engine') ui.complain.set(i, 'power'); });
+            if (V.awake(s) > V.food(s)) s.rooms.forEach((r, i) => { if (r.kind === 'hydro' && !r.flesh) ui.complain.set(i, 'food'); });
         }
-        // the dead wait in the Cryo Bay
-        if (s.fallen.length) s.rooms.forEach((r, i) => { if (r.kind === 'cryo' && !r.flesh) ui.wanted.add(i); });
+        // pods in trouble: the dead waiting, or the power short in the night
+        if (s.fallen.length || (s.phase === 'night' && s.asleep > 0 && V.power(s).short)) {
+            s.rooms.forEach((r, i) => { if (r.kind === 'cryo' && !r.flesh) ui.trouble.add(i); });
+        }
         return ui;
     }
 
@@ -295,7 +320,8 @@ export function init() {
         $('rise').hidden = true;
         $('cards').hidden = true;
         selected = -1; paintInfo();
-        await view.rise(3200);
+        root.classList.add('is-rising');
+        await view.rise(RISE_MS);
         playChapterCard({ roman: 'V', title: 'UNITY', mode: 'to-come', dark: true });
     }
 

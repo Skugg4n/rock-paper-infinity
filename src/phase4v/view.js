@@ -294,7 +294,28 @@ export function createVaultView(canvas, opts = {}) {
         if (r.flesh || (r.job && r.job.op === 'grow')) flesh(x, y, w, h, r.flesh === 1 ? 1 : (r.flesh || 0), t, i, r);
         if (can) glow(x, y, w, h, t);
         if (wanted && !sel) outline(x, y, w, h, 'rgba(255,214,120,0.85)', true, t);
+        if (ui.trouble && ui.trouble.has(i)) {
+            ctx.strokeStyle = `rgba(255,70,60,${0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * 6))})`;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+            ctx.lineWidth = 1;
+        }
+        if (ui.complain && ui.complain.has(i)) complainTab(x, y, ui.complain.get(i), t);
         if (sel) outline(x, y, w, h, '#f1efe8');
+    }
+    /** A room complaining: a small tab on its top-left corner with an icon. */
+    function complainTab(x, y, kind, t) {
+        const cx = x + 2, cy = y - 10;
+        ctx.save();
+        ctx.translate(cx + 9, cy + 9 + Math.sin(t * 3) * 1);
+        ctx.fillStyle = '#e8c45a';
+        ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#12171e'; ctx.fillStyle = '#12171e'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+        ctx.beginPath();
+        if (kind === 'power') { ctx.moveTo(1.5, -6); ctx.lineTo(-3, 1); ctx.lineTo(1, 1); ctx.lineTo(-1.5, 6); ctx.stroke(); }
+        else if (kind === 'food') { ctx.ellipse(0, 2.5, 6, 1.8, 0, 0, Math.PI * 2); ctx.moveTo(-4.5, 2); ctx.arc(0, 2, 4.5, Math.PI, 0); ctx.stroke(); }
+        else { ctx.moveTo(0, -5); ctx.lineTo(0, 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 4.8, 1.2, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
     }
 
     function shade(hex, k) {
@@ -554,24 +575,63 @@ export function createVaultView(canvas, opts = {}) {
         }
     }
 
+    /**
+     * The rise, in three beats over riseAnim.ms: the body fills the shaft from the bottom (0 to 0.4),
+     * the crust bulges and cracks (0.4 to 0.6), the mass breaks through and swells over the ruined city
+     * until it is the sky (0.6 to 1).
+     */
     function drawRise(s, t) {
         if (!riseAnim) return;
         const k = Math.min(1, (t * 1000 - riseAnim.t0) / riseAnim.ms);
         const x = geo.shaftX - 6, w = geo.shaftW + 12;
         const bottom = geo.slots[(LEVELS - 1) * SLOTS].y + geo.levelH;
         const gy = groundY(s);
-        const top = bottom - (bottom - gy + 80) * Math.min(1, k * 1.25);
+        const fill = Math.min(1, k / 0.4);
+        const top = bottom - (bottom - gy) * fill;
         ctx.fillStyle = '#2a0a12';
         ctx.fillRect(x, top, w, bottom - top);
         ctx.strokeStyle = 'rgba(168,19,44,0.9)';
         ctx.lineWidth = 2;
         ctx.beginPath(); for (let y = bottom; y > top; y -= 8) ctx.lineTo(x + w / 2 + Math.sin(y * 0.2 + t * 4) * w * 0.3, y); ctx.stroke();
-        ctx.lineWidth = 1;
-        if (k > 0.8) {
-            const b = (k - 0.8) / 0.2;
-            ctx.fillStyle = `rgba(42,10,18,${b})`;
-            ctx.beginPath(); ctx.ellipse(x + w / 2, gy, 40 + b * 160, 20 + b * 60, 0, Math.PI, 0); ctx.fill();
+        const cx = x + w / 2;
+        if (k > 0.4) {
+            // the crust bulges and cracks
+            const b = Math.min(1, (k - 0.4) / 0.2);
+            ctx.strokeStyle = 'rgba(20,10,8,0.95)';
+            ctx.lineWidth = 2;
+            for (let c = 0; c < 7; c++) {
+                const ang = -Math.PI + (c + 0.5) * Math.PI / 7;
+                ctx.beginPath(); ctx.moveTo(cx, gy);
+                ctx.lineTo(cx + Math.cos(ang) * (30 + b * 160) * (0.6 + hash(c) * 0.6), gy + Math.sin(ang) * (8 + b * 40));
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#2a0a12';
+            ctx.beginPath(); ctx.ellipse(cx, gy, 20 + b * 40, 6 + b * 26, 0, Math.PI, 0); ctx.fill();
         }
+        if (k > 0.6) {
+            // through: the mass swells over the city and becomes the sky
+            const m = (k - 0.6) / 0.4;
+            const R = 60 + m * Math.max(W, geo.ground * 4);
+            const g = ctx.createRadialGradient(cx, gy, 10, cx, gy, R);
+            g.addColorStop(0, 'rgba(60,12,22,1)');
+            g.addColorStop(0.7, 'rgba(36,7,13,0.97)');
+            g.addColorStop(1, 'rgba(20,4,8,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.ellipse(cx, gy, R, R * 0.55 + m * geo.ground, 0, Math.PI, 0); ctx.fill();
+            ctx.strokeStyle = `rgba(168,19,44,${0.5 + 0.4 * Math.sin(t * 3.7)})`;
+            ctx.lineWidth = 1.5;
+            for (let v = 0; v < 14; v++) {
+                const ang = -Math.PI + (v + 0.5) * Math.PI / 14;
+                ctx.beginPath(); ctx.moveTo(cx, gy);
+                for (let st = 1; st <= 6; st++) {
+                    const rr = R * 0.9 * st / 6;
+                    ctx.lineTo(cx + Math.cos(ang + (hash(v * 7 + st) - 0.5) * 0.3) * rr, gy + Math.sin(ang) * rr * 0.6);
+                }
+                ctx.stroke();
+            }
+            if (m > 0.85) { ctx.fillStyle = `rgba(0,0,0,${(m - 0.85) / 0.15})`; ctx.fillRect(0, 0, W, H); }
+        }
+        ctx.lineWidth = 1;
         if (k >= 1 && !riseAnim.done) { riseAnim.done = true; riseAnim.resolve?.(); }
     }
 
@@ -687,6 +747,7 @@ export function createVaultView(canvas, opts = {}) {
                 }
                 ctx.beginPath(); ctx.arc(e.x, e.y + 4, 3.5, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
                 ctx.fillStyle = '#7d8691'; ctx.fillRect(e.x - 3, e.y - 2, 1.5, 1.5); ctx.fillRect(e.x + 1.5, e.y - 2, 1.5, 1.5);
+                if (e.text) { ctx.fillStyle = '#ff8a70'; ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(e.text, e.x, e.y - 14 - age * 22); }
             } else {
                 ctx.fillStyle = e.type === 'wave' ? '#ffd678' : '#bdf5c4';
                 ctx.font = `600 ${e.type === 'wave' ? 18 : 12}px system-ui, sans-serif`;
@@ -710,7 +771,7 @@ export function createVaultView(canvas, opts = {}) {
         bubbleAt: (s, x, y) => bubbleAt(s, x, y),
         setPointer: (x, y) => { pointer.x = x; pointer.y = y; },
         startDescent: (ms) => { descent = { t0: performance.now(), ms }; },
-        rise: (ms = 3200) => new Promise((resolve) => { riseAnim = { t0: performance.now(), ms, resolve }; }),
+        rise: (ms = 5200) => new Promise((resolve) => { riseAnim = { t0: performance.now(), ms, resolve }; }),
         get geo() { return geo; },
     };
 }

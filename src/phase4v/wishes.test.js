@@ -6,7 +6,7 @@ import { VAULT_CHECKPOINTS } from './checkpoints.js';
 const run = (s, sec, speed = 1) => { for (let t = 0; t < sec; t += 0.25) V.advance(s, 0.25, speed); };
 
 describe('the small wishes', () => {
-    test('act I: one every 6 to 8 s; a click pops it for +1 mood; a drink costs an ore', () => {
+    test('act I: one every 6 to 8 s; a click pops it for +2 % mood, shown floating, and costs nothing', () => {
         const s = V.newVault();
         run(s, 3.25);
         expect(s.wishes.list.length).toBe(1);
@@ -17,9 +17,9 @@ describe('the small wishes', () => {
         const b = s.wishes.list[s.wishes.list.length - 1];
         const fav = s.favour, ore = s.ore;
         expect(W.popWish(s, b.id)).toBe(true);
-        expect(s.favour).toBeCloseTo(fav + 1, 5);
-        expect(s.ore).toBe(ore - b.cost);
-        expect(s.fx.some((e) => e.type === 'pop')).toBe(true);
+        expect(s.favour).toBeCloseTo(fav + 2, 5);
+        expect(s.ore).toBe(ore);
+        expect(s.fx.some((e) => e.type === 'pop' && e.text === '+2 %')).toBe(true);
         expect(at).toBeGreaterThan(0);
     });
     test('missed after 10 s: it bursts grey and costs a point of mood', () => {
@@ -28,7 +28,7 @@ describe('the small wishes', () => {
         const fav = s.favour;
         run(s, 10.5);
         expect(s.wishes.missed).toBeGreaterThanOrEqual(1);
-        expect(s.fx.some((e) => e.type === 'miss')).toBe(true);
+        expect(s.fx.some((e) => e.type === 'miss' && e.text === '-2 %')).toBe(true);
         expect(s.favour).toBeLessThan(fav);
     });
     test('four of one icon at once is a wave: the CRT says it once, the card is marked, building it is a big bump', () => {

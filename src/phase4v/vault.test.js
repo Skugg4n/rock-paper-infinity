@@ -82,18 +82,20 @@ describe('the palace', () => {
 });
 
 describe('the cold', () => {
-    test('SLEEP 10 needs pods; the asleep do not count in mood and the night begins when all sleep', () => {
+    test('SLEEP 50 needs pods; SLEEP ALL shows whenever all fit; the night begins when all sleep', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-cold']();
         expect(V.pods(s)).toBe(3 * V.PODS_PER_LEVEL);
         const cryo = s.rooms.findIndex((r) => r.kind === 'cryo');
         const ids = V.actionsFor(s, cryo).map((a) => a.id);
         expect(ids).toContain('sleep');
         expect(ids).toContain('wake');
+        expect(V.actionsFor(s, cryo).find((a) => a.id === 'sleep').label).toBe('SLEEP 50');
         const before = V.awake(s);
         V.act(s, 'sleep', cryo);
-        expect(V.awake(s)).toBe(before - 10);
-        s.rooms[cryo].lvl = 3; s.rooms[slotFor(s)] = { ...s.rooms[cryo] };
-        while (V.awake(s) > 0 && V.freePods(s) > 0) V.sleepSome(s, 10);
+        expect(V.awake(s)).toBe(before - 50);
+        s.rooms[slotFor(s)] = { ...s.rooms[cryo] };
+        expect(V.actionsFor(s, cryo).map((a) => a.id)).toContain('sleepall');
+        V.act(s, 'sleepall', cryo);
         expect(s.phase).toBe('night');
     });
 });
@@ -154,5 +156,55 @@ describe('sound words', () => {
         expect(wordFor('built')).toBe('pling');
         expect(wordFor('fail')).toBe('knock');
         expect(wordFor('nothing')).toBe(null);
+    });
+});
+
+describe('after the human test', () => {
+    const night = () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        return { s, cryo: s.rooms.findIndex((r) => r.kind === 'cryo') };
+    };
+    test('TAKE ONE has a price: the pods beside it open, three wake, terrified; mood shows and falls', () => {
+        const { s, cryo } = night();
+        expect(V.awake(s)).toBe(0);
+        V.act(s, 'take', cryo);
+        expect(V.awake(s)).toBe(V.TAKE_WAKES);
+        expect(s.out.some((o) => o.text === '3 woke. They saw.')).toBe(true);
+        expect(V.mood(s)).toBeLessThanOrEqual(V.DESPAIR_AT);
+        // left awake at 0 %, one tries the shaft
+        s.out.length = 0;
+        for (let t = 0; t < 20; t += 0.25) V.advance(s, 0.25, 1);
+        expect(s.out.map((o) => o.text)).toEqual(expect.arrayContaining(['They are banging on the screen.', 'Someone tried the shaft. They fell.']));
+        // dealt with: SLEEP ALL puts them back
+        expect(V.actionsFor(s, cryo).map((a) => a.id)).toContain('sleepall');
+    });
+    test('RECLAIM is for the dead only, TAKE ONE is the dark one; every night button says what it does', () => {
+        const { s, cryo } = night();
+        s.fallen = ['Pod', 'Pod'];
+        s.engineWear = 99; s.ore = 0;
+        const acts = V.actionsFor(s, cryo);
+        const by = Object.fromEntries(acts.map((a) => [a.id, a]));
+        expect(by.reclaim.label).toBe('RECLAIM 2 DEAD');
+        expect(by.take.dark).toBe(true);
+        for (const id of ['bury', 'reclaim', 'take', 'cut', 'wake']) expect(by[id].hint).toMatch(/\.$/);
+        const g = s.rooms.findIndex((r, i) => V.canGrowInto(s, i));
+        expect(V.actionsFor(s, g).find((a) => a.id === 'grow').hint).toMatch(/^The body takes this room\./);
+    });
+    test('in the night a Cryo Bay goes on bare rock (nobody digs); a full floor says how the body climbs', () => {
+        const { s } = night();
+        const rock = s.rooms.findIndex((r, i) => r.kind === 'rock' && V.levelOf(i) === 2 && !r.flesh);
+        expect(V.canPlace(s, 'cryo', rock)).toBe(true);
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2 && i !== V.slotIndex(2, 7)) r.flesh = 1; });
+        s.bio = 1000;
+        V.growInto(s, V.slotIndex(2, 7));
+        for (let t = 0; t < 30; t += 0.25) V.advance(s, 0.25, 2);
+        expect(s.out.map((o) => o.text)).toEqual(expect.arrayContaining(['Level 3 is one.', 'The body grows up from a full floor.']));
+    });
+    test('at 0 % in the palace they bang on the screen, then one tries the shaft', () => {
+        const s = V.newVault();
+        s.despair = 300; s.day = 1;
+        for (let d = 0; d < 12; d++) V.stepDays(s, 1);
+        expect(s.out.some((o) => o.text === 'Someone tried the shaft. They fell.')).toBe(true);
+        expect(s.dead).toBeGreaterThan(0);
     });
 });

@@ -1,10 +1,11 @@
 /**
  * Chapter IV, the vault: PLUPPAR, the small wishes (spec, section "Pluppar"). The residents are
- * obnoxious: speech bubbles with an icon pop up over rooms; a click pops one (+1 mood, some cost
- * an ore), a missed one bursts grey (-1 mood). Four or more of one icon at once is a WAVE: the CRT
+ * obnoxious: speech bubbles with an icon pop up over rooms; a click pops one (+2 % mood, shown
+ * floating), a missed one bursts grey (-2 %). Four or more of one icon at once is a WAVE: the CRT
  * says it once, the card it points to is marked, building that thing ends the wave with a big bump.
  * After the turn they come faster, two or three at once, ruder. The asleep make none. In the night
- * they still come, faint, over the pods; nobody is awake to want anything.
+ * they still come, faint, over the pods; nobody is awake to want anything. The woken (TAKE ONE, WAKE)
+ * make real ones in the night, rude only.
  *
  * Real seconds (not game days): a bubble lives ~10 s at ▶ and at ▶▶ alike. Pure; state in s.wishes.
  */
@@ -16,16 +17,16 @@ export const GHOST_EVERY_S = 4;
 export const WAVE_AT = 4;
 export const WAVE_EVERY_S = 70;
 export const WAVE_BUMP = 10;
-export const POP_MOOD = 1;
-export const MISS_MOOD = 1;
+export const POP_MOOD = 2;
+export const MISS_MOOD = 2;
 
 /** The icons, what they say on hover, where they float, what a wave of them asks for. */
 export const ICONS = {
-    drink: { text: 'Drink to room {n}.', cost: 1, at: ['suites'], wave: { line: 'Overwhelming wishes for a better bar.', kind: 'bar' } },
+    drink: { text: 'Drink to room {n}.', at: ['suites'], wave: { line: 'Overwhelming wishes for a better bar.', kind: 'bar' } },
     hand: { text: 'Human #{n} wants a backrub.', at: ['suites', 'common', 'gym'], wave: { line: 'Overwhelming wishes for a spa.', kind: 'gym' } },
-    food: { text: 'Room {n} wants breakfast in bed.', cost: 1, at: ['suites'], wave: { line: 'Overwhelming wishes for fresh fruit.', kind: 'hydro' } },
+    food: { text: 'Room {n} wants breakfast in bed.', at: ['suites'], wave: { line: 'Overwhelming wishes for fresh fruit.', kind: 'hydro' } },
     music: { text: 'Human #{n} wants the music louder.', at: ['common', 'bar', 'cinema'], wave: { line: 'Overwhelming wishes for a better cinema.', kind: 'cinema' } },
-    towel: { text: 'More towels to room {n}.', cost: 1, at: ['suites', 'gym'], wave: { line: 'Overwhelming wishes for a garden to sit in.', kind: 'garden' } },
+    towel: { text: 'More towels to room {n}.', at: ['suites', 'gym'], wave: { line: 'Overwhelming wishes for a garden to sit in.', kind: 'garden' } },
     pool: { text: 'Human #{n} wants a pool table.', at: ['common', 'game', 'bar'], wave: { line: 'Overwhelming wishes for a pool table.', kind: 'game' } },
     bell: { text: 'Room {n} is ringing for service.', at: ['suites'], rude: true },
     finger: { text: 'Human #{n} wants to complain.', at: ['common', 'suites', 'bar', 'cinema'], rude: true },
@@ -52,7 +53,7 @@ function slotsFor(s, icon) {
     const at = ICONS[icon].at;
     const out = [];
     s.rooms.forEach((r, i) => { if (at.includes(r.kind) && r.flesh !== 1 && !(r.job && r.job.op === 'build')) out.push(i); });
-    if (!out.length) s.rooms.forEach((r, i) => { if (r.kind === 'common' || r.kind === 'suites') out.push(i); });
+    if (!out.length) s.rooms.forEach((r, i) => { if (r.flesh !== 1 && r.kind !== 'rock' && r.kind !== 'empty') out.push(i); });
     return out;
 }
 
@@ -84,8 +85,8 @@ const fx = (s, e) => { (s.fx || (s.fx = [])).push(e); };
 export function stepWishes(s, sec) {
     const w = s.wishes = normalizeWishes(s.wishes);
     w.clock += sec;
-    // the night: ghosts over the pods, nobody to answer to
-    if (s.phase !== 'palace' || awakeOf(s) === 0) {
+    // nobody awake: ghosts over the pods, nobody to answer to
+    if (awakeOf(s) === 0) {
         for (const b of w.list) if (!b.ghost) b.ghost = true;
         w.list = w.list.filter((b) => w.clock - b.born < b.life);
         if (s.phase === 'night' && s.asleep > 0 && w.clock >= w.ghostNext) {
@@ -101,14 +102,14 @@ export function stepWishes(s, sec) {
         if (w.clock - b.born >= b.life) {
             s.favour -= MISS_MOOD;
             w.missed++;
-            fx(s, { type: 'miss', slot: b.slot, fx: b.fx });
+            fx(s, { type: 'miss', slot: b.slot, fx: b.fx, text: `-${MISS_MOOD} %` });
         }
     }
     w.list = w.list.filter((b) => w.clock - b.born < b.life);
     // a wave answered: the thing they wanted is built
     if (w.wave && builtScore(s, w.wave.kind) > w.wave.base) {
         s.favour += WAVE_BUMP;
-        fx(s, { type: 'wave', slot: w.wave.slot, fx: 0.5, text: `+${WAVE_BUMP}` });
+        fx(s, { type: 'wave', slot: w.wave.slot, fx: 0.5, text: `+${WAVE_BUMP} %` });
         // the wave is answered: its bubbles go, happily
         for (const b of w.list) if (b.icon === w.wave.icon) fx(s, { type: 'pop', slot: b.slot, fx: b.fx, text: '' });
         w.list = w.list.filter((b) => b.icon !== w.wave.icon);
@@ -120,11 +121,13 @@ export function stepWishes(s, sec) {
         const share = Math.max(0.15, awakeOf(s) / Math.max(1, s.residents));
         const [a, b] = s.turned ? EVERY_TURNED_S : EVERY_S;
         w.next = w.clock + (a + rnd(s) * (b - a)) / share;
-        const n = s.turned ? 2 + (rnd(s) < 0.5 ? 1 : 0) : 1;
-        for (let k = 0; k < n; k++) spawn(s, s.turned && rnd(s) < 0.5 ? pick(s, RUDE) : pick(s, POLITE));
+        // the woken at night are only rude
+        const night = s.phase === 'night';
+        const n = night ? 1 + (rnd(s) < 0.5 ? 1 : 0) : s.turned ? 2 + (rnd(s) < 0.5 ? 1 : 0) : 1;
+        for (let k = 0; k < n; k++) spawn(s, night || (s.turned && rnd(s) < 0.5) ? pick(s, RUDE) : pick(s, POLITE));
     }
     // a wave: one icon over many rooms, hinting at a long project
-    if (!w.wave && w.clock >= w.waveNext && awakeOf(s) > 20) {
+    if (!w.wave && w.clock >= w.waveNext && awakeOf(s) > 20 && s.phase === 'palace') {
         w.waveNext = w.clock + WAVE_EVERY_S * (0.8 + rnd(s) * 0.4);
         const open = POLITE.filter((i) => ICONS[i].wave && builtScore(s, ICONS[i].wave.kind) < 3);
         if (open.length) {
@@ -157,7 +160,7 @@ export function popWish(s, id) {
     s.favour += POP_MOOD;
     w.popped++;
     w.list = w.list.filter((x) => x !== b);
-    fx(s, { type: 'pop', slot: b.slot, fx: b.fx, text: `+${POP_MOOD}` });
+    fx(s, { type: 'pop', slot: b.slot, fx: b.fx, text: `+${POP_MOOD} %` });
     s.sfx?.push('pop');
     return true;
 }

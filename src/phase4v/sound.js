@@ -12,7 +12,7 @@ export const PULSE_S = 1.7;
 export function wordFor(name) {
     return ({
         click: 'click', built: 'pling', dug: 'thunk', thanks: 'pling', request: 'click', turn: 'knock',
-        riot: 'knock', fail: 'knock', pop: 'pling', miss: null, flesh: 'thunk', taken: 'thunk', end: 'knock', rise: 'rise', sleep: 'click', wake: 'click',
+        riot: 'knock', fail: 'knock', pop: 'pling', miss: null, bang: 'knock', take: 'boom', flesh: 'thunk', taken: 'thunk', end: 'knock', rise: 'rise', sleep: 'click', wake: 'click',
     })[name] || null;
 }
 

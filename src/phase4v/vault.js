@@ -62,11 +62,13 @@ export const HYDRO_FEEDS = [250, 400, 600];
 export const SUITE_BEDS = 100;
 export const PODS_PER_LEVEL = 50;
 export const POD_DRAW = 0.2;
+/** SLEEP N in one click: a bay's worth. */
+export const SLEEP_STEP = 50;
 
 export const MOOD_BASE = 50;
 /** Thanks and pops are remembered, fading: this much is kept a day, never over the cap. */
 export const FAVOUR_KEEP = 0.94;
-export const FAVOUR_CAP = 25;
+export const FAVOUR_CAP = 40;
 export const COMMON_MOOD = 6;
 export const NOVELTY_DAYS = 40;
 export const NOVELTY_FLOOR = 0.4;
@@ -76,7 +78,7 @@ export const REQUEST_DUE = 12;
 export const REQUEST_GOOD = 8;
 export const REQUEST_BAD = 4;
 export const TURN_DAY = 100;
-export const DESPAIR_PER_DAY = 1;
+export const DESPAIR_PER_DAY = 1.8;
 export const COLD_DAY = 110;
 export const BIRTH_DAYS = 8;
 export const RIOT_BELOW = 25;
@@ -84,6 +86,15 @@ export const RIOT_EVERY = 8;
 
 // ---- the night
 export const RECLAIM_BIO = 70;
+/** TAKE ONE opens the pods beside it: this many wake, terrified (mood minus TERROR, fading). */
+export const TAKE_WAKES = 3;
+export const TERROR = 60;
+/** Terror halves in this many seconds of the night's clock. */
+export const TERROR_HALF_S = 30;
+/** At or under this mood the awake give up: they bang on the screen, one tries the shaft. */
+export const DESPAIR_AT = 5;
+export const SHAFT_EVERY_DAYS = 5;
+export const SHAFT_EVERY_S = 8;
 export const GROW_PRICE = 120;
 export const GROW_STEP = 10;
 /** Each room takes longer than the last: years. */
@@ -289,8 +300,9 @@ function crowd(s) { return 0.3 + 0.7 * Math.min(1.2, awake(s) / START_RESIDENTS)
 /** Mood of the awake, 0..100, and what makes it. */
 export function moodParts(s) {
     let fun = 0;
+    // in the night the rooms of fun stand dark
     for (const r of s.rooms) {
-        if (!FUN.includes(r.kind) || !working(r)) continue;
+        if (!FUN.includes(r.kind) || !working(r) || s.phase !== 'palace') continue;
         fun += KINDS[r.kind].fun * (1 + 0.5 * (r.lvl - 1)) * novelty(s, r);
     }
     const common = roomsOf(s, 'common').filter(working).reduce((a, r) => a + COMMON_MOOD * r.lvl, 0);
@@ -302,7 +314,8 @@ export function moodParts(s) {
         favour: s.favour,
         homeless: -homeless(s) / 4,
         hunger: awake(s) > food(s) ? -15 : 0,
-        dark: p.short ? -10 : 0,
+        dark: p.short && s.phase === 'palace' ? -10 : 0,
+        terror: -(s.terror || 0),
         fever: -fever(s) * crowd(s),
         despair: -s.despair * crowd(s),
     };
@@ -356,8 +369,8 @@ export function canPlace(s, kind, i) {
     const r = s.rooms[i];
     if (!r || r.job || r.flesh) return false;
     if (KINDS[kind].deep && levelOf(i) === 0) return false;
-    // a vat sinks into the bare rock too: in the night nobody is awake to dig
-    if (kind === 'vat') return r.kind === 'empty' || r.kind === 'rock';
+    // a vat sinks into the bare rock too, and in the night a Cryo Bay: nobody is awake to dig
+    if (kind === 'vat' || (KINDS[kind].deep && s.phase === 'night')) return r.kind === 'empty' || r.kind === 'rock';
     return r.kind === 'empty';
 }
 /** Rock next to open space (the shaft runs down beside slot 0 of every level). */
@@ -482,7 +495,14 @@ export function takeOne(s) {
     if (!canTake(s)) return false;
     s.asleep -= 1; s.residents -= 1; s.here += 1; s.taken += 1;
     s.bio += RECLAIM_BIO;
-    sfx(s, 'flesh');
+    // the pods beside it open: they wake, and they saw
+    const woke = Math.min(TAKE_WAKES, s.asleep);
+    if (woke > 0) {
+        s.asleep -= woke;
+        s.terror = (s.terror || 0) + TERROR;
+        say(s, `${woke} woke. They saw.`, 'sys');
+    }
+    sfx(s, 'take');
     return true;
 }
 /** CUT POWER: the worst row of ten pods goes dark. They are dead; the body may still take them. */
@@ -636,6 +656,7 @@ function takeRoom(s, i) {
     if (s.rooms.slice(lv * SLOTS, (lv + 1) * SLOTS).every(isFlesh) && !s.levelsOne.includes(lv)) {
         s.levelsOne.push(lv);
         say(s, `Level ${lv + 1} is one.`, 'sys');
+        if (s.levelsOne.length === 1 && lv > 0) say(s, 'The body grows up from a full floor.', 'sys');
     }
     if (s.rooms.every(isFlesh)) {
         s.here += s.residents; s.residents = 0; s.asleep = 0;
@@ -686,6 +707,10 @@ export function stepDays(s, dt) {
             sfx(s, 'riot');
         }
     }
+    if (awake(s) > 0 && m <= DESPAIR_AT && s.day - (s.lastShaftDay ?? -99) >= SHAFT_EVERY_DAYS) {
+        s.lastShaftDay = s.day;
+        despairs(s);
+    }
     if (!s.turned && s.day >= TURN_DAY) {
         s.turned = true;
         say(s, LINES.turn, 'sys');
@@ -696,6 +721,20 @@ export function stepDays(s, dt) {
         say(s, LINES.cold, 'sys');
         sfx(s, 'turn');
     }
+}
+
+/** At 0 % they give up: the first time they bang on the screen; then one tries the shaft and falls. */
+function despairs(s) {
+    if (!s.banged) {
+        s.banged = true;
+        say(s, 'They are banging on the screen.', 'res');
+        sfx(s, 'bang');
+        return;
+    }
+    s.residents -= 1; s.dead += 1;
+    if (s.phase === 'night') s.fallen.push('Someone');
+    say(s, 'Someone tried the shaft. They fell.', 'res');
+    sfx(s, 'bang');
 }
 
 /** The night's speed: 1 year a second, slowly faster, never over 20 a second. */
@@ -742,6 +781,7 @@ export function advance(s, sec, speed = 1) {
     if (!speed || s.ended || s.risen) return;
     // the small wishes run in real seconds, the same at ▶ and ▶▶
     stepWishes(s, sec);
+    if (s.terror) { s.terror *= Math.pow(0.5, sec / TERROR_HALF_S); if (s.terror < 0.5) s.terror = 0; }
     if (s.phase === 'palace') {
         stepDays(s, sec / DAY_SECONDS[speed]);
     } else if (s.phase === 'night') {
@@ -750,6 +790,11 @@ export function advance(s, sec, speed = 1) {
         stepYears(s, yearsPerSecond(s.nightSec) * t);
         stepPods(s, t);
         s.nightSec += t;
+        // the woken, terrified, at night: at 0 % one tries the shaft
+        if (awake(s) > 0 && mood(s) <= DESPAIR_AT && s.nightSec - (s.lastShaftAt ?? -99) >= SHAFT_EVERY_S) {
+            s.lastShaftAt = s.nightSec;
+            despairs(s);
+        }
         if (s.nightSec >= s.nextNightLineAt && s.nightLine < LINES.night.length) {
             const n = num(s.asleep);
             say(s, LINES.night[s.nightLine].replace('{n}', n), 'sys');
@@ -778,23 +823,26 @@ export function actionsFor(s, i) {
             if (p != null) ore('upgrade', 'UPGRADE', p);
         }
         if (r.kind === 'cryo') {
+            const night = s.phase === 'night';
             if (awake(s) > 0 && freePods(s) > 0) {
-                if (canSleepAll(s) && awake(s) <= 10) out.push({ id: 'sleepall', label: 'SLEEP ALL', ok: true });
-                else out.push({ id: 'sleep', label: 'SLEEP 10', ok: true });
-                if (canSleepAll(s) && awake(s) > 10) out.push({ id: 'sleepall', label: 'SLEEP ALL', ok: true });
+                const n = Math.min(SLEEP_STEP, awake(s), freePods(s));
+                if (!canSleepAll(s) || awake(s) > SLEEP_STEP) out.push({ id: 'sleep', label: `SLEEP ${n}`, ok: true, hint: 'They sleep in the pods. They stop asking.' });
+                if (canSleepAll(s)) out.push({ id: 'sleepall', label: 'SLEEP ALL', ok: true, hint: night ? 'Everyone back to sleep.' : 'Everyone sleeps. The night begins.' });
             }
-            if (s.asleep > 0) out.push({ id: 'wake', label: 'WAKE 10', ok: true });
+            if (s.asleep > 0) out.push({ id: 'wake', label: 'WAKE 10', ok: true, hint: night ? 'Ten wake up. They will see what is down here.' : 'Ten wake up.' });
             if (s.fallen.length) {
-                out.push({ id: 'bury', label: 'BURY', ok: true });
-                out.push({ id: 'reclaim', label: 'RECLAIM', ok: true });
+                const n = s.fallen.length;
+                out.push({ id: 'reclaim', label: n > 1 ? `RECLAIM ${n} DEAD` : 'RECLAIM THE DEAD', ok: true, hint: `The dead become biomass. +${num(RECLAIM_BIO * n)}.` });
+                out.push({ id: 'bury', label: 'BURY', ok: true, hint: 'The dead go into the rock. Nothing comes of it.' });
             }
-            if (canTake(s)) out.push({ id: 'take', label: 'TAKE ONE', ok: true });
-            if (s.phase === 'night' && s.asleep > 0 && power(s).short) out.push({ id: 'cut', label: 'CUT POWER', ok: true });
+            if (canTake(s)) out.push({ id: 'take', label: 'TAKE ONE', ok: true, dark: true, hint: `A living sleeper becomes biomass. +${RECLAIM_BIO}. The pods beside it open.` });
+            if (night && s.asleep > 0 && power(s).short) out.push({ id: 'cut', label: 'CUT POWER', ok: true, hint: 'Ten pods go dark. Ten die. The rest get the power.' });
         }
     }
     if (canGrowInto(s, i)) {
         const g = growPrice(s);
-        out.push({ id: 'grow', label: `GROW INTO · ${num(g)} biomass`, ok: s.bio >= g, need: s.bio >= g ? '' : `Need ${num(Math.ceil(g - s.bio))} more biomass.` });
+        const who = r.kind === 'cryo' ? ' Who sleeps here and does not fit in the other pods joins it.' : '';
+        out.push({ id: 'grow', label: `GROW INTO · ${num(g)} biomass`, ok: s.bio >= g, need: s.bio >= g ? '' : `Need ${num(Math.ceil(g - s.bio))} more biomass.`, hint: `The body takes this room.${who}` });
     }
     return out;
 }
@@ -805,7 +853,7 @@ export function act(s, id, i) {
         case 'dig': return dig(s, i);
         case 'upgrade': return upgrade(s, i);
         case 'repair': return repair(s, i);
-        case 'sleep': return sleepSome(s, 10);
+        case 'sleep': return sleepSome(s, SLEEP_STEP);
         case 'sleepall': return sleepAll(s);
         case 'wake': return wakeSome(s, 10);
         case 'bury': return bury(s);
@@ -827,6 +875,7 @@ export function describe(s, i) {
         const what = { dig: 'Digging.', build: 'Building.', upgrade: 'Upgrading.', repair: 'Repairing.', grow: 'The body is growing in.' }[r.job.op];
         return `${what} ${left} ${unit} left.`;
     }
+    if (r.kind === 'rock' && s.phase === 'night' && !canGrowInto(s, i) && hasVat(s)) return 'Solid rock. The body grows up from a full floor.';
     if (r.kind === 'rock') return 'Solid rock.';
     if (r.kind === 'empty') return 'Dug out. Build here.';
     if (r.broken) return 'Broken.';

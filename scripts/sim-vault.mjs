@@ -66,7 +66,7 @@ function palaceMove() {
         if (V.pods(s) < s.residents && tryBuild('cryo')) return true;
         if (V.pods(s) < s.residents && tryUpgrade('cryo')) return true;
         if (V.canSleepAll(s) && (m < 40 || V.awake(s) <= 60)) { V.sleepAll(s); note('SLEEP ALL'); return true; }
-        if (m < 50 && V.freePods(s) > 0 && t - lastActAt > 2) { V.sleepSome(s, 10); note('sleep10'); return true; }
+        if (m < 50 && V.freePods(s) > 0 && t - lastActAt > 2) { V.sleepSome(s, V.SLEEP_STEP); note('sleep50'); return true; }
         return false;
     }
     if (count('mine') < 2 && s.day > 15 && tryBuild('mine')) return true;
@@ -81,6 +81,8 @@ function palaceMove() {
 
 function nightMove() {
     if (s.fallen.length) { V.reclaim(s); note('reclaim'); return true; }
+    // the woken saw: back to sleep (a human takes a second or two to do it)
+    if (V.awake(s) > 0 && t - lastActAt > 1.5 && V.canSleepAll(s)) { V.sleepAll(s); note('sleep all'); return true; }
     const p = V.power(s);
     const vats = count('vat');
     if (s.reclaimed > 0 && (vats < 2 || (p.short && vats < 4)) && s.ore >= 150 && s.bio >= 70) {
