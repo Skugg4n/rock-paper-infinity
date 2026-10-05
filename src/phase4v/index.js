@@ -6,6 +6,7 @@
  */
 import * as V from './vault.js';
 import { popWish, waveKind } from './wishes.js';
+import * as T from './tutorial.js';
 import { createVaultView } from './view.js';
 import { VAULT_CSS, VT } from './style.js';
 import { createVaultSound } from './sound.js';
@@ -49,6 +50,7 @@ export function init() {
     root.innerHTML = `
       <canvas class="v-cut"></canvas>
       <div class="v-panel">
+        <div class="v-goal" data-v="goal"></div>
         <div class="v-crt" data-v="crt"></div>
         <div class="v-log" data-v="log"></div>
         <div class="v-gauge" data-v="g-power"><div class="row"><span class="dymo">Power</span><span class="val" data-v="power"></span></div><div class="v-bar"><i data-v="power-bar"></i></div><div class="sub" data-v="power-sub"></div></div>
@@ -57,10 +59,10 @@ export function init() {
         <div class="v-gauge" data-v="g-mood"><div class="row"><span class="dymo">Mood</span><span class="val" data-v="mood"></span></div><div class="v-bar"><i data-v="mood-bar"></i></div><div class="sub" data-v="mood-sub"></div></div>
         <div class="v-gauge" data-v="g-body" hidden><div class="row"><span class="dymo">Body</span><span class="val" data-v="body"></span></div><div class="v-bar"><i data-v="body-bar" style="background:var(--v-pulse)"></i></div></div>
         <div class="v-check" data-v="checklist" hidden>
-          <div class="c" data-v="chk-heart"><i class="box"></i><span class="dymo">Heart</span></div>
-          <div class="c" data-v="chk-lungs"><i class="box"></i><span class="dymo">Lungs</span></div>
-          <div class="c" data-v="chk-skin"><i class="box"></i><span class="dymo">Skin</span></div>
-          <div class="c" data-v="chk-stomach"><i class="box"></i><span class="dymo">Stomach</span></div>
+          <div class="c" data-v="chk-heart"><i class="box"></i><span class="dymo">Heart</span><span class="fx">power</span></div>
+          <div class="c" data-v="chk-lungs"><i class="box"></i><span class="dymo">Lungs</span><span class="fx">speed</span></div>
+          <div class="c" data-v="chk-skin"><i class="box"></i><span class="dymo">Skin</span><span class="fx">cost</span></div>
+          <div class="c" data-v="chk-stomach"><i class="box"></i><span class="dymo">Stomach</span><span class="fx">biomass</span></div>
           <div class="c in"><span class="dymo">Inside</span><span class="val" data-v="chk-inside"></span></div>
         </div>
         <div class="v-rows">
@@ -80,6 +82,7 @@ export function init() {
         <div class="v-cards" data-v="cards"></div>
       </div>
       <div class="v-info" data-v="info" hidden></div>
+      <div class="v-stop" data-v="stop" hidden><div class="txt" data-v="stop-text"></div><button type="button" class="ok" data-v="stop-ok">OK</button></div>
       <button type="button" class="v-rise" data-v="rise" hidden>RISE</button>`;
     document.body.appendChild(root);
     const $ = (k) => root.querySelector(`[data-v="${k}"]`);
@@ -213,6 +216,19 @@ export function init() {
         }
         // a moment that matters: time runs slow for a few seconds
         root.classList.toggle('is-slow', s.slow > 0);
+        // pass 3: the goal on top; ORE and POWER once they matter; the stop box
+        $('goal').textContent = T.goalLine(s);
+        $('g-ore').hidden = !T.shows(s, 'ore');
+        $('g-power').hidden = !T.shows(s, 'power');
+        const st = s.tut && s.tut.stop;
+        $('stop').hidden = !st;
+        if (st) {
+            const html = st.text.map((l) => `<div>${esc(l)}</div>`).join('');
+            if ($('stop-text').__html !== html) { $('stop-text').innerHTML = html; $('stop-text').__html = html; }
+        }
+        $('g-ore').classList.toggle('focus', !!st && st.focus === 'ore');
+        $('g-power').classList.toggle('focus', !!st && st.focus === 'power');
+        root.classList.toggle('has-stop', !!st);
     }
 
     // ---------------------------------------------------------------- the BUILD bar
@@ -230,7 +246,12 @@ export function init() {
         const want = s.request && s.request.kind && !(s.request.lvl > 1) ? s.request.kind : null;
         const wave = waveKind(s);
         // in the night a card with no place left is not shown (nobody can dig)
-        const parts = V.cards(s).filter((k) => s.phase !== 'night' || placeable(k).size > 0).map((k) => {
+        const shown = V.cards(s).filter((k) => s.phase !== 'night' || placeable(k).size > 0);
+        // pass 3: no BUILD before there is a card in the hand
+        root.querySelector('.v-build').hidden = !shown.length;
+        const st = s.tut && s.tut.stop;
+        const fresh = s.tut && s.tut.newCard;
+        const parts = shown.map((k) => {
             const K = V.KINDS[k];
             const needOre = Math.max(0, Math.ceil(K.price - s.ore));
             const needBio = K.bio ? Math.max(0, Math.ceil(K.bio - s.bio)) : 0;
@@ -240,12 +261,15 @@ export function init() {
             else if (needBio) need = `Need ${V.num(needBio)} more biomass.`;
             else if (!spots) need = K.deep ? 'Dig a place on level 2 or 3.' : 'Dig a place first.';
             const price = K.bio ? `${K.price} ore · ${K.bio} bio` : `${K.price} ore`;
-            return `<button type="button" class="v-card${need ? ' off' : ''}${armed === k ? ' armed' : ''}" data-card="${k}">
+            const focus = st && st.focus === `card:${k}`;
+            return `<button type="button" class="v-card${need ? ' off' : ''}${armed === k ? ' armed' : ''}${focus ? ' focus' : ''}${fresh === k ? ' fresh' : ''}" data-card="${k}">
                 ${want === k || wave === k ? '<span class="mark"></span>' : ''}
                 <span class="top"><i data-lucide="${ICONS[k]}" style="width:15px;height:15px"></i><span class="p">${price}</span></span>
                 <span class="n">${K.name}</span><span class="d">${V.cardLine(k, s)}</span>${need ? `<span class="need">${need}</span>` : ''}</button>`;
         }).join('');
         if (host.__html !== parts) { host.innerHTML = parts; host.__html = parts; icons(); }
+        // the glimt plays once; the card stays
+        if (fresh) timers.push(setTimeout(() => { if (s.tut && s.tut.newCard === fresh) s.tut.newCard = null; }, 1600));
     }
 
     // ---------------------------------------------------------------- the info box
@@ -271,7 +295,7 @@ export function init() {
             <div class="acts">${acts.map((a, k) => {
                 // GROW INTO is one choice: a heading over its organ buttons
                 const head = a.group === 'grow' && (k === 0 || acts[k - 1].group !== 'grow') ? '<div class="grp"><span class="dymo">Grow into</span></div>' : '';
-                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.id === 'grow' ? ' flesh' : a.dark ? ' dark' : a.id === 'reclaim' || a.id === 'bury' ? ' quiet' : '';
+                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.id === 'grow' ? ' flesh' : a.dark ? ` dark${a.small ? ' small' : ''}` : '';
                 return `${head}<button type="button" class="a${cls}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}${a.hint ? `<div class="hint">${esc(a.hint)}</div>` : ''}`;
             }).join('')}</div>`;
         if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
@@ -301,7 +325,15 @@ export function init() {
      * trouble (the dead waiting, the power short); a small tab with an icon = a room complaining.
      */
     function uiState() {
-        const ui = { selected, placeable: armed ? placeable(armed) : null, diggable: new Set(), wanted: new Set(), trouble: new Set(), complain: new Map() };
+        const ui = { selected, placeable: armed ? placeable(armed) : null, diggable: new Set(), wanted: new Set(), trouble: new Set(), complain: new Map(), focus: new Set() };
+        // a stop lights what it is about
+        const st = s.tut && s.tut.stop;
+        if (st) {
+            if (typeof st.focus === 'number' && st.focus >= 0) ui.focus.add(st.focus);
+            if (st.focus === 'meatlab') s.rooms.forEach((r, i) => { if (r.kind === 'meatlab') ui.focus.add(i); });
+            if (st.focus === 'body') s.rooms.forEach((r, i) => { if (V.isFlesh(r)) ui.focus.add(i); });
+            if (st.focus === 'grow') s.rooms.forEach((r, i) => { if (V.canGrowInto(s, i)) ui.focus.add(i); });
+        }
         s.rooms.forEach((r, i) => { if (V.canDig(s, i)) ui.diggable.add(i); });
         // in the night nobody digs: the places are the rock a vat or a Cryo Bay can go into
         if (s.phase === 'night') V.cards(s).forEach((k) => placeable(k).forEach((i) => ui.diggable.add(i)));
@@ -323,10 +355,20 @@ export function init() {
     }
 
     // ---------------------------------------------------------------- input
+    /** While a stop points at one room, only that room (and a place for the card it hands out) answers. */
+    function stopAllows(i) {
+        const st = s.tut && s.tut.stop;
+        if (!st) return true;
+        if (typeof st.focus === 'number' && st.focus >= 0) return i === st.focus;
+        if (typeof st.focus === 'string' && st.focus.startsWith('card:')) return !!armed;
+        return true;
+    }
+    $('stop-ok').addEventListener('click', () => { T.closeStop(s); sound.event('click'); afterAct(); }, { signal });
     canvas.addEventListener('click', (e) => {
         if (performance.now() < introUntil) return;
         const rect = canvas.getBoundingClientRect();
         const bx = e.clientX - rect.left, by = e.clientY - rect.top;
+        if (!stopAllows(view.slotAt(bx, by)) && !view.bubbleAt(s, bx, by)) return;
         // a wish first: it floats over the room
         const wish = view.bubbleAt(s, bx, by);
         if (wish) { popWish(s, wish); afterAct(); return; }
@@ -346,7 +388,7 @@ export function init() {
         if (performance.now() < introUntil) return;
         const rect = canvas.getBoundingClientRect();
         const i = view.slotAt(e.clientX - rect.left, e.clientY - rect.top);
-        if (i >= 0 && V.canDig(s, i) && V.dig(s, i)) { selected = -1; afterAct(); }
+        if (i >= 0 && stopAllows(i) && V.canDig(s, i) && V.dig(s, i)) { selected = -1; afterAct(); }
     }, { signal });
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -360,6 +402,8 @@ export function init() {
         if (e.target.closest('[data-v="build-btn"]')) { buildOpen = !buildOpen; armed = null; afterAct(); return; }
         if (!card || card.classList.contains('off')) return;
         const k = card.dataset.card;
+        const st = s.tut && s.tut.stop;
+        if (st && typeof st.focus === 'string' && st.focus.startsWith('card:') && st.focus !== `card:${k}`) return;
         // a place already picked: build right there
         if (selected >= 0 && V.canPlace(s, k, selected)) { V.build(s, k, selected); armed = null; afterAct(); return; }
         armed = armed === k ? null : k;

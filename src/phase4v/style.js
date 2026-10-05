@@ -74,6 +74,23 @@ body.in-vault #pause-btn { display: none; }
 .v-gauge.flash-down .val { animation: v-down 700ms ease-out; }
 @keyframes v-up { 0% { color: #bdf5c4; transform: translateY(-3px) scale(1.12); } 100% { transform: none; } }
 @keyframes v-down { 0% { color: var(--v-danger); transform: translateY(2px) scale(0.94); } 100% { transform: none; } }
+.v-goal { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 19px; letter-spacing: 0.08em; color: var(--v-amber); line-height: 20px; margin: -2px 0 -4px; text-shadow: 0 0 8px rgba(255,214,120,0.25); }
+.v-stop { position: fixed; left: calc(50% + 140px); top: 18px; transform: translateX(-50%); z-index: 30; max-width: 470px; min-width: 300px; padding: 18px 22px 16px; border-radius: 10px; box-sizing: border-box;
+  background: rgba(7,8,10,0.94); box-shadow: 0 0 0 1.5px var(--v-amber), 0 20px 60px rgba(0,0,0,0.7), 0 0 30px rgba(255,214,120,0.15);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 15px; line-height: 22px; color: var(--v-amber); text-shadow: 0 0 6px rgba(255,214,120,0.35); display: flex; flex-direction: column; gap: 14px; }
+.v-stop[hidden] { display: none; }
+.v-stop .txt > div + div { margin-top: 6px; }
+.v-stop .ok { align-self: flex-end; border: 0; border-radius: 6px; padding: 7px 22px; background: var(--v-amber); color: var(--v-ink); font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 18px; letter-spacing: 0.12em; cursor: pointer; }
+#phase-vault.has-stop canvas.v-cut { filter: brightness(0.8); }
+.v-gauge.focus, .v-card.focus { animation: v-focus 1s ease-in-out infinite; }
+.v-card.focus { box-shadow: 0 0 0 3px var(--v-amber), 0 2px 6px rgba(0,0,0,0.5); }
+@keyframes v-focus { 50% { filter: brightness(1.5); } }
+.v-card.fresh { animation: v-fresh 1.4s ease-out; }
+@keyframes v-fresh { 0% { transform: translateY(30px); opacity: 0; box-shadow: 0 0 0 3px var(--v-paper); } 40% { transform: none; opacity: 1; box-shadow: 0 0 22px 4px rgba(241,239,232,0.7); } 100% { box-shadow: 0 2px 6px rgba(0,0,0,0.5); } }
+.v-check .c .fx { font-size: 11px; color: var(--v-mist); }
+.v-check .c.done .fx { color: var(--v-plate); }
+.v-build[hidden] { display: none; }
+.v-info button.a.small { font-size: 13px; padding: 5px 9px; align-self: flex-start; }
 .v-log { margin-top: -6px; font-size: 11px; line-height: 14px; color: var(--v-mist); opacity: 0.75; min-height: 42px; }
 .v-log > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-req { height: 4px; margin-top: -8px; border-radius: 2px; background: var(--v-ink); overflow: hidden; position: relative; }

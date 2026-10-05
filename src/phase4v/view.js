@@ -14,7 +14,7 @@
  * redrawn when its key changes. Per frame: sky, rain, the rooms' small motifs, pulses, people.
  */
 
-import { LEVELS, SLOTS, levelOf, idxOf, KINDS, awake, isFlesh, isVatRoom, organOf, PODS_PER_LEVEL, SUITE_BEDS, roomsOf } from './vault.js';
+import { LEVELS, SLOTS, levelOf, idxOf, KINDS, awake, isFlesh, isVatRoom, organOf, PODS_PER_LEVEL, SUITE_BEDS, roomsOf, nameOf } from './vault.js';
 import { VT } from './style.js';
 
 /** Seeded noise for the stone and the city, the same every frame. */
@@ -84,7 +84,7 @@ export function createVaultView(canvas, opts = {}) {
         const xs = x0 + Math.max(0, Math.floor((x1 - x0 - span) / 2));
         const shaftX = xs + half * (slotW + gap);
         const ground = Math.round(H * 0.25);
-        const levelH = Math.round(Math.min(110, Math.max(70, (H - ground - 60) / 3.4)));
+        const levelH = Math.round(Math.min(84, Math.max(60, (H - ground - 60) / 3.4)));
         const top0 = Math.round(ground + Math.max(40, levelH * 0.55));
         const levelGap = Math.round(Math.max(18, levelH * 0.28));
         const slots = [];
@@ -106,7 +106,7 @@ export function createVaultView(canvas, opts = {}) {
 
     // ---------------------------------------------------------------- the people
     function syncWalkers(s) {
-        const want = s.phase === 'night' && awake(s) === 0 ? 0 : Math.min(48, Math.ceil(awake(s) / 6));
+        const want = s.phase === 'night' && awake(s) === 0 ? 0 : Math.min(12, Math.ceil(awake(s) / 18));
         while (walkers.length < want) {
             walkers.push({ lv: 0, x: Math.random(), v: (Math.random() < 0.5 ? -1 : 1) * (0.012 + Math.random() * 0.02), pause: 0, seed: Math.random() });
         }
@@ -139,6 +139,7 @@ export function createVaultView(canvas, opts = {}) {
         drawSky(s, t);
         drawWorld(s);
         drawSpine(s, t);
+        drawHoses(s, t);
         for (let i = 0; i < s.rooms.length; i++) drawSlot(s, i, ui, t);
         drawBridges(s, t);
         drawOrgans(s, t);
@@ -188,11 +189,11 @@ export function createVaultView(canvas, opts = {}) {
             const o = offscreen(W, H);
             paintStone(o.g);
             paintLayers(o.g, s);
-            paintCity(o.g, s);
             paintShaft(o.g, s);
             world = { key, c: o.c };
         }
         ctx.drawImage(world.c, 0, 0, W, H);
+        drawCity(s, performance.now() / 1000);
     }
 
     function paintStone(g) {
@@ -240,96 +241,143 @@ export function createVaultView(canvas, opts = {}) {
         }
     }
 
+    // ---------------------------------------------------------------- the city (pass 3, D)
     /**
-     * The city of act II gone to ruin: its rounded tiles stacked as towers, whole at year 0 (a few
-     * warm windows), cracked and tipped at 10, halved at 100, rubble half sunk at 1 000, gone at 10 000.
+     * A real skyline in three depths (lighter behind, darker in front): tall thin towers, blocks, a crane,
+     * a bridge, antennas. It goes out window by window over the first hundred days, an antenna snaps, and in
+     * the night a tower leans and falls in a cloud of dust every 20 to 30 seconds, until only stumps are
+     * left for the sediment to cover. Beautiful and sad: time can be seen passing.
      */
-    function paintCity(g, s) {
-        const stage = cityStage(s);
-        const gy = groundY(s);
-        if (stage >= 4) return;
-        const T = 24, GAP = 4, step = T + GAP + 6;
-        const n = Math.ceil(W / step) + 1;
-        g.save();
-        g.beginPath(); g.rect(0, 0, W, gy); g.clip();
-        // the ruined skyline stands on something: the buildings' dark cores behind their tiles
-        for (let k = 0; k < n; k++) {
-            if (hash(k * 1.7 + 0.3) < 0.28) continue;
-            const x0 = k * step + 3 + (hash(k) - 0.5) * 4;
-            let tall = 1 + Math.floor(hash(k + 9) * 3) + (k % 7 === 3 ? 3 : 0) + (k % 11 === 5 ? 1 : 0);
-            if (stage === 2) tall = Math.max(1, Math.ceil(tall / 2));
-            if (stage === 3) tall = 1;
-            const coreTop = stage === 3 ? gy - T * 0.5 : gy - tall * (T + GAP) + T * 0.35;
-            g.fillStyle = VT.stone;
-            g.beginPath();
-            // a broken top edge, sloping where the floors fell
-            g.moveTo(x0 - 2, gy);
-            g.lineTo(x0 - 2, coreTop + (hash(k * 3) - 0.5) * 6);
-            g.lineTo(x0 + T * 0.5, coreTop + (stage >= 1 ? hash(k * 5) * 8 : 0));
-            g.lineTo(x0 + T + 2, coreTop + (hash(k * 7) - 0.5) * 6);
-            g.lineTo(x0 + T + 2, gy);
-            g.fill();
-            g.fillStyle = rgba(VT.mist, 0.06);
-            g.fillRect(x0 - 2, coreTop, 1, gy - coreTop);
-        }
-        // the ground they stand on: a band of rubble, higher as the city falls
-        const heap = 4 + stage * 3;
-        g.fillStyle = VT.stone;
-        g.beginPath(); g.moveTo(0, gy);
-        for (let x = 0; x <= W + 8; x += 8) g.lineTo(x, gy - heap * (0.4 + hash(x * 0.37) * 0.8));
-        g.lineTo(W, gy); g.closePath(); g.fill();
-        g.fillStyle = rgba(VT.mist, 0.1);
-        for (let x = hash(stage) * 7; x < W; x += 6 + hash(x) * 10) g.fillRect(x, gy - heap * 0.4 - hash(x * 3) * heap * 0.6, 2, 1);
-        for (let k = 0; k < n; k++) {
-            if (hash(k * 1.7 + 0.3) < 0.28) continue;     // a gap between the blocks
-            const x0 = k * step + 3 + (hash(k) - 0.5) * 4;
-            let tall = 1 + Math.floor(hash(k + 9) * 3) + (k % 7 === 3 ? 3 : 0) + (k % 11 === 5 ? 1 : 0);
-            if (stage === 2) tall = Math.max(1, Math.ceil(tall / 2));
-            if (stage === 3) tall = 1;
-            for (let q = 0; q < tall; q++) {
-                const top = q === tall - 1;
-                if (stage === 1 && top && hash(k * 5) < 0.3 && tall > 1) continue;
-                const x = x0;
-                let y = gy - (q + 1) * (T + GAP), rot = 0;
-                if (stage >= 1 && top) rot = (hash(k * 3 + q) - 0.5) * (stage === 1 ? 0.35 : 0.6);
-                if (stage === 3) { y = gy - T * (0.35 + hash(k) * 0.4); rot = (hash(k * 7) - 0.5) * 1.2; }
-                tile(g, x, y, T, rot, stage, k * 10 + q);
+    let cityModel = null;     // { key, buildings, bridge }
+    let cityCache = null;     // { key, c }
+    const CITY_COLS = ['#2a313b', '#151a21', VT.ink];
+    function makeCity() {
+        const R = rng(4.2);
+        const gy = geo.ground;
+        const list = [];
+        const maxH = [gy * 0.78, gy * 0.6, gy * 0.42];
+        for (let layer = 0; layer < 3; layer++) {
+            let x = -20 + R() * 20;
+            while (x < W + 20) {
+                const tower = R() < 0.35;
+                const w = tower ? 7 + R() * 9 : 14 + R() * 26;
+                const h = maxH[layer] * (tower ? 0.6 + R() * 0.4 : 0.22 + R() * 0.45);
+                const b = { x, w, h, layer, tower, seed: R(), antenna: tower && R() < 0.5, crane: false };
+                list.push(b);
+                x += w + (layer === 2 ? 4 + R() * 26 : 1 + R() * 8);
             }
-            // fallen tiles at the foot from stage 2
-            if (stage === 2 && hash(k * 19) < 0.5) tile(g, x0 + step * 0.45, gy - T * 0.55, T, 0.9 + hash(k) * 0.5, 3, k * 10 + 9);
         }
-        g.restore();
-        // the ground line
-        g.fillStyle = rgba(VT.mist, 0.22);
-        g.fillRect(0, gy, W, 1);
+        // a crane on a mid block, a bridge between two mid towers
+        const mids = list.filter((b) => b.layer === 1 && !b.tower);
+        if (mids.length) mids[Math.floor(mids.length * 0.3)].crane = true;
+        const tw = list.filter((b) => b.layer === 1 && b.tower);
+        const bridge = tw.length > 3 ? { a: tw[1], b: tw[3], y: 0.55 } : null;
+        // the order they fall in: the tall and the front first, a little at random
+        const fall = [...list.filter((b) => b.layer > 0).sort((p, q) => p.seed - q.seed), ...list.filter((b) => b.layer === 0).sort((p, q) => p.seed - q.seed)];
+        fall.forEach((b, k) => { b.fallAt = CITY_FALL_FIRST + k * (CITY_FALL_EVERY + (b.seed - 0.5) * 10); });
+        return { key: `${W}x${H}`, buildings: list, bridge };
     }
-    function tile(g, x, y, T, rot, stage, seed) {
+    const CITY_FALL_FIRST = 20, CITY_FALL_EVERY = 25, CITY_FALL_S = 3.5;
+    /** 0 standing, 0..1 falling, 1 down (a stump), by the night's clock. */
+    function fallOf(s, b) {
+        if (s.phase === 'palace' || b.fallAt == null) return 0;
+        return Math.max(0, Math.min(1, ((s.nightSec || 0) - b.fallAt) / CITY_FALL_S));
+    }
+    /** Lit windows: each goes out on its own day in the first hundred; none in the night. */
+    const windowLit = (s, b, k) => s.phase === 'palace' && s.day < 1 + hash(b.seed * 977 + k * 13.1) * 99;
+    function paintBuilding(g, s, b, gy, fall, t) {
+        const col = CITY_COLS[b.layer];
+        const h = b.h * (fall >= 1 ? 0.12 + b.seed * 0.1 : 1);
         g.save();
-        g.translate(x + T / 2, y + T / 2);
-        g.rotate(rot);
-        const fill = stage >= 3 ? '#151a21' : VT.steel2;
-        g.fillStyle = fill;
-        g.strokeStyle = stage >= 3 ? rgba(VT.mist, 0.1) : rgba(VT.mist, 0.16);
-        g.lineWidth = 1;
-        g.beginPath(); g.roundRect(-T / 2, -T / 2, T, T, 5); g.fill(); g.stroke();
-        // the act II building glyph: a block with windows
-        const ink = stage >= 2 ? rgba(VT.mist, 0.08) : rgba(VT.mist, 0.18);
-        g.strokeStyle = ink;
-        g.beginPath(); g.roundRect(-T * 0.22, -T * 0.26, T * 0.44, T * 0.52, 2); g.stroke();
-        for (let wy = 0; wy < 3; wy++) {
-            for (let wx = 0; wx < 2; wx++) {
-                const px = -T * 0.12 + wx * T * 0.16, py = -T * 0.17 + wy * T * 0.13;
-                const lit = stage === 0 && hash(seed * 7 + wy * 3 + wx) > 0.72;
-                g.fillStyle = lit ? rgba(VT.lamp, 0.75) : ink;
-                g.fillRect(px - 1.5, py - 1.5, 3, 3);
+        if (fall > 0 && fall < 1) {
+            // it leans over its foot and sinks as it goes
+            const dir = b.seed < 0.5 ? -1 : 1;
+            const e = fall * fall;
+            g.translate(b.x + (dir > 0 ? b.w : 0), gy + e * b.h * 0.4);
+            g.rotate(dir * e * 1.3);
+            g.translate(-(b.x + (dir > 0 ? b.w : 0)), -gy);
+        }
+        g.fillStyle = col;
+        g.beginPath();
+        if (fall >= 1) {
+            // a stump with a broken top
+            g.moveTo(b.x, gy); g.lineTo(b.x, gy - h); g.lineTo(b.x + b.w * 0.4, gy - h * 0.6); g.lineTo(b.x + b.w * 0.7, gy - h * 1.1); g.lineTo(b.x + b.w, gy - h * 0.7); g.lineTo(b.x + b.w, gy);
+        } else {
+            g.rect(b.x, gy - h, b.w, h);
+            if (b.tower) { g.rect(b.x + b.w * 0.25, gy - h - 6, b.w * 0.5, 6); }
+        }
+        g.fill();
+        if (fall < 1) {
+            // antenna (snapped after day 60, if it is the one)
+            if (b.antenna) {
+                const snapped = s.phase !== 'palace' || (b.seed < 0.25 && s.day > 60);
+                g.strokeStyle = col; g.lineWidth = 1;
+                g.beginPath(); g.moveTo(b.x + b.w / 2, gy - h - 6);
+                if (snapped) { g.lineTo(b.x + b.w / 2, gy - h - 12); g.lineTo(b.x + b.w / 2 + 6, gy - h - 9); }
+                else g.lineTo(b.x + b.w / 2, gy - h - 22);
+                g.stroke();
+                if (!snapped && s.phase === 'palace' && Math.sin((t || 0) * 2 + b.seed * 9) > 0.6) { g.fillStyle = rgba(VT.danger, 0.8); g.fillRect(b.x + b.w / 2 - 1, gy - h - 23, 2, 2); }
+            }
+            // the crane: a mast, a jib, a hook
+            if (b.crane) {
+                g.strokeStyle = col; g.lineWidth = 1.5;
+                const mx = b.x + b.w * 0.7, top = gy - h - 40;
+                g.beginPath(); g.moveTo(mx, gy - h); g.lineTo(mx, top); g.moveTo(mx - 14, top + 3); g.lineTo(mx + 34, top + 3); g.moveTo(mx + 26, top + 3); g.lineTo(mx + 26, top + 18 + (s.phase === 'palace' ? 0 : 10)); g.stroke();
+                g.lineWidth = 1;
+            }
+            // windows, mid and front: they go out one by one
+            if (b.layer > 0) {
+                let k = 0;
+                for (let wy = gy - h + 4; wy < gy - 4; wy += 6) {
+                    for (let wx = b.x + 2; wx < b.x + b.w - 3; wx += 4.5) {
+                        if (windowLit(s, b, k++)) { g.fillStyle = rgba(VT.lamp, b.layer === 2 ? 0.75 : 0.45); g.fillRect(wx, wy, 1.6, 2); }
+                    }
+                }
             }
         }
-        if (stage >= 1) {
-            // a crack across
-            g.strokeStyle = 'rgba(0,0,0,0.7)';
-            g.beginPath(); g.moveTo(-T / 2, -T * 0.1 + (hash(seed) - 0.5) * 10); g.lineTo(-T * 0.05, T * 0.05); g.lineTo(T / 2, (hash(seed + 1) - 0.5) * 16); g.stroke();
-        }
         g.restore();
+    }
+    function drawCity(s, t) {
+        if (!cityModel || cityModel.key !== `${W}x${H}`) cityModel = makeCity();
+        const gy = groundY(s);
+        const night = s.phase !== 'palace';
+        const falling = cityModel.buildings.filter((b) => { const f = fallOf(s, b); return f > 0 && f < 1; });
+        const downs = cityModel.buildings.filter((b) => fallOf(s, b) >= 1).length;
+        const key = `${W}x${H}|${Math.round(gy)}|${night ? 'n' : Math.floor(s.day)}|${downs}|${falling.map((b) => b.x).join(',')}`;
+        if (!cityCache || cityCache.key !== key) {
+            const o = offscreen(W, H);
+            o.g.save(); o.g.beginPath(); o.g.rect(0, 0, W, gy); o.g.clip();
+            for (const b of cityModel.buildings) if (!falling.includes(b)) paintBuilding(o.g, s, b, gy, fallOf(s, b), 0);
+            // the bridge between two towers, broken in the night
+            const br = cityModel.bridge;
+            if (br && fallOf(s, br.a) < 1 && fallOf(s, br.b) < 1) {
+                const y = gy - Math.min(br.a.h, br.b.h) * br.y;
+                o.g.strokeStyle = CITY_COLS[1]; o.g.lineWidth = 2;
+                const x1 = br.a.x + br.a.w, x2 = br.b.x;
+                o.g.beginPath(); o.g.moveTo(x1, y); o.g.lineTo(night ? x1 + (x2 - x1) * 0.4 : x2, y); o.g.stroke();
+                o.g.lineWidth = 1;
+                o.g.beginPath();
+                for (let x = x1; x < (night ? x1 + (x2 - x1) * 0.4 : x2); x += 6) { o.g.moveTo(x, y); o.g.lineTo(x + 3, y + 5); o.g.lineTo(x + 6, y); }
+                o.g.stroke();
+            }
+            o.g.restore();
+            o.g.fillStyle = rgba(VT.mist, 0.22); o.g.fillRect(0, gy, W, 1);
+            cityCache = { key, c: o.c };
+        }
+        ctx.drawImage(cityCache.c, 0, 0, W, H);
+        // what is falling now, and its dust
+        if (!falling.length) return;
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, gy + 2); ctx.clip();
+        for (const b of falling) {
+            const f = fallOf(s, b);
+            paintBuilding(ctx, s, b, gy, f, t);
+            for (let k = 0; k < 7; k++) {
+                const r = 6 + f * 26 * (0.6 + hash(k + b.seed) * 0.8);
+                ctx.fillStyle = rgba(VT.mist, 0.18 * (1 - f));
+                ctx.beginPath(); ctx.arc(b.x + b.w / 2 + (k - 3) * 6 * f * 2, gy - r * 0.5, r, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        ctx.restore();
     }
 
     function paintShaft(g, s) {
@@ -415,6 +463,7 @@ export function createVaultView(canvas, opts = {}) {
             if (can) glow(x, y, w, h, t);
             if (wanted && !sel) outline(x, y, w, h, rgba(VT.amber, 0.85), true, t);
             if (sel) outline(x, y, w, h, VT.paper);
+            if (ui.focus && ui.focus.has(i)) focusRing(x, y, w, h, t);
             return;
         }
         const building = r.job && r.job.op === 'build';
@@ -455,8 +504,48 @@ export function createVaultView(canvas, opts = {}) {
             ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
             ctx.lineWidth = 1;
         }
+        // the name on the frame: every room, the organs and vats of the body; plain tissue has none
+        if (r.kind !== 'empty' && (!taken || isVatRoom(r) || (organOf(r) && organOf(r) !== 'tissue')) && !(r.kind === 'rock' && !taken)) nameLabel(nameOf(s, i).toUpperCase(), x, y);
         if (ui.complain && ui.complain.has(i)) complainTab(x, y, ui.complain.get(i), t);
         if (sel) outline(x, y, w, h, VT.paper);
+        if (ui.focus && ui.focus.has(i)) focusRing(x, y, w, h, t);
+    }
+    /**
+     * Pass 3, E1: the pods are fed by the meat lab. A hose runs from the lab to each Cryo Bay through the
+     * rock under the floors, with red going along it while anyone sleeps.
+     */
+    function drawHoses(s, t) {
+        const lab = s.rooms.findIndex((r) => r.kind === 'meatlab');
+        if (lab < 0) return;
+        const a = geo.slots[lab];
+        s.rooms.forEach((r, i) => {
+            if (r.kind !== 'cryo' || r.flesh === 1) return;
+            const b = geo.slots[i];
+            const x1 = a.x + a.w * 0.5, y1 = a.y + a.h + 2, x2 = b.x + b.w * 0.5, y2 = b.y + b.h + 2;
+            const my = Math.max(y1, y2) + geo.levelGap * 0.55;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#1d2328'; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(x1, y1 - 6); ctx.lineTo(x1, my); ctx.lineTo(x2, my); ctx.lineTo(x2, y2 - 6); ctx.stroke();
+            ctx.strokeStyle = rgba(VT.mist, 0.25); ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(x1 - 2, y1 - 6); ctx.lineTo(x1 - 2, my - 2); ctx.lineTo(x2 - 2, my - 2); ctx.lineTo(x2 - 2, y2 - 6); ctx.stroke();
+            if (s.asleep > 0) {
+                const len = Math.abs(my - y1) + Math.abs(x2 - x1) + Math.abs(my - y2);
+                for (let k = 0; k < 3; k++) {
+                    let d = (((t * 40) + k * len / 3) % len);
+                    let px, py;
+                    if (d < my - y1) { px = x1; py = y1 + d; } else if ((d -= my - y1) < Math.abs(x2 - x1)) { px = x1 + Math.sign(x2 - x1) * d; py = my; } else { d -= Math.abs(x2 - x1); px = x2; py = my - d; }
+                    ctx.fillStyle = rgba(VT.pulse, 0.9); ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+                }
+            }
+        });
+        ctx.lineWidth = 1;
+    }
+    /** A stop points here: an amber frame that breathes. */
+    function focusRing(x, y, w, h, t) {
+        const a = 0.55 + 0.45 * Math.sin(t * 5);
+        ctx.strokeStyle = rgba(VT.amber, a); ctx.lineWidth = 3;
+        ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
+        ctx.lineWidth = 1;
     }
     /** A room complaining: a small tab on its top-left corner with an icon. */
     function complainTab(x, y, kind, t) {
@@ -543,118 +632,226 @@ export function createVaultView(canvas, opts = {}) {
         ctx.drawImage(c.c, x, y, w, h);
     }
 
+    // ---------------------------------------------------------------- the people (pass 3, G2)
+    /** Clothes: the quiet tokens, one per person, seeded. */
+    const CLOTHES = [VT.mist, VT.plate, VT.slate, '#5a6574'];
     /**
-     * Each room its own simple, strong motif, drawn in the room's light (plate and mist), with the
-     * accent only where it means something: cold for sleep, life for plants, lamp for lit windows.
+     * A resident, about 10 px tall, standing on `floor` at x. Poses: stand, walk, sit, pick, lift, run, tend.
+     * The head is paper, the body their clothes; an apron for the meat lab.
+     */
+    function person(x, floor, pose, t, seed, apron = false) {
+        const ph = t * 6 + seed * 7;
+        const col = CLOTHES[Math.floor(hash(seed) * CLOTHES.length)];
+        const sit = pose === 'sit';
+        const hipY = floor - (sit ? 3 : 4.5);
+        const top = hipY - 4.5;
+        ctx.lineCap = 'round';
+        // legs
+        ctx.strokeStyle = VT.slate; ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        if (sit) { ctx.moveTo(x, hipY); ctx.lineTo(x + 3, hipY); ctx.lineTo(x + 3, floor); }
+        else {
+            const sw = pose === 'walk' ? Math.sin(ph) * 1.6 : pose === 'run' ? Math.sin(ph * 2) * 2.2 : 0;
+            ctx.moveTo(x, hipY); ctx.lineTo(x - 1 + sw, floor); ctx.moveTo(x, hipY); ctx.lineTo(x + 1 - sw, floor);
+        }
+        ctx.stroke();
+        // body
+        ctx.fillStyle = apron ? VT.plate : col;
+        ctx.beginPath(); ctx.roundRect(x - 1.8, top, 3.6, 5, 1.2); ctx.fill();
+        // arms
+        ctx.strokeStyle = apron ? VT.plate : col; ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        if (pose === 'pick') {
+            const a = -1.2 + Math.max(0, Math.sin(ph * 0.8)) * 1.6;
+            const hx = x + Math.cos(a) * 5, hy = top + 1 + Math.sin(a) * 5;
+            ctx.moveTo(x, top + 1); ctx.lineTo(hx, hy); ctx.stroke();
+            // the pick
+            ctx.strokeStyle = VT.mist; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 2.5, hy + 2.5); ctx.moveTo(hx - 1.5, hy + 1.5); ctx.lineTo(hx + 2, hy - 1.5); ctx.stroke();
+        } else if (pose === 'lift') {
+            const up = Math.max(0, Math.sin(ph * 0.5)) * 3;
+            ctx.moveTo(x - 1.5, top + 1); ctx.lineTo(x - 3, top - 1 - up); ctx.moveTo(x + 1.5, top + 1); ctx.lineTo(x + 3, top - 1 - up); ctx.stroke();
+            ctx.fillStyle = VT.slate; ctx.fillRect(x - 6, top - 2 - up, 12, 1.4); ctx.fillRect(x - 6.5, top - 3.5 - up, 2, 4); ctx.fillRect(x + 4.5, top - 3.5 - up, 2, 4);
+        } else if (pose === 'tend') {
+            ctx.moveTo(x, top + 1); ctx.lineTo(x + 4, top + 1 + Math.sin(ph * 0.4)); ctx.stroke();
+        } else {
+            const sw = pose === 'walk' || pose === 'run' ? Math.sin(ph) * 1.2 : 0;
+            ctx.moveTo(x - 1.5, top + 1); ctx.lineTo(x - 2 - sw, top + 4); ctx.moveTo(x + 1.5, top + 1); ctx.lineTo(x + 2 + sw, top + 4); ctx.stroke();
+        }
+        // head
+        ctx.fillStyle = VT.paper;
+        ctx.beginPath(); ctx.arc(x, top - 2.2, 1.9, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 1;
+    }
+    /** How many people a room shows: none when nobody is awake (asleep or the night), fewer as fewer are awake. */
+    function crowdIn(s, n) {
+        const a = awake(s);
+        if (!a) return 0;
+        return Math.max(1, Math.round(n * Math.min(1, a / 120)));
+    }
+
+    /**
+     * Each room in the people's scale (pass 3, G2), a doll's house: furniture and machines sized to the
+     * residents, who sit, walk and use things. Plate and mist for the things, colour only where it means
+     * something (lamp, life, cold). Asleep or dead: no people.
      */
     function art(s, r, i, x, y, w, h, t, dark) {
         const floor = y + h - 2;
         const P = VT.plate, M = VT.mist, S = VT.slate;
+        const n = dark ? 0 : crowdIn(s, 4);
         ctx.globalAlpha = dark ? 0.25 : 1;
         ctx.lineCap = 'round';
         switch (r.kind) {
             case 'common': {
-                // two sofas, a low table, a standing lamp
-                ctx.fillStyle = S;
-                ctx.beginPath(); ctx.roundRect(x + 8, floor - 15, w * 0.3, 11, 3); ctx.fill();
-                ctx.beginPath(); ctx.roundRect(x + w - 8 - w * 0.3, floor - 15, w * 0.3, 11, 3); ctx.fill();
-                ctx.fillStyle = M;
-                ctx.fillRect(x + 8, floor - 21, 5, 17); ctx.fillRect(x + w - 13, floor - 21, 5, 17);
-                ctx.fillStyle = P; ctx.fillRect(x + w / 2 - 8, floor - 12, 16, 3); ctx.fillRect(x + w / 2 - 1, floor - 9, 2, 7);
-                ctx.fillStyle = rgba(VT.lamp, 0.9); ctx.fillRect(x + w / 2 - 3, y + h * 0.3, 6, 4);
-                ctx.fillStyle = rgba(VT.lamp, 0.1);
-                ctx.beginPath(); ctx.moveTo(x + w / 2 - 3, y + h * 0.3 + 4); ctx.lineTo(x + w / 2 - 22, floor - 3); ctx.lineTo(x + w / 2 + 22, floor - 3); ctx.lineTo(x + w / 2 + 3, y + h * 0.3 + 4); ctx.fill();
+                // two sofas with people on them, a low table, a lamp, someone walking by
+                const sw = Math.min(26, w * 0.26);
+                for (const [k, sx] of [[0, x + 8], [1, x + w - 8 - sw]]) {
+                    ctx.fillStyle = S; ctx.beginPath(); ctx.roundRect(sx, floor - 6, sw, 6, 2); ctx.fill();
+                    ctx.fillRect(sx + (k ? sw - 3 : 0), floor - 10, 3, 6);
+                    ctx.fillStyle = M; ctx.fillRect(sx, floor - 6, sw, 1);
+                    for (let q = 0; q < Math.min(2, n); q++) person(sx + 6 + q * 9, floor - 4, 'sit', t, i * 10 + k * 3 + q);
+                }
+                ctx.fillStyle = P; ctx.fillRect(x + w / 2 - 6, floor - 5, 12, 2); ctx.fillRect(x + w / 2 - 1, floor - 3, 2, 3);
+                ctx.fillStyle = M; ctx.fillRect(x + w / 2 + 14, floor - 16, 1, 16);
+                ctx.fillStyle = rgba(VT.lamp, 0.9); ctx.beginPath(); ctx.moveTo(x + w / 2 + 11, floor - 16); ctx.lineTo(x + w / 2 + 18, floor - 16); ctx.lineTo(x + w / 2 + 16, floor - 20); ctx.lineTo(x + w / 2 + 13, floor - 20); ctx.fill();
+                if (n > 2) person(x + 12 + ((t * 6 + i * 13) % (w - 24)), floor, 'walk', t, i * 10 + 7);
                 break;
             }
-            case 'engine': machine(x, y, w, h, t, r); break;
+            case 'engine': {
+                // the machine, sized to a room, and its operator at a console
+                ctx.save(); ctx.translate(x + w * 0.55, floor); ctx.scale(0.72, 0.72); ctx.translate(-(x + w * 0.55), -floor);
+                machine(x + w * 0.1, y, w * 0.9, h, t, r);
+                ctx.restore();
+                ctx.fillStyle = S; ctx.fillRect(x + 6, floor - 9, 9, 9);
+                ctx.fillStyle = (Math.floor(t * 3) % 2) ? rgba(VT.cold, 0.9) : rgba(VT.cold, 0.4); ctx.fillRect(x + 8, floor - 7, 5, 3);
+                if (n) person(x + 19, floor, 'tend', t, i * 10 + 1);
+                break;
+            }
             case 'hydro': {
-                for (let row = 0; row < 3; row++) {
-                    const ry = y + 12 + row * (h - 18) / 3;
-                    ctx.fillStyle = rgba(VT.plate, 0.35); ctx.fillRect(x + 6, ry - 2, w - 12, 1);       // the grow light
-                    ctx.fillStyle = S; ctx.fillRect(x + 5, ry + 9, w - 10, 3);                          // the tray
-                    ctx.fillStyle = VT.life;
-                    for (let px = x + 9; px < x + w - 8; px += 7) { ctx.beginPath(); ctx.arc(px, ry + 6 + Math.sin(t + px) * 0.5, 2.6, 0, Math.PI * 2); ctx.fill(); }
+                // racks of green, a figure tending them
+                const racks = 3, rw = (w - 20) / racks;
+                for (let k = 0; k < racks; k++) {
+                    const rx = x + 6 + k * (rw + 4);
+                    ctx.fillStyle = S; ctx.fillRect(rx, floor - 17, 1.5, 17); ctx.fillRect(rx + rw - 1.5, floor - 17, 1.5, 17);
+                    for (let sh = 0; sh < 3; sh++) {
+                        const sy = floor - 3 - sh * 6;
+                        ctx.fillStyle = S; ctx.fillRect(rx, sy, rw, 1.5);
+                        ctx.fillStyle = VT.life;
+                        for (let px = rx + 3; px < rx + rw - 2; px += 4) { ctx.beginPath(); ctx.arc(px, sy - 1.6, 1.6 + Math.sin(t + px) * 0.2, 0, Math.PI * 2); ctx.fill(); }
+                    }
+                    ctx.fillStyle = rgba(VT.plate, 0.35); ctx.fillRect(rx, floor - 21, rw, 1);
                 }
+                if (n) person(x + 10 + ((Math.sin(t * 0.3 + i) * 0.5 + 0.5) * (w - 24)), floor, 'tend', t, i * 10 + 2);
                 break;
             }
             case 'suites': suiteWindows(s, r, i, x, y, w, h, t, false); break;
             case 'cinema': {
+                // a screen, and rows of heads before it
                 const f = 0.55 + 0.4 * Math.abs(Math.sin(t * 7) * Math.sin(t * 3.3));
-                ctx.fillStyle = rgba(VT.plate, f); ctx.fillRect(x + 8, y + 10, w - 16, h * 0.4);
-                ctx.fillStyle = rgba(VT.plate, 0.06 * f);
-                ctx.beginPath(); ctx.moveTo(x + 8, y + 10 + h * 0.4); ctx.lineTo(x + w - 8, y + 10 + h * 0.4); ctx.lineTo(x + w, floor); ctx.lineTo(x, floor); ctx.fill();
-                ctx.fillStyle = S;
-                for (let row = 0; row < 2; row++) for (let px = x + 9; px < x + w - 9; px += 8) ctx.fillRect(px, floor - 17 + row * 8, 6, 5);
+                ctx.fillStyle = rgba(VT.plate, f); ctx.fillRect(x + 10, y + 10, w - 20, h * 0.32);
+                ctx.fillStyle = rgba(VT.plate, 0.05 * f);
+                ctx.beginPath(); ctx.moveTo(x + 10, y + 10 + h * 0.32); ctx.lineTo(x + w - 10, y + 10 + h * 0.32); ctx.lineTo(x + w - 4, floor); ctx.lineTo(x + 4, floor); ctx.fill();
+                for (let row = 0; row < 2; row++) {
+                    const ry = floor - 3 - row * 7;
+                    ctx.fillStyle = S; ctx.fillRect(x + 6, ry, w - 12, 3);
+                    const seats = Math.floor((w - 16) / 8);
+                    for (let k = 0; k < seats; k++) {
+                        if (hash(i * 31 + row * 7 + k) > (n / 4) * 0.9) continue;
+                        ctx.fillStyle = VT.paper; ctx.beginPath(); ctx.arc(x + 10 + k * 8, ry - 2.5, 1.9, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
                 break;
             }
             case 'gym': {
-                ctx.fillStyle = M;
-                ctx.fillRect(x + 8, floor - 10, w * 0.32, 3);
-                ctx.fillRect(x + 8 + w * 0.12, floor - 22, 3, 12);
-                ctx.fillStyle = S; ctx.beginPath(); ctx.arc(x + 12, floor - 26, 5, 0, Math.PI * 2); ctx.arc(x + 12 + w * 0.22, floor - 26, 5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = M; ctx.fillRect(x + 12, floor - 27, w * 0.22, 2);
-                if (r.lvl >= 2) { ctx.fillStyle = rgba(VT.cold, 0.7); ctx.fillRect(x + w * 0.52, floor - 10, w * 0.42, 7); }
+                // a treadmill with a runner, a bench with a lifter; level 2 a pool, level 3 the steam of a spa
+                ctx.fillStyle = S; ctx.fillRect(x + 6, floor - 3, 22, 3); ctx.fillRect(x + 25, floor - 13, 2, 10); ctx.fillRect(x + 21, floor - 13, 6, 1.5);
+                if (n) person(x + 15, floor - 3, 'run', t, i * 10 + 3);
+                ctx.fillStyle = S; ctx.fillRect(x + 36, floor - 5, 14, 2.5); ctx.fillRect(x + 38, floor - 3, 1.5, 3); ctx.fillRect(x + 47, floor - 3, 1.5, 3);
+                if (n > 1) person(x + 43, floor - 5, 'lift', t, i * 10 + 4);
+                if (r.lvl >= 2) {
+                    const px = x + w * 0.62, pw = w * 0.32;
+                    ctx.fillStyle = rgba(VT.cold, 0.65); ctx.fillRect(px, floor - 5, pw, 5);
+                    ctx.fillStyle = M; ctx.fillRect(px, floor - 5, pw, 1);
+                    if (n > 2) { ctx.fillStyle = VT.paper; ctx.beginPath(); ctx.arc(px + pw * (0.3 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.7 + i))), floor - 5, 1.9, 0, Math.PI * 2); ctx.fill(); }
+                }
                 if (r.lvl >= 3) {
                     ctx.strokeStyle = rgba(VT.plate, 0.3);
-                    for (let k = 0; k < 3; k++) { const sx = x + w * 0.6 + k * 8; ctx.beginPath(); ctx.moveTo(sx, floor - 14); ctx.quadraticCurveTo(sx + 4 * Math.sin(t * 2 + k), floor - 24, sx, floor - 34); ctx.stroke(); }
+                    for (let k = 0; k < 3; k++) { const sx = x + w * 0.68 + k * 6; ctx.beginPath(); ctx.moveTo(sx, floor - 7); ctx.quadraticCurveTo(sx + 3 * Math.sin(t * 2 + k), floor - 14, sx, floor - 21); ctx.stroke(); }
                 }
                 break;
             }
             case 'bar': {
-                ctx.fillStyle = S; ctx.fillRect(x + 5, floor - 15, w - 10, 11);
-                ctx.fillStyle = M; ctx.fillRect(x + 5, floor - 15, w - 10, 2);
-                ctx.fillStyle = S; ctx.fillRect(x + 5, y + 16, w - 10, 2);
-                for (let px = x + 9, n = 0; px < x + w - 8; px += 6, n++) {
-                    const glint = Math.sin(t * 2 + n * 1.7) > 0.92;
-                    ctx.fillStyle = glint ? VT.paper : rgba(VT.plate, 0.35 + (n % 3) * 0.15);
-                    ctx.fillRect(px, y + 7, 3, 9);
+                // a back shelf of bottles, the barkeeper, the counter, stools with people on them
+                ctx.fillStyle = S; ctx.fillRect(x + 6, y + h * 0.3, w - 12, 1.5);
+                for (let px = x + 9, k = 0; px < x + w - 8; px += 5, k++) {
+                    const glint = Math.sin(t * 2 + k * 1.7) > 0.92;
+                    ctx.fillStyle = glint ? VT.paper : rgba(VT.plate, 0.35 + (k % 3) * 0.15);
+                    ctx.fillRect(px, y + h * 0.3 - 6, 2, 6);
+                }
+                if (n) person(x + w * 0.5, floor - 8, 'tend', t, i * 10 + 5);
+                ctx.fillStyle = S; ctx.fillRect(x + 6, floor - 9, w - 12, 9);
+                ctx.fillStyle = M; ctx.fillRect(x + 6, floor - 9, w - 12, 1.5);
+                for (let k = 0; k < 4; k++) {
+                    const sx = x + 14 + k * ((w - 28) / 3);
+                    if (k < n - 1) person(sx - 2, floor - 7, 'sit', t, i * 10 + 6 + k);
                 }
                 break;
             }
             case 'garden': {
-                ctx.fillStyle = rgba(VT.lamp, 0.95); ctx.beginPath(); ctx.arc(x + w / 2, y + 10, 5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = rgba(VT.lamp, 0.1); ctx.beginPath(); ctx.moveTo(x + w / 2, y + 10); ctx.lineTo(x, floor); ctx.lineTo(x + w, floor); ctx.fill();
+                // a sun lamp, trees a little taller than people, people under them
+                ctx.fillStyle = rgba(VT.lamp, 0.95); ctx.beginPath(); ctx.arc(x + w / 2, y + 9, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = rgba(VT.lamp, 0.08); ctx.beginPath(); ctx.moveTo(x + w / 2, y + 9); ctx.lineTo(x + 2, floor); ctx.lineTo(x + w - 2, floor); ctx.fill();
                 for (let k = 0; k < 3; k++) {
-                    const tx = x + w * (0.22 + k * 0.28);
-                    ctx.fillStyle = S; ctx.fillRect(tx - 1.5, floor - 14, 3, 13);
-                    ctx.fillStyle = r.lvl >= 2 ? VT.life : rgba(VT.life, 0.75);
-                    ctx.beginPath(); ctx.arc(tx, floor - 18, 8 + Math.sin(t + k) * 0.6, 0, Math.PI * 2); ctx.fill();
+                    const tx = x + w * (0.2 + k * 0.3);
+                    ctx.fillStyle = S; ctx.fillRect(tx - 1, floor - 11, 2, 11);
+                    ctx.fillStyle = r.lvl >= 2 ? VT.life : rgba(VT.life, 0.8);
+                    ctx.beginPath(); ctx.arc(tx, floor - 15, 6 + Math.sin(t + k) * 0.4, 0, Math.PI * 2); ctx.fill();
                 }
+                ctx.fillStyle = rgba(VT.life, 0.5); ctx.fillRect(x + 4, floor - 1.5, w - 8, 1.5);
+                if (n) person(x + w * 0.35, floor, 'stand', t, i * 10 + 8);
+                if (n > 1) person(x + w * 0.62, floor, 'sit', t, i * 10 + 9);
+                if (n > 2) person(x + 10 + ((t * 4 + i * 9) % (w - 20)), floor, 'walk', t, i * 10 + 10);
                 break;
             }
             case 'game': {
-                for (let k = 0; k < 3; k++) {
-                    const sw = (w - 12) / 3;
-                    const sx = x + 6 + k * sw;
+                // desks with screens, people sitting at them
+                const desks = Math.max(2, Math.floor((w - 12) / 26));
+                for (let k = 0; k < desks; k++) {
+                    const dx = x + 8 + k * ((w - 16) / desks);
+                    ctx.fillStyle = S; ctx.fillRect(dx, floor - 8, 18, 1.5); ctx.fillRect(dx + 1, floor - 7, 1.2, 7); ctx.fillRect(dx + 16, floor - 7, 1.2, 7);
                     const on = Math.sin(t * (3 + k) + k) > -0.2;
-                    ctx.fillStyle = on ? (k === 1 ? rgba(VT.cold, 0.85) : rgba(VT.plate, 0.85)) : '#1a2029';
-                    ctx.fillRect(sx + 2, y + 12, sw - 4, h * 0.3);
-                    ctx.fillStyle = S; ctx.fillRect(sx + sw / 2 - 1, y + 12 + h * 0.3, 2, 9);
-                    ctx.fillRect(sx + sw / 2 - 5, y + 20 + h * 0.3, 10, 2);
+                    ctx.fillStyle = on ? (k % 2 ? rgba(VT.cold, 0.85) : rgba(VT.plate, 0.85)) : '#1a2029';
+                    ctx.fillRect(dx + 8, floor - 15, 9, 6);
+                    if (k < n) person(dx + 3, floor - 5, 'sit', t, i * 10 + 11 + k);
                 }
                 break;
             }
             case 'mine': {
+                // a rock face, two or three with picks at it, a cart on rails, a lamp
                 ctx.fillStyle = S;
-                for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + 12 + k * 7, floor - 1, 6, Math.PI, 0); ctx.fill(); }
-                ctx.fillStyle = rgba(VT.lamp, 0.6);
-                for (let k = 0; k < 5; k++) ctx.fillRect(x + 10 + k * 6, floor - 4 - (k % 2) * 3, 2, 2);
-                const bx = x + w * 0.7, by = y + h * 0.38;
-                ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.sin(t * 1.4) * 0.15);
-                ctx.fillStyle = M; ctx.fillRect(-4, -14, 8, 22);
-                ctx.fillStyle = P; ctx.beginPath(); ctx.moveTo(-5, 8); ctx.lineTo(0, 16 + Math.sin(t * 20)); ctx.lineTo(5, 8); ctx.fill();
-                ctx.restore();
+                ctx.beginPath(); ctx.moveTo(x + w, y + 4); ctx.lineTo(x + w - 18, y + 14); ctx.lineTo(x + w - 13, y + h * 0.45); ctx.lineTo(x + w - 22, y + h * 0.7); ctx.lineTo(x + w - 16, floor); ctx.lineTo(x + w, floor); ctx.fill();
+                ctx.fillStyle = rgba(VT.lamp, 0.7);
+                for (let k = 0; k < 5; k++) ctx.fillRect(x + w - 15 + hash(k + i) * 10, y + 16 + hash(k * 3 + i) * (h - 30), 2, 2);
+                ctx.fillStyle = M; ctx.fillRect(x + 4, floor - 1, w - 22, 1);
+                const cx = x + 10 + (0.5 + 0.5 * Math.sin(t * 0.4 + i)) * (w * 0.3);
+                ctx.fillStyle = '#5a6574'; ctx.fillRect(cx, floor - 7, 13, 5);
+                ctx.fillStyle = S; ctx.beginPath(); ctx.arc(cx + 3, floor - 1.5, 1.5, 0, Math.PI * 2); ctx.arc(cx + 10, floor - 1.5, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = rgba(VT.lamp, 0.6); ctx.fillRect(cx + 2, floor - 9, 4, 2); ctx.fillRect(cx + 7, floor - 9.5, 4, 2.5);
+                ctx.fillStyle = M; ctx.fillRect(x + w * 0.55, y + 2, 1, 8);
+                ctx.fillStyle = rgba(VT.lamp, 0.9); ctx.beginPath(); ctx.arc(x + w * 0.55, y + 11, 2, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = rgba(VT.lamp, 0.06); ctx.beginPath(); ctx.moveTo(x + w * 0.55, y + 11); ctx.lineTo(x + w * 0.3, floor); ctx.lineTo(x + w * 0.85, floor); ctx.fill();
+                const miners = Math.min(3, Math.max(n ? 2 : 0, n));
+                for (let k = 0; k < miners; k++) person(x + w - 24 - k * 9, floor, 'pick', t, i * 10 + 14 + k);
                 break;
             }
-            case 'meatlab': meatLab(x, y, w, h, t, r); break;
+            case 'meatlab': meatLab(x, y, w, h, t, r, n); break;
             case 'cryo': {
                 const cols = 5 * r.lvl, rows = 2;
                 const pw = (w - 10) / cols, ph = (h - 16) / rows;
                 const share = s.asleep / Math.max(1, roomsOf(s, 'cryo').reduce((a, q) => a + q.lvl * PODS_PER_LEVEL, 0));
-                for (let n = 0; n < cols * rows; n++) {
-                    const cx = x + 5 + (n % cols) * pw, cy = y + 8 + Math.floor(n / cols) * ph;
-                    const filled = n / (cols * rows) < share;
-                    ctx.fillStyle = filled ? rgba(VT.cold, 0.5 + 0.15 * Math.sin(t + n)) : '#161c24';
+                for (let k = 0; k < cols * rows; k++) {
+                    const cx = x + 5 + (k % cols) * pw, cy = y + 8 + Math.floor(k / cols) * ph;
+                    const filled = k / (cols * rows) < share;
+                    ctx.fillStyle = filled ? rgba(VT.cold, 0.5 + 0.15 * Math.sin(t + k)) : '#161c24';
                     ctx.beginPath(); ctx.roundRect(cx + 1.5, cy + 1.5, pw - 3, ph - 3, 3); ctx.fill();
                 }
                 break;
@@ -665,53 +862,44 @@ export function createVaultView(canvas, opts = {}) {
     }
 
     /**
-     * The Meat Lab, in the palace: a clean white lab, comic and tidy. Steel vats with a red slab
-     * floating in each, a lamp over a steel table with a steak on it, a hook with a cut hanging.
-     * The meat is the only red; it does not glow (only the body does).
+     * The Meat Lab, in the palace: a clean lab in the people's scale. Steel tanks a little taller than a
+     * person with a red slab in each, a worker in an apron at them, a steak on a steel table under a lamp.
      */
-    function meatLab(x, y, w, h, t, r) {
+    function meatLab(x, y, w, h, t, r, n = 1) {
         const floor = y + h - 2;
-        const P = VT.plate, M = VT.mist, S = VT.slate;
-        // the lamp over the table, and its cone
-        const lx = x + w * 0.68;
-        ctx.fillStyle = M; ctx.fillRect(lx - 0.5, y, 1, h * 0.22);
-        ctx.fillStyle = P; ctx.beginPath(); ctx.moveTo(lx - 7, y + h * 0.22 + 5); ctx.lineTo(lx - 3, y + h * 0.22); ctx.lineTo(lx + 3, y + h * 0.22); ctx.lineTo(lx + 7, y + h * 0.22 + 5); ctx.fill();
-        ctx.fillStyle = rgba(VT.lamp, 0.12);
-        ctx.beginPath(); ctx.moveTo(lx - 7, y + h * 0.22 + 5); ctx.lineTo(lx - w * 0.22, floor - 12); ctx.lineTo(lx + w * 0.22, floor - 12); ctx.lineTo(lx + 7, y + h * 0.22 + 5); ctx.fill();
-        // the steel table and the steak on it (fat rim, a bone)
-        ctx.fillStyle = S; ctx.fillRect(lx - w * 0.2, floor - 13, w * 0.4, 3);
-        ctx.fillStyle = M; ctx.fillRect(lx - w * 0.2, floor - 13, w * 0.4, 1);
-        ctx.fillRect(lx - w * 0.17, floor - 10, 2, 9); ctx.fillRect(lx + w * 0.17 - 2, floor - 10, 2, 9);
-        ctx.fillStyle = VT.fBone; ctx.beginPath(); ctx.ellipse(lx, floor - 16, 9, 3.6, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = VT.fCore; ctx.beginPath(); ctx.ellipse(lx - 0.5, floor - 16.3, 7.6, 2.7, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,170,175,0.35)'; ctx.lineWidth = 0.8;
-        ctx.beginPath(); ctx.moveTo(lx - 5, floor - 17); ctx.quadraticCurveTo(lx, floor - 18.5, lx + 5, floor - 17); ctx.stroke();
-        // the vats: steel tanks, a slab of red turning slowly in each
-        const n = r.lvl >= 2 ? 3 : 2;
-        const vw = Math.min(14, w * 0.15), vh = h * 0.5;
-        for (let k = 0; k < n; k++) {
-            const vx = x + 6 + k * (vw + 4), vy = floor - 4 - vh;
-            ctx.fillStyle = '#161c24'; ctx.beginPath(); ctx.roundRect(vx, vy, vw, vh, 3); ctx.fill();
-            ctx.save(); ctx.beginPath(); ctx.roundRect(vx + 1, vy + 1, vw - 2, vh - 2, 2); ctx.clip();
-            const bob = Math.sin(t * 0.9 + k * 1.7) * 2;
-            ctx.fillStyle = VT.fCore;
-            ctx.beginPath(); ctx.ellipse(vx + vw / 2, vy + vh * 0.55 + bob, vw * 0.32, vh * 0.2, Math.sin(t * 0.4 + k) * 0.5, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = rgba(VT.fBone, 0.6);
-            ctx.fillRect(vx + vw / 2 - vw * 0.2, vy + vh * 0.5 + bob, vw * 0.4, 1);
-            ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(vx + 2, vy + 3, 2, vh - 6);
-            ctx.restore();
-            ctx.strokeStyle = rgba(M, 0.6); ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.roundRect(vx + 0.5, vy + 0.5, vw - 1, vh - 1, 3); ctx.stroke();
-            ctx.fillStyle = S; ctx.fillRect(vx - 1, vy - 3, vw + 2, 3); ctx.fillRect(vx - 1, floor - 4, vw + 2, 3);
-            ctx.fillStyle = M; ctx.fillRect(vx + vw / 2 - 0.5, y + 2, 1, vy - 3 - y - 2);
+        const M = VT.mist, S = VT.slate;
+        const lx = x + w * 0.72;
+        ctx.fillStyle = M; ctx.fillRect(lx - 0.5, y + 2, 1, h * 0.3);
+        ctx.fillStyle = VT.plate; ctx.beginPath(); ctx.moveTo(lx - 5, y + h * 0.3 + 4); ctx.lineTo(lx - 2, y + h * 0.3); ctx.lineTo(lx + 2, y + h * 0.3); ctx.lineTo(lx + 5, y + h * 0.3 + 4); ctx.fill();
+        ctx.fillStyle = rgba(VT.lamp, 0.1);
+        ctx.beginPath(); ctx.moveTo(lx - 5, y + h * 0.3 + 4); ctx.lineTo(lx - 14, floor - 7); ctx.lineTo(lx + 14, floor - 7); ctx.lineTo(lx + 5, y + h * 0.3 + 4); ctx.fill();
+        ctx.fillStyle = S; ctx.fillRect(lx - 11, floor - 8, 22, 2);
+        ctx.fillStyle = M; ctx.fillRect(lx - 11, floor - 8, 22, 0.8);
+        ctx.fillRect(lx - 10, floor - 6, 1.5, 6); ctx.fillRect(lx + 8.5, floor - 6, 1.5, 6);
+        ctx.fillStyle = VT.fBone; ctx.beginPath(); ctx.ellipse(lx, floor - 10, 5, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = VT.fCore; ctx.beginPath(); ctx.ellipse(lx - 0.3, floor - 10.1, 4, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+        const tanks = r.lvl >= 2 ? 3 : 2;
+        for (let k = 0; k < tanks; k++) {
+            const vw = 9, vh = 15, vx = x + 7 + k * (vw + 4), vy = floor - 2 - vh;
+            ctx.fillStyle = '#161c24'; ctx.beginPath(); ctx.roundRect(vx, vy, vw, vh, 2); ctx.fill();
+            const bob = Math.sin(t * 0.9 + k * 1.7) * 1;
+            ctx.fillStyle = VT.fCore; ctx.beginPath(); ctx.ellipse(vx + vw / 2, vy + vh * 0.55 + bob, vw * 0.3, vh * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = rgba(M, 0.6); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.roundRect(vx + 0.5, vy + 0.5, vw - 1, vh - 1, 2); ctx.stroke();
+            ctx.fillStyle = S; ctx.fillRect(vx - 1, vy - 2, vw + 2, 2); ctx.fillRect(vx - 1, floor - 2, vw + 2, 2);
+            ctx.fillStyle = M; ctx.fillRect(vx + vw / 2 - 0.5, y + 2, 1, vy - y - 4);
         }
-        // a cut on a hook, swinging a little
-        const hx = x + w - 9, sw = Math.sin(t * 1.3) * 0.08;
-        ctx.save(); ctx.translate(hx, y + 4); ctx.rotate(sw);
-        ctx.strokeStyle = M; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 8); ctx.arc(-2, 8, 2, 0, Math.PI); ctx.stroke();
-        ctx.fillStyle = VT.fCore; ctx.beginPath(); ctx.ellipse(0, 16, 3.6, 6.5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = rgba(VT.fBone, 0.7); ctx.fillRect(-0.5, 10, 1, 4);
-        ctx.restore();
+        if (n) person(x + 7 + tanks * 13 + 3, floor, 'tend', t, 77, true);
+        ctx.lineWidth = 1;
+    }
+
+    /** The room's name on its frame, a small dymo, always there (pass 3, G2). */
+    function nameLabel(text, x, y) {
+        ctx.font = "11px 'Bebas Neue', 'Arial Narrow', sans-serif";
+        const tw = ctx.measureText(text).width;
+        ctx.fillStyle = 'rgba(7,8,10,0.92)';
+        ctx.fillRect(x + 3, y + 3, tw + 8, 12);
+        ctx.fillStyle = VT.paper; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillText(text, x + 7, y + 13);
     }
 
     /**
@@ -1463,12 +1651,12 @@ export function createVaultView(canvas, opts = {}) {
             const x = a.x + (b.x + b.w - a.x) * wk.x;
             const idx = Math.max(0, Math.min(SLOTS - 1, Math.floor(wk.x * SLOTS)));
             const room = s.rooms[wk.lv * SLOTS + idx];
-            const y = a.y + a.h - 6 - (wk.pause > 0 ? 0 : Math.abs(Math.sin(t * 9 + wk.seed * 9)) * 1.2);
             // in rock the corridor runs behind; they are drawn faint there
             const faint = room && (room.kind === 'rock' || isFlesh(room));
-            if (!faint) { ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill(); }
-            ctx.fillStyle = faint ? rgba(VT.paper, 0.25) : VT.paper;
-            ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+            // the residents are small people, the same as in the rooms
+            ctx.globalAlpha = faint ? 0.25 : 1;
+            person(x, a.y + a.h - 2, wk.pause > 0 ? 'stand' : 'walk', t, wk.seed * 100);
+            ctx.globalAlpha = 1;
         }
     }
 
