@@ -197,7 +197,7 @@ export function createRenderer(canvas) {
 
         // ---- the dark: a circle of light around the drone; daylight near the top
         const dx = r.originX + p.x * TS + TS / 2, dy = p.y * TS + TS / 2 - camY;
-        const under = Math.max(0, Math.min(1, (p.y + 1) / 5));
+        const under = Math.max(0, Math.min(1, (p.y + 1) / 14));   // the city layer is still half lit from above
         if (under > 0 && !s.ended) {
             let rad = lampRadius(s) * TS;
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);

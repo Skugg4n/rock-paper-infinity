@@ -67,7 +67,7 @@ try {
     const jump = async (cp) => {
         await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug` });
         await sleep(1200);
-        await ev(`localStorage.setItem('rpi-audio', JSON.stringify({ sfx: false, music: false })); true`);
+        await ev(`localStorage.setItem('rpi-audio', JSON.stringify(${process.argv.includes('--sound') ? '{ sfx: true, music: true }' : '{ sfx: false, music: false }'})); true`);
         await ev(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(cp)}); return true; })`);
         await sleep(2500);
     };
@@ -115,6 +115,11 @@ try {
     await sleep(2000);
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: d.x, y: d.y + 60, button: 'left', clickCount: 1 });
     await shot('06-mouse-dig');
+    // the ☰ item and a clean teardown
+    const menu = await ev(`(document.getElementById('deep-version-toggle') || {}).textContent || null`);
+    const td0 = await ev(`import('/src/gamePhase.js').then(async (m) => { await m.setPhase('INDUSTRY'); await new Promise((r) => setTimeout(r, 300));
+        return { root: !!document.getElementById('dig-root'), pilot: !!window.rpiDig, item: !!document.getElementById('deep-version-toggle'), cls: document.getElementById('phase-deep').className }; })`);
+    console.log('menu item:', menu, '| after leaving IV:', JSON.stringify(td0));
     for (const [cp, name] of [['iv-dig-war', '07-war'], ['iv-dig-machine', '08-machine'], ['iv-dig-flesh', '09-flesh']]) {
         await jump(cp);
         await hold('ArrowDown', 1500);
