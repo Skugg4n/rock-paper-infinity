@@ -11,10 +11,11 @@
 import { playChapterCard } from '../chapterCard.js';
 import {
     SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, NEXT_TEXT, GRAFTS, graftShown,
-    batteryCap, cargoCap, homeCost, isHome, sleepers, depthM,
+    batteryCap, cargoCap, homeCost, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS,
 } from './dig.js';
 import { depthOf, FINDS } from './world.js';
-import { createRenderer } from './render.js';
+import { createRenderer, RISE_S } from './render.js';
+import { pathHome } from './autopilot.js';
 import { createDigSound } from './sound.js';
 
 const END = { roman: 'V', title: 'UNITY' };
@@ -22,7 +23,7 @@ const COLUMN = 300;                   // the panel's column, px
 const KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', a: 'left', d: 'right', w: 'up', s: 'down', A: 'left', D: 'right', W: 'up', S: 'down' };
 const ROW_NAME = { drill: 'DRILL', battery: 'BATTERY', cargo: 'CARGO', lamp: 'LAMP', hull: 'HULL', radar: 'RADAR' };
 
-let ac = null, raf = 0, saveTimer = 0, root = null, style = null, sound = null, state = null;
+let ac = null, raf = 0, saveTimer = 0, riseTimer = 0, root = null, style = null, sound = null, state = null;
 
 const CSS = `
 #phase-deep.is-dig > :not(#dig-root) { display: none !important; }
@@ -38,21 +39,27 @@ const CSS = `
 .dig-bar { position: relative; height: 8px; background: #0b0d10; border-radius: 2px; margin: 2px 0 8px; overflow: visible; }
 .dig-bar > i { position: absolute; left: 0; top: 0; bottom: 0; background: #7fd18b; border-radius: 2px; }
 .dig-bar > i.is-red { background: #ff5a5a; }
-.dig-bar > b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #f1efe8; }
-.dig-bar > em { position: absolute; top: 10px; font: 10px/1 system-ui; color: #8fa1b6; font-style: normal; transform: translateX(-50%); white-space: nowrap; }
+.dig-bar > b { position: absolute; top: -4px; bottom: -4px; width: 3px; background: #ffe08a; box-shadow: 0 0 6px rgba(255,224,138,.8); }
+.dig-bar > em { position: absolute; top: 11px; font: 700 10px/1 system-ui; letter-spacing: .08em; color: #ffe08a; font-style: normal; transform: translateX(-50%); white-space: nowrap; }
+.dig-bar > s { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,90,90,.28); text-decoration: none; }
+.dig-pods { display: block; width: 100%; height: 26px; margin: 2px 0 6px; image-rendering: pixelated; }
+.dig-ending .dig-col, .dig-ending #dig-help { opacity: 0; transition: opacity 1.2s ease; pointer-events: none; }
+.dig-line { transition: opacity .8s ease; }
+.dig-line.is-gone { opacity: 0; }
+.dig-line.is-turnback { color: #ff6a5a; }
 .dig-line { min-height: 34px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.06); font: 14px/1.35 'Courier New', monospace; color: #e8e1c8; }
 .dig-line.is-voice { color: #ff8a9a; }
 .dig-line.is-alarm { color: #ff6a5a; }
 .dig-line.is-find { color: #f2d98a; }
 .dig-shop h3 { margin: 0 0 6px; display: flex; justify-content: space-between; align-items: center; }
-.dig-shop .dig-note { font-size: 12px; color: #8fa1b6; }
+.dig-shop .dig-note { font-size: 13px; color: #c9d3de; }
 .dig-buy { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 2px 8px; width: 100%; text-align: left; padding: 5px 6px; margin: 2px 0; border-radius: 4px; background: rgba(255,255,255,.03); color: inherit; border: 0; cursor: pointer; font: inherit; }
 .dig-buy:hover:not(:disabled) { background: rgba(255,255,255,.09); }
 .dig-buy:disabled { cursor: default; }
 .dig-buy .dig-dash { letter-spacing: 2px; color: #7fd18b; font-size: 11px; }
-.dig-buy .dig-desc { grid-column: 1 / 3; font-size: 12px; color: #aab6c3; }
+.dig-buy .dig-desc { grid-column: 1 / 3; font-size: 14px; color: #dfe6ee; }
 .dig-buy .dig-price { grid-row: 1 / 3; grid-column: 3; font: 600 15px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .06em; color: #f2d98a; text-align: right; white-space: nowrap; }
-.dig-buy .dig-price.is-short { color: #8fa1b6; font: 11px/1.2 system-ui; }
+.dig-buy .dig-price.is-short { color: #c9d3de; font: 13px/1.2 system-ui; }
 .dig-buy.is-graft .dig-dash { color: #ff6a7d; }
 .dig-buy.is-ready { box-shadow: inset 0 0 0 1px rgba(242,217,138,.45); }
 .dig-away .dig-buy { opacity: .55; }
@@ -70,12 +77,13 @@ function buildDom(host) {
     const panel = el('div', 'dig-card dig-panel');
     panel.innerHTML = `
       <div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val" id="dig-power">100 %</span></div>
-      <div class="dig-bar"><i id="dig-power-fill"></i><b id="dig-power-home"></b><em id="dig-power-home-label">home</em></div>
+      <div class="dig-bar" id="dig-power-track"><i id="dig-power-fill"></i><s id="dig-power-zone"></s><b id="dig-power-home"></b><em id="dig-power-home-label">HOME</em></div>
       <div class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val" id="dig-cargo">0 / 8</span></div>
       <div class="dig-row"><span class="dymo is-small">DEPTH</span><span class="dig-val" id="dig-depth">0 m</span></div>
       <div class="dig-row"><span class="dymo is-small">COLONY</span><span class="dig-val" id="dig-colony">100 %</span></div>
       <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div>
       <div class="dig-row"><span class="dymo is-small">SLEEPERS</span><span class="dig-val" id="dig-sleepers">216</span></div>
+      <canvas class="dig-pods" id="dig-pods" width="240" height="26"></canvas>
       <div class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val" id="dig-parts">0</span></div>
       <div class="dig-row" id="dig-bio-row" hidden><span class="dymo is-small">BIOMASS</span><span class="dig-val" id="dig-bio">0</span></div>
       <div class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>
@@ -90,6 +98,7 @@ function buildDom(host) {
     const $ = (id) => root.querySelector('#' + id);
     return {
         canvas, rise, help,
+        powerTrack: $('dig-power-track'), powerZone: $('dig-power-zone'), pods: $('dig-pods'), root,
         power: $('dig-power'), powerFill: $('dig-power-fill'), powerHome: $('dig-power-home'), powerHomeLabel: $('dig-power-home-label'),
         cargo: $('dig-cargo'), depth: $('dig-depth'), colony: $('dig-colony'), colonyFill: $('dig-colony-fill'),
         sleepers: $('dig-sleepers'), parts: $('dig-parts'), bio: $('dig-bio'), bioRow: $('dig-bio-row'), finds: $('dig-finds'),
@@ -123,6 +132,7 @@ export function init() {
     rnd.resize();
     window.addEventListener('resize', () => rnd.resize(), { signal });
 
+    if (s.ended && !s.risen) ui.root.classList.add('dig-ending');
     if (s.risen) {
         // the act is over: the wall again
         playChapterCard({ roman: END.roman, title: END.title, mode: 'to-come', dark: true });
@@ -131,7 +141,8 @@ export function init() {
     // ---- the hands
     const held = [];
     let mouse = null;              // {x, y} while the button is held on the world
-    const press = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); held.push(dir); };
+    const pressedAt = { left: -1e9, right: -1e9 };
+    const press = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); held.push(dir); if (dir in pressedAt) pressedAt[dir] = performance.now(); };
     const release = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); };
     window.addEventListener('keydown', (e) => {
         const d = KEYS[e.key];
@@ -146,7 +157,21 @@ export function init() {
     const up = () => { mouse = null; };
     ui.canvas.addEventListener('pointerup', up, { signal });
     ui.canvas.addEventListener('pointercancel', up, { signal });
-    const view = () => ({ w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN });
+    // the way home is drawn when the power is short; worked out a few times a second
+    let path = null, pathAt = -1;
+    const view = () => {
+        const short = !isHome(s) && !s.ended && s.y > 2 && s.battery < homeCost(s) * 1.6 + 6;
+        if (!short) path = null;
+        else if (s.time - pathAt > 0.4) { pathAt = s.time; path = pathHome(s); }
+        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path };
+    };
+    /** The hand: a direction, and with up a side (held, or pressed in the last 250 ms) to turn into. */
+    function hand() {
+        const nowMs = performance.now();
+        const sideHeld = ['left', 'right'].filter((d) => held.includes(d) || nowMs - pressedAt[d] < 250);
+        if (held.includes('up')) return { dir: 'up', side: sideHeld.length ? sideHeld[sideHeld.length - 1] : null };
+        return { dir: handDir(), side: null };
+    }
     function handDir() {
         if (held.length) return held[held.length - 1];
         if (!mouse) return null;
@@ -204,11 +229,13 @@ export function init() {
     // ---- the line, typed
     let typed = { n: -1, text: '', shown: 0, kind: 'line' };
     function typeLine(dt) {
+        const on = lineNow(s);
+        ui.line.classList.toggle('is-gone', !on);
         if (s.line && s.line.n !== typed.n) typed = { n: s.line.n, text: s.line.text, shown: 0, kind: s.line.kind };
         if (typed.shown < typed.text.length) {
             typed.shown = Math.min(typed.text.length, typed.shown + dt * 40);
             ui.line.textContent = typed.text.slice(0, Math.ceil(typed.shown));
-            ui.line.className = `dig-line is-${typed.kind}`;
+            ui.line.className = `dig-line is-${typed.kind}${on ? '' : ' is-gone'}`;
         }
     }
 
@@ -220,12 +247,17 @@ export function init() {
         const pct = Math.max(0, Math.round(100 * s.battery / cap));
         const homePct = Math.min(100, 100 * (homeCost(s) * 1.1 + 1) / cap);
         const low = pct < 25 || (!isHome(s) && s.battery < homeCost(s) * 1.1 + 2);
-        put('power', ui.power, `${pct} %`);
+        put('power', ui.power, `${Math.max(0, Math.round(s.battery))} / ${cap}`);
+        // the bar is as long as the battery: an upgrade is seen
+        const maxCap = BATTERY_CAP[BATTERY_CAP.length - 1];
+        ui.powerTrack.style.width = `${Math.round(30 + 70 * (cap - BATTERY_CAP[0]) / (maxCap - BATTERY_CAP[0]))}%`;
+        ui.powerZone.style.width = `${homePct}%`;
         ui.power.classList.toggle('is-red', low);
         ui.powerFill.style.width = `${pct}%`;
         ui.powerFill.classList.toggle('is-red', low);
         const showHome = !isHome(s) && s.y > 2;
         ui.powerHome.style.display = showHome ? '' : 'none';
+        ui.powerZone.style.display = showHome ? '' : 'none';
         ui.powerHomeLabel.style.display = showHome ? '' : 'none';
         ui.powerHome.style.left = `${homePct}%`;
         ui.powerHomeLabel.style.left = `${homePct}%`;
@@ -238,12 +270,33 @@ export function init() {
         put('colony', ui.colony, `${col} %`);
         ui.colony.classList.toggle('is-red', col < 25);
         ui.colonyFill.style.width = `${s.reserve}%`;
-        ui.colonyFill.style.background = s.reserve < 25 ? '#ff5a5a' : s.dreaming ? '#d33a4a' : '#5fb4ff';
+        ui.colonyFill.style.background = s.reserve < 25 ? '#ff5a5a' : s.dreaming ? '#c46a92' : '#5fb4ff';
         put('sleepers', ui.sleepers, String(sleepers(s)));
+        drawPods();
         put('parts', ui.parts, String(s.parts));
         ui.bioRow.hidden = !(s.bioSeen || s.grafts > 0);
         put('bio', ui.bio, String(s.bio));
         put('finds', ui.finds, `${s.found.length} / ${FINDS.length}`);
+    }
+
+    // ---- the pods, small: one goes dark where you can see it
+    let blinkPod = null, podsKey = '';
+    const pctx = ui.pods.getContext('2d');
+    function drawPods() {
+        const blinking = blinkPod && performance.now() - blinkPod.at < 2500;
+        const key = `${s.dark.length}|${s.dreaming}|${blinking ? Math.floor(performance.now() / 160) % 2 : 'x'}`;
+        if (key === podsKey) return;
+        podsKey = key;
+        pctx.clearRect(0, 0, 240, 26);
+        const dark = new Set(s.dark);
+        for (let i = 0; i < SLEEPERS; i++) {
+            const pod = i + 1, x = (i % 72) * 3.33, y = Math.floor(i / 72) * 9;
+            let col = s.dreaming ? '#d33a4a' : '#5fb4ff';
+            if (dark.has(pod)) col = '#1a2028';
+            if (blinking && pod === blinkPod.pod) col = Math.floor(performance.now() / 160) % 2 ? '#ffffff' : '#ff5a5a';
+            pctx.fillStyle = col;
+            pctx.fillRect(x, y, 2.4, 7);
+        }
     }
 
     // ---- the end
@@ -252,8 +305,12 @@ export function init() {
         s.risen = true;
         save();
         ui.rise.hidden = true;
-        sound?.stop();
-        playChapterCard({ roman: END.roman, title: END.title, mode: 'to-come', dark: true });
+        // something rises first: the red mass climbs the shaft and breaks through the city
+        rnd.rise();
+        riseTimer = setTimeout(() => {
+            sound?.stop();
+            playChapterCard({ roman: END.roman, title: END.title, mode: 'to-come', dark: true });
+        }, RISE_S * 1000);
     }, { signal });
 
     // ---- the loop
@@ -264,12 +321,19 @@ export function init() {
         prev = now;
         if (window.__rpiPaused || document.hidden) dt = 0;
         if (dt > 0) {
-            const dir = s.ended ? null : handDir();
+            const input = s.ended ? {} : hand();
             // small steps, so a slow frame does not skip a tile
             let left = dt;
-            while (left > 0) { const h = Math.min(0.05, left); step(s, h, { dir }); left -= h; }
+            while (left > 0) { const h = Math.min(0.05, left); step(s, h, input); left -= h; }
             for (const e of s.events) {
                 sound?.event(e);
+                if (e.type === 'find') {
+                    const first = !s.findSaid;
+                    s.findSaid = true;
+                    rnd.pop(e.bio ? `+${e.bio} BIOMASS` : `+${e.parts} PARTS`, '#f2d98a', true, first ? 'Finds are worth more than ore.' : '');
+                }
+                if (e.type === 'pod') blinkPod = { pod: e.pod, at: performance.now() };
+                if (e.type === 'heart') ui.root.classList.add('dig-ending');
                 if (e.type === 'buy' || e.type === 'graft' || e.type === 'deliver') shopKey = '';
             }
             s.events.length = 0;
@@ -294,6 +358,7 @@ export function teardown() {
     ac = null;
     cancelAnimationFrame(raf); raf = 0;
     clearInterval(saveTimer); saveTimer = 0;
+    clearTimeout(riseTimer); riseTimer = 0;
     try { sound?.stop(); } catch { /* gone */ }
     sound = null;
     root?.remove(); root = null;

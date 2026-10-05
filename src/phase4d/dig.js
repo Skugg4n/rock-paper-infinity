@@ -69,6 +69,11 @@ export const VOICES = [
     'You do not need to go back up.',
 ];
 
+export const HEART_BEATS = 4;
+export const HEART_BEAT_S = 0.95;
+export const HEART_LINES = ['It beats.', 'Come home.', 'Almost.'];
+export const HOVER_DRAIN = 0.2;         // per second, standing still in the air under a ledge
+export const ROUTE_TURN = 'turnback';
 export const isOre = (t) => t === T.ROCK || t === T.PAPER || t === T.SCISSORS || t === T.BIO;
 export const isSolid = (t) => t !== T.AIR;
 
@@ -137,11 +142,17 @@ export function gateOf(s, t, y) {
     return null;
 }
 
+/** How long a line stays true, seconds, by kind; the turn-back line is held by the rules instead. */
+export const LINE_TTL = { line: 6, gate: 5, alarm: 5, find: 10, voice: 8, turnback: Infinity, end: Infinity };
+/** The line on show now, or null: a line goes when its time is up. */
+export const lineNow = (s) => (s.line && s.line.text && s.time - s.line.at < (s.line.ttl ?? 6) ? s.line : null);
+const clearLine = (s) => { s.line = { text: '', at: s.time, n: (s.line?.n || 0) + 1, kind: 'line', ttl: 0 }; };
+
 function say(s, text, kind = 'line', hold = 4) {
     const last = s.sayAt[text];
     if (last !== undefined && s.time - last < hold) return;
     s.sayAt[text] = s.time;
-    s.line = { text, at: s.time, n: (s.line?.n || 0) + 1, kind };
+    s.line = { text, at: s.time, n: (s.line?.n || 0) + 1, kind, ttl: LINE_TTL[kind] ?? 6 };
     s.events.push({ type: 'line', text, kind });
 }
 
@@ -181,7 +192,14 @@ function arrive(s, x, y) {
 function finishDig(s, tx, ty) {
     const i = ty * W + tx;
     const t = s.tiles[i];
-    if (t === T.HEART) { touchHeart(s); return; }
+    if (t === T.HEART) {
+        // the heart's wall takes a few beats
+        s.heartHits = (s.heartHits || 0) + 1;
+        s.events.push({ type: 'beat', n: s.heartHits });
+        if (s.heartHits >= HEART_BEATS) touchHeart(s);
+        else say(s, HEART_LINES[s.heartHits - 1], 'voice', 0);
+        return;
+    }
     s.tiles[i] = T.AIR;
     if (isOre(t)) {
         if (s.cargo.length < cargoCap(s)) {
@@ -218,7 +236,7 @@ function touchHeart(s) {
     s.endAt = s.time;
     s.act = null;
     s.events.push({ type: 'heart' });
-    say(s, 'Woke: everyone is here.', 'voice', 0);
+    say(s, 'Woke: everyone is here.', 'end', 0);
 }
 
 /** Where the way up is, from a side tunnel: the nearest open tile above along this row's open ground. */
@@ -250,7 +268,7 @@ function tryDir(s, dir) {
         return true;
     }
     if (dy === -1) { say(s, shaftHint(s), 'line', 8); return false; }
-    if (t === T.HEART) { touchHeart(s); return true; }
+    if (t === T.HEART) { s.act = { kind: 'dig', tx, ty, t: 0, dur: HEART_BEAT_S, cost: 0, tile: t }; s.events.push({ type: 'dig-start', t }); return true; }
     const gate = gateOf(s, t, ty);
     if (gate) { say(s, gate, 'gate', 3); s.events.push({ type: 'gate' }); return false; }
     s.act = { kind: 'dig', tx, ty, t: 0, dur: digTime(s, t, ty), cost: digCost(t, ty), tile: t };
@@ -262,7 +280,8 @@ function tryDir(s, dir) {
  * The world moves on by dt seconds.
  * @param {object} s state
  * @param {number} dt seconds (the caller keeps it small, under 0.1)
- * @param {{dir?: 'left'|'right'|'up'|'down'|null, decide?: (s:object) => string|null}} input
+ * @param {{dir?: 'left'|'right'|'up'|'down'|null, side?: 'left'|'right'|null, decide?: (s:object) => string|null}} input
+ *   `side` is a side key held (or pressed just now) with up: climb and turn into the first opening
  */
 export function step(s, dt, input = {}) {
     s.time += dt;
@@ -280,7 +299,12 @@ export function step(s, dt, input = {}) {
         }
     } else s.podT = 0;
     const cap = batteryCap(s);
-    if (isHome(s)) s.warned = false;
+    if (isHome(s)) { s.warned = false; s.hoverSaid = false; }
+    // a new dive starts with a clean line
+    if (!isHome(s) && s.wasHome) { if (s.line?.kind !== 'find') clearLine(s); }
+    s.wasHome = isHome(s);
+    if (isHome(s) && s.line?.kind === ROUTE_TURN) clearLine(s);
+    if (isHome(s) && !s.cargo.length && /^Cargo full/.test(s.line?.text || '')) clearLine(s);
     if (isHome(s) && !s.act) {
         s.battery = Math.min(cap, s.battery + cap * CHARGE_RATE * dt);
         if (s.cargo.length) {
@@ -298,7 +322,13 @@ export function step(s, dt, input = {}) {
         } else s.unloadT = 0;
     } else if (s.y >= 0) {
         // once a dive: the moment the battery is just enough to fly home
-        if (!s.warned && s.y > 2 && s.battery < homeCost(s) * 1.15 + 3) { s.warned = true; say(s, 'Turn back. Just enough power to fly home.', 'alarm', 0); s.events.push({ type: 'warn' }); }
+        // the turn-back line is on while it is true, and only then
+        const low = s.y > 2 && s.battery < homeCost(s) * 1.15 + 3;
+        if (low && s.line?.kind !== ROUTE_TURN && s.line?.kind !== 'end') {
+            if (!s.warned) s.events.push({ type: 'warn' });
+            s.warned = true;
+            say(s, 'Turn back. Just enough power to fly home.', ROUTE_TURN, 0);
+        } else if (!low && s.line?.kind === ROUTE_TURN) clearLine(s);
         let drain = IDLE_DRAIN;
         if (depthOf(s.y) > HEAT_FROM && s.grafts < 3) drain += HEAT_DRAIN;
         s.battery -= drain * dt;
@@ -338,9 +368,19 @@ export function step(s, dt, input = {}) {
         const below = tileAt(s, s.x, s.y + 1);
         // a hand that thinks (the autopilot) is asked each time the drone is free
         if (input.decide) input = { ...input, dir: input.decide(s) };
+        // up with a side held: climb, and turn into the first opening on that side
+        if (input.side && input.dir === 'up' && tileAt(s, s.x + (input.side === 'left' ? -1 : 1), s.y) === T.AIR && tryDir(s, input.side)) continue;
         const side = input.dir === 'left' || input.dir === 'right';
         if (side && tryDir(s, input.dir)) continue;
         const wantsUp = input.dir === 'up' && tileAt(s, s.x, s.y - 1) === T.AIR;
+        // up under a ledge: the drone hovers where it is (a small cost), it does not bounce
+        const hovering = input.dir === 'up' && !wantsUp && below === T.AIR;
+        if (hovering) {
+            s.battery -= HOVER_DRAIN * left;
+            if (input.side) tryDir(s, input.side);
+            if (!s.act) { if (!s.hoverSaid) { s.hoverSaid = true; say(s, shaftHint(s), 'line', 8); } break; }
+            continue;
+        }
         const onHatch = isHome(s) && input.dir !== 'down';
         if (below === T.AIR && !wantsUp && !onHatch) {
             const dur = Math.max(0.03, 0.1 - 0.012 * s.fallStreak);
