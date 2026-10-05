@@ -10,6 +10,7 @@
  * Real seconds (not game days): a bubble lives ~10 s at ▶ and at ▶▶ alike. Pure; state in s.wishes.
  */
 import { computerSays } from './story.js';
+import { tutOn, did, hand, FIRST_WISHES_S, FIRST_WISHES_FOR_S } from './tutorial.js';
 
 export const LIFE_S = 10;
 export const EVERY_S = [6, 8];           // act I: one every 6 to 8 s
@@ -124,11 +125,15 @@ export function stepWishes(s, sec) {
         s.sfx?.push('thanks');
         w.wave = null;
     }
+    // pass 3: no wishes before the bubbles are taught; then one every 12 s the first minute
+    const taught = !tutOn(s) || s.tut.at.wishes != null;
+    if (!taught && s.phase === 'palace') return;
     // new ones: the fewer awake, the fewer wishes
     if (w.clock >= w.next) {
         const share = Math.max(0.15, awakeOf(s) / Math.max(1, s.residents));
         const [a, b] = s.turned ? EVERY_TURNED_S : EVERY_S;
-        w.next = w.clock + (a + rnd(s) * (b - a)) / share;
+        const early = tutOn(s) && s.wishes.firstAt != null && w.clock - s.wishes.firstAt < FIRST_WISHES_FOR_S;
+        w.next = w.clock + (early ? FIRST_WISHES_S : (a + rnd(s) * (b - a)) / share);
         // the woken at night are only rude
         const night = s.phase === 'night';
         const n = night ? 1 + (rnd(s) < 0.5 ? 1 : 0) : s.turned ? 2 + (rnd(s) < 0.5 ? 1 : 0) : 1;
@@ -152,6 +157,7 @@ export function stepWishes(s, sec) {
             const { line, kind } = ICONS[icon].wave;
             const slot = w.list.find((b) => b.icon === icon).slot;
             w.wave = { icon, kind, base: builtScore(s, kind), slot };
+            hand(s, kind);
             s.out?.push({ text: line, who: 'sys' });
         }
     }
@@ -170,6 +176,7 @@ export function popWish(s, id) {
     w.list = w.list.filter((x) => x !== b);
     fx(s, { type: 'pop', slot: b.slot, fx: b.fx, text: `+${POP_MOOD} %` });
     s.sfx?.push('pop');
+    did(s, 'pop');
     return true;
 }
 

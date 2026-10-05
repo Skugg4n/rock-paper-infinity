@@ -4,6 +4,7 @@
  */
 import { newVault, slotIndex, mood, START_RESIDENTS, PODS_PER_LEVEL, TURN_DAY } from './vault.js';
 import { story } from './story.js';
+import { inferTut } from './tutorial.js';
 
 /** The moments a checkpoint has already had (they are not marked again). */
 function had(s, ...keys) { for (const k of keys) story(s).moments[k] = true; }
@@ -38,16 +39,18 @@ function palace(s) {
     return s;
 }
 
+/** A checkpoint skips the stops behind it (pass 3); the ones ahead still come. */
+const at = (make) => () => { const s = make(); inferTut(s); return s; };
 export const VAULT_CHECKPOINTS = {
     'iv-vault-start': () => newVault(),
-    'iv-vault-turn': () => {
+    'iv-vault-turn': at(() => {
         const s = palace(newVault());
         // Mood 50 %: what the days under the rock have taken
         s.favour = 0;
         s.favour = 50 - mood(s);
         return s;
-    },
-    'iv-vault-cold': () => {
+    }),
+    'iv-vault-cold': at(() => {
         const s = palace(newVault());
         s.day = 120; s.turned = true; s.coldOpen = true; s.despair = 0;
         s.turnDay = TURN_DAY; s.hydroSaid = true;
@@ -57,8 +60,8 @@ export const VAULT_CHECKPOINTS = {
         s.favour = 25;
         s.ore = 400;
         return s;
-    },
-    'iv-vault-night': () => {
+    }),
+    'iv-vault-night': at(() => {
         const s = palace(newVault());
         s.day = 150; s.turned = true; s.coldOpen = true; s.despair = 50;
         put(s, slotIndex(1, 6), 'cryo', { lvl: 2 });
@@ -69,10 +72,10 @@ export const VAULT_CHECKPOINTS = {
         s.ore = 300;
         s.turnDay = TURN_DAY; s.hydroSaid = true;
         had(s, 'turn', 'cold');
-        // the night begins here: the goal is said on the first tick, as in play
+        // the night begins here: its steps (pass 3, section E) are ahead
         return s;
-    },
-    'iv-vault-flesh': () => {
+    }),
+    'iv-vault-flesh': at(() => {
         const s = VAULT_CHECKPOINTS['iv-vault-night']();
         s.year = 300; s.nightSec = 120; s.nightLine = 5; s.nextNightLineAt = 125; s.engineWear = 6;
         put(s, slotIndex(2, 0), 'vat'); s.rooms[slotIndex(2, 0)].flesh = 1;
@@ -85,5 +88,5 @@ export const VAULT_CHECKPOINTS = {
         had(s, 'first-dead', 'goal');
         s.out = []; s.sfx = []; s.slow = 0;
         return s;
-    },
+    }),
 };

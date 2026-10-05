@@ -4,6 +4,12 @@
 // Prints one line a minute (and the moments that matter), then the summary the spec asks for.
 import * as V from '../src/phase4v/vault.js';
 import { popWish } from '../src/phase4v/wishes.js';
+import * as T from '../src/phase4v/tutorial.js';
+/** --order=heart|stomach|lungs: the first organ the night player goes for (G4: the order changes the night). */
+const ORDER = (process.argv.find((a) => a.startsWith('--order=')) || '--order=heart').slice(8);
+/** A human reads a stop for this long, then does the thing (or OK). */
+const READ_S = 2.5;
+let stopAt = null, stopsSeen = [];
 const POP = Number((process.argv.find((a) => a.startsWith('--pop=')) || '--pop=0.75').slice(6));
 let popped = 0, seen = new Set(), wished = 0;
 
@@ -15,7 +21,7 @@ const buys = [];          // { t, what }
 const events = [];
 let lastReq = '';
 let turnAt = null, coldAt = null, nightAt = null, endAt = null, firstBuyAt = null;
-let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0, cuts = 0;
+let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0;
 let lastActAt = 0;
 let maxBioAfterHeart = 0;
 let waitFrom = null, waitTotal = 0, gapEndAt = 0, maxCouldGap = 0, lastCould = 0;
@@ -42,6 +48,7 @@ function placeFor(kind) {
 }
 const digging = () => s.rooms.some((r) => r.job && r.job.op === 'dig');
 function tryBuild(kind) {
+    if (!V.cards(s).includes(kind)) return false;
     const p = placeFor(kind);
     if (!p) return false;
     if (p.slot != null) { if (s.ore >= V.KINDS[kind].price && V.build(s, kind, p.slot)) { note(`${kind}`); return true; } return false; }
@@ -58,6 +65,9 @@ function tryUpgrade(kind) {
 const count = (k) => s.rooms.filter((r) => r.kind === k).length;
 
 function palaceMove() {
+    // a new player follows the first stops and does nothing else until then
+    if (!T.done(s, 'dig')) return false;
+    if (!T.done(s, 'suites')) { const e = s.rooms.findIndex((r) => r.kind === 'empty'); return e >= 0 && V.build(s, 'suites', e) && (note('suites'), true); }
     // repair first
     for (const [i, r] of s.rooms.entries()) if (r.broken && !r.job && s.ore >= V.REPAIR_PRICE) { V.repair(s, i); note('repair'); return true; }
     const p = V.power(s);
@@ -91,15 +101,17 @@ function palaceMove() {
 }
 
 /** What the night player wants the next room of the body to be, for slot i. */
+/** The orders of G4: what the night player grows first, then next (stomachs counted). */
+const ORDERS = { heart: ['heart', 'stomach', 'lungs'], stomach: ['stomach', 'stomach', 'lungs', 'heart'], lungs: ['lungs', 'stomach', 'heart'] };
 function wantOrgan(i) {
-    const have = (o) => V.hasOrgan(s, o) || s.rooms.some((r) => r.job && r.job.op === 'grow' && r.organ === o);
-    const stomachs = s.rooms.filter((r) => r.organ === 'stomach' && (r.flesh === 1 || (r.job && r.job.op === 'grow'))).length;
+    const grown = (o) => s.rooms.filter((r) => r.organ === o && (r.flesh === 1 || (r.job && r.job.op === 'grow'))).length;
+    const have = (o) => grown(o) > 0;
     if (V.levelOf(i) === 0 && !have('skin') && V.organAllowed(s, 'skin', i)) return 'skin';
-    if (stomachs < STOMACHS) return 'stomach';
+    const seq = ORDERS[ORDER] || ORDERS.heart;
+    const seen = {};
+    for (const o of seq) { seen[o] = (seen[o] || 0) + 1; if (grown(o) < seen[o]) return o; }
     // the third tester: a stomach wherever one can be had
-    if (GREEDY && have('heart') && s.bio >= V.organPrice(s, 'stomach')) return 'stomach';
-    if (!have('heart')) return 'heart';
-    if (!have('lungs') && V.organAllowed(s, 'lungs', i)) return 'lungs';
+    if (GREEDY && s.bio >= V.organPrice(s, 'stomach')) return 'stomach';
     return 'tissue';
 }
 const GREEDY = process.argv.includes('--greedy');
@@ -127,8 +139,7 @@ function nightMove() {
         wantPrice = price;
         if (s.bio >= price) { V.growInto(s, g[0], organ); note(organ === 'tissue' ? 'grow' : organ); return true; }
         // short: who do I take? (a human hesitates a few seconds first)
-        if (V.canTake(s) && t - lastActAt > 3) { V.takeOne(s); takes++; note('take'); return true; }
-        if (!V.growingCount(s) && s.asleep > 20 && V.power(s).short && t - lastActAt > 3) { V.cutPower(s); cuts++; note('cut'); return true; }
+        if (V.canTake(s) && t - lastActAt > 3) { V.takeOne(s, price - s.bio > 300 ? 10 : 1); takes++; note('take'); return true; }
     }
     return false;
 }
@@ -136,6 +147,23 @@ function nightMove() {
 let lastMinute = -1;
 const rows = [];
 while (t < 40 * 60 && !s.risen) {
+    // a stop: the human reads it, then does the thing it asks (or OK)
+    if (T.stopOpen(s)) {
+        const st = s.tut.stop;
+        if (stopAt == null) { stopAt = t; stopsSeen.push(`${fmt(t)} ${st.id} (day ${Math.floor(s.day)})`); }
+        if (t - stopAt >= READ_S) {
+            stopAt = null;
+            if (st.id === 'dig') V.dig(s, st.focus);
+            else if (st.id === 'hale') V.reclaim(s);
+            else T.closeStop(s);
+            if (T.stopOpen(s) && s.tut.stop.id === st.id) T.closeStop(s);
+            lastActAt = t;
+        }
+        V.advance(s, DT, speed);
+        s.out.length = 0; s.sfx.length = 0;
+        t += DT;
+        continue;
+    }
     // a human acts about twice a second at most
     if (Math.round(t / DT) % 2 === 0) {
         const moved = s.phase === 'night' ? nightMove() : palaceMove();
@@ -165,6 +193,7 @@ while (t < 40 * 60 && !s.risen) {
     V.advance(s, DT, speed);
     for (const o of s.out) {
         if (o.text === lastReq) continue;
+        for (const og of ['heart', 'stomach', 'lungs', 'skin']) if (!organAt[og] && V.hasOrgan(s, og)) organAt[og] = fmt(t);
         if (o.mark || /^(Level|Computer|COMPUTER|Is this|Who prog|Sleeper|The hydro|The steak|Mr Hale: Finally)/.test(o.text)) events.push(`${fmt(t)}  ${o.mark ? '* ' : '  '}${o.text}`);
     }
     s.out.length = 0; s.sfx.length = 0;
@@ -197,7 +226,9 @@ for (const e of events) console.log(e);
 console.log('');
 const riseAt = s.risen ? t : null;
 // waiting for biomass = a room could be grown and the price is not there yet (the player may take one meanwhile)
-console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, first vat to RISE ${riseAt != null && vatAt != null ? fmt(riseAt - vatAt) : '-'}, longest gap between night decisions ${Math.round(maxNightGap)} s (ending ${fmt(gapEndAt)}), without a possible one ${Math.round(maxCouldGap)} s, takes ${takes}, cuts ${cuts}`);
+console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, first vat to RISE ${riseAt != null && vatAt != null ? fmt(riseAt - vatAt) : '-'}, longest gap between night decisions ${Math.round(maxNightGap)} s (ending ${fmt(gapEndAt)}), without a possible one ${Math.round(maxCouldGap)} s, takes ${takes}`);
+console.log(`order ${ORDER}; stops: ${stopsSeen.join(', ')}`);
+console.log(`pods failed in the night: ${s.podsFailed || 0}; organs: heart ${organAt.heart || '-'}, stomach ${organAt.stomach || '-'}, lungs ${organAt.lungs || '-'}, skin ${organAt.skin || '-'}`);
 waits.sort((a, b) => b - a);
 console.log(`most biomass after the heart: ${Math.round(maxBioAfterHeart)}`);
 console.log(`waiting for biomass: ${waits.length} times, ${Math.round(waitTotal)} s in all, longest ${Math.round(waits[0] || 0)} s, median ${Math.round(waits[Math.floor(waits.length / 2)] || 0)} s`);

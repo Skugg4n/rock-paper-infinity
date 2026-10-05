@@ -46,11 +46,12 @@ describe('the vault screen', () => {
         const cryo = window.rpiVault.state.rooms.findIndex((r) => r.kind === 'cryo');
         window.rpiVault.select(cryo);
         const info = root.querySelector('[data-v="info"]');
-        expect(info.querySelector('[data-act="reclaim"]').className).toContain('quiet');
-        expect(info.querySelector('[data-act="take"]').className).toContain('dark');
-        expect(info.textContent).toContain('The dead become biomass.');
-        // TAKE ONE: three wake, the mood gauge comes back, the info box still answers
-        info.querySelector('[data-act="take"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        // G1: two buttons, the one that makes sense (big) and the dark one (small)
+        expect(info.querySelectorAll('button.a')).toHaveLength(2);
+        expect(info.querySelector('[data-act="take10"]').className).toContain('dark');
+        expect(info.textContent).toContain('They feed the others.');
+        // TAKE TEN: three wake, the mood gauge comes back, the info box still answers
+        info.querySelector('[data-act="take10"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
         tick();
         expect(V.awake(window.rpiVault.state)).toBe(3);
         expect(root.querySelector('[data-v="g-mood"]').hidden).toBe(false);

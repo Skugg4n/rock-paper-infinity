@@ -18,7 +18,7 @@ export const HYDRO_FAILING = 'The hydroponics are failing. The lamps are old.';
 export const GOAL_LINES = [
     'THE SURFACE WILL NOT RECOVER.',
     'THEY CANNOT LIVE UP THERE.',
-    'SOMETHING STRONGER COULD.',
+    'THIS COULD.',
     'GOAL: GET THEM TO THE SURFACE.',
 ];
 export const COMPUTER = {
@@ -54,8 +54,8 @@ export const ORGANS = {
     tissue: { name: 'TISSUE', price: null, hint: 'Just more of the body.', done: null },
     stomach: { name: 'STOMACH', price: 150, hint: 'Eats the rock. More biomass every year.', done: 'A stomach. It eats the rock.' },
     heart: { name: 'HEART', price: 250, hint: 'Power for everything. The engine can rest.', done: 'A heart. It beats for all of them.' },
-    lungs: { name: 'LUNGS', price: 350, needs: 'heart', hint: 'To breathe up there.', done: 'Lungs. The air up there is poison. Not to us.' },
-    skin: { name: 'SKIN', price: 350, needs: 'heart', top: true, hint: 'To take the storms. Only on the top level.', done: 'Skin. Let the storms come.' },
+    lungs: { name: 'LUNGS', price: 350, hint: 'The body grows twice as fast.', done: 'Lungs. The air up there is poison. Not to us.' },
+    skin: { name: 'SKIN', price: 350, top: true, hint: 'Rooms cost half. Needed to rise.', done: 'Skin. Let the storms come.' },
 };
 export const ORGAN_ORDER = ['tissue', 'stomach', 'heart', 'lungs', 'skin'];
 /** The panel's checklist, in its order; RISE needs the first three. */
