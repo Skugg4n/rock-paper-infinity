@@ -56,7 +56,7 @@ export const CHARGE_RATE = 0.6;         // share of the battery per second, at h
 export const UNLOAD_EVERY = 0.08;       // seconds a piece
 // ---- the colony -------------------------------------------------------------------------------
 export const DRAIN_BASE = 1 / 6;        // % a second at the start
-export const DRAIN_GROWS = 600;         // seconds: the drain doubles over this long
+export const DRAIN_GROWS = 400;         // seconds: the drain doubles over this long
 export const POD_EVERY = 3;             // seconds at 0 %
 export const LOST_ON_DEATH = 10;        // % of the reserve
 export const VOICE_FROM = 700;          // metres: below, the mind slips
@@ -221,6 +221,19 @@ function touchHeart(s) {
     say(s, 'Woke: everyone is here.', 'voice', 0);
 }
 
+/** Where the way up is, from a side tunnel: the nearest open tile above along this row's open ground. */
+export function shaftHint(s) {
+    for (let d = 1; d < W; d++) {
+        for (const dir of [-1, 1]) {
+            const x = s.x + dir * d;
+            let open = true;
+            for (let k = s.x + dir; k !== x + dir; k += dir) if (tileAt(s, k, s.y) !== T.AIR) { open = false; break; }
+            if (open && tileAt(s, x, s.y - 1) === T.AIR) return `Up only through open ground. The way up is to the ${dir < 0 ? 'left' : 'right'}.`;
+        }
+    }
+    return 'Up only through open ground.';
+}
+
 /** One try at a direction: start a move or a dig, or say why not. */
 function tryDir(s, dir) {
     const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
@@ -236,7 +249,7 @@ function tryDir(s, dir) {
         s.act = { kind: 'move', tx, ty, t: 0, dur: MOVE_TIME, cost: MOVE_COST };
         return true;
     }
-    if (dy === -1) { say(s, 'Up only through open ground.', 'line', 8); return false; }
+    if (dy === -1) { say(s, shaftHint(s), 'line', 8); return false; }
     if (t === T.HEART) { touchHeart(s); return true; }
     const gate = gateOf(s, t, ty);
     if (gate) { say(s, gate, 'gate', 3); s.events.push({ type: 'gate' }); return false; }

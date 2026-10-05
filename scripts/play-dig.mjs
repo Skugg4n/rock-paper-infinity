@@ -124,7 +124,11 @@ try {
     await jump('iv-dig-heart');
     await shot('10-heart-near');
     await hold('ArrowDown', 400);
-    await sleep(6500);
+    await sleep(1500);
+    await shot('11a-pods-empty');
+    await sleep(3500);
+    await shot('11b-band');
+    await sleep(5500);
     await shot('11-woke');
     const rise = await ev(`(() => { const e = document.getElementById('dig-rise'); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     if (rise) { await click(rise.x, rise.y); await sleep(3500); }

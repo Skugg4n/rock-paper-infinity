@@ -73,9 +73,19 @@ export function createRenderer(canvas) {
         r.originX = Math.round(left + Math.max(0, (vw - left - W * TS) / 2));
         const p = dronePos(s);
         // the camera: the drone a little above the middle; the sky shown at the top
-        const want = Math.max(-8 * TS, Math.min((H + 1) * TS - vh, p.y * TS - vh * 0.42));
+        // at the end the camera goes up to the pods, then follows the red band down to the heart
+        let focusY = p.y;
+        if (s.ended) {
+            if (r.ending < 2.6) focusY = -3;
+            else {
+                const k = Math.min(1, (r.ending - 2.6) / 6);
+                focusY = -1 + (p.y + 1) * k;
+            }
+        }
+        const want = Math.max(-8 * TS, Math.min((H + 1) * TS - vh, focusY * TS - vh * 0.42));
         r.cam.y += (want - r.cam.y) * Math.min(1, dt * 6);
-        if (Math.abs(want - r.cam.y) > vh) r.cam.y = want;
+        if (Math.abs(want - r.cam.y) > vh && !(s.ended && r.ending > 2.6)) r.cam.y = want;
+        if (s.ended && r.ending > 2.6) r.cam.y = want;
         const camY = r.cam.y;
         const t = s.time;
         const deep = p.y * 5;                            // metres, roughly
@@ -170,18 +180,19 @@ export function createRenderer(canvas) {
         // ---- the red band at the end, from the base down the way the drone came
         if (s.ended) {
             r.ending += dt;
-            const k = Math.min(1, r.ending / 6);
+            const k = Math.max(0, Math.min(1, (r.ending - 2.6) / 6));
             const pts = [{ x: HOME_X, y: -1 }, ...s.trail.map((i) => ({ x: i % W, y: Math.floor(i / W) })), { x: s.x, y: s.y + 1 }];
             const n = Math.min(pts.length, Math.max(2, Math.ceil(pts.length * k)));
-            ctx.strokeStyle = `rgba(200,20,45,${0.55 + 0.25 * Math.sin(t * 3.2)})`;
-            ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
             ctx.beginPath();
             for (let i = 0; i < n; i++) {
                 const q = pts[i];
                 const qx = r.originX + q.x * TS + TS / 2, qy = q.y * TS + TS / 2 - camY;
                 if (i === 0) ctx.moveTo(qx, qy); else ctx.lineTo(qx, qy);
             }
-            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,40,70,0.25)'; ctx.lineWidth = 24; ctx.stroke();
+            ctx.strokeStyle = '#c8142d'; ctx.lineWidth = 12; ctx.stroke();
+            ctx.strokeStyle = `rgba(255,150,165,${(0.35 + 0.35 * Math.max(0, Math.sin(t * 3.2))).toFixed(3)})`; ctx.lineWidth = 3; ctx.stroke();
         }
 
         // ---- the dark: a circle of light around the drone; daylight near the top
@@ -308,7 +319,7 @@ export function createRenderer(canvas) {
         const cols = 24, pitch = 10;   // nine rows
         const wx = bx + (bw - cols * pitch) / 2, wy = top + 14;
         const dark = new Set(s.dark);
-        const emptied = s.ended ? Math.floor(Math.min(1, r.ending / 5) * SLEEPERS) : 0;
+        const emptied = s.ended ? Math.floor(Math.min(1, r.ending / 2.4) * SLEEPERS) : 0;
         for (let i = 0; i < SLEEPERS; i++) {
             const pod = i + 1;
             const cx = wx + (i % cols) * pitch, cy = wy + Math.floor(i / cols) * pitch;

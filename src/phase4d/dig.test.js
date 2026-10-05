@@ -63,6 +63,15 @@ describe('the rules', () => {
         step(s, 0.05, {});
         expect(s.line.text).toBe('Turn back. Just enough power to fly home.');
     });
+    test('pressing up under rock in a side tunnel says where the way up is', () => {
+        const s = preparedState({ row: 10 });
+        s.y = 10;
+        s.tiles[10 * W + HOME_X + 1] = T.AIR; s.tiles[10 * W + HOME_X + 2] = T.AIR;
+        s.tiles[9 * W + HOME_X + 2] = T.STONE;
+        s.x = HOME_X + 2;
+        step(s, 0.05, { dir: 'up' });
+        expect(s.line.text).toBe('Up only through open ground. The way up is to the left.');
+    });
     test('the colony at 0 %: a pod goes dark every three seconds', () => {
         const s = newState(7);
         s.reserve = 0;

@@ -275,7 +275,7 @@ export function init() {
             s.events.length = 0;
             sound?.update(depthM(s), dt, s.ended);
             if (s.ended && !s.risen && !riseShownAt) riseShownAt = s.time;
-            if (riseShownAt && !s.risen && s.time - riseShownAt > 5) ui.rise.hidden = false;
+            if (riseShownAt && !s.risen && s.time - riseShownAt > 9.5) ui.rise.hidden = false;
         }
         typeLine(dt);
         refreshPanel();
