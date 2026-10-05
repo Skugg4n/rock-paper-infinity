@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (deep-dig)
+
+### v1.87.0: chapter IV, the dig (a parallel version, chosen with `?deep=dig` or ☰ → Deep)
+- New src/phase4d: a Motherload-style digging game. The drone digs down from the base under the ruins, mines ROCK, PAPER and SCISSORS ore, flies home through its own shaft, delivers piece by piece into PARTS and the colony's reserve; 216 pods go dark one by one when the reserve is empty.
+- Workshop with six rows (DRILL, BATTERY, CARGO, LAMP, HULL, RADAR), three levels each, and GRAFT (bone drill, healing cell, skin) once biomass comes home. Gates: hard rock at 300 m (DRILL 2), basalt at 700 m (DRILL 3), pressure at 500 and 900 m (HULL 1 and 2), heat at 1 200 m (HULL 3), sinew over the heart (bone).
+- Six layers that tell the game's history, twelve finds with a line each, ghost ore and a voice below 700 m, flesh that pulses, the heart at 2 000 m: "Woke: everyone is here.", the pods empty, a red band down the shaft, RISE, then V · UNITY.
+- The POWER bar carries a "home" mark: the battery it takes to fly back. Keyboard (arrows, WASD) and mouse (hold beside the drone).
+- src/deepVersion.js picks the version (colony, vault, dig); gamePhase.js loads it; checkpoints iv-dig-start, -war, -machine, -flesh, -heart; rpi-deep-version kept across jumps.
+- scripts/sim-dig.mjs (a plausible player) and scripts/play-dig.mjs (headless Chrome, muted, screenshots).
+
 ## v1.85.0 - 2026-10-04 (chapter IV, the rise in reach)
 
 ### Chapter IV: the rise in reach, quicker dreams, fixed prices, honest pumps, a mind that matters, bugs (B410 to B419)

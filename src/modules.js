@@ -7,7 +7,7 @@
 export const MODULE_PATHS = [
   'index.html', 'main.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'roman.js',
   'src/audio.js', 'src/audio-city.js', 'src/audio-war.js', 'src/chapterCard.js', 'src/checkpoints.js', 'src/constants.js', 'src/deepGate.js', 'src/gamePhase.js',
-  'src/icons.js', 'src/modules.js', 'src/perf.js', 'src/save-export.js', 'src/version.js',
+  'src/deepVersion.js', 'src/icons.js', 'src/modules.js', 'src/perf.js', 'src/save-export.js', 'src/version.js',
   'src/phase1/cost-visual.js', 'src/phase1/countdown.js', 'src/phase1/factory-view.js', 'src/phase1/index.js',
   'src/phase1/persistence.js', 'src/phase1/rates.js', 'src/phase1/rendering.js',
   'src/phase1/upgrade-dashes.js', 'src/phase1/upgrades-config.js',
@@ -21,5 +21,6 @@ export const MODULE_PATHS = [
   'src/phase4/machine.js', 'src/phase4/organ-art.js', 'src/phase4/organs.js', 'src/phase4/panel.js', 'src/phase4/persistence.js', 'src/phase4/policy.js',
   'src/phase4/readout.js', 'src/phase4/replay.js', 'src/phase4/scene.js', 'src/phase4/sound.js', 'src/phase4/strata.js',
   'src/phase4/strata-view.js', 'src/phase4/surface.js',
+  'src/phase4d/autopilot.js', 'src/phase4d/dig.js', 'src/phase4d/index.js', 'src/phase4d/render.js', 'src/phase4d/sound.js', 'src/phase4d/world.js',
   'src/phase4/tree-view.js', 'src/phase4/tree.js', 'src/phase4/view-hooks.js', 'src/phase4/views.js', 'src/phase4/watcher.js',
 ];
