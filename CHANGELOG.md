@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased (deep-vault)
+
+### v1.86.4 - 2026-10-05 (chapter IV, the vault: graphics pass)
+- **One palette** for the vault (`VT` in src/phase4v/style.js, also as CSS variables): cutaway, panel, CRT, cards and info box share it; each accent has one meaning.
+- **The cutaway as a sibling of the strata view**: veined stone, speckled sediment, every room the same frame with a lamp and a cone of light and one pale motif; the surface city is act II's tiles gone to ruin; the Engine Room is the locked RPS machine (caged tube, cog, smoke, cables with a pulse).
+- **The shaft in the middle**, four rooms on each side; the body climbs it as it takes the vault.
+- **Meatier meat**: layered fibre with direction, wet sheen and glints, tendons, mycelium, branching vessels with the pulse running through them on the heartbeat, slow breathing, the creep running ahead over a room before the tissue fills it, sinews between body rooms, vats with a turning red knot and tubes into the rock, taken rooms sunk under the tissue.
+- **Bigger CRT** (six lines, 14 px), wider panel, a hidden checklist slot (Heart / Lungs / Skin / Stomach) for the story pass.
+- **Lighter on slow machines**: static layers cached in offscreen canvases, the picture at 30 fps (10 when paused).
+- Before/after shots: docs/playtests/vault-gfx/.
+
 ## v1.86.3 - 2026-10-05 (chapter IV, the dig after its second independent test)
 
 ### The dig after its second independent test (docs/playtests/2026-10-05-dig-human-test-2.md)

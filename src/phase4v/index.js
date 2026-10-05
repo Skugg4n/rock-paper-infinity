@@ -7,7 +7,7 @@
 import * as V from './vault.js';
 import { popWish, waveKind } from './wishes.js';
 import { createVaultView } from './view.js';
-import { VAULT_CSS } from './style.js';
+import { VAULT_CSS, VT } from './style.js';
 import { createVaultSound } from './sound.js';
 import { audio } from '../audio.js';
 import { playChapterCard } from '../chapterCard.js';
@@ -17,7 +17,7 @@ import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from 
 export const INTRO_MS = 8000;
 /** Letters typed on the CRT, ms each. */
 export const TYPE_MS = 26;
-export const CRT_LINES = 4;
+export const CRT_LINES = 6;
 /** The rise: the body fills the shaft, breaks the crust and the city, before the card. */
 export const RISE_MS = 5200;
 const SAVE_EVERY_MS = 4000;
@@ -53,7 +53,13 @@ export function init() {
         <div class="v-gauge" data-v="g-ore"><div class="row"><span class="dymo">Ore</span><span class="val" data-v="ore"></span></div><div class="sub" data-v="ore-sub"></div></div>
         <div class="v-gauge" data-v="g-bio" hidden><div class="row"><span class="dymo">Biomass</span><span class="val" data-v="bio"></span></div><div class="sub" data-v="bio-sub"></div></div>
         <div class="v-gauge" data-v="g-mood"><div class="row"><span class="dymo">Mood</span><span class="val" data-v="mood"></span></div><div class="v-bar"><i data-v="mood-bar"></i></div><div class="sub" data-v="mood-sub"></div></div>
-        <div class="v-gauge" data-v="g-body" hidden><div class="row"><span class="dymo">Body</span><span class="val" data-v="body"></span></div><div class="v-bar"><i data-v="body-bar" style="background:#a8132c"></i></div></div>
+        <div class="v-gauge" data-v="g-body" hidden><div class="row"><span class="dymo">Body</span><span class="val" data-v="body"></span></div><div class="v-bar"><i data-v="body-bar" style="background:var(--v-pulse)"></i></div></div>
+        <div class="v-check" data-v="checklist" hidden>
+          <div class="c" data-v="chk-heart"><i class="box"></i><span class="dymo">Heart</span></div>
+          <div class="c" data-v="chk-lungs"><i class="box"></i><span class="dymo">Lungs</span></div>
+          <div class="c" data-v="chk-skin"><i class="box"></i><span class="dymo">Skin</span></div>
+          <div class="c" data-v="chk-stomach"><i class="box"></i><span class="dymo">Stomach</span></div>
+        </div>
         <div class="v-rows">
           <div class="r" data-v="r-res"><span class="dymo">Residents</span><span class="val" data-v="res"></span></div>
           <div class="r" data-v="r-asleep" hidden><span class="dymo">Asleep</span><span class="val" data-v="asleep"></span></div>
@@ -77,7 +83,7 @@ export function init() {
     const canvas = root.querySelector('canvas');
     const infoEl = $('info');
     view = createVaultView(canvas, {
-        insetLeft: () => 300,
+        insetLeft: () => 324,
         insetRight: () => 270,
     });
     sound = createVaultSound(audio);
@@ -135,7 +141,7 @@ export function init() {
         $('power-sub').textContent = `${V.num(p.use)} in use`;
         const pb = $('power-bar');
         pb.style.width = `${Math.min(100, p.make ? (p.use / p.make) * 100 : 100)}%`;
-        pb.style.background = p.short ? '#ff6b5a' : '#8fd0ff';
+        pb.style.background = p.short ? VT.danger : VT.cold;
         $('g-power').classList.toggle('is-red', p.short);
         $('ore').textContent = V.num(Math.floor(s.ore));
         const oreRate = s.phase === 'palace' ? V.oreRate(s) : null;
@@ -155,7 +161,7 @@ export function init() {
         $('mood').textContent = anyAwake ? `${m} %` : '-';
         const mb = $('mood-bar');
         mb.style.width = `${anyAwake ? m : 0}%`;
-        mb.style.background = m > 75 ? '#7fd38a' : m >= 40 ? '#e8c45a' : '#ff6b5a';
+        mb.style.background = m > 75 ? VT.life : m >= 40 ? VT.amber : VT.danger;
         $('g-mood').classList.toggle('is-red', anyAwake && m < 40);
         $('mood-sub').textContent = !anyAwake ? '' : m <= V.DESPAIR_AT ? 'At 0 % they try to leave.' : m < V.RIOT_BELOW ? 'They are breaking things.' : m < 40 ? 'Under 25 % they break things.' : '';
         $('g-body').hidden = !body;
@@ -181,7 +187,7 @@ export function init() {
             const left = Math.max(0, (q.due - s.day) / (q.due - q.at));
             const bar = $('req-bar');
             bar.style.width = `${left * 100}%`;
-            bar.style.background = left < 0.3 ? '#ff8a70' : '#e8c45a';
+            bar.style.background = left < 0.3 ? VT.danger : VT.amber;
             $('req').title = `${Math.ceil(q.due - s.day)} days to answer`;
         }
         $('rise').hidden = !V.riseReady(s);
@@ -353,6 +359,7 @@ export function init() {
     // ---------------------------------------------------------------- the frame
     let last = performance.now();
     let slowAt = 0;
+    let drewAt = 0, drawDt = 0;
     function frame(now) {
         rafId = requestAnimationFrame(frame);
         const dt = Math.min(0.25, (now - last) / 1000);
@@ -361,7 +368,15 @@ export function init() {
         if (!held && !s.risen) V.advance(s, dt, speed);
         if (s.out.length || s.sfx.length) pushLines();
         stepCrt(now);
-        view.frame(s, uiState(), now, held ? 0 : dt);
+        // the picture at 30 fps, 10 when held or paused and nothing on it moves by itself
+        // (the owner's machine is slow; the rules above still step every frame)
+        drawDt += held ? 0 : dt;
+        const still = (held || speed === 0) && !view.busy;
+        if (now - drewAt >= (still ? 100 : 33) - 2) {
+            drewAt = now;
+            view.frame(s, uiState(), now, drawDt);
+            drawDt = 0;
+        }
         if (now - slowAt > 200) {
             slowAt = now;
             paintPanel(); paintCards(); paintInfo();
