@@ -128,7 +128,7 @@ try {
     }
     await jump('iv-dig-heart');
     await shot('10-heart-near');
-    await hold('ArrowDown', 400);
+    await hold('ArrowDown', 4200);          // the heart's wall takes four beats
     await sleep(1500);
     await shot('11a-pods-empty');
     await sleep(3500);

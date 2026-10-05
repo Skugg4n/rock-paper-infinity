@@ -8,7 +8,7 @@
 import { W, H, T } from './world.js';
 import {
     tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, radarRange,
-    PRICES, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST,
+    priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST,
 } from './dig.js';
 
 const DIRS = [['down', 0, 1], ['left', -1, 0], ['right', 1, 0], ['up', 0, -1]];
@@ -165,12 +165,12 @@ export function shop(s, mem) {
         if (graftShown(s) && GRAFTS[s.grafts] && s.bio >= GRAFTS[s.grafts].price && buyGraft(s)) { bought.push('graft'); continue; }
         const want = mem.need && mem.need !== 'graft' ? mem.need : null;
         if (want && s.levels[want] < 3) {
-            if (s.parts >= PRICES[s.levels[want]]) { buy(s, want); bought.push(want); mem.need = null; continue; }
+            if (s.parts >= priceFor(want, s.levels[want])) { buy(s, want); bought.push(want); mem.need = null; continue; }
             // save for it, but buy cheap things that do not delay it much
         }
         const cands = USEFUL.filter((r) => s.levels[r] < 3 && (r !== 'hull' || mem.need === 'hull'))
-            .map((r) => ({ r, p: PRICES[s.levels[r]] }))
-            .filter((c) => c.p <= s.parts && (!want || s.parts - c.p >= PRICES[s.levels[want]] * 0.5 || c.p <= 30))
+            .map((r) => ({ r, p: priceFor(r, s.levels[r]) }))
+            .filter((c) => c.p <= s.parts && (!want || s.parts - c.p >= priceFor(want, s.levels[want]) * 0.5 || c.p <= 30))
             .sort((a, b) => a.p - b.p || USEFUL.indexOf(a.r) - USEFUL.indexOf(b.r));
         if (!cands.length) break;
         buy(s, cands[0].r);
@@ -205,7 +205,7 @@ export function decide(s, mem) {
     let tgt = null;
     if (mem.target && tileAt(s, mem.target.x, mem.target.y) > 0) tgt = nearestWanted(s, 30, mem.target);
     // saving for a gate it cannot pay yet: it explores sideways for ore, as a player would
-    const saving = mem.need && mem.need !== 'graft' && s.levels[mem.need] < 3 && s.parts < PRICES[s.levels[mem.need]];
+    const saving = mem.need && mem.need !== 'graft' && s.levels[mem.need] < 3 && s.parts < priceFor(mem.need, s.levels[mem.need]);
     s.__explore = saving;
     if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < (saving ? 90 : 6) ? { x: tgt.x, y: tgt.y } : null; }
     if (tgt && tgt.cost < (saving ? 90 : 6)) return { dir: tgt.dir };
@@ -225,7 +225,7 @@ export function decide(s, mem) {
         // the gate is a whole band: home, buy it
         if (need === 'graft' || /DRILL|HULL/.test(g)) {
             if (tgt) return { dir: tgt.dir };
-            if (need !== 'graft' && s.parts < PRICES[s.levels[need]]) {
+            if (need !== 'graft' && s.parts < priceFor(need, s.levels[need])) {
                 // nothing seen: dig sideways into the dark
                 const first = (Math.floor(s.time / 20) % 2) ? 'left' : 'right';
                 for (const d of [first, first === 'left' ? 'right' : 'left']) {

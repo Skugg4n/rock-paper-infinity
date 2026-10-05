@@ -83,16 +83,18 @@ export function createRenderer(canvas) {
         // at the end the camera goes up to the pods, then follows the red band down to the heart
         let focusY = p.y;
         let mid = 0.42;
-        if (p.y >= 380 && !s.ended) { focusY = HEART.cy - 1; mid = 0.5; }
+        if (p.y >= 380) { focusY = HEART.cy - 0.5; mid = 0.5; }
         if (r.rising !== null) { focusY = riseY(); mid = 0.5; }
         else if (s.ended) {
             if (r.ending < 2.6) focusY = -3;
             else {
                 const k = Math.min(1, (r.ending - 2.6) / 6);
-                focusY = -1 + (p.y + 1) * k;
+                focusY = -1 + (HEART.cy + 0.5) * k;
+                mid = 0.5;
             }
         }
-        const want = Math.max(-8 * TS, Math.min((H + 1) * TS - vh, focusY * TS - vh * mid));
+        // the bottom may scroll past the world's end, so the heart can sit in the middle
+        const want = Math.max(-8 * TS, Math.min((H + 6) * TS - vh * 0.5, focusY * TS - vh * mid));
         r.cam.y += (want - r.cam.y) * Math.min(1, dt * 6);
         if (Math.abs(want - r.cam.y) > vh && !(s.ended && r.ending > 2.6)) r.cam.y = want;
         if ((s.ended && r.ending > 2.6) || r.rising !== null) r.cam.y = want;
@@ -435,5 +437,5 @@ export function createRenderer(canvas) {
         ctx.restore();
     }
 
-    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise };
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, worldWidth: W * TS };
 }

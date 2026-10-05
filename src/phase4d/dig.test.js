@@ -47,8 +47,25 @@ describe('the rules', () => {
         expect(s.delivered).toBeGreaterThan(0);
         expect(t).toBeLessThan(30);                  // first ore home within 30 s
     });
-    test('an empty battery: recovered home, cargo gone, a tenth of the reserve lost', () => {
+    test('the first recoveries cost only the cargo', () => {
         const s = preparedState({ row: 10 });
+        s.y = 10; s.cargo = [T.ROCK]; s.battery = 0.01; s.reserve = 50;
+        step(s, 0.05, { dir: 'left' }); step(s, 0.5, { dir: 'left' });
+        expect(s.y).toBe(-1);
+        expect(s.cargo).toEqual([]);
+        expect(s.reserve).toBe(50);
+    });
+    test('the colony does not drink before the first purchase', () => {
+        const s = newState(7);
+        for (let i = 0; i < 200; i++) step(s, 0.05, {});
+        expect(s.reserve).toBe(100);
+        s.parts = 100; buy(s, 'drill');
+        for (let i = 0; i < 200; i++) step(s, 0.05, {});
+        expect(s.reserve).toBeLessThan(100);
+    });
+    test('an empty battery, later on: recovered home, cargo gone, a tenth of the reserve lost', () => {
+        const s = preparedState({ row: 10 });
+        s.deaths = 3;
         s.y = 10; s.cargo = [T.ROCK, T.ROCK]; s.battery = 0.01; s.reserve = 50;
         step(s, 0.05, { dir: 'left' });
         step(s, 0.5, { dir: 'left' });
@@ -59,7 +76,7 @@ describe('the rules', () => {
     });
     test('once a dive, when the battery is just enough to fly home: Turn back.', () => {
         const s = preparedState({ row: 30 });
-        s.y = 30; s.battery = 20;
+        s.y = 30; s.battery = 8;
         step(s, 0.05, {});
         expect(s.line.text).toBe('Turn back. Just enough power to fly home.');
     });
@@ -83,17 +100,24 @@ describe('the rules', () => {
         expect([...ys]).toEqual([10]);
         expect(b0 - s.battery).toBeLessThan(1);
     });
+    test('ore right above a tunnel can be dug from below', () => {
+        const s = preparedState({ row: 10 });
+        s.y = 10; s.tiles[9 * W + HOME_X] = T.ROCK;
+        for (let i = 0; i < 12; i++) step(s, 0.05, { dir: 'up' });
+        expect(s.cargo).toContain(T.ROCK);
+    });
     test('up with a side held turns into the first opening on that side', () => {
         const s = preparedState({ row: 20 });
         s.y = 20;
         s.tiles[15 * W + HOME_X - 1] = T.AIR;
+        s.tiles[14 * W + HOME_X] = T.STONE;                                   // the shaft's ceiling
         for (let i = 0; i < 60 && s.x === HOME_X; i++) step(s, 0.05, { dir: 'up', side: 'left' });
         expect(s.x).toBe(HOME_X - 1);
         expect(s.y).toBe(15);
     });
     test('the turn-back line is on only while it is true', () => {
         const s = preparedState({ row: 30 });
-        s.y = 30; s.battery = 20;
+        s.y = 30; s.battery = 8;
         step(s, 0.05, {});
         expect(s.line.kind).toBe('turnback');
         s.battery = 200; s.levels.battery = 3;

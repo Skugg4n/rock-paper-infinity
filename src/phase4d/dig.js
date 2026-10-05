@@ -16,7 +16,14 @@ export const SLEEPERS = 216;
 export const HOME_X = 11;
 
 // ---- the workshop -----------------------------------------------------------------------------
-export const PRICES = [25, 100, 400];
+/** Prices per row and level: a little different per row, so the list does not all say the same. */
+export const PRICE = {
+    drill: [20, 70, 420], battery: [30, 60, 380], cargo: [25, 60, 340],
+    lamp: [25, 50, 280], hull: [30, 90, 440], radar: [40, 80, 360],
+};
+/** Kept for old callers: the drill's prices. */
+export const PRICES = PRICE.drill;
+export const priceFor = (row, lv) => (lv >= 3 ? null : PRICE[row][lv]);
 export const ROWS = ['drill', 'battery', 'cargo', 'lamp', 'hull', 'radar'];
 export const DRILL_MULT = [1, 0.7, 0.5, 0.36];
 export const BATTERY_CAP = [40, 90, 180, 340];
@@ -34,6 +41,20 @@ export const NEXT_TEXT = {
     hull: ['Goes below 500 m.', 'Goes below 900 m.', 'Takes the heat below 1 200 m.'],
     radar: ['Shows ore in the dark.', 'Shows ore farther.', 'Shows ore and finds far off.'],
 };
+/** The workshop row's line: what the drone has now, and what the next level gives. */
+export function rowText(row, lv) {
+    const top = lv >= 3;
+    const next = (t) => (top ? t : `${t} Next: `);
+    switch (row) {
+        case 'drill': return top ? 'Breaks basalt.' : ['Steel bit. Next: digs faster.', 'Faster. Next: breaks hard rock (300 m).', 'Breaks hard rock. Next: basalt (700 m).'][lv];
+        case 'battery': return next(`Holds ${BATTERY_CAP[lv]}.`) + (top ? '' : `${BATTERY_CAP[lv + 1]}.`);
+        case 'cargo': return next(`Carries ${CARGO_CAP[lv]}.`) + (top ? '' : `${CARGO_CAP[lv + 1]}.`);
+        case 'lamp': return next(`Lights ${LAMP_RADIUS[lv]} tiles.`) + (top ? '' : `${LAMP_RADIUS[lv + 1]}.`);
+        case 'hull': return top ? 'Takes the heat.' : `Safe to ${HULL_MAX[lv]} m. Next: ${lv === 2 ? 'the heat below 1 200 m' : `${HULL_MAX[lv + 1]} m`}.`;
+        case 'radar': return top ? 'Ore and finds far off.' : ['No radar. Next: ore in the dark.', 'Ore nearby. Next: farther.', 'Ore far off. Next: finds too.'][lv];
+        default: return '';
+    }
+}
 export const GRAFTS = [
     { id: 'bone', name: 'BONE DRILL', text: 'Cuts flesh like soil.', price: 6 },
     { id: 'cell', name: 'HEALING CELL', text: 'Charges in the deep.', price: 15 },
@@ -47,7 +68,7 @@ export const DIG_COST = { [T.SOIL]: 0.8, [T.STONE]: 1.3, [T.HARD]: 1.8, [T.BASAL
 const ORE_TIME = [0.28, 0.4, 0.6, 0.8, 0.95, 0.5];
 const ORE_COST = [0.8, 1.1, 1.3, 1.8, 2.2, 1];
 export const MOVE_TIME = 0.13, MOVE_COST = 0.3;
-export const UP_TIME = 0.075, UP_MIN = 0.03, UP_COST = 0.6;
+export const UP_TIME = 0.075, UP_MIN = 0.03, UP_COST = 0.4;
 export const IDLE_DRAIN = 0.1;          // per second below the surface
 export const HEAT_FROM = 1200;          // metres
 export const HEAT_DRAIN = 0.4;          // per second in the heat, without SKIN
@@ -56,9 +77,10 @@ export const CHARGE_RATE = 0.6;         // share of the battery per second, at h
 export const UNLOAD_EVERY = 0.08;       // seconds a piece
 // ---- the colony -------------------------------------------------------------------------------
 export const DRAIN_BASE = 1 / 6;        // % a second at the start
-export const DRAIN_GROWS = 400;         // seconds: the drain doubles over this long
+export const DRAIN_GROWS = 720;         // seconds: the drain doubles over this long
 export const POD_EVERY = 3;             // seconds at 0 %
-export const LOST_ON_DEATH = 10;        // % of the reserve
+export const LOST_ON_DEATH = 10;        // % of the reserve, from the fourth recovery on
+export const FREE_DEATHS = 3;           // the first recoveries cost only the cargo
 export const VOICE_FROM = 700;          // metres: below, the mind slips
 export const VOICE_EVERY = 45;          // seconds
 export const VOICES = [
@@ -72,7 +94,7 @@ export const VOICES = [
 export const HEART_BEATS = 4;
 export const HEART_BEAT_S = 0.95;
 export const HEART_LINES = ['It beats.', 'Come home.', 'Almost.'];
-export const HOVER_DRAIN = 0.2;         // per second, standing still in the air under a ledge
+export const HOVER_DRAIN = 0.03;        // per second, standing still in the air under a ledge
 export const ROUTE_TURN = 'turnback';
 export const isOre = (t) => t === T.ROCK || t === T.PAPER || t === T.SCISSORS || t === T.BIO;
 export const isSolid = (t) => t !== T.AIR;
@@ -114,7 +136,15 @@ export const depthM = (s) => depthOf(s.y);
 export const isHome = (s) => s.y === -1;
 /** Battery to fly home from here. */
 export const homeCost = (s) => Math.max(0, s.y + 1) * UP_COST;
-export const drainRate = (s) => DRAIN_BASE * (1 + s.time / DRAIN_GROWS);
+/** The colony drinks from the first purchase on: discovery first, pressure later. */
+/** The battery the way home really takes (the climb, the drain on the way), plus a small margin. */
+export const turnBackAt = (s) => {
+    const rows = Math.max(0, s.y + 1);
+    const secs = rows * 0.045 + 1;
+    const heat = depthOf(s.y) > HEAT_FROM && s.grafts < 3 ? HEAT_DRAIN : 0;
+    return rows * UP_COST + secs * (IDLE_DRAIN + heat) + 3 + rows * UP_COST * 0.06;
+};
+export const drainRate = (s) => (s.drainFrom == null ? 0 : DRAIN_BASE * (1 + (s.time - s.drainFrom) / DRAIN_GROWS));
 
 /** The seconds a tile takes to dig with this drone. */
 export function digTime(s, t, y) {
@@ -143,7 +173,7 @@ export function gateOf(s, t, y) {
 }
 
 /** How long a line stays true, seconds, by kind; the turn-back line is held by the rules instead. */
-export const LINE_TTL = { line: 6, gate: 5, alarm: 5, find: 10, voice: 8, turnback: Infinity, end: Infinity };
+export const LINE_TTL = { ghost: 3, hint: 6, line: 6, gate: 5, alarm: 5, find: 10, voice: 8, turnback: Infinity, end: Infinity };
 /** The line on show now, or null: a line goes when its time is up. */
 export const lineNow = (s) => (s.line && s.line.text && s.time - s.line.at < (s.line.ttl ?? 6) ? s.line : null);
 const clearLine = (s) => { s.line = { text: '', at: s.time, n: (s.line?.n || 0) + 1, kind: 'line', ttl: 0 }; };
@@ -158,7 +188,7 @@ function say(s, text, kind = 'line', hold = 4) {
 
 function die(s) {
     s.cargo = [];
-    s.reserve = Math.max(0, s.reserve - LOST_ON_DEATH);
+    if (s.deaths >= FREE_DEATHS) s.reserve = Math.max(0, s.reserve - LOST_ON_DEATH);
     s.x = HOME_X; s.y = -1; s.act = null; s.fallStreak = 0;
     s.battery = batteryCap(s) * 0.15;
     s.deaths++;
@@ -212,7 +242,7 @@ function finishDig(s, tx, ty) {
         }
     } else if (t === T.GHOST) {
         s.events.push({ type: 'ghost' });
-        say(s, 'It was not there.', 'voice', 6);
+        say(s, 'It was not there.', 'ghost', 6);
     } else if (t === T.FIND) {
         const n = s.finds[i];
         if (n !== undefined && !s.found.includes(n)) {
@@ -267,7 +297,17 @@ function tryDir(s, dir) {
         s.act = { kind: 'move', tx, ty, t: 0, dur: MOVE_TIME, cost: MOVE_COST };
         return true;
     }
-    if (dy === -1) { say(s, shaftHint(s), 'line', 8); return false; }
+    if (dy === -1) {
+        // ore or a find right above: dig up into it, slower and costlier; other rock only from below
+        if ((isOre(t) || t === T.FIND || t === T.GHOST) && !gateOf(s, t, ty)) {
+            s.act = { kind: 'dig', tx, ty, t: 0, dur: digTime(s, t, ty) * 1.6, cost: digCost(t, ty) * 1.6, tile: t };
+            s.events.push({ type: 'dig-start', t });
+            return true;
+        }
+        say(s, shaftHint(s), 'hint', 8);
+        s.hintAt = [s.x, s.y];
+        return false;
+    }
     if (t === T.HEART) { s.act = { kind: 'dig', tx, ty, t: 0, dur: HEART_BEAT_S, cost: 0, tile: t }; s.events.push({ type: 'dig-start', t }); return true; }
     const gate = gateOf(s, t, ty);
     if (gate) { say(s, gate, 'gate', 3); s.events.push({ type: 'gate' }); return false; }
@@ -300,6 +340,8 @@ export function step(s, dt, input = {}) {
     } else s.podT = 0;
     const cap = batteryCap(s);
     if (isHome(s)) { s.warned = false; s.hoverSaid = false; }
+    // a hint is about where the drone was: it goes when the drone moves, or at the base
+    if (s.line?.kind === 'hint' && (isHome(s) || !s.hintAt || s.hintAt[0] !== s.x || s.hintAt[1] !== s.y)) clearLine(s);
     // a new dive starts with a clean line
     if (!isHome(s) && s.wasHome) { if (s.line?.kind !== 'find') clearLine(s); }
     s.wasHome = isHome(s);
@@ -323,7 +365,7 @@ export function step(s, dt, input = {}) {
     } else if (s.y >= 0) {
         // once a dive: the moment the battery is just enough to fly home
         // the turn-back line is on while it is true, and only then
-        const low = s.y > 2 && s.battery < homeCost(s) * 1.15 + 3;
+        const low = s.y > 2 && s.battery < turnBackAt(s);
         if (low && s.line?.kind !== ROUTE_TURN && s.line?.kind !== 'end') {
             if (!s.warned) s.events.push({ type: 'warn' });
             s.warned = true;
@@ -369,16 +411,18 @@ export function step(s, dt, input = {}) {
         // a hand that thinks (the autopilot) is asked each time the drone is free
         if (input.decide) input = { ...input, dir: input.decide(s) };
         // up with a side held: climb, and turn into the first opening on that side
-        if (input.side && input.dir === 'up' && tileAt(s, s.x + (input.side === 'left' ? -1 : 1), s.y) === T.AIR && tryDir(s, input.side)) continue;
+        // (climb while the way up is open; turn when it is not; never swing back and forth)
+        if (input.side && input.dir === 'up' && tileAt(s, s.x, s.y - 1) !== T.AIR
+            && tileAt(s, s.x + (input.side === 'left' ? -1 : 1), s.y) === T.AIR && tryDir(s, input.side)) { s.turned = true; continue; }
         const side = input.dir === 'left' || input.dir === 'right';
         if (side && tryDir(s, input.dir)) continue;
         const wantsUp = input.dir === 'up' && tileAt(s, s.x, s.y - 1) === T.AIR;
         // up under a ledge: the drone hovers where it is (a small cost), it does not bounce
-        const hovering = input.dir === 'up' && !wantsUp && below === T.AIR;
+        const hovering = input.dir === 'up' && !wantsUp && below === T.AIR && !(isOre(tileAt(s, s.x, s.y - 1)) || tileAt(s, s.x, s.y - 1) === T.FIND);
         if (hovering) {
             s.battery -= HOVER_DRAIN * left;
             if (input.side) tryDir(s, input.side);
-            if (!s.act) { if (!s.hoverSaid) { s.hoverSaid = true; say(s, shaftHint(s), 'line', 8); } break; }
+            if (!s.act) { if (!s.hoverSaid) { s.hoverSaid = true; say(s, shaftHint(s), 'hint', 8); s.hintAt = [s.x, s.y]; } break; }
             continue;
         }
         const onHatch = isHome(s) && input.dir !== 'down';
@@ -395,13 +439,14 @@ export function step(s, dt, input = {}) {
 /** Can row `row` be bought now: at home, not at the top, enough parts. */
 export function priceOf(s, row) {
     const lv = s.levels[row];
-    return lv >= 3 ? null : PRICES[lv];
+    return priceFor(row, lv);
 }
 export function buy(s, row) {
     const price = priceOf(s, row);
     if (price === null || !isHome(s) || s.parts < price) return false;
     s.parts -= price;
     s.levels[row]++;
+    if (s.drainFrom == null) s.drainFrom = s.time;
     if (row === 'battery') s.battery = batteryCap(s);
     s.events.push({ type: 'buy', row });
     return true;
