@@ -112,9 +112,11 @@ body.in-vault #pause-btn { display: none; }
 .v-card.off .need { color: var(--v-danger); }
 .v-card.armed { box-shadow: 0 0 0 3px var(--v-paper), 0 2px 6px rgba(0,0,0,0.5); }
 .v-card .mark { position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--v-amber); box-shadow: 0 0 8px rgba(255,214,120,0.8); }
-.v-info { position: absolute; right: 16px; top: 16px; width: 252px; padding: 14px 16px; border-radius: 10px; z-index: 7; box-sizing: border-box;
+.v-info { position: fixed; left: 0; top: 0; width: 252px; padding: 14px 16px; border-radius: 10px; z-index: 7; box-sizing: border-box;
   background: linear-gradient(180deg, var(--v-steel2) 0%, var(--v-steel) 100%); box-shadow: 0 18px 40px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.7); display: flex; flex-direction: column; gap: 10px; }
 .v-info[hidden] { display: none; }
+.v-info.tile { width: auto; padding: 6px; gap: 4px; background: rgba(18,23,30,0.92); }
+.v-info.tile .need { margin: 0 4px 2px; }
 .v-info .t { display: flex; justify-content: space-between; align-items: center; }
 .v-info .lv { font-size: 11px; color: var(--v-mist); }
 .v-info .desc { font-size: 13px; line-height: 18px; color: var(--v-plate); }
@@ -133,7 +135,7 @@ body.in-vault #pause-btn { display: none; }
 #phase-vault.is-rising canvas.v-cut { animation: v-quake 260ms linear infinite; }
 @keyframes v-quake { 25% { transform: translate(2px, -1px); } 75% { transform: translate(-2px, 1px); } }
 #phase-vault.is-rising .v-panel, #phase-vault.is-rising .v-build, #phase-vault.is-rising .v-time { opacity: 0.15; transition: opacity 1.5s ease; }
-.v-rise { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 8; border: 0; border-radius: 10px; padding: 14px 44px; background: var(--v-pulse); color: #f6e6e8;
+.v-rise { white-space: nowrap; position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 8; border: 0; border-radius: 10px; padding: 14px 44px; background: var(--v-pulse); color: #f6e6e8;
   font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 34px; letter-spacing: 0.3em; cursor: pointer; box-shadow: 0 0 40px rgba(168,19,44,0.7); animation: v-throb 1.7s ease-in-out infinite; }
 .v-rise[hidden] { display: none; }
 @keyframes v-throb { 50% { box-shadow: 0 0 70px rgba(168,19,44,0.95); } }

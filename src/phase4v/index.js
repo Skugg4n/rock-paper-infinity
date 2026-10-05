@@ -87,7 +87,7 @@ export function init() {
     const infoEl = $('info');
     view = createVaultView(canvas, {
         insetLeft: () => 324,
-        insetRight: () => 270,
+        insetRight: () => 40,
     });
     sound = createVaultSound(audio);
 
@@ -210,6 +210,7 @@ export function init() {
             $('req').title = `${Math.ceil(q.due - s.day)} days to answer`;
         }
         $('rise').hidden = !V.riseReady(s);
+        if (V.riseReady(s) && $('rise').textContent !== V.riseLabel(s)) $('rise').textContent = V.riseLabel(s);
         // the goal's checklist, from the moment the goal is said
         const goal = V.goal(s);
         $('checklist').hidden = !(goal.shown && s.phase !== 'palace');
@@ -256,20 +257,50 @@ export function init() {
 
     // ---------------------------------------------------------------- the info box
     function paintInfo() {
-        if (selected < 0) { if (!infoEl.hidden) { infoEl.hidden = true; view.resize(); } return; }
+        if (selected < 0) { if (!infoEl.hidden) infoEl.hidden = true; return; }
         const r = s.rooms[selected];
         const acts = V.actionsFor(s, selected);
+        // bare rock: only DIG, sitting on the tile itself
+        const tile = r.kind === 'rock' && !r.flesh && acts.length === 1 && acts[0].id === 'dig';
+        if (tile) {
+            const a = acts[0];
+            const html = `<button type="button" class="a" data-act="dig" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}`;
+            if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
+            infoEl.classList.add('tile');
+            infoEl.hidden = false;
+            placeInfo(true);
+            return;
+        }
+        infoEl.classList.remove('tile');
         const lvl = !['rock', 'empty'].includes(r.kind) && !r.flesh && r.kind !== 'vat' ? `Level ${r.lvl}` : '';
         const html = `<div class="t"><span class="dymo">${esc(V.nameOf(s, selected))}</span><span class="lv">${lvl}</span></div>
             <div class="desc">${esc(V.describe(s, selected))}</div>
             <div class="acts">${acts.map((a, k) => {
                 // GROW INTO is one choice: a heading over its organ buttons
                 const head = a.group === 'grow' && (k === 0 || acts[k - 1].group !== 'grow') ? '<div class="grp"><span class="dymo">Grow into</span></div>' : '';
-                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.dark ? ' dark' : a.id === 'reclaim' || a.id === 'bury' ? ' quiet' : '';
+                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.id === 'grow' ? ' flesh' : a.dark ? ' dark' : a.id === 'reclaim' || a.id === 'bury' ? ' quiet' : '';
                 return `${head}<button type="button" class="a${cls}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}${a.hint ? `<div class="hint">${esc(a.hint)}</div>` : ''}`;
             }).join('')}</div>`;
         if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
-        if (infoEl.hidden) { infoEl.hidden = false; view.resize(); }
+        infoEl.hidden = false;
+        placeInfo(false);
+    }
+    /** The info box sits by what was clicked: beside the room (right, or left if no room), or on the tile. */
+    function placeInfo(onTile) {
+        const g = view.slotRect(selected);
+        if (!g) return;
+        const c = canvas.getBoundingClientRect();
+        const bw = infoEl.offsetWidth || 252, bh = infoEl.offsetHeight || 120;
+        let x, y;
+        if (onTile) { x = c.left + g.x + (g.w - bw) / 2; y = c.top + g.y + (g.h - bh) / 2; }
+        else {
+            x = c.left + g.x + g.w + 10;
+            if (x + bw > window.innerWidth - 12) x = c.left + g.x - bw - 10;
+            y = c.top + g.y - 8;
+        }
+        x = Math.max(12, Math.min(window.innerWidth - bw - 12, x));
+        y = Math.max(12, Math.min(window.innerHeight - bh - 12, y));
+        infoEl.style.left = `${Math.round(x)}px`; infoEl.style.top = `${Math.round(y)}px`;
     }
 
     /**
@@ -316,6 +347,13 @@ export function init() {
         selected = i;
         if (i >= 0) sound.event('click');
         afterAct();
+    }, { signal });
+    // a double click on rock digs it at once
+    canvas.addEventListener('dblclick', (e) => {
+        if (performance.now() < introUntil) return;
+        const rect = canvas.getBoundingClientRect();
+        const i = view.slotAt(e.clientX - rect.left, e.clientY - rect.top);
+        if (i >= 0 && V.canDig(s, i) && V.dig(s, i)) { selected = -1; afterAct(); }
     }, { signal });
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();

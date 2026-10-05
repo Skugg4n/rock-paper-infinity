@@ -130,9 +130,6 @@ function nightMove() {
         if (V.canTake(s) && t - lastActAt > 3) { V.takeOne(s); takes++; note('take'); return true; }
         if (!V.growingCount(s) && s.asleep > 20 && V.power(s).short && t - lastActAt > 3) { V.cutPower(s); cuts++; note('cut'); return true; }
     }
-    // the last sleepers: the body will not take them; the system must (CUT POWER, a row at a time)
-    const last = slotsWhere((r, i) => V.lastSleepers(s, i) && s.rooms.some((q, j) => q.flesh === 1 && (Math.abs(j - i) === 1 || Math.abs(j - i) === V.SLOTS)));
-    if (!g.length && last.length && !V.growingCount(s) && t - lastActAt > 2) { V.cutPower(s); cuts++; note('cut'); return true; }
     return false;
 }
 

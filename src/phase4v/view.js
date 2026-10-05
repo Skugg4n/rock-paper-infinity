@@ -400,7 +400,11 @@ export function createVaultView(canvas, opts = {}) {
                 ctx.strokeStyle = rgba(VT.mist, 0.16); ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
                 progress(x, y, w, h, 1 - r.job.left / r.job.total, VT.plate);
                 pickaxe(x + w / 2, y + h / 2, t);
-            } else if (ui.diggable && ui.diggable.has(i)) {
+            } else if (!(ui.diggable && ui.diggable.has(i))) {
+                // every level is eight places wide: unworked rock still shows its place, faintly
+                ctx.strokeStyle = rgba(VT.mist, 0.06);
+                ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+            } else {
                 // a place: rock that can be dug by day, or take a vat or a Cryo Bay in the night
                 ctx.setLineDash([3, 4]);
                 ctx.strokeStyle = rgba(VT.mist, s.phase === 'night' ? 0.32 : 0.16);

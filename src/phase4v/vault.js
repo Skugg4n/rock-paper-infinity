@@ -297,7 +297,19 @@ export const hasOrgan = (s, organ) => s.rooms.some((r) => organOf(r) === organ);
 export const roomsOf = (s, kind) => s.rooms.filter((r) => r.kind === kind && r.flesh !== 1 && (!r.job || r.job.op !== 'build'));
 
 export function beds(s) { return roomsOf(s, 'suites').length * SUITE_BEDS; }
-export function pods(s) { return roomsOf(s, 'cryo').reduce((a, r) => a + r.lvl * PODS_PER_LEVEL, 0); }
+/** Pods in the Cryo Bays still standing (a bay the body is growing into has given up its sleepers). */
+export function pods(s) { return roomsOf(s, 'cryo').filter((r) => !(r.job && r.job.op === 'grow')).reduce((a, r) => a + r.lvl * PODS_PER_LEVEL, 0); }
+/** Who sleeps in Cryo Bay i: the sleepers fill the bays in order. */
+export function bayOccupants(s, i) {
+    let left = s.asleep;
+    for (const [j, r] of s.rooms.entries()) {
+        if (r.kind !== 'cryo' || r.flesh === 1 || (r.job && r.job.op === 'grow') || (r.job && r.job.op === 'build')) continue;
+        const k = Math.min(left, r.lvl * PODS_PER_LEVEL);
+        if (j === i) return k;
+        left -= k;
+    }
+    return 0;
+}
 /** What one hydroponics room feeds now: after the turn the lamps are old. */
 export function hydroFeeds(s, r) { return Math.round(HYDRO_FEEDS[r.lvl - 1] * (s.turned ? HYDRO_TURNED : 1)); }
 export function food(s) {
@@ -607,10 +619,13 @@ export function reclaim(s) {
     return true;
 }
 export const canTake = (s) => s.reclaimed > 0 && s.asleep > 0;
-export function takeOne(s) {
+/** TAKE TEN: ten at once. */
+export const TAKE_MANY = 10;
+export function takeOne(s, n = 1) {
     if (!canTake(s)) return false;
-    s.asleep -= 1; s.residents -= 1; s.here += 1; s.taken += 1;
-    s.bio += TAKE_BIO;
+    const k = Math.min(n, s.asleep);
+    s.asleep -= k; s.residents -= k; s.here += k; s.taken += k;
+    s.bio += TAKE_BIO * k;
     // the pods beside it open: they wake, and they saw
     const woke = Math.min(TAKE_WAKES, s.asleep);
     if (woke > 0) {
@@ -635,19 +650,10 @@ export function cutPower(s) {
 }
 
 /** The body's neighbours: beside a vat or flesh on the same level, or under/over one. */
-/** The last Cryo Bay with anyone asleep in it: the body will not take them. The system must. */
-export function lastSleepers(s, i) {
-    const r = s.rooms[i];
-    if (!r || r.kind !== 'cryo' || r.flesh || s.asleep <= 0) return false;
-    return !s.rooms.some((q, j) => j !== i && q.kind === 'cryo' && q.flesh !== 1 && !(q.job && q.job.op === 'grow'));
-}
-export const LAST_SLEEPERS = 'The body will not take the last sleepers. You must.';
-
 export function canGrowInto(s, i) {
     const r = s.rooms[i];
     if (!r || r.flesh || r.job || s.phase !== 'night' || growing(s)) return false;
     if (!hasVat(s)) return false;
-    if (lastSleepers(s, i)) return false;
     const lv = levelOf(i), ix = idxOf(i);
     // the body grows from below: a level is taken only when the one under it is all body
     if (lv < LEVELS - 1 && !s.rooms.slice((lv + 1) * SLOTS, (lv + 2) * SLOTS).every(isFlesh)) return false;
@@ -673,6 +679,15 @@ export function growInto(s, i, organ = 'tissue') {
     if (!canGrowInto(s, i) || !organAllowed(s, organ, i) || s.bio < price) return false;
     s.bio -= price;
     const r = s.rooms[i];
+    // a Cryo Bay: the sleepers inside go into the body with it, in the one click
+    if (r.kind === 'cryo') {
+        const k = bayOccupants(s, i);
+        if (k > 0) {
+            s.asleep -= k; s.residents -= k; s.here += k;
+            s.bio += k * JOIN_BIO;
+            say(s, `${num(k)} sleepers are inside now.`, 'sys');
+        }
+    }
     r.flesh = 0.001;
     r.organ = organ;
     const years = growYears(s);
@@ -699,10 +714,21 @@ export function goal(s) {
     out.ready = riseReady(s);
     return out;
 }
-/** RISE: a heart, lungs and skin, and everyone who lives is inside. */
-export const riseReady = (s) => !s.risen && s.phase === 'night' && s.residents === 0 && s.here > 0 && REQUIRED.every((o) => hasOrgan(s, o));
+/**
+ * RISE: a heart, lungs and skin, and every sleeper inside. Who is still AWAKE does not come: that is the
+ * dark choice, and the lever says so.
+ */
+export const riseReady = (s) => !s.risen && s.phase === 'night' && s.asleep === 0 && s.here > 0 && REQUIRED.every((o) => hasOrgan(s, o));
+/** The RISE lever's words. */
+export function riseLabel(s) {
+    const a = awake(s);
+    return a > 0 ? `RISE · ${num(a)} ${a === 1 ? 'is' : 'are'} still awake` : 'RISE';
+}
+export const LEFT_BEHIND = 'They can stay.';
 export function rise(s) {
     if (!riseReady(s)) return false;
+    const left = awake(s);
+    if (left > 0) { s.left = left; s.residents = 0; say(s, LEFT_BEHIND, 'sys'); }
     s.risen = true;
     s.phase = 'risen';
     sfx(s, 'rise');
@@ -819,12 +845,12 @@ function takeRoom(s, i) {
     const r = s.rooms[i];
     r.flesh = 1;
     if (!r.organ) r.organ = 'tissue';
-    // a Cryo Bay taken: who does not fit in the pods left is here now; the last one takes everyone
-    if (r.kind === 'cryo' && (s.asleep > pods(s) || (pods(s) === 0 && s.residents > 0))) {
-        const k = pods(s) === 0 ? s.residents : s.asleep - pods(s);
-        s.asleep = Math.max(0, s.asleep - k); s.residents -= k; s.here += k;
+    // the sleepers of a Cryo Bay went in when it was chosen; any who no longer fit in the pods left go in now
+    if (r.kind === 'cryo' && s.asleep > pods(s)) {
+        const k = s.asleep - pods(s);
+        s.asleep -= k; s.residents -= k; s.here += k;
         s.bio += k * JOIN_BIO;
-        say(s, `${num(k)} sleepers are here now.`, 'sys');
+        say(s, `${num(k)} sleepers are inside now.`, 'sys');
     }
     organGrown(s, r.organ);
     sfx(s, 'taken');
@@ -849,7 +875,7 @@ function takeRoom(s, i) {
         }
     }
     // every room is body: whoever is left is inside it
-    if (s.rooms.every(isFlesh) && s.residents > 0) { s.here += s.residents; s.residents = 0; s.asleep = 0; }
+    if (s.rooms.every(isFlesh) && s.asleep > 0) { s.here += s.asleep; s.residents -= s.asleep; s.asleep = 0; }
     checkEnd(s);
 }
 
@@ -1057,11 +1083,19 @@ export function actionsFor(s, i) {
                 out.push({ id: 'bury', label: 'BURY', ok: true, hint: 'The dead go into the rock. Nothing comes of it.' });
             }
             if (canTake(s)) out.push({ id: 'take', label: 'TAKE ONE', ok: true, dark: true, hint: `A living sleeper becomes biomass. +${TAKE_BIO}. The pods beside it open.` });
+            if (canTake(s) && s.asleep >= TAKE_MANY) out.push({ id: 'take10', label: 'TAKE TEN', ok: true, dark: true, hint: `Ten sleepers become biomass. +${num(TAKE_BIO * TAKE_MANY)}. The pods beside them open.` });
             if (night && s.asleep > 0) out.push({ id: 'cut', label: 'CUT POWER', ok: true, hint: 'Ten pods go dark. Ten die. Their power goes to the rest.' });
         }
     }
     // the body's choice first, the same place in every room: what this room becomes
-    if (canGrowInto(s, i)) out.unshift(...organButtons(s, i, ORGAN_ORDER));
+    if (canGrowInto(s, i)) {
+        const n = r.kind === 'cryo' ? bayOccupants(s, i) : 0;
+        if (n > 0) {
+            // a Cryo Bay with sleepers: one click, and they are inside
+            const price = organPrice(s, 'tissue');
+            out.unshift({ id: 'grow', organ: 'tissue', label: `GROW INTO · takes the ${num(n)} sleepers inside`, ok: s.bio >= price, need: s.bio >= price ? '' : `Need ${num(Math.ceil(price - s.bio))} more biomass.`, hint: `${num(price)} biomass.` });
+        } else out.unshift(...organButtons(s, i, ORGAN_ORDER));
+    }
     // a Cryo Bay in the night: only what applies now, the likeliest first, four at most
     if (r.kind === 'cryo' && s.phase === 'night') return nightCryo(s, out);
     return out;
@@ -1069,7 +1103,7 @@ export function actionsFor(s, i) {
 export const NIGHT_CRYO_MAX = 4;
 function nightCryo(s, out) {
     const need = !hasOrgan(s, 'heart') ? 'grow-heart' : !hasOrgan(s, 'lungs') ? 'grow-lungs' : 'grow-stomach';
-    const order = ['reclaim', 'sleepall', 'sleep', 'grow', need, 'take', 'cut', 'bury', 'wake'];
+    const order = ['reclaim', 'sleepall', 'sleep', 'grow', need, 'take10', 'take', 'cut', 'bury', 'wake'];
     const by = new Map(out.map((a) => [a.id, a]));
     const picked = order.filter((id) => by.has(id)).map((id) => by.get(id));
     // WAKE only when nothing else applies
@@ -1105,6 +1139,7 @@ export function act(s, id, i) {
         case 'bury': return bury(s);
         case 'reclaim': return reclaim(s);
         case 'take': return takeOne(s);
+        case 'take10': return takeOne(s, TAKE_MANY);
         case 'cut': return cutPower(s);
         case 'grow': return growInto(s, i, 'tissue');
         default:
@@ -1145,7 +1180,7 @@ export function describe(s, i) {
         }
         case 'suites': return 'Beds for 100.';
         case 'mine': return `Digs ${MINE_ORE[r.lvl - 1]} ore a day.`;
-        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(s.asleep)} asleep in all.${s.phase === 'night' && lastSleepers(s, i) && hasVat(s) ? ` ${LAST_SLEEPERS}` : ''}`;
+        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(bayOccupants(s, i))} asleep here.`;
         case 'game': return r.lvl >= 2 ? `Game studio. They sell games to each other: ${GAME_STUDIO_ORE} ore a day.` : 'Screens and games.';
         case 'gym': return r.lvl === 2 ? 'Weights, a track and a pool.' : r.lvl === 3 ? 'Weights, a pool and a spa.' : 'Weights and a track.';
         default: return KINDS[r.kind].does;

@@ -242,16 +242,15 @@ describe('the night: the goal and the organs', () => {
         s.rooms.forEach((r, i) => { if (!bays.includes(i) && i !== V.slotIndex(0, 3) && !r.flesh) Object.assign(r, { flesh: 1, organ: 'tissue' }); });
         s.rooms[V.slotIndex(2, 3)].organ = 'heart';
         s.rooms[V.slotIndex(2, 4)].organ = 'lungs';
-        // skin waits for a full floor under it: the Cryo Bays first; the last one's sleepers the body will not take
+        // skin waits for a full floor under it: the Cryo Bays first; each takes its sleepers inside in one click
         expect(V.growInto(s, V.slotIndex(0, 3), 'skin')).toBe(false);
         expect(V.goal(s).inside).toBeLessThan(V.goal(s).total);
-        s.bio = 1e4; expect(V.growInto(s, bays[0])).toBe(true); run(s, 40, 2);
-        const last = bays[1];
-        expect(V.canGrowInto(s, last)).toBe(false);
-        expect(V.describe(s, last)).toMatch(/The body will not take the last sleepers\. You must\.$/);
-        // the dark choice: CUT POWER until nobody sleeps, the dead to the meat lab
-        while (s.asleep > 0) { V.cutPower(s); V.reclaim(s); if (V.awake(s)) V.sleepAll(s); }
-        s.bio = 1e4; expect(V.growInto(s, last)).toBe(true); run(s, 40, 2);
+        for (const b of bays) {
+            s.bio = 1e4;
+            expect(V.actionsFor(s, b)[0].label).toMatch(/^GROW INTO · takes the \d+ sleepers inside$/);
+            expect(V.growInto(s, b)).toBe(true);
+            run(s, 40, 2);
+        }
         expect(s.residents).toBe(0);
         expect(V.riseReady(s)).toBe(false);
         s.bio = 1e4;
@@ -333,15 +332,24 @@ describe('after the third test', () => {
         s.grown += 4;
         expect(V.organPrice(s, 'heart')).toBeGreaterThan(heart);
     });
-    test('the last Cryo Bay: the body will not take its sleepers, the system must (a dark choice before RISE)', () => {
+    test('RISE with some still awake: they do not come; the lever says so, and the system: "They can stay."', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
-        const bays = s.rooms.map((r, i) => (r.kind === 'cryo' ? i : -1)).filter((i) => i >= 0);
-        s.rooms[bays[0]].flesh = 1;
-        expect(V.lastSleepers(s, bays[1])).toBe(true);
-        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2) r.flesh = 1; });
-        expect(V.canGrowInto(s, bays[1])).toBe(false);
-        V.cutPower(s);
-        expect(V.fallenBio(s)).toBe(10 * V.CUT_BIO);
+        s.rooms.forEach((r) => { r.flesh = 1; r.job = null; r.organ = 'tissue'; });
+        s.rooms[V.slotIndex(2, 3)].organ = 'heart'; s.rooms[V.slotIndex(2, 4)].organ = 'lungs'; s.rooms[V.slotIndex(0, 3)].organ = 'skin';
+        s.here = 190; s.asleep = 0; s.residents = 3;
+        expect(V.riseReady(s)).toBe(true);
+        expect(V.riseLabel(s)).toBe('RISE · 3 are still awake');
+        expect(V.rise(s)).toBe(true);
+        expect(s.left).toBe(3);
+        expect(s.out.map((o) => o.text)).toContain('They can stay.');
+    });
+    test('TAKE TEN: ten at once, the fast dark way', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        const cryo = s.rooms.findIndex((r) => r.kind === 'cryo');
+        const bio = s.bio, asleep = s.asleep;
+        expect(V.act(s, 'take10', cryo)).toBe(true);
+        expect(s.bio).toBe(bio + 10 * V.TAKE_BIO);
+        expect(s.asleep).toBeLessThanOrEqual(asleep - 10);
     });
     test('the first pod of the night: the way is pointed out once, marked; later failures are one counting line', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-night']();
@@ -372,6 +380,6 @@ describe('after the third test', () => {
         s.bio = 1000;
         const acts = V.actionsFor(s, cryo);
         expect(acts.length).toBeLessThanOrEqual(4);
-        expect(acts.map((a) => a.id)).toEqual(['reclaim', 'grow', 'grow-heart', 'take']);
+        expect(acts.map((a) => a.id)).toEqual(['reclaim', 'grow', 'take10', 'take']);
     });
 });
