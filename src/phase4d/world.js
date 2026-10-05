@@ -18,8 +18,8 @@ export const T = {
 
 /** Ore: what it is worth and in what. */
 export const ORE = {
-    [T.ROCK]: { kind: 'rock', parts: 1, bio: 0 },
-    [T.PAPER]: { kind: 'paper', parts: 3, bio: 0 },
+    [T.ROCK]: { kind: 'rock', parts: 2, bio: 0 },
+    [T.PAPER]: { kind: 'paper', parts: 4, bio: 0 },
     [T.SCISSORS]: { kind: 'scissors', parts: 8, bio: 0 },
     [T.BIO]: { kind: 'bio', parts: 0, bio: 1 },
 };

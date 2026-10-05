@@ -46,6 +46,32 @@ export function wayHome(s) {
     return { dir, cost };
 }
 
+/** The cells of the way home through open ground, from the drone to the surface, or null. */
+export function pathHome(s) {
+    if (isHome(s)) return null;
+    const key = (x, y) => (y + 1) * W + x;
+    const prev = new Map([[key(s.x, s.y), null]]);
+    const q = [[s.x, s.y]];
+    let end = null;
+    for (let qi = 0; qi < q.length; qi++) {
+        const [x, y] = q[qi];
+        if (y === -1) { end = [x, y]; break; }
+        for (const [, dx, dy] of DIRS) {
+            const nx = x + dx, ny = y + dy;
+            if (tileAt(s, nx, ny) !== T.AIR) continue;
+            const k = key(nx, ny);
+            if (prev.has(k)) continue;
+            prev.set(k, [x, y]);
+            q.push([nx, ny]);
+        }
+    }
+    if (!end) return null;
+    const out = [end];
+    let cur = prev.get(key(end[0], end[1]));
+    while (cur) { out.push(cur); cur = prev.get(key(cur[0], cur[1])); }
+    return out.reverse();
+}
+
 /** Is this tile one the player would go for: ore or a find, seen in the lamp or on the radar. */
 function wanted(s, x, y, t) {
     if (s.__explore && (isOre(t) || t === T.FIND) && Math.abs(x - s.x) + Math.abs(y - s.y) <= 70) return true;

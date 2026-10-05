@@ -9,6 +9,7 @@
 - The POWER bar carries a "home" mark: the battery it takes to fly back. Keyboard (arrows, WASD) and mouse (hold beside the drone).
 - src/deepVersion.js picks the version (colony, vault, dig); gamePhase.js loads it; checkpoints iv-dig-start, -war, -machine, -flesh, -heart; rpi-deep-version kept across jumps.
 - scripts/sim-dig.mjs (a plausible player) and scripts/play-dig.mjs (headless Chrome, muted, screenshots).
+- After the independent test: the drone hovers under a ledge instead of bouncing, up + side turns into the first opening (250 ms buffer); dug tunnels stay faintly visible and a dotted way home shows when power is short; POWER reads as capacity ("62 / 90") and the bar grows with upgrades; the status line is only shown while true; ore glints, rubble looks like rock; surface ore worth more (300 m in about 2.5 min); a find pops its value; the heart takes four beats, is centred, the panel fades, RISE shows the red mass climbing through the city; bigger drone, larger workshop text, a pod strip in the panel.
 
 ## v1.85.0 - 2026-10-04 (chapter IV, the rise in reach)
 

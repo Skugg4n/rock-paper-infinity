@@ -72,6 +72,34 @@ describe('the rules', () => {
         step(s, 0.05, { dir: 'up' });
         expect(s.line.text).toBe('Up only through open ground. The way up is to the left.');
     });
+    test('up under a ledge: the drone hovers, it does not bounce, and costs little', () => {
+        const s = preparedState({ row: 10 });
+        s.y = 10;
+        s.tiles[11 * W + HOME_X] = T.AIR; s.tiles[12 * W + HOME_X] = T.AIR;   // open below
+        s.tiles[9 * W + HOME_X] = T.STONE;                                    // a ledge above
+        const b0 = s.battery;
+        const ys = new Set();
+        for (let i = 0; i < 40; i++) { step(s, 0.05, { dir: 'up' }); ys.add(s.y); }
+        expect([...ys]).toEqual([10]);
+        expect(b0 - s.battery).toBeLessThan(1);
+    });
+    test('up with a side held turns into the first opening on that side', () => {
+        const s = preparedState({ row: 20 });
+        s.y = 20;
+        s.tiles[15 * W + HOME_X - 1] = T.AIR;
+        for (let i = 0; i < 60 && s.x === HOME_X; i++) step(s, 0.05, { dir: 'up', side: 'left' });
+        expect(s.x).toBe(HOME_X - 1);
+        expect(s.y).toBe(15);
+    });
+    test('the turn-back line is on only while it is true', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.battery = 20;
+        step(s, 0.05, {});
+        expect(s.line.kind).toBe('turnback');
+        s.battery = 200; s.levels.battery = 3;
+        step(s, 0.05, {});
+        expect(s.line.text).toBe('');
+    });
     test('the colony at 0 %: a pod goes dark every three seconds', () => {
         const s = newState(7);
         s.reserve = 0;
@@ -96,7 +124,9 @@ describe('the rules', () => {
     test('touching the heart ends it: Woke: everyone is here.', () => {
         const s = preparedState({ row: 397, levels: { drill: 3, hull: 3 }, grafts: 3 });
         s.y = 397; s.x = HOME_X;
-        for (let i = 0; i < 10 && !s.ended; i++) step(s, 0.05, { dir: 'down' });
+        const said = [];
+        for (let i = 0; i < 200 && !s.ended; i++) { step(s, 0.05, { dir: 'down' }); if (!said.includes(s.line.text)) said.push(s.line.text); }
+        expect(said).toEqual(expect.arrayContaining(['It beats.', 'Come home.', 'Almost.']));
         expect(s.ended).toBe(true);
         expect(s.line.text).toBe('Woke: everyone is here.');
     });

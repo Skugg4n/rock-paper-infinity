@@ -8,6 +8,7 @@ import { W, H, T, HEART, layerIndexOf } from './world.js';
 import { lampRadius, radarRange, isOre, SLEEPERS, HOME_X } from './dig.js';
 
 export const TS = 32;
+export const RISE_S = 5;
 const BASE_X0 = 7, BASE_X1 = 16;          // the base's tiles, on the surface
 // per layer: the ground's two tones and a mark colour
 const PAL = [
@@ -18,7 +19,7 @@ const PAL = [
     { a: '#3d1a17', b: '#2f1311', m: '#8a2c1f', soil: '#4a1f1a' },      // warm: dark red, veins
     { a: '#5a1f2a', b: '#45161f', m: '#a8132c', soil: '#5a1f2a' },      // flesh
 ];
-const ORE_COL = { [T.ROCK]: '#b9c0c8', [T.PAPER]: '#efe6c8', [T.SCISSORS]: '#9fe3ff', [T.BIO]: '#ff4d6d' };
+const ORE_COL = { [T.ROCK]: '#9fd8e8', [T.PAPER]: '#efe6c8', [T.SCISSORS]: '#9fe3ff', [T.BIO]: '#ff4d6d' };
 const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 /** The ruins on the skyline, made once. */
@@ -38,7 +39,13 @@ export function createRenderer(canvas) {
     const skyline = makeSkyline(7);
     const sparks = [];
     let flash = 0, flashAt = 4;
-    const r = { cam: { x: 0, y: -6 * TS }, originX: 0, ending: 0 };
+    const r = { cam: { x: 0, y: -6 * TS }, originX: 0, ending: 0, rising: null };
+    const pops = [];
+    /** A number that floats up from the drone: a find's worth. */
+    function pop(text, col = '#f2d98a', big = true, sub = '') { pops.push({ text, col, big, sub, life: 2.2 }); }
+    /** RISE: the red mass climbs from the heart to the city in RISE_S seconds. */
+    function rise() { r.rising = 0; }
+    function riseY() { const k = Math.min(1, (r.rising || 0) / (RISE_S * 0.8)); const e = k * k * (3 - 2 * k); return HEART.cy + (-6 - HEART.cy) * e; }
 
     function resize() {
         const dpr = Math.min(1.5, window.devicePixelRatio || 1);
@@ -75,17 +82,20 @@ export function createRenderer(canvas) {
         // the camera: the drone a little above the middle; the sky shown at the top
         // at the end the camera goes up to the pods, then follows the red band down to the heart
         let focusY = p.y;
-        if (s.ended) {
+        let mid = 0.42;
+        if (p.y >= 380 && !s.ended) { focusY = HEART.cy - 1; mid = 0.5; }
+        if (r.rising !== null) { focusY = riseY(); mid = 0.5; }
+        else if (s.ended) {
             if (r.ending < 2.6) focusY = -3;
             else {
                 const k = Math.min(1, (r.ending - 2.6) / 6);
                 focusY = -1 + (p.y + 1) * k;
             }
         }
-        const want = Math.max(-8 * TS, Math.min((H + 1) * TS - vh, focusY * TS - vh * 0.42));
+        const want = Math.max(-8 * TS, Math.min((H + 1) * TS - vh, focusY * TS - vh * mid));
         r.cam.y += (want - r.cam.y) * Math.min(1, dt * 6);
         if (Math.abs(want - r.cam.y) > vh && !(s.ended && r.ending > 2.6)) r.cam.y = want;
-        if (s.ended && r.ending > 2.6) r.cam.y = want;
+        if ((s.ended && r.ending > 2.6) || r.rising !== null) r.cam.y = want;
         const camY = r.cam.y;
         const t = s.time;
         const deep = p.y * 5;                            // metres, roughly
@@ -197,9 +207,11 @@ export function createRenderer(canvas) {
 
         // ---- the dark: a circle of light around the drone; daylight near the top
         const dx = r.originX + p.x * TS + TS / 2, dy = p.y * TS + TS / 2 - camY;
-        const under = Math.max(0, Math.min(1, (p.y + 1) / 14));   // the city layer is still half lit from above
+        // daylight fades over the first 150 m, never all at once
+        const u0 = Math.max(0, Math.min(1, (p.y + 1) / 30));
+        const under = u0 * u0 * (3 - 2 * u0);
         if (under > 0 && !s.ended) {
-            let rad = lampRadius(s) * TS;
+            let rad = lampRadius(s) * TS * (1 + 2.2 * (1 - under));
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);
             const g = ctx.createRadialGradient(dx, dy, rad * 0.35, dx, dy, rad);
             g.addColorStop(0, 'rgba(0,0,0,0)');
@@ -207,6 +219,19 @@ export function createRenderer(canvas) {
             ctx.fillStyle = g;
             const top = Math.max(0, groundY);
             ctx.fillRect(0, top, vw, vh - top);
+            // the remembered map: what was dug stays faintly drawn in the dark
+            ctx.fillStyle = 'rgba(150,170,195,0.10)';
+            for (let y = Math.max(0, y0); y <= y1; y++) {
+                for (let x = 0; x < W; x++) if (s.tiles[y * W + x] === T.AIR) ctx.fillRect(r.originX + x * TS + 3, y * TS - camY + 3, TS - 6, TS - 6);
+            }
+            // the way home, when the power is short: a faint dotted line along the open ground
+            if (view.path && view.path.length > 1) {
+                ctx.strokeStyle = 'rgba(255,220,150,0.55)';
+                ctx.lineWidth = 2; ctx.setLineDash([4, 6]);
+                ctx.beginPath();
+                view.path.forEach(([x, y], i) => { const px = r.originX + x * TS + TS / 2, py = y * TS + TS / 2 - camY; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+                ctx.stroke(); ctx.setLineDash([]);
+            }
             // the radar: true ore as faint dots outside the light
             const rr = radarRange(s);
             if (rr > 0) {
@@ -218,14 +243,43 @@ export function createRenderer(canvas) {
                         const d = Math.hypot(x - p.x, y - p.y);
                         if (d > rr || d < lampRadius(s) * 0.8) continue;
                         ctx.fillStyle = tt === T.FIND ? 'rgba(255,220,120,0.55)' : `rgba(${tt === T.BIO ? '255,90,110' : '140,220,255'},${(0.5 - 0.35 * d / rr).toFixed(3)})`;
-                        ctx.fillRect(r.originX + x * TS + TS / 2 - 2, y * TS + TS / 2 - camY - 2, 4, 4);
+                        ctx.fillRect(r.originX + x * TS + TS / 2 - 3, y * TS + TS / 2 - camY - 3, 6, 6);
                     }
                 }
             }
         }
 
         // ---- the drone
-        drawDrone(s, dx, dy, t);
+        if (r.rising === null) drawDrone(s, dx, dy, t);
+        // ---- what rises: the red mass climbs the shaft and breaks through the city
+        if (r.rising !== null) {
+            r.rising += dt;
+            const by = riseY() * TS - camY, bx = r.originX + HOME_X * TS + TS / 2;
+            const hy2 = HEART.cy * TS - camY;
+            ctx.strokeStyle = '#a3102a'; ctx.lineWidth = 40; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(bx, hy2); ctx.lineTo(bx, by); ctx.stroke();
+            const pulse = 1 + 0.08 * Math.sin(t * 9);
+            const rg = ctx.createRadialGradient(bx, by, 6, bx, by, 70 * pulse);
+            rg.addColorStop(0, '#ff5a6e'); rg.addColorStop(0.6, '#b0122d'); rg.addColorStop(1, 'rgba(90,6,20,0)');
+            ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(bx, by, 70 * pulse, 0, Math.PI * 2); ctx.fill();
+            const k = Math.max(0, (r.rising - RISE_S * 0.72) / (RISE_S * 0.28));
+            if (k > 0) {                 // it breaks through: red over the ruins and the sky
+                ctx.fillStyle = `rgba(150,10,30,${Math.min(0.85, k).toFixed(3)})`;
+                ctx.beginPath(); ctx.arc(bx, by, 80 + k * vw, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        for (let i = pops.length - 1; i >= 0; i--) {
+            const q = pops[i];
+            q.life -= dt; if (q.life <= 0) { pops.splice(i, 1); continue; }
+            ctx.globalAlpha = Math.min(1, q.life);
+            ctx.font = `600 ${q.big ? 30 : 20}px "Bebas Neue", "Arial Narrow", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = q.col;
+            ctx.fillText(q.text, dx, dy - 30 - (2.2 - q.life) * 30);
+            if (q.sub) { ctx.font = '13px system-ui, sans-serif'; ctx.fillText(q.sub, dx, dy - 8 - (2.2 - q.life) * 30); }
+            ctx.textAlign = 'left';
+        }
+        ctx.globalAlpha = 1;
         // dust
         for (let i = sparks.length - 1; i >= 0; i--) {
             const k = sparks[i];
@@ -251,13 +305,16 @@ export function createRenderer(canvas) {
         if (tt === T.FLESH || tt === T.BIO || li === 5) {
             const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 - y * 0.35 + x * 0.2);
             base = `rgb(${Math.round(80 + 30 * pulse)},${Math.round(22 + 6 * pulse)},${Math.round(34 + 8 * pulse)})`;
-            if (tt === T.SINEW) base = `rgb(${Math.round(120 + 20 * pulse)},${Math.round(60 + 10 * pulse)},70)`;
+            if (tt === T.SINEW) base = `rgb(${Math.round(92 + 18 * pulse)},${Math.round(28 + 6 * pulse)},40)`;
         }
         ctx.fillStyle = base;
         ctx.fillRect(sx, sy, TS, TS);
         // texture: what the layer is made of
         ctx.fillStyle = pal.m;
-        if (li === 0 && tt === T.STONE) { ctx.fillRect(sx + 3, sy + 3, TS - 6, TS - 6); ctx.fillStyle = '#6b4a35'; ctx.fillRect(sx + 4, sy + 14 + h * 6, TS - 8, 2); }
+        if (li === 0 && tt === T.STONE) {        // rubble: dull rock, nothing to want
+            ctx.fillStyle = '#3f3c3a'; ctx.beginPath(); ctx.moveTo(sx + 4, sy + 26); ctx.lineTo(sx + 8, sy + 8); ctx.lineTo(sx + 22, sy + 5); ctx.lineTo(sx + 28, sy + 20); ctx.lineTo(sx + 20, sy + 28); ctx.fill();
+            ctx.fillStyle = '#2c2a28'; ctx.fillRect(sx + 10, sy + 14, 4, 3); ctx.fillRect(sx + 18, sy + 18, 3, 3);
+        }
         else if (li === 1 && h > 0.6) { ctx.fillRect(sx + h * 18, sy + 6, 8, 4); ctx.fillRect(sx + 6, sy + 18 + h * 6, 12, 3); }
         else if (li === 2 && h > 0.85) { ctx.strokeStyle = '#7a7d80'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx + 16, sy + 16, 7, 0.3, 5.5); ctx.stroke(); }
         else if (li === 3) {
@@ -276,7 +333,17 @@ export function createRenderer(canvas) {
             if (Math.sin(t * 1.3 + h * 40) < 0.2 - mad * 0.6) return;
             ore = h < 0.5 ? T.SCISSORS : T.PAPER;
         }
-        if (ORE_COL[ore]) drawOre(ore, sx, sy, h);
+        if (ORE_COL[ore]) {
+            drawOre(ore, sx, sy, h);
+            // a glint that travels over it now and then: treasure
+            const g = (t * 0.7 + h * 7) % 2.4;
+            if (g < 0.35) {
+                const a = Math.sin(g / 0.35 * Math.PI);
+                ctx.fillStyle = `rgba(255,255,255,${(0.9 * a).toFixed(3)})`;
+                const gx = sx + 10 + h * 12, gy = sy + 10 + (1 - h) * 8;
+                ctx.fillRect(gx - 4 * a, gy - 0.75, 8 * a, 1.5); ctx.fillRect(gx - 0.75, gy - 4 * a, 1.5, 8 * a);
+            }
+        }
         if (tt === T.FIND) {
             ctx.fillStyle = '#e9c46a';
             ctx.fillRect(sx + 8, sy + 10, 16, 12);
@@ -287,7 +354,8 @@ export function createRenderer(canvas) {
 
     function drawOre(ore, sx, sy, h) {
         ctx.fillStyle = ORE_COL[ore];
-        if (ore === T.ROCK) {           // grey crystals
+        if (ore === T.ROCK) {           // pale blue crystals on a dark seat
+            ctx.fillStyle = 'rgba(20,40,50,0.55)'; ctx.fillRect(sx + 6, sy + 22, 21, 4); ctx.fillStyle = ORE_COL[ore];
             ctx.beginPath(); ctx.moveTo(sx + 9, sy + 24); ctx.lineTo(sx + 13, sy + 9); ctx.lineTo(sx + 17, sy + 24); ctx.fill();
             ctx.beginPath(); ctx.moveTo(sx + 16, sy + 25); ctx.lineTo(sx + 21, sy + 12); ctx.lineTo(sx + 25, sy + 25); ctx.fill();
         } else if (ore === T.PAPER) {   // pale flakes, old paper in the stone
@@ -343,6 +411,7 @@ export function createRenderer(canvas) {
         const body = g === 0 ? '#b8c0c8' : g === 1 ? '#c9a9a0' : g === 2 ? '#b77a7a' : '#a54a58';
         ctx.save();
         ctx.translate(dx, dy);
+        ctx.scale(1.5, 1.5);
         // the lamp's beam forward
         ctx.fillStyle = 'rgba(255,240,200,0.10)';
         ctx.beginPath(); ctx.moveTo(s.face * 8, -2); ctx.lineTo(s.face * 60, -22); ctx.lineTo(s.face * 60, 18); ctx.fill();
@@ -366,5 +435,5 @@ export function createRenderer(canvas) {
         ctx.restore();
     }
 
-    return { draw, resize, burst, screenOf, tileAtScreen, r };
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise };
 }
