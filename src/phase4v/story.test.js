@@ -118,9 +118,11 @@ describe('the turn and the cold', () => {
         V.sleepSome(s, 50);
         s.out = []; s.slow = 0;
         run(s, 41);
-        const weighed = texts(s).filter((t) => /^Sleeper \d+\. \d+ kg\.$/.test(t));
-        expect(weighed.length).toBe(3);
-        expect(weighed[0]).toMatch(/^Sleeper 41\./);
+        // test 4: the weighing goes to the small log
+        expect(S.story(s).weighNext).toBe(44);
+        const weighed = s.log.filter((t) => /^Sleeper \d+\. \d+ kg\.$/.test(t));
+        expect(weighed[weighed.length - 1]).toMatch(/^Sleeper 43\./);
+        expect(s.out.some((o) => /^Sleeper/.test(o.text))).toBe(false);
         for (const w of weighed) { const kg = Number(w.match(/(\d+) kg/)[1]); expect(kg).toBeGreaterThanOrEqual(50); expect(kg).toBeLessThanOrEqual(95); }
     });
 });
@@ -221,10 +223,10 @@ describe('the night: the goal and the organs', () => {
         expect(V.hasOrgan(s, 'heart')).toBe(true);
         expect(V.power(s).make).toBeGreaterThanOrEqual(make + V.HEART_POWER - 5);
         expect(texts(s)).toContain('A heart. It beats for all of them.');
-        // lungs need no heart now; the body grows twice as fast with them
-        const years = V.growYears(s);
+        // lungs need no heart now; the body grows twice as fast with them (the years left tick double)
+        expect(V.growRate(s)).toBe(1);
         s.rooms[V.slotIndex(2, 5)].flesh = 1; s.rooms[V.slotIndex(2, 5)].organ = 'lungs';
-        expect(V.growYears(s)).toBe(Math.round(years / 2));
+        expect(V.growRate(s)).toBe(2);
         // skin: rooms cost half
         const price = V.growPrice(s);
         s.rooms[V.slotIndex(2, 6)].flesh = 1; s.rooms[V.slotIndex(2, 6)].organ = 'skin';
@@ -328,7 +330,7 @@ describe('the words', () => {
         expect(all).not.toMatch(new RegExp(String.fromCharCode(0x2014)));
     });
     test('only the moments of the spec are marked', () => {
-        expect(S.MOMENTS).toEqual(['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'reclaim-hint', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise']);
+        expect(S.MOMENTS).toEqual(['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'reclaim-hint', 'no-ore', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise']);
     });
 });
 
@@ -391,7 +393,9 @@ describe('after the third test', () => {
         s.rooms[cryo - 1].flesh = 1;
         s.fallen = ['Pod'];
         s.bio = 1000;
-        expect(V.actionsFor(s, cryo).map((a) => a.id)).toEqual(['reclaim', 'take10']);
+        // test 4: GROW INTO is never hidden by RECLAIM; RECLAIM is the small third one
+        expect(V.actionsFor(s, cryo).map((a) => a.id)).toEqual(['grow', 'reclaim', 'take10']);
+        expect(V.actionsFor(s, cryo)[1].small).toBe(true);
         V.reclaim(s);
         expect(V.actionsFor(s, cryo).map((a) => a.id)).toEqual(['grow', 'take10']);
     });

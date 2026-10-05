@@ -43,8 +43,8 @@ body.in-vault #pause-btn { display: none; }
 .v-panel { position: absolute; left: 16px; top: 16px; bottom: 84px; width: 300px; padding: 14px 16px; border-radius: 10px; box-sizing: border-box;
   background: radial-gradient(120% 80% at 30% 0%, rgba(255,255,255,0.05), transparent 60%), repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px), linear-gradient(180deg, var(--v-steel2) 0%, var(--v-steel) 100%);
   box-shadow: 0 18px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(0,0,0,0.7);
-  display: flex; flex-direction: column; gap: 12px; z-index: 5; overflow: hidden; }
-.v-crt { position: relative; flex: none; background: #030604; border-radius: 6px; padding: 12px 12px 10px; min-height: 170px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: inset 0 0 18px rgba(0,0,0,0.9), 0 0 0 2px var(--v-ink), 0 0 0 3px var(--v-slate);
+  display: flex; flex-direction: column; gap: 9px; z-index: 5; overflow: hidden; }
+.v-crt { position: relative; flex: none; background: #030604; border-radius: 6px; padding: 10px 12px 8px; min-height: 150px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: inset 0 0 18px rgba(0,0,0,0.9), 0 0 0 2px var(--v-ink), 0 0 0 3px var(--v-slate);
   font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 21px; color: var(--v-crt); text-shadow: 0 0 6px rgba(120,255,140,0.45); overflow: hidden; }
 .v-crt::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px); border-radius: 6px; }
 .v-crt .l { white-space: pre-wrap; word-break: break-word; opacity: 0.55; }
@@ -64,7 +64,7 @@ body.in-vault #pause-btn { display: none; }
 @keyframes v-blink { 50% { opacity: 0; } }
 .v-gauge { display: flex; flex-direction: column; gap: 5px; transition: opacity 600ms ease, filter 600ms ease; }
 .v-gauge .row { display: flex; align-items: baseline; justify-content: space-between; }
-.v-gauge .val { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 26px; letter-spacing: 0.04em; color: var(--v-paper); line-height: 22px; }
+.v-gauge .val { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 24px; letter-spacing: 0.04em; color: var(--v-paper); line-height: 22px; }
 .v-gauge .sub { font-size: 11px; color: var(--v-mist); }
 .v-bar { height: 8px; border-radius: 4px; background: var(--v-ink); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); overflow: hidden; position: relative; }
 .v-bar > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--v-cold); transition: width 300ms ease, background 300ms ease; }
@@ -79,6 +79,8 @@ body.in-vault #pause-btn { display: none; }
   background: rgba(7,8,10,0.94); box-shadow: 0 0 0 1.5px var(--v-amber), 0 20px 60px rgba(0,0,0,0.7), 0 0 30px rgba(255,214,120,0.15);
   font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 15px; line-height: 22px; color: var(--v-amber); text-shadow: 0 0 6px rgba(255,214,120,0.35); display: flex; flex-direction: column; gap: 14px; }
 .v-stop[hidden] { display: none; }
+.v-stop.shake { animation: v-stop-shake 360ms linear; }
+@keyframes v-stop-shake { 20%, 60% { transform: translateX(calc(-50% - 7px)); } 40%, 80% { transform: translateX(calc(-50% + 7px)); } }
 .v-stop .txt > div + div { margin-top: 6px; }
 .v-stop .ok { align-self: flex-end; border: 0; border-radius: 6px; padding: 7px 22px; background: var(--v-amber); color: var(--v-ink); font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 18px; letter-spacing: 0.12em; cursor: pointer; }
 #phase-vault.has-stop canvas.v-cut { filter: brightness(0.8); }
@@ -91,11 +93,12 @@ body.in-vault #pause-btn { display: none; }
 .v-check .c.done .fx { color: var(--v-plate); }
 .v-build[hidden] { display: none; }
 .v-info button.a.small { font-size: 13px; padding: 5px 9px; align-self: flex-start; }
-.v-log { margin-top: -6px; font-size: 11px; line-height: 14px; color: var(--v-mist); opacity: 0.75; min-height: 42px; }
+.v-log { margin-top: -4px; font-size: 12px; line-height: 15px; color: var(--v-mist); min-height: 45px; }
 .v-log > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v-req { height: 4px; margin-top: -8px; border-radius: 2px; background: var(--v-ink); overflow: hidden; position: relative; }
 .v-req > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; transition: width 300ms linear; }
-.v-check { display: flex; flex-direction: column; gap: 6px; }
+.v-check { display: flex; flex-direction: column; gap: 3px; }
+.v-check .dymo { font-size: 13px; line-height: 13px; padding: 2px 6px 1px; }
 .v-check .c { display: flex; align-items: center; gap: 8px; }
 .v-check .box { width: 12px; height: 12px; border-radius: 2px; box-shadow: inset 0 0 0 1.5px var(--v-mist); }
 .v-check .c.done .box { background: var(--v-pulse); box-shadow: inset 0 0 0 1.5px var(--v-pulse), 0 0 8px rgba(168,19,44,0.7); }
@@ -104,9 +107,9 @@ body.in-vault #pause-btn { display: none; }
 .v-check .c .val { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 22px; letter-spacing: 0.05em; color: var(--v-paper); }
 #phase-vault.is-slow canvas.v-cut { filter: saturate(0.7) brightness(0.9); }
 #phase-vault canvas.v-cut { transition: filter 400ms ease; }
-.v-rows { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.v-rows { display: flex; flex-direction: column; gap: 3px; margin-top: auto; }
 .v-rows .r { display: flex; justify-content: space-between; align-items: center; }
-.v-rows .r .val { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 22px; letter-spacing: 0.05em; color: var(--v-paper); }
+.v-rows .r .val { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 20px; letter-spacing: 0.05em; color: var(--v-paper); }
 .v-off { opacity: 0.25; filter: grayscale(1); }
 .v-lamp-off { opacity: 0; transform: translateY(4px); }
 .v-panel > * { transition: opacity 500ms ease, transform 500ms ease; }

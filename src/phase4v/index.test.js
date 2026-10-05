@@ -35,6 +35,7 @@ describe('the vault screen', () => {
         const V = await import('./vault.js');
         const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
         s.fallen = ['Pod'];
+        s.tut = { on: false };
         localStorage.setItem(V.SAVE_KEY, V.serialize(s));
         const m = await import('./index.js');
         m.init();

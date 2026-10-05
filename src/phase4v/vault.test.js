@@ -122,7 +122,7 @@ describe('the night', () => {
         expect(ids[0]).toBe('reclaim');
         expect(ids).not.toContain('bury');
         V.act(s, 'reclaim', cryo);
-        expect(s.bio).toBeGreaterThanOrEqual(70);
+        expect(s.bio).toBeGreaterThanOrEqual(V.RECLAIM_BIO);
         expect(V.cards(s)).toContain('vat');
         expect(V.actionsFor(s, cryo).map((a) => a.id)).toContain('take10');
     });
@@ -185,7 +185,8 @@ describe('after the human test', () => {
         // left awake at 0 %, one tries the shaft
         s.out.length = 0;
         for (let t = 0; t < 20; t += 0.25) V.advance(s, 0.25, 1);
-        expect(s.out.map((o) => o.text)).toEqual(expect.arrayContaining(['They are banging on the screen.', 'Someone tried the shaft. They fell.']));
+        expect(s.out.map((o) => o.text)).toContain('They are banging on the screen.');
+        expect(s.log).toContain('Someone tried the shaft. They fell.');
         // dealt with: the dead first, then SLEEP ALL puts them back
         V.act(s, 'reclaim', cryo);
         expect(V.actionsFor(s, cryo).map((a) => a.id)).toContain('sleepall');

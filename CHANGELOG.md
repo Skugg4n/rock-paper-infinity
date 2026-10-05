@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.87.1 - 2026-10-06 (chapter IV, the vault after the fourth test)
+
+After the fourth independent test (docs/playtests/2026-10-06-vault-human-test-4.md, almost):
+- **No dead end in the night.** A Cryo Bay shows GROW INTO beside RECLAIM (RECLAIM becomes the small third button), never one hiding the other. Rock the body cannot reach yet says what is missing: "Fill the floor below first. 2 rooms left." or "The body has to reach it first.".
+- **The turn is a stop**: "SURFACE REPORT: NOT RECOVERING. ESTIMATE: 3 000 YEARS." / "They will get angry. The Cryo Bay can keep them quiet.", and the Cryo Bay card slides in with it. Mood falls over about three minutes (despair 0.6 a day, was 1.8). The ORE stop comes the first time a card in the hand cannot be paid, by day 20 at the latest.
+- **The SYSTEM box is for the system.** "X is boring now", the weighing, the waves and "Someone tried the shaft" (once in 30 s at most, the first still a moment) go to the grey log, now 12 px and three lines.
+- **The night is short of biomass and the first organ matters.** RECLAIM gives 5 a dead, TAKE 30; a stomach gives +3 a year (the biggest source; they share the rock); LUNGS make the years left tick twice as fast and the box says "The lungs make it twice as fast."; the panel says "The engine burns 2 ore a year." and at 0: "No ore. The engine stopped." (marked). Sim: heart first a safe slow night (7:42, 9 pods failed), stomach first rich and fast with deaths (5:12, 20 failed, the most biomass), lungs first quick (5:34, 16 failed).
+- **Stops lock the same way.** Only what a stop points at answers (its room; for a card the card, its places and rock to dig them); anything else shakes the box. "Build Mrs Vance a cinema." Requests that need an upgrade say so in their bubble ("Upgrade the gym."); the wants nobody can answer are gone. Wishes come at most one in 8 s in act I.
+- **Small.** The Mine has its rock face, ore, rails and a loaded cart; the Engine Room its big machine in a cold glow. Room names are drawn over the flesh and the organs and shrink to fit. The info box opens outward, on the free side, below the room. The panel fits 900 px high at night.
+
 ## v1.87.0 - 2026-10-05 (chapter IV, the vault: soft start, two voices, flesh with a reason)
 
 Pass 3 after Ola played v1.86.6 himself (docs/superpowers/specs/2026-10-05-deep-vault-pass3.md, sections A to G).

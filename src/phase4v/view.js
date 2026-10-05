@@ -143,6 +143,7 @@ export function createVaultView(canvas, opts = {}) {
         for (let i = 0; i < s.rooms.length; i++) drawSlot(s, i, ui, t);
         drawBridges(s, t);
         drawOrgans(s, t);
+        drawLabels(s);
         drawWalkers(s, t);
         drawWishes(s, t);
         drawTalk(s);
@@ -504,8 +505,6 @@ export function createVaultView(canvas, opts = {}) {
             ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
             ctx.lineWidth = 1;
         }
-        // the name on the frame: every room, the organs and vats of the body; plain tissue has none
-        if (r.kind !== 'empty' && (!taken || isVatRoom(r) || (organOf(r) && organOf(r) !== 'tissue')) && !(r.kind === 'rock' && !taken)) nameLabel(nameOf(s, i).toUpperCase(), x, y);
         if (ui.complain && ui.complain.has(i)) complainTab(x, y, ui.complain.get(i), t);
         if (sel) outline(x, y, w, h, VT.paper);
         if (ui.focus && ui.focus.has(i)) focusRing(x, y, w, h, t);
@@ -718,7 +717,11 @@ export function createVaultView(canvas, opts = {}) {
             }
             case 'engine': {
                 // the machine, sized to a room, and its operator at a console
-                ctx.save(); ctx.translate(x + w * 0.55, floor); ctx.scale(0.72, 0.72); ctx.translate(-(x + w * 0.55), -floor);
+                // the engine room is its machine: big, with a cold glow
+                const gl = ctx.createRadialGradient(x + w * 0.55, floor - h * 0.35, 2, x + w * 0.55, floor - h * 0.35, h * 0.6);
+                gl.addColorStop(0, rgba(VT.cold, 0.16)); gl.addColorStop(1, rgba(VT.cold, 0));
+                ctx.fillStyle = gl; ctx.fillRect(x, y, w, h);
+                ctx.save(); ctx.translate(x + w * 0.55, floor); ctx.scale(0.88, 0.88); ctx.translate(-(x + w * 0.55), -floor);
                 machine(x + w * 0.1, y, w * 0.9, h, t, r);
                 ctx.restore();
                 ctx.fillStyle = S; ctx.fillRect(x + 6, floor - 9, 9, 9);
@@ -826,21 +829,24 @@ export function createVaultView(canvas, opts = {}) {
                 break;
             }
             case 'mine': {
-                // a rock face, two or three with picks at it, a cart on rails, a lamp
-                ctx.fillStyle = S;
-                ctx.beginPath(); ctx.moveTo(x + w, y + 4); ctx.lineTo(x + w - 18, y + 14); ctx.lineTo(x + w - 13, y + h * 0.45); ctx.lineTo(x + w - 22, y + h * 0.7); ctx.lineTo(x + w - 16, floor); ctx.lineTo(x + w, floor); ctx.fill();
-                ctx.fillStyle = rgba(VT.lamp, 0.7);
-                for (let k = 0; k < 5; k++) ctx.fillRect(x + w - 15 + hash(k + i) * 10, y + 16 + hash(k * 3 + i) * (h - 30), 2, 2);
-                ctx.fillStyle = M; ctx.fillRect(x + 4, floor - 1, w - 22, 1);
-                const cx = x + 10 + (0.5 + 0.5 * Math.sin(t * 0.4 + i)) * (w * 0.3);
-                ctx.fillStyle = '#5a6574'; ctx.fillRect(cx, floor - 7, 13, 5);
-                ctx.fillStyle = S; ctx.beginPath(); ctx.arc(cx + 3, floor - 1.5, 1.5, 0, Math.PI * 2); ctx.arc(cx + 10, floor - 1.5, 1.5, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = rgba(VT.lamp, 0.6); ctx.fillRect(cx + 2, floor - 9, 4, 2); ctx.fillRect(cx + 7, floor - 9.5, 4, 2.5);
-                ctx.fillStyle = M; ctx.fillRect(x + w * 0.55, y + 2, 1, 8);
-                ctx.fillStyle = rgba(VT.lamp, 0.9); ctx.beginPath(); ctx.arc(x + w * 0.55, y + 11, 2, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = rgba(VT.lamp, 0.06); ctx.beginPath(); ctx.moveTo(x + w * 0.55, y + 11); ctx.lineTo(x + w * 0.3, floor); ctx.lineTo(x + w * 0.85, floor); ctx.fill();
+                // a mine, plainly: a big rock face with ore in it, miners with picks, rails and a loaded cart
+                const fx = x + w * 0.52;
+                ctx.fillStyle = '#2a2420';
+                ctx.beginPath(); ctx.moveTo(x + w, y); ctx.lineTo(fx + 8, y); ctx.lineTo(fx, y + h * 0.35); ctx.lineTo(fx + 10, y + h * 0.6); ctx.lineTo(fx + 2, floor); ctx.lineTo(x + w, floor); ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(fx + 14, y + 8); ctx.lineTo(fx + 24, y + h * 0.4); ctx.moveTo(fx + 20, y + h * 0.55); ctx.lineTo(x + w - 6, y + h * 0.7); ctx.stroke();
+                for (let k = 0; k < 8; k++) { ctx.fillStyle = rgba(VT.lamp, 0.85); ctx.fillRect(fx + 10 + hash(k + i) * (x + w - fx - 14), y + 6 + hash(k * 3 + i) * (h - 16), 2.5, 2); }
+                // rails with their sleepers, and the cart heaped with ore
+                ctx.fillStyle = M; ctx.fillRect(x + 4, floor - 1.5, fx - x, 1);
+                ctx.fillStyle = S; for (let rx = x + 6; rx < fx; rx += 5) ctx.fillRect(rx, floor - 1, 2, 1.5);
+                const cx = x + 6 + (0.5 + 0.5 * Math.sin(t * 0.4 + i)) * (fx - x - 26);
+                ctx.fillStyle = '#5a6574'; ctx.beginPath(); ctx.moveTo(cx, floor - 9); ctx.lineTo(cx + 16, floor - 9); ctx.lineTo(cx + 14, floor - 3); ctx.lineTo(cx + 2, floor - 3); ctx.fill();
+                ctx.fillStyle = S; ctx.beginPath(); ctx.arc(cx + 4, floor - 2, 1.8, 0, Math.PI * 2); ctx.arc(cx + 12, floor - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = rgba(VT.lamp, 0.75); ctx.beginPath(); ctx.arc(cx + 5, floor - 9.5, 2.5, Math.PI, 0); ctx.arc(cx + 10, floor - 10, 3, Math.PI, 0); ctx.fill();
+                // a hard-hat lamp on the wall
+                ctx.fillStyle = rgba(VT.lamp, 0.9); ctx.beginPath(); ctx.arc(fx - 4, y + 12, 1.8, 0, Math.PI * 2); ctx.fill();
                 const miners = Math.min(3, Math.max(n ? 2 : 0, n));
-                for (let k = 0; k < miners; k++) person(x + w - 24 - k * 9, floor, 'pick', t, i * 10 + 14 + k);
+                for (let k = 0; k < miners; k++) person(fx - 4 - k * 9, floor, 'pick', t, i * 10 + 14 + k);
                 break;
             }
             case 'meatlab': meatLab(x, y, w, h, t, r, n); break;
@@ -892,10 +898,23 @@ export function createVaultView(canvas, opts = {}) {
         ctx.lineWidth = 1;
     }
 
+    /** Every room's name, over everything (the flesh and the organs never clip it). Plain tissue has none. */
+    function drawLabels(s) {
+        s.rooms.forEach((r, i) => {
+            const taken = r.flesh === 1;
+            if (r.kind === 'empty' || (r.kind === 'rock' && !taken)) return;
+            if (taken && !isVatRoom(r) && !(organOf(r) && organOf(r) !== 'tissue')) return;
+            const g = geo.slots[i];
+            nameLabel(nameOf(s, i).toUpperCase(), g.x, g.y, g.w);
+        });
+    }
     /** The room's name on its frame, a small dymo, always there (pass 3, G2). */
-    function nameLabel(text, x, y) {
-        ctx.font = "11px 'Bebas Neue', 'Arial Narrow', sans-serif";
-        const tw = ctx.measureText(text).width;
+    function nameLabel(text, x, y, w = 999) {
+        let size = 12;
+        ctx.font = `${size}px 'Bebas Neue', 'Arial Narrow', sans-serif`;
+        let tw = ctx.measureText(text).width;
+        // it fits the frame: a smaller size before it would be cut
+        while (tw + 14 > w && size > 8) { size -= 1; ctx.font = `${size}px 'Bebas Neue', 'Arial Narrow', sans-serif`; tw = ctx.measureText(text).width; }
         ctx.fillStyle = 'rgba(7,8,10,0.92)';
         ctx.fillRect(x + 3, y + 3, tw + 8, 12);
         ctx.fillStyle = VT.paper; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -1822,7 +1841,7 @@ export function createVaultView(canvas, opts = {}) {
         const q = s.request;
         if (q && q.slot != null && s.phase === 'palace') {
             const left = Math.max(0, Math.min(1, (q.due - s.day) / Math.max(0.001, q.due - q.at)));
-            list.push({ slot: q.slot, text: q.who ? `${q.who}: ${q.text}` : q.text, ring: left, mark: q.mark, alpha: 1, req: true });
+            list.push({ slot: q.slot, text: q.who ? `${q.who}: ${q.text}` : q.text, hint: q.hint, ring: left, mark: q.mark, alpha: 1, req: true });
         }
         const now = s.wishes ? s.wishes.clock : 0;
         for (const b of s.talk || []) {
@@ -1840,6 +1859,7 @@ export function createVaultView(canvas, opts = {}) {
             ctx.font = `${b.computer ? '700 ' : ''}12px system-ui, -apple-system, sans-serif`;
             const ring = b.ring != null ? 22 : 0;
             const lines = wrap(b.text, 190);
+            if (b.hint) lines.push(b.hint);
             const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
             const bw = tw + 16 + ring, bh = lines.length * 15 + 9;
             const up = stack.get(b.slot) || 0;
@@ -1862,9 +1882,8 @@ export function createVaultView(canvas, opts = {}) {
                 ctx.beginPath(); ctx.arc(rx, ry, 7, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * b.ring); ctx.stroke();
                 ctx.fillStyle = VT.paper; ctx.fillRect(rx - 0.75, ry - 4, 1.5, 5); ctx.fillRect(rx - 0.75, ry + 2.5, 1.5, 1.5);
             }
-            ctx.fillStyle = b.sour ? VT.mist : VT.paper;
             ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-            lines.forEach((l, k) => ctx.fillText(l, x + 8 + ring, y + 16 + k * 15));
+            lines.forEach((l, k) => { ctx.fillStyle = b.sour || (b.hint && k === lines.length - 1) ? VT.amber : VT.paper; if (b.sour) ctx.fillStyle = VT.mist; ctx.fillText(l, x + 8 + ring, y + 16 + k * 15); });
         }
         ctx.restore();
         ctx.lineWidth = 1;

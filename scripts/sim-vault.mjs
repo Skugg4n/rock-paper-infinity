@@ -23,7 +23,7 @@ let lastReq = '';
 let turnAt = null, coldAt = null, nightAt = null, endAt = null, firstBuyAt = null;
 let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0;
 let lastActAt = 0;
-let maxBioAfterHeart = 0;
+let maxBioAfterHeart = 0, bioMade = 0, lastBio = 0;
 let waitFrom = null, waitTotal = 0, gapEndAt = 0, maxCouldGap = 0, lastCould = 0;
 const waits = [];
 const organAt = {};
@@ -102,7 +102,12 @@ function palaceMove() {
 
 /** What the night player wants the next room of the body to be, for slot i. */
 /** The orders of G4: what the night player grows first, then next (stomachs counted). */
-const ORDERS = { heart: ['heart', 'stomach', 'lungs'], stomach: ['stomach', 'stomach', 'lungs', 'heart'], lungs: ['lungs', 'stomach', 'heart'] };
+/**
+ * The three players of G4, each true to their first choice all night: the careful one (a heart, lungs, then
+ * only what the body needs), the greedy one (stomachs whenever one can be had, the heart late), the hasty
+ * one (lungs, one stomach, then the heart).
+ */
+const ORDERS = { heart: ['heart', 'lungs'], stomach: ['stomach', 'stomach', 'stomach', 'heart', 'lungs'], lungs: ['lungs', 'stomach', 'heart'] };
 function wantOrgan(i) {
     const grown = (o) => s.rooms.filter((r) => r.organ === o && (r.flesh === 1 || (r.job && r.job.op === 'grow'))).length;
     const have = (o) => grown(o) > 0;
@@ -110,8 +115,8 @@ function wantOrgan(i) {
     const seq = ORDERS[ORDER] || ORDERS.heart;
     const seen = {};
     for (const o of seq) { seen[o] = (seen[o] || 0) + 1; if (grown(o) < seen[o]) return o; }
-    // the third tester: a stomach wherever one can be had
-    if (GREEDY && s.bio >= V.organPrice(s, 'stomach')) return 'stomach';
+    // the greedy player (and the third tester): a stomach wherever one can be had
+    if ((GREEDY || ORDER === 'stomach') && s.bio >= V.organPrice(s, 'stomach')) return 'stomach';
     return 'tissue';
 }
 const GREEDY = process.argv.includes('--greedy');
@@ -176,6 +181,7 @@ while (t < 40 * 60 && !s.risen) {
             const could = moved || s.fallen.length || V.canTake(s) || s.rooms.some((r, i) => V.canGrowInto(s, i) && s.bio >= V.growPrice(s));
             if (could) { maxCouldGap = Math.max(maxCouldGap, t - lastCould); lastCould = t; }
             if (V.hasOrgan(s, 'heart')) maxBioAfterHeart = Math.max(maxBioAfterHeart, s.bio);
+            bioMade += Math.max(0, s.bio - lastBio); lastBio = s.bio;
             // waiting for biomass: a room could be grown, the price is not there yet
             const waiting = wantPrice > 0 && s.bio < wantPrice;
             if (waiting) { if (waitFrom == null) waitFrom = t; waitTotal += DT * 2; }
@@ -230,6 +236,6 @@ console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != nul
 console.log(`order ${ORDER}; stops: ${stopsSeen.join(', ')}`);
 console.log(`pods failed in the night: ${s.podsFailed || 0}; organs: heart ${organAt.heart || '-'}, stomach ${organAt.stomach || '-'}, lungs ${organAt.lungs || '-'}, skin ${organAt.skin || '-'}`);
 waits.sort((a, b) => b - a);
-console.log(`most biomass after the heart: ${Math.round(maxBioAfterHeart)}`);
+console.log(`most biomass after the heart: ${Math.round(maxBioAfterHeart)}; biomass gained in the night: ${Math.round(bioMade)}`);
 console.log(`waiting for biomass: ${waits.length} times, ${Math.round(waitTotal)} s in all, longest ${Math.round(waits[0] || 0)} s, median ${Math.round(waits[Math.floor(waits.length / 2)] || 0)} s`);
 console.log(`first buy ${fmt(firstBuyAt ?? 0)}; longest gap between buys in act I ${Math.round(maxGap)} s (at ${fmt(gapAt)}); turn ${turnAt != null ? fmt(turnAt) : '-'}; cold ${coldAt != null ? fmt(coldAt) : '-'}; night ${nightAt != null ? fmt(nightAt) : '-'}; RISE ready ${endAt != null ? fmt(endAt) : '-'}; risen ${s.risen ? fmt(t) : '-'}`);

@@ -165,7 +165,8 @@ export function init() {
         $('g-power').classList.toggle('is-red', p.short);
         $('ore').textContent = V.num(Math.floor(s.ore));
         const oreRate = s.phase === 'palace' ? V.oreRate(s) : null;
-        $('ore-sub').textContent = oreRate != null ? `+${V.num(oreRate)} a day` : '';
+        // in the night the engine eats the ore: say so
+        $('ore-sub').textContent = oreRate != null ? `+${V.num(oreRate)} a day` : s.phase === 'night' && !V.engineResting(s) ? V.ENGINE_BURNS : '';
         const showBio = s.reclaimed > 0 || s.bio > 0 || V.hasVat(s);
         $('g-bio').hidden = !showBio;
         if (showBio) {
@@ -295,7 +296,7 @@ export function init() {
             <div class="acts">${acts.map((a, k) => {
                 // GROW INTO is one choice: a heading over its organ buttons
                 const head = a.group === 'grow' && (k === 0 || acts[k - 1].group !== 'grow') ? '<div class="grp"><span class="dymo">Grow into</span></div>' : '';
-                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.id === 'grow' ? ' flesh' : a.dark ? ` dark${a.small ? ' small' : ''}` : '';
+                const cls = a.group === 'grow' ? ` flesh organ o-${a.organ}` : a.id === 'grow' ? ' flesh' : a.dark ? ` dark${a.small ? ' small' : ''}` : a.quiet ? ' quiet small' : '';
                 return `${head}<button type="button" class="a${cls}" data-act="${a.id}" ${a.ok ? '' : 'disabled'}>${esc(a.label)}</button>${a.need ? `<div class="need">${esc(a.need)}</div>` : ''}${a.hint ? `<div class="hint">${esc(a.hint)}</div>` : ''}`;
             }).join('')}</div>`;
         if (infoEl.__html !== html) { infoEl.innerHTML = html; infoEl.__html = html; }
@@ -311,9 +312,13 @@ export function init() {
         let x, y;
         if (onTile) { x = c.left + g.x + (g.w - bw) / 2; y = c.top + g.y + (g.h - bh) / 2; }
         else {
-            x = c.left + g.x + g.w + 10;
-            if (x + bw > window.innerWidth - 12) x = c.left + g.x - bw - 10;
-            y = c.top + g.y - 8;
+            // the free side: outward from the middle of the map, so it never sits on the room or the shaft
+            const mid = view.geo ? view.geo.shaftX : window.innerWidth / 2;
+            const right = g.x + g.w / 2 > mid;
+            x = right ? c.left + g.x + g.w + 10 : c.left + g.x - bw - 10;
+            if (x + bw > window.innerWidth - 12 || x < 330) x = right ? c.left + g.x - bw - 10 : c.left + g.x + g.w + 10;
+            y = c.top + g.y + g.h + 8;
+            if (y + bh > window.innerHeight - 110) y = c.top + g.y - 8;
         }
         x = Math.max(12, Math.min(window.innerWidth - bw - 12, x));
         y = Math.max(12, Math.min(window.innerHeight - bh - 12, y));
@@ -356,19 +361,36 @@ export function init() {
 
     // ---------------------------------------------------------------- input
     /** While a stop points at one room, only that room (and a place for the card it hands out) answers. */
+    /**
+     * Test 4: every stop locks the same way. Only what it points at answers: its room; for a card, the card,
+     * a place for it, and rock to dig a place; the rooms the body can grow into; the meat lab. Anything else
+     * shakes the box.
+     */
     function stopAllows(i) {
         const st = s.tut && s.tut.stop;
         if (!st) return true;
-        if (typeof st.focus === 'number' && st.focus >= 0) return i === st.focus;
-        if (typeof st.focus === 'string' && st.focus.startsWith('card:')) return !!armed;
-        return true;
+        const f = st.focus;
+        if (typeof f === 'number' && f >= 0) return i === f;
+        if (typeof f === 'string' && f.startsWith('card:')) { const k = f.slice(5); return i >= 0 && (V.canPlace(s, k, i) || V.canDig(s, i)); }
+        if (f === 'grow') return i >= 0 && V.canGrowInto(s, i);
+        if (f === 'meatlab') return i >= 0 && s.rooms[i].kind === 'meatlab';
+        return false;
+    }
+    function shakeStop() {
+        const b = $('stop'); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+        sound.event('click');
     }
     $('stop-ok').addEventListener('click', () => { T.closeStop(s); sound.event('click'); afterAct(); }, { signal });
     canvas.addEventListener('click', (e) => {
         if (performance.now() < introUntil) return;
         const rect = canvas.getBoundingClientRect();
         const bx = e.clientX - rect.left, by = e.clientY - rect.top;
-        if (!stopAllows(view.slotAt(bx, by)) && !view.bubbleAt(s, bx, by)) return;
+        const stopNow = s.tut && s.tut.stop;
+        if (stopNow) {
+            const bubble = view.bubbleAt(s, bx, by);
+            const ok = bubble ? stopNow.id === 'bubbles' : stopAllows(view.slotAt(bx, by));
+            if (!ok) { shakeStop(); return; }
+        }
         // a wish first: it floats over the room
         const wish = view.bubbleAt(s, bx, by);
         if (wish) { popWish(s, wish); afterAct(); return; }
@@ -389,7 +411,8 @@ export function init() {
         if (performance.now() < introUntil) return;
         const rect = canvas.getBoundingClientRect();
         const i = view.slotAt(e.clientX - rect.left, e.clientY - rect.top);
-        if (i >= 0 && stopAllows(i) && V.canDig(s, i) && V.dig(s, i)) { selected = -1; afterAct(); }
+        if (i >= 0 && !stopAllows(i)) { shakeStop(); return; }
+        if (i >= 0 && V.canDig(s, i) && V.dig(s, i)) { selected = -1; afterAct(); }
     }, { signal });
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -404,7 +427,7 @@ export function init() {
         if (!card || card.classList.contains('off')) return;
         const k = card.dataset.card;
         const st = s.tut && s.tut.stop;
-        if (st && typeof st.focus === 'string' && st.focus.startsWith('card:') && st.focus !== `card:${k}`) return;
+        if (st && st.focus !== `card:${k}`) { shakeStop(); return; }
         // a place already picked: build right there
         if (selected >= 0 && V.canPlace(s, k, selected)) { V.build(s, k, selected); armed = null; selected = -1; afterAct(); return; }
         armed = armed === k ? null : k;
@@ -414,6 +437,7 @@ export function init() {
     infoEl.addEventListener('click', (e) => {
         const b = e.target.closest('[data-act]');
         if (!b || b.disabled) return;
+        if (s.tut && s.tut.stop && !stopAllows(selected)) { shakeStop(); return; }
         V.act(s, b.dataset.act, selected);
         // digging: the tile's box goes with it
         if (b.dataset.act === 'dig') selected = -1;

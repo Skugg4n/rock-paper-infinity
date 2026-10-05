@@ -20,9 +20,10 @@ export const STOPS = {
     dig: '16 of them have no bed. Click the rock to dig a place.',
     suites: 'Now build suites there.',
     bubbles: 'They will ask for things. Click a bubble to answer it.',
-    cinema: 'Some wishes need a room. Build her a cinema.',
+    cinema: 'Some wishes need a room. Build Mrs Vance a cinema.',
     ore: 'Ore pays for everything. A mine digs more.',
     power: 'The engine is at its limit. Upgrade it.',
+    turn: ['SURFACE REPORT: NOT RECOVERING. ESTIMATE: 3 000 YEARS.', 'They will get angry. The Cryo Bay can keep them quiet.'],
     // the night (section E)
     feed: 'Sleepers do not eat. The pods feed them. The pods are fed by the meat lab.',
     feedBuild: 'Build one.',
@@ -35,7 +36,7 @@ export const HALE_LABEL = 'RECLAIM MR HALE';
 export const HALE_HINT = 'He feeds the others.';
 export const GOALS = { happy: 'GOAL: KEEP THEM HAPPY.', quiet: 'GOAL: KEEP THEM QUIET.', surface: 'GOAL: GET THEM TO THE SURFACE.' };
 /** The palace's stops, in order; then the night's. */
-export const PALACE_STOPS = ['welcome', 'dig', 'suites', 'bubbles', 'cinema', 'ore', 'power'];
+export const PALACE_STOPS = ['welcome', 'dig', 'suites', 'bubbles', 'cinema', 'ore', 'power', 'turn'];
 export const NIGHT_STOPS = ['feed', 'hale', 'grew', 'goal', 'heart'];
 
 /** Real seconds: the dig stop after the welcome; named requests after the bubbles; the lab's growth after Mr Hale. */
@@ -51,6 +52,8 @@ export const FIRST_WISHES_S = 12;
 export const FIRST_WISHES_FOR_S = 60;
 /** ORE is "not enough" the first time it is under this, after the cinema. */
 export const ORE_SHORT = 120;
+/** The ORE stop comes by this day at the latest. */
+export const ORE_BY_DAY = 20;
 
 export function newTut() {
     return { on: true, stop: null, done: {}, hand: [], show: { ore: false, power: false }, clock: 0, at: {} };
@@ -154,10 +157,19 @@ export function stepTutorial(s, sec) {
             open(s, 'cinema', STOPS.cinema, 'card:cinema');
             return true;
         }
-        if (d.cinema && !d.ore && s.ore < ORE_SHORT) {
+        // ORE: the first time a card in the hand cannot be paid (or day 20 at the latest), a little after the bubbles
+        const short = t.hand.some((k) => KINDS[k] && KINDS[k].price > s.ore);
+        if (d.bubbles && !d.ore && (short || s.day >= ORE_BY_DAY) && t.clock - (t.at.bubblesClosed ?? 0) >= 10 && !(s.request && s.request.kind === 'cinema' && !d.cinema)) {
             hand(s, 'mine');
             t.show.ore = true;
             open(s, 'ore', STOPS.ore, 'ore');
+            return true;
+        }
+        // the turn: a stop, and the Cryo Bay card slides in with it
+        if (!d.turn && s.turned) {
+            s.coldOpen = true;
+            t.newCard = 'cryo';
+            open(s, 'turn', STOPS.turn, 'card:cryo');
             return true;
         }
         if (!d.power && d.bubbles && power(s).short) {

@@ -123,3 +123,40 @@ describe('the flesh has a reason (E)', () => {
         expect(s.tut.stop.text).toEqual([T.STOPS.heart]);
     });
 });
+
+describe('after the fourth test', () => {
+    test('the turn is a stop, and the Cryo Bay card slides in with it', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-turn']();
+        s.tut.done.turn = false;
+        const st = until(s, 30);
+        expect(st.id).toBe('turn');
+        expect(st.text).toEqual(T.STOPS.turn);
+        expect(V.cards(s)).toContain('cryo');
+        expect(s.tut.newCard).toBe('cryo');
+    });
+    test('the ORE stop comes by day 20 at the latest', () => {
+        const s = V.newVault();
+        for (let k = 0; k < 60; k++) {
+            const st = until(s, 60, 2);
+            if (!st) break;
+            if (st.id === 'ore') break;
+            if (st.id === 'dig') V.dig(s, st.focus);
+            else if (st.id === 'suites') V.build(s, 'suites', s.rooms.findIndex((r) => r.kind === 'empty'));
+            else T.closeStop(s);
+        }
+        expect(s.tut.stop && s.tut.stop.id).toBe('ore');
+        expect(s.day).toBeLessThanOrEqual(T.ORE_BY_DAY + 1);
+    });
+    test('rock the body cannot reach says what is missing; no ore stops the engine, said once', () => {
+        const s = VAULT_CHECKPOINTS['iv-vault-flesh']();
+        s.tut = { on: false };
+        // a room on level 1 over a floor that is not body yet: make one rock
+        const rock = V.slotIndex(0, 7);
+        Object.assign(s.rooms[rock], { kind: 'rock', job: null, flesh: 0 });
+        expect(V.describe(s, rock)).toMatch(/^Fill the floor below first\. \d+ rooms? left\.$/);
+        s.ore = 1;
+        run(s, 5);
+        expect(s.out.filter((o) => o.text === V.NO_ORE)).toHaveLength(1);
+        expect(V.enginePower(s)).toBe(0);
+    });
+});

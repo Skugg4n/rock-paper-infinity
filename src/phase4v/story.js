@@ -68,7 +68,7 @@ export const NEEDS_HEART = 'Needs a heart first.';
 export const SLOW_S = 3;
 export const SLOW_RATE = 0.25;
 /** The only moments that are marked (spec, section 5). */
-export const MOMENTS = ['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'reclaim-hint', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise'];
+export const MOMENTS = ['first-request', 'meatlab', 'turn', 'cold', 'first-dead', 'reclaim-hint', 'no-ore', 'goal', 'organ-stomach', 'organ-heart', 'organ-lungs', 'organ-skin', 'first-floor', 'rise'];
 
 /**
  * Says `lines` as a moment: once per key, amber on the CRT (`mark`), a pling (`moment`), and time slows.
@@ -192,7 +192,7 @@ export function stepWeighing(s) {
     const now = clock(s);
     if (now < st.weighAt || st.weighNext > s.asleep) return;
     const kg = 50 + Math.floor(rnd(s) * 46);
-    s.out.push({ text: weighLine(st.weighNext, kg), who: 'sys' });
+    logLine(s, weighLine(st.weighNext, kg));
     st.weighNext += 1;
     st.weighAt = now + WEIGH_EVERY_S;
 }

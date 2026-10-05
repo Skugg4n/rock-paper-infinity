@@ -43,7 +43,8 @@ describe('the small wishes', () => {
         const wave = s.wishes.wave;
         expect(wave).toBeTruthy();
         const line = W.ICONS[wave.icon].wave.line;
-        expect(s.out.filter((o) => o.text === line)).toHaveLength(1);
+        // test 4: the wave goes to the small log, not the SYSTEM box
+        expect(s.log.filter((t) => t === line)).toHaveLength(1);
         expect(W.waveKind(s)).toBe(wave.kind);
         const free = s.rooms.findIndex((r) => r.kind === 'rock');
         Object.assign(s.rooms[free], { kind: wave.kind, lvl: 1, job: null });
@@ -57,7 +58,8 @@ describe('the small wishes', () => {
         s.turned = true;
         s.wishes = W.normalizeWishes({ next: 0, waveNext: 999 });
         run(s, 20);
-        expect(s.wishes.list.length).toBeGreaterThanOrEqual(4);
+        // test 4: never a clicking job; still more than act I, and ruder
+        expect(s.wishes.list.length).toBeGreaterThanOrEqual(2);
         expect(s.wishes.list.some((b) => b.icon === 'bell' || b.icon === 'finger')).toBe(true);
     });
     test('the asleep make none; in the night they are ghosts over the pods that cannot be clicked', () => {
