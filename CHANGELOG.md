@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased (deep-vault)
+## v1.86.2 - 2026-10-05 (chapter IV, the vault after its second independent test)
 
-### v1.86.2: the vault after its second independent test (docs/playtests/2026-10-05-vault-human-test-2.md)
+### The vault after its second independent test (docs/playtests/2026-10-05-vault-human-test-2.md)
 
 - **The night shows where to act.** Rock that can take a Vat or a Cryo Bay is framed, rock the body can grow into has the gold dashed frame (rock had none); the Vat card lights its places; a card with no place is not shown in the night.
 - **The night is short of biomass and ore.** Vats grow 0.15 a year, the body 0.05 a room; GROW INTO 120 + 15 per room; TAKE ONE +100; CUT POWER always there in the night; sleepers taken with a Cryo Bay give 10 each. The engine burns 2 ore a year, the mines give 0.6 a year a level.
