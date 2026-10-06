@@ -192,8 +192,9 @@ describe('Ola after v1.87.1 (H)', () => {
     });
     test('H1: the meat lab feeds 100 pods a level; more sleepers than that is underfed', () => {
         const s = VAULT_CHECKPOINTS['iv-vault-night']();
-        const lab = V.slotIndex(2, 3);
-        Object.assign(s.rooms[lab], { kind: 'meatlab', lvl: 1, job: null, flesh: 0 });
+        // the checkpoint has its meat lab (level 1), so the night never says it cannot feed them with no lab there
+        const lab = s.rooms.findIndex((r) => r.kind === 'meatlab');
+        expect(lab).toBeGreaterThanOrEqual(0);
         expect(V.podFeed(s)).toBe(100);
         expect(V.underfed(s)).toBe(true);
         s.rooms[lab].lvl = 3;

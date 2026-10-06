@@ -262,13 +262,14 @@ describe('after the second human test', () => {
     });
     test('a full floor pushes into the one above by itself, and gives one more room at once', () => {
         const s = cp('iv-vault-flesh');
-        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2 && i !== V.slotIndex(2, 7)) r.flesh = 1; });
+        // (2, 7) is the checkpoint's meat lab: the last room taken is (2, 6)
+        s.rooms.forEach((r, i) => { if (V.levelOf(i) === 2 && i !== V.slotIndex(2, 6)) r.flesh = 1; });
         const slots = V.growSlots(s);
         s.bio = 1000;
-        V.growInto(s, V.slotIndex(2, 7));
+        V.growInto(s, V.slotIndex(2, 6));
         for (let t = 0; t < 30; t += 0.25) V.advance(s, 0.25, 2);
         expect(V.growSlots(s)).toBe(slots + 1);
-        const above = s.rooms[V.slotIndex(1, 7)];
+        const above = s.rooms[V.slotIndex(1, 6)];
         expect(above.flesh === 1 || (above.job && above.job.op === 'grow')).toBe(true);
     });
 });

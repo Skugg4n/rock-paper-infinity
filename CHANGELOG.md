@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.87.3 - 2026-10-06 (chapter IV, the vault: the burst)
+
+- **The burst is a mass.** A dome of the rooms' own muscle fibre and vessels (tiled at their scale, not stretched) pushes out of the crust and swells until it fills the top of the screen, with folds where one sheet of muscle lies over the next, wet highlights, thick branching vessels that whip with red light running along them, a ring of the heartbeat moving out through the whole of it, torn crust and tower pieces riding on its back and sliding off, and dust. The kit (tissue, vessel trees, riders) is made once when the rise starts; per frame only transforms and the pulse.
+- **Checkpoints with a meat lab.** iv-vault-night has a Meat Lab (level 1) on level 3, so "The meat lab cannot feed them all." never shows with no lab on the map; iv-vault-flesh keeps it.
+
 ## v1.87.2 - 2026-10-06 (chapter IV, the vault: tending the cold, the mission, a whole body)
 
 After Ola played v1.87.1 ("KUL! SNYGGT! Love it!"), section H of docs/superpowers/specs/2026-10-05-deep-vault-pass3.md:

@@ -72,6 +72,9 @@ export const VAULT_CHECKPOINTS = {
         s.ore = 300;
         s.turnDay = TURN_DAY; s.hydroSaid = true;
         had(s, 'turn', 'cold');
+        // the meat lab that feeds the pods (level 1: it cannot feed them all, as the night will say)
+        put(s, slotIndex(2, 7), 'meatlab', { born: 60 });
+        s.meatOpen = true;
         // the night begins here: its steps (pass 3, section E) are ahead
         return s;
     }),

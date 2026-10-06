@@ -1694,6 +1694,118 @@ export function createVaultView(canvas, opts = {}) {
         }
     }
 
+    // ---------------------------------------------------------------- the burst (v1.87.3)
+    /**
+     * What the burst is made of, made once when the rise starts: a big tissue (the rooms' fibre and
+     * vessels, scaled up), branching vessel trees from the root outwards, the slabs and tower pieces that
+     * ride on it, the dust. Per frame only transforms, clips and the moving pulse.
+     */
+    let burstKit = null;
+    function makeBurst() {
+        const tw = 260, th = 150;
+        const tissue = makeTissue(tw, th, 91.7, 'lrud');
+        const R = rng(7.7);
+        const trees = [];
+        // branching vessels from the root, outward and up, in unit space (radius 1)
+        function grow(x, y, a, len, wid, depth, out) {
+            const pts = [[x, y]];
+            let px = x, py = y;
+            for (let st = 0; st < 5; st++) { a += (R() - 0.5) * 0.5; px += Math.cos(a) * len / 5; py += Math.sin(a) * len / 5; pts.push([px, py]); }
+            out.push({ pts, wid, phase: R() * 6, delay: R() });
+            if (depth > 0) for (let b = 0; b < 2; b++) grow(px, py, a + (b ? 1 : -1) * (0.35 + R() * 0.4), len * 0.62, wid * 0.62, depth - 1, out);
+        }
+        for (let v = 0; v < 7; v++) grow(0, 0, -Math.PI + (v + 0.5) * Math.PI / 7 + (R() - 0.5) * 0.2, 0.55, 9, 3, trees);
+        const riders = [];
+        for (let q = 0; q < 14; q++) riders.push({ a: -Math.PI / 2 + (R() - 0.5) * 1.6, slab: q % 3 !== 0, w: 10 + R() * 26, h: q % 3 === 0 ? 24 + R() * 40 : 6 + R() * 8, spin: (R() - 0.5) * 2, slide: 0.4 + R() * 0.8 });
+        const dust = [];
+        for (let q = 0; q < 40; q++) dust.push({ a: -Math.PI + R() * Math.PI, sp: 0.3 + R() * 0.9, r: 6 + R() * 22 });
+        return { tissue, trees, riders, dust };
+    }
+    /** m 0..1: the mass from first breaking the crust to filling the sky. */
+    function burst(s, t, m, cx, gy, hb) {
+        if (!burstKit) burstKit = makeBurst();
+        const K = burstKit;
+        // it pushes out slowly, then swells until it fills the top of the screen
+        const ease = Math.pow(m, 1.35);
+        const Rx = 50 + ease * W * 0.82 * (1 + 0.025 * hb);
+        const Ry = 30 + ease * (gy + 80) * (1 + 0.03 * hb);
+        const dome = () => { ctx.beginPath(); ctx.ellipse(cx, gy + 4, Rx, Ry, 0, Math.PI, 0); ctx.closePath(); };
+        // dust thrown up behind it
+        for (const d of K.dust) {
+            const dist = (0.6 + d.sp * m) * Rx * 0.9;
+            ctx.fillStyle = rgba(VT.mist, 0.12 * (1 - m * 0.7));
+            ctx.beginPath(); ctx.arc(cx + Math.cos(d.a) * dist, gy + Math.sin(d.a) * dist * 0.5 - m * 30, d.r * (0.6 + m), 0, Math.PI * 2); ctx.fill();
+        }
+        // the mass: layered muscle, the rooms' own tissue scaled up, inside the dome
+        ctx.save();
+        dome(); ctx.clip();
+        // tiled at the rooms' scale (a little larger), not stretched: the fibre keeps its grain
+        const tw = K.tissue.W2 * 1.35, th = K.tissue.H2 * 1.35;
+        let row = 0;
+        for (let ty = gy + 8 - th; ty > gy - Ry - th; ty -= th - 2, row++) {
+            // rows offset by half a tile, so no seam runs straight up the mass
+            for (let tx = cx - Math.ceil(Rx / tw) * tw - (row % 2) * tw / 2; tx < cx + Rx; tx += tw - 2) {
+                ctx.drawImage(K.tissue.base, tx, ty, tw, th);
+                ctx.globalAlpha = 0.55 + 0.45 * hb;
+                ctx.drawImage(K.tissue.glint, tx, ty, tw, th);
+                ctx.globalAlpha = 1;
+            }
+        }
+        // layered muscle: folds where one sheet lies over the next, following the dome
+        for (const f of [0.82, 0.6, 0.38]) {
+            ctx.strokeStyle = 'rgba(8,2,4,0.55)'; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.ellipse(cx, gy + 4, Rx * f, Ry * f, 0, Math.PI * 1.04, Math.PI * 1.96); ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,170,175,0.14)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.ellipse(cx, gy + 1, Rx * f, Ry * f, 0, Math.PI * 1.06, Math.PI * 1.94); ctx.stroke();
+        }
+        // shading: dark at the rim, the heartbeat as a ring of light running out from the root
+        const sh = ctx.createRadialGradient(cx, gy, Ry * 0.2, cx, gy, Math.max(Rx, Ry));
+        sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(0.8, 'rgba(10,2,5,0.35)'); sh.addColorStop(1, 'rgba(6,1,3,0.8)');
+        ctx.fillStyle = sh; ctx.fillRect(cx - Rx, gy - Ry, Rx * 2, Ry + 8);
+        const ph = (t % BEAT) / BEAT;
+        const ringR = ph * Math.max(Rx, Ry) * 1.1;
+        const ring = ctx.createRadialGradient(cx, gy, Math.max(1, ringR - 40), cx, gy, ringR + 10);
+        ring.addColorStop(0, rgba(VT.pulse, 0)); ring.addColorStop(0.7, rgba(VT.pulse, 0.35 * (1 - ph))); ring.addColorStop(1, rgba(VT.pulse, 0));
+        ctx.fillStyle = ring; ctx.fillRect(cx - Rx, gy - Ry, Rx * 2, Ry + 8);
+        // the vessels, thick and branching, whipping, red light running root to tip
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (const v of K.trees) {
+            const whip = Math.sin(t * 2.6 + v.phase) * 0.06;
+            const P = v.pts.map(([px, py], n) => [cx + (px + whip * n * py) * Rx * 1.05, gy + 4 + (py - whip * n * px) * Ry * 1.05]);
+            const path = () => { ctx.beginPath(); P.forEach((p, n) => (n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); };
+            const wid = v.wid * (0.6 + 0.6 * ease);
+            path(); ctx.strokeStyle = VT.fArtery; ctx.lineWidth = wid + 3; ctx.stroke();
+            path(); ctx.strokeStyle = VT.fCore; ctx.lineWidth = wid; ctx.stroke();
+            ctx.save(); ctx.translate(-wid * 0.25, -wid * 0.3); path(); ctx.strokeStyle = 'rgba(255,170,175,0.22)'; ctx.lineWidth = Math.max(1, wid * 0.25); ctx.stroke(); ctx.restore();
+            const p = ((t / BEAT) + v.delay * 0.4) % 1;
+            const f = p * (P.length - 1), i0 = Math.floor(f), u = f - i0, a = P[i0], b = P[Math.min(P.length - 1, i0 + 1)];
+            ctx.fillStyle = `rgba(255,74,92,${0.55 + 0.45 * hb})`;
+            ctx.beginPath(); ctx.arc(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, wid * 0.7, 0, Math.PI * 2); ctx.fill();
+        }
+        // wet highlights over the top
+        ctx.strokeStyle = `rgba(255,190,195,${0.16 + 0.1 * hb})`; ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.ellipse(cx - Rx * 0.15, gy - Ry * 0.55, Rx * 0.45, Ry * 0.22, -0.15, Math.PI * 1.08, Math.PI * 1.62); ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(cx + Rx * 0.3, gy - Ry * 0.4, Rx * 0.2, Ry * 0.12, 0.2, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
+        ctx.restore();
+        // the rim of the mass, wet
+        dome(); ctx.strokeStyle = rgba(VT.pulse, 0.45 + 0.35 * hb); ctx.lineWidth = 2.5; ctx.stroke();
+        // torn crust and towers riding on its back, sliding off down the sides
+        for (const r of K.riders) {
+            const a = r.a + (r.a < -Math.PI / 2 ? -1 : 1) * m * m * r.slide;
+            const on = a > -Math.PI && a < 0;
+            const px = cx + Math.cos(a) * Rx, py = gy + 4 + Math.sin(a) * Ry;
+            const fall = on ? 0 : (Math.abs(a + Math.PI / 2) - Math.PI / 2) * 200;
+            ctx.save(); ctx.translate(px, py + fall); ctx.rotate(a + Math.PI / 2 + r.spin * m);
+            ctx.fillStyle = r.slab ? '#1a1f27' : CITY_COLS[1];
+            ctx.fillRect(-r.w / 2, -r.h, r.w, r.h);
+            ctx.fillStyle = rgba(VT.mist, 0.15); ctx.fillRect(-r.w / 2, -r.h, r.w, 1.5);
+            if (!r.slab) { ctx.fillStyle = rgba(VT.lamp, 0.25); for (let wy = -r.h + 4; wy < -3; wy += 6) ctx.fillRect(-r.w / 4, wy, 2, 2); }
+            ctx.restore();
+        }
+        ctx.lineWidth = 1;
+    }
+
     /**
      * H6: the rise, meatier, over riseAnim.ms (about 7 s): the body climbs the shaft as fibre and vessels
      * (0 to 0.3), the crust bulges and cracks with light between the cracks (0.3 to 0.45), rock and the
@@ -1754,41 +1866,7 @@ export function createVaultView(canvas, opts = {}) {
                 ctx.restore();
             }
         }
-        if (k > 0.6) {
-            // 4. the surge: wet red mass with whipping vessels, the heartbeat through all of it
-            const m = Math.min(1, (k - 0.6) / 0.4);
-            const R = 40 + m * Math.max(W, geo.ground * 4) * (0.9 + 0.04 * hb);
-            const g = ctx.createRadialGradient(cx, gy, 10, cx, gy, R);
-            g.addColorStop(0, `rgba(${90 + 60 * hb},18,32,1)`); g.addColorStop(0.55, 'rgba(46,9,17,0.98)'); g.addColorStop(1, 'rgba(20,4,8,0)');
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.ellipse(cx, gy, R, R * 0.6 + m * geo.ground, 0, Math.PI, 0); ctx.fill();
-            // wet sheen
-            ctx.strokeStyle = 'rgba(255,170,175,0.18)'; ctx.lineWidth = 6;
-            ctx.beginPath(); ctx.ellipse(cx - R * 0.12, gy - R * 0.25, R * 0.5, R * 0.18, -0.2, Math.PI * 1.1, Math.PI * 1.7); ctx.stroke();
-            // vessels whipping out from the mass
-            for (let v = 0; v < 12; v++) {
-                const ang = -Math.PI + (v + 0.5) * Math.PI / 12;
-                const whip = Math.sin(t * 3 + v * 1.7) * 0.25;
-                ctx.strokeStyle = VT.fArtery; ctx.lineWidth = 6;
-                const pts = [];
-                for (let st = 0; st <= 8; st++) { const rr = R * 1.02 * st / 8; pts.push([cx + Math.cos(ang + whip * st / 8) * rr, gy + Math.sin(ang + whip * st / 8) * rr * 0.7]); }
-                ctx.beginPath(); pts.forEach((p, n) => (n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke();
-                ctx.strokeStyle = rgba(VT.pulse, 0.6 + 0.4 * hb); ctx.lineWidth = 2.5; ctx.stroke();
-                const p = ((t / BEAT) + v * 0.13) % 1, q = pts[Math.floor(p * 8)];
-                ctx.fillStyle = `rgba(255,74,92,${0.7 + 0.3 * hb})`; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, Math.PI * 2); ctx.fill();
-            }
-            // 5. what is left of the city rides on its back
-            if (k > 0.8) {
-                const r = (k - 0.8) / 0.2;
-                const back = gy - (R * 0.6 + m * geo.ground) * 0.92;
-                for (let q = 0; q < 7; q++) {
-                    const bx = cx + (q - 3) * 34 + Math.sin(t + q) * 3, bh = 18 + hash(q + 11) * 40;
-                    ctx.save(); ctx.translate(bx, back + 6 + Math.abs(q - 3) * 6); ctx.rotate((q - 3) * 0.12 + Math.sin(t * 0.8 + q) * 0.03);
-                    ctx.fillStyle = `rgba(21,26,33,${r})`; ctx.fillRect(-7, -bh, 14, bh);
-                    ctx.restore();
-                }
-            }
-        }
+        if (k > 0.55) burst(s, t, Math.min(1, (k - 0.55) / 0.45), cx, gy, hb);
         ctx.lineWidth = 1;
         // hold the risen body a moment, then the card
         if (t * 1000 - riseAnim.t0 >= riseAnim.ms + RISE_HOLD_MS && !riseAnim.done) { riseAnim.done = true; riseAnim.resolve?.(); }
@@ -2058,7 +2136,7 @@ export function createVaultView(canvas, opts = {}) {
         failAt: (s, x, y) => failAt(s, x, y),
         setPointer: (x, y) => { pointer.x = x; pointer.y = y; },
         startDescent: (ms) => { descent = { t0: performance.now(), ms }; },
-        rise: (ms = 7200) => new Promise((resolve) => { riseAnim = { t0: performance.now(), ms, resolve }; }),
+        rise: (ms = 7200) => new Promise((resolve) => { burstKit = null; riseAnim = { t0: performance.now(), ms, resolve }; }),
         /** True while something on screen moves on its own (the descent, the rise, effects). */
         get busy() { return !!descent || !!riseAnim || effects.length > 0; },
         get geo() { return geo; },

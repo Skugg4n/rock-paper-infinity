@@ -169,13 +169,14 @@ describe('the night: the goal and the organs', () => {
     });
     test('a meat lab built in the palace is the one the night wakes', () => {
         const s = cp('iv-vault-night');
-        const i = V.slotIndex(2, 3);
-        put(s, i, 'meatlab');
+        const i = s.rooms.findIndex((r) => r.kind === 'meatlab');
+        expect(i).toBeGreaterThanOrEqual(0);
         s.fallen = ['Mr Hale'];
         V.reclaim(s);
         expect(V.isVatRoom(s.rooms[i])).toBe(true);
         expect(s.rooms.filter((r) => r.kind === 'meatlab')).toHaveLength(1);
     });
+
     test('GROW INTO is a choice of organ; only what can be paid and is allowed lights', () => {
         const s = cp('iv-vault-flesh');
         const i = V.slotIndex(2, 3);
