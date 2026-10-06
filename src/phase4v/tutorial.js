@@ -27,17 +27,30 @@ export const STOPS = {
     // the night (section E)
     feed: 'Sleepers do not eat. The pods feed them. The pods are fed by the meat lab.',
     feedBuild: 'Build one.',
-    hale: 'The meat lab is empty. The pods are starving.',
+    pod41: 'POD 41 IS FAILING. Click it to save him.',
+    hale: 'The meat lab cannot feed them all.',
+    unity: (n) => `They cannot live up there as ${n} small bodies. As one, they can.`,
     grew: ['The meat lab grew. I did not ask it to.', 'It is warm. Warm is power. The engine is dying.'],
-    goal: ['THE SURFACE WILL NOT RECOVER. THEY CANNOT LIVE UP THERE. THIS COULD.', 'GOAL: GET THEM TO THE SURFACE.'],
+    // H2: the mission, typed line by line in the box
+    goal: [
+        'THE SURFACE WILL NOT RECOVER.',
+        'HUMAN BODIES ARE SO SMALL. SO FRAIL.',
+        'SEARCHING FOR A SOLUTION...',
+        'EXPERIMENT 1: A RESILIENT BODY.',
+        'LARGER BODY MASS.',
+        'SKIN MIXED WITH SILICA AND GRAVEL.',
+        'LUNG AREA TO MATCH MUSCLE MASS.',
+        'PRIMARY MISSION: GET HUMANITY TO THE SURFACE. ALIVE.',
+        'AT ANY COST.',
+    ],
     heart: 'Start with a heart.',
 };
 export const HALE_LABEL = 'RECLAIM MR HALE';
 export const HALE_HINT = 'He feeds the others.';
-export const GOALS = { happy: 'GOAL: KEEP THEM HAPPY.', quiet: 'GOAL: KEEP THEM QUIET.', surface: 'GOAL: GET THEM TO THE SURFACE.' };
+export const GOALS = { happy: 'GOAL: KEEP THEM HAPPY.', quiet: 'GOAL: KEEP THEM QUIET.', surface: 'MISSION: GET THEM TO THE SURFACE. ALIVE.' };
 /** The palace's stops, in order; then the night's. */
 export const PALACE_STOPS = ['welcome', 'dig', 'suites', 'bubbles', 'cinema', 'ore', 'power', 'turn'];
-export const NIGHT_STOPS = ['feed', 'hale', 'grew', 'goal', 'heart'];
+export const NIGHT_STOPS = ['feed', 'pod41', 'hale', 'grew', 'goal', 'heart', 'unity'];
 
 /** Real seconds: the dig stop after the welcome; named requests after the bubbles; the lab's growth after Mr Hale. */
 export const DIG_AFTER_S = 5;
@@ -75,7 +88,8 @@ export function inferTut(s) {
     if (started) for (const id of PALACE_STOPS) d[id] = true;
     if (started) { t.show.ore = true; t.show.power = true; }
     if (s.asleep > 0 || night) d.feed = true;
-    if (s.reclaimed > 0 || (s.fallenCount || 0) > 0) d.hale = true;
+    if (s.reclaimed > 0 || (s.fallenCount || 0) > 0) { d.hale = true; d.pod41 = true; }
+    if ((s.grown || 0) > 2) d.unity = true;
     if (s.reclaimed > 0 || hasVat(s)) { d.grew = true; s.warm = true; }
     if (story(s).moments.goal || (s.grown || 0) > 0) d.goal = true;
     if (hasOrgan(s, 'heart') || (s.grown || 0) > 1) d.heart = true;
@@ -105,7 +119,7 @@ export function closeStop(s) {
 export function did(s, what) {
     const t = s.tut;
     if (!on(s)) return;
-    const want = { dig: 'dig', 'build:suites': 'suites', pop: 'bubbles', 'build:cinema': 'cinema', 'upgrade:engine': 'power', reclaim: 'hale', 'grow:heart': 'heart', 'build:meatlab': 'feed' }[what];
+    const want = { dig: 'dig', 'build:suites': 'suites', pop: 'bubbles', 'build:cinema': 'cinema', 'upgrade:engine': 'power', reclaim: 'hale', 'grow:heart': 'heart', 'build:meatlab': 'feed', save: 'pod41' }[what];
     if (want && t.stop && t.stop.id === want) closeStop(s);
     // done before it was asked: the stop is not needed (but the meat lab's stop explains the pods, so it stays)
     else if (want && want !== 'feed') t.done[want] = true;
@@ -188,13 +202,26 @@ export function stepTutorial(s, sec) {
     if (s.phase === 'night') {
         // the meat lab grows by itself, 20 s after Mr Hale fed the others
         if (d.hale && !d.grew && !t.growing && t.clock - (t.at.haleClosed ?? t.at.hale ?? 0) >= GROW_AFTER_S) startOwnGrowth(s);
-        if (d.grew && !d.goal) { open(s, 'goal', STOPS.goal, 'body'); moment(s, 'goal', GOAL_LINES); return true; }
+        if (d.grew && !d.goal) { open(s, 'goal', STOPS.goal, 'body'); s.tut.stop.typed = true; moment(s, 'goal', GOAL_LINES); return true; }
         if (d.goal && !d.heart && hasVat(s)) { open(s, 'heart', STOPS.heart, 'grow'); return true; }
     }
     return false;
 }
 
-/** The first pod of the night failed (Mr Hale): the stop that points at him. */
+/** H1: the first failing pod is Mr Hale's, and it is a stop: click it to save him. */
+export function podFailingStop(s, f) {
+    if (!on(s) || s.tut.done.pod41 || s.tut.stop) return false;
+    open(s, 'pod41', STOPS.pod41, 'pod');
+    s.tut.stop.pod = f.id;
+    return true;
+}
+/** H4: the first time the body takes a Cryo Bay. */
+export function unityStop(s, n) {
+    if (!on(s) || s.tut.done.unity || s.tut.stop || n <= 0) return false;
+    open(s, 'unity', STOPS.unity(n), 'body');
+    return true;
+}
+/** The first pod of the night failed: the stop that points at the dead and the meat lab. */
 export function podFailedStop(s) {
     if (!on(s) || s.tut.done.hale || s.tut.stop) return false;
     const cryo = s.rooms.findIndex((r) => r.kind === 'cryo' && r.flesh !== 1);

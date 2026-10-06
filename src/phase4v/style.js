@@ -160,6 +160,9 @@ body.in-vault #pause-btn { display: none; }
 .v-rise { white-space: nowrap; position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 8; border: 0; border-radius: 10px; padding: 14px 44px; background: var(--v-pulse); color: #f6e6e8;
   font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 34px; letter-spacing: 0.3em; cursor: pointer; box-shadow: 0 0 40px rgba(168,19,44,0.7); animation: v-throb 1.7s ease-in-out infinite; }
 .v-rise[hidden] { display: none; }
+.v-rise.dim { background: var(--v-steel3); color: var(--v-mist); font-size: 18px; letter-spacing: 0.14em; padding: 12px 26px; box-shadow: none; animation: none; cursor: default; }
+.v-stop .cur { display: inline-block; width: 8px; height: 14px; background: var(--v-amber); vertical-align: -1px; animation: v-blink 1s steps(1) infinite; }
+.v-stop .ok[hidden] { display: none; }
 @keyframes v-throb { 50% { box-shadow: 0 0 70px rgba(168,19,44,0.95); } }
 #phase-vault.is-night .v-panel { filter: brightness(0.82); }
 #phase-vault.is-night .v-dim { opacity: 0.35; }

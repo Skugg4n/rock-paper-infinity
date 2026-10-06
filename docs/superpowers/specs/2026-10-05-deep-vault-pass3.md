@@ -126,3 +126,31 @@ målraden, inforutan vid rummet, dubbelklick, checklistan med effekter). Simuler
 - Kort som redan fanns i en gammal sparning eller checkpoint ligger i handen direkt.
 - Simuleringen landar på ca 18 min för hela akten (målet 20-25). En människa som läser stoppen och spelar på ▶ blir
   längre; natten ca 6 min (målet 6-8).
+
+## H. Efter Olas spel av v1.87.1 ("KUL! SNYGGT! Love it!")
+
+1. **THE COLD sköts, den tittas inte på.** När alla sover: kapslar som sviktar kommer som bubblor över kryobayerna
+   (iskristall, texten `Failing pod`), en var ca 8-12:e s, ringen räknar ner; klick räddar kapseln (2 malm motorarbete,
+   ett mjukt tick). Missad: den sovande dör (`Pod 41 failed.` i loggen, PODS FAILED-räknaren). Köttlabbet MATAR kapslarna:
+   varje labbnivå föder 100 kapslar; fler sovande än mat: bubblorna kommer dubbelt så tätt och Meat Lab märks: uppgradera.
+   Motorn nöts under natten (POWER sjunker); när strömmen är röd kommer de ännu tätare. En noggrann spelare håller ca 90 % vid liv.
+   Första sviktande kapseln är ett stopp: `POD 41 IS FAILING. Click it to save him.` Räddad: bubblan `Mr Hale sleeps on.`
+   Senare, när tre sviktar på en gång, missas en, och den första döden startar köttlabbets väg som i dag (`The meat lab
+   cannot feed them all.` + RECLAIM). Den lugna starten (45 s) står kvar; första döden 1,5-2,5 min in i natten.
+2. **Målet blir UPPDRAGET**, skrivet rad för rad i rutan (systemröst, 40 ms/tecken, kort paus per rad, OK sist):
+   `THE SURFACE WILL NOT RECOVER.` / `HUMAN BODIES ARE SO SMALL. SO FRAIL.` / `SEARCHING FOR A SOLUTION...` /
+   `EXPERIMENT 1: A RESILIENT BODY.` / `LARGER BODY MASS.` / `SKIN MIXED WITH SILICA AND GRAVEL.` /
+   `LUNG AREA TO MATCH MUSCLE MASS.` / `PRIMARY MISSION: GET HUMANITY TO THE SURFACE. ALIVE.` / `AT ANY COST.`
+   Panelens rad: `MISSION: GET THEM TO THE SURFACE. ALIVE.` Checklistan: HEART · power, LUNGS · area, SKIN · silica, STOMACH · acid.
+3. **MAGEN:** knappen `Acid turns rock and soil into minerals and nutrients. Biomass +3 a year.`; rummets ruta
+   `Acid. Rock becomes nutrients. Biomass +N a year.`; klar-raden `A stomach. Acid turns the rock into nutrients.`
+4. **GROW INTO en kryobay:** knappen `GROW INTO · 50 sleepers join the body`, raden under `As one body they survive what 50 cannot.`
+   Första gången kroppen tar en kryobay är ett stopp: `They cannot live up there as 50 small bodies. As one, they can.`
+   Panelens INSIDE blir `UNITY 125 / 196`. CRT-raden `N sleepers are inside now.` blir `Unity: N of M.`
+5. **Kroppen ska bli HEL före RISE:** alla rum på nivå 1 går att växa in i; SKIN på vilket rum som helst på översta nivån (flera
+   går bra, minst en krävs). RISE erbjuds först vid BODY 100 % och HEART, LUNGS, SKIN; innan dess säger den stora knappen
+   dämpat `THE BODY IS NOT WHOLE · N rooms left`. Sista rummet säger `We are whole.` (markerat). Natten 7-9 min i simuleringen.
+6. **Uppstigningen, köttigare (6-8 s):** kroppen klättrar i schaktet som fiber och kärl, skorpan buktar och spricker med ljus
+   mellan sprickorna, sten och tornens ruiner rasar, massan bryter igenom i en våt röd våg med piskande kärl och hjärtslaget
+   genom allt, lyfter det som är kvar av staden på ryggen, sväller tills den fyller himlen med en långsam puls, sedan V · UNITY.
+   Ljud: den tunga smällen plus ett vått stigande sus via src/audio.js (inställningarna gäller).

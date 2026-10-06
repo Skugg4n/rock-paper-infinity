@@ -35,7 +35,7 @@ const BREATH_RATE = 0.9;
 const BEAT = 1.7;
 const PAD = 6;
 /** After the rise, the risen body stays on screen this long before the chapter card. */
-export const RISE_HOLD_MS = 1800;              // the tissue is drawn this much larger than its room, so it can swell
+export const RISE_HOLD_MS = 1800;
 
 export function createVaultView(canvas, opts = {}) {
     const ctx = canvas.getContext('2d');
@@ -1695,62 +1695,99 @@ export function createVaultView(canvas, opts = {}) {
     }
 
     /**
-     * The rise, in three beats over riseAnim.ms: the body fills the shaft from the bottom (0 to 0.4),
-     * the crust bulges and cracks (0.4 to 0.6), the mass breaks through and swells over the ruined city
-     * until it is the sky (0.6 to 1).
+     * H6: the rise, meatier, over riseAnim.ms (about 7 s): the body climbs the shaft as fibre and vessels
+     * (0 to 0.3), the crust bulges and cracks with light between the cracks (0.3 to 0.45), rock and the
+     * ruined towers tumble (0.45 to 0.6), the mass bursts through in a wet red surge with vessels whipping
+     * and the heartbeat running through it (0.6 to 0.8), lifts what is left of the city on its back and
+     * swells until it fills the sky with a slow pulse (0.8 to 1). Then it holds.
      */
     function drawRise(s, t) {
         if (!riseAnim) return;
         const k = Math.min(1, (t * 1000 - riseAnim.t0) / riseAnim.ms);
-        const x = geo.shaftX - 6, w = geo.shaftW + 12;
+        const hb = beat(t);
+        const x = geo.shaftX - 6, w = geo.shaftW + 12, cx = x + w / 2;
         const bottom = geo.slots[(LEVELS - 1) * SLOTS].y + geo.levelH;
         const gy = groundY(s);
-        const fill = Math.min(1, k / 0.4);
+        // 1. up the shaft: fibre, vessels, the pulse climbing
+        const fill = Math.min(1, k / 0.3);
         const top = bottom - (bottom - gy) * fill;
-        ctx.fillStyle = '#2a0a12';
-        ctx.fillRect(x, top, w, bottom - top);
-        // fibres up the shaft, and the pulse climbing it
-        ctx.strokeStyle = 'rgba(98,30,44,0.8)'; ctx.lineWidth = 2;
-        for (let f = 0; f < 4; f++) { ctx.beginPath(); for (let y = bottom; y > top; y -= 8) ctx.lineTo(x + w * (0.2 + f * 0.2) + Math.sin(y * 0.15 + f) * 2, y); ctx.stroke(); }
-        ctx.strokeStyle = rgba(VT.pulse, 0.9);
-        ctx.beginPath(); for (let y = bottom; y > top; y -= 8) ctx.lineTo(x + w / 2 + Math.sin(y * 0.2 + t * 4) * w * 0.3, y); ctx.stroke();
-        const cx = x + w / 2;
-        if (k > 0.4) {
-            // the crust bulges and cracks
-            const b = Math.min(1, (k - 0.4) / 0.2);
-            ctx.strokeStyle = 'rgba(20,10,8,0.95)';
-            ctx.lineWidth = 2;
-            for (let c = 0; c < 7; c++) {
-                const ang = -Math.PI + (c + 0.5) * Math.PI / 7;
-                ctx.beginPath(); ctx.moveTo(cx, gy);
-                ctx.lineTo(cx + Math.cos(ang) * (30 + b * 160) * (0.6 + hash(c) * 0.6), gy + Math.sin(ang) * (8 + b * 40));
-                ctx.stroke();
+        ctx.fillStyle = '#2a0a12'; ctx.fillRect(x, top, w, bottom - top);
+        ctx.lineCap = 'round';
+        for (let f = 0; f < 6; f++) {
+            ctx.strokeStyle = f % 2 ? 'rgba(98,30,44,0.85)' : 'rgba(23,11,16,0.9)'; ctx.lineWidth = 3;
+            ctx.beginPath(); for (let y = bottom; y > top; y -= 7) ctx.lineTo(x + w * (0.1 + f * 0.16) + Math.sin(y * 0.12 + f + t * 2) * 2.5, y); ctx.stroke();
+        }
+        for (const side of [-1, 1]) {
+            ctx.strokeStyle = VT.fCore; ctx.lineWidth = 3;
+            ctx.beginPath(); for (let y = bottom; y > top; y -= 7) ctx.lineTo(cx + side * w * 0.22 + Math.sin(y * 0.07 + side) * 3, y); ctx.stroke();
+        }
+        for (let q = 0; q < 4; q++) {
+            const p = ((t / BEAT) + q / 4) % 1, y = bottom - (bottom - top) * p;
+            ctx.fillStyle = `rgba(255,74,92,${0.5 + 0.5 * hb})`; ctx.beginPath(); ctx.arc(cx + Math.sin(y * 0.07) * 3, y, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        if (k > 0.3) {
+            // 2. the crust bulges and cracks, light between the cracks
+            const b = Math.min(1, (k - 0.3) / 0.15);
+            const bulge = 6 + b * 30;
+            ctx.fillStyle = '#151a21';
+            ctx.beginPath(); ctx.ellipse(cx, gy, 40 + b * 90, bulge, 0, Math.PI, 0); ctx.fill();
+            for (let c = 0; c < 9; c++) {
+                const ang = -Math.PI + (c + 0.5) * Math.PI / 9;
+                const len = (30 + b * 150) * (0.6 + hash(c) * 0.6);
+                ctx.strokeStyle = rgba(VT.amber, 0.25 + 0.6 * b * (0.6 + 0.4 * hb)); ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(cx, gy - bulge * 0.4);
+                ctx.lineTo(cx + Math.cos(ang) * len * 0.5 + (hash(c + 3) - 0.5) * 10, gy + Math.sin(ang) * bulge * 0.6);
+                ctx.lineTo(cx + Math.cos(ang) * len, gy + Math.sin(ang) * (bulge + 10)); ctx.stroke();
+                ctx.strokeStyle = 'rgba(10,6,4,0.9)'; ctx.lineWidth = 1.2; ctx.stroke();
             }
-            ctx.fillStyle = '#2a0a12';
-            ctx.beginPath(); ctx.ellipse(cx, gy, 20 + b * 40, 6 + b * 26, 0, Math.PI, 0); ctx.fill();
+        }
+        if (k > 0.45) {
+            // 3. rock and the ruined towers tumble out and away
+            const m = (k - 0.45) / 0.55;
+            for (let q = 0; q < 26; q++) {
+                const a = -Math.PI + hash(q) * Math.PI, sp = 60 + hash(q + 7) * 260;
+                const px = cx + Math.cos(a) * sp * m, py = gy - Math.abs(Math.sin(a)) * sp * m * 1.2 + 260 * m * m * (0.4 + hash(q + 2));
+                ctx.save(); ctx.translate(px, py); ctx.rotate(m * (hash(q + 5) - 0.5) * 8);
+                ctx.fillStyle = q % 4 === 0 ? CITY_COLS[1] : '#2a2420';
+                const sz = 3 + hash(q + 9) * (q % 4 === 0 ? 16 : 7);
+                ctx.fillRect(-sz / 2, -sz * (q % 4 === 0 ? 1.6 : 0.5), sz, sz * (q % 4 === 0 ? 3.2 : 1));
+                ctx.restore();
+            }
         }
         if (k > 0.6) {
-            // through: the mass swells over the city and becomes the sky
-            const m = (k - 0.6) / 0.4;
-            const R = 60 + m * Math.max(W, geo.ground * 4);
+            // 4. the surge: wet red mass with whipping vessels, the heartbeat through all of it
+            const m = Math.min(1, (k - 0.6) / 0.4);
+            const R = 40 + m * Math.max(W, geo.ground * 4) * (0.9 + 0.04 * hb);
             const g = ctx.createRadialGradient(cx, gy, 10, cx, gy, R);
-            g.addColorStop(0, 'rgba(60,12,22,1)');
-            g.addColorStop(0.7, 'rgba(36,7,13,0.97)');
-            g.addColorStop(1, 'rgba(20,4,8,0)');
+            g.addColorStop(0, `rgba(${90 + 60 * hb},18,32,1)`); g.addColorStop(0.55, 'rgba(46,9,17,0.98)'); g.addColorStop(1, 'rgba(20,4,8,0)');
             ctx.fillStyle = g;
-            ctx.beginPath(); ctx.ellipse(cx, gy, R, R * 0.55 + m * geo.ground, 0, Math.PI, 0); ctx.fill();
-            ctx.strokeStyle = rgba(VT.pulse, 0.5 + 0.4 * Math.sin(t * 3.7));
-            ctx.lineWidth = 1.5;
-            for (let v = 0; v < 14; v++) {
-                const ang = -Math.PI + (v + 0.5) * Math.PI / 14;
-                ctx.beginPath(); ctx.moveTo(cx, gy);
-                for (let st = 1; st <= 6; st++) {
-                    const rr = R * 0.9 * st / 6;
-                    ctx.lineTo(cx + Math.cos(ang + (hash(v * 7 + st) - 0.5) * 0.3) * rr, gy + Math.sin(ang) * rr * 0.6);
-                }
-                ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(cx, gy, R, R * 0.6 + m * geo.ground, 0, Math.PI, 0); ctx.fill();
+            // wet sheen
+            ctx.strokeStyle = 'rgba(255,170,175,0.18)'; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.ellipse(cx - R * 0.12, gy - R * 0.25, R * 0.5, R * 0.18, -0.2, Math.PI * 1.1, Math.PI * 1.7); ctx.stroke();
+            // vessels whipping out from the mass
+            for (let v = 0; v < 12; v++) {
+                const ang = -Math.PI + (v + 0.5) * Math.PI / 12;
+                const whip = Math.sin(t * 3 + v * 1.7) * 0.25;
+                ctx.strokeStyle = VT.fArtery; ctx.lineWidth = 6;
+                const pts = [];
+                for (let st = 0; st <= 8; st++) { const rr = R * 1.02 * st / 8; pts.push([cx + Math.cos(ang + whip * st / 8) * rr, gy + Math.sin(ang + whip * st / 8) * rr * 0.7]); }
+                ctx.beginPath(); pts.forEach((p, n) => (n ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke();
+                ctx.strokeStyle = rgba(VT.pulse, 0.6 + 0.4 * hb); ctx.lineWidth = 2.5; ctx.stroke();
+                const p = ((t / BEAT) + v * 0.13) % 1, q = pts[Math.floor(p * 8)];
+                ctx.fillStyle = `rgba(255,74,92,${0.7 + 0.3 * hb})`; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, Math.PI * 2); ctx.fill();
             }
-            // no cut to black: the risen body holds the screen until the card comes
+            // 5. what is left of the city rides on its back
+            if (k > 0.8) {
+                const r = (k - 0.8) / 0.2;
+                const back = gy - (R * 0.6 + m * geo.ground) * 0.92;
+                for (let q = 0; q < 7; q++) {
+                    const bx = cx + (q - 3) * 34 + Math.sin(t + q) * 3, bh = 18 + hash(q + 11) * 40;
+                    ctx.save(); ctx.translate(bx, back + 6 + Math.abs(q - 3) * 6); ctx.rotate((q - 3) * 0.12 + Math.sin(t * 0.8 + q) * 0.03);
+                    ctx.fillStyle = `rgba(21,26,33,${r})`; ctx.fillRect(-7, -bh, 14, bh);
+                    ctx.restore();
+                }
+            }
         }
         ctx.lineWidth = 1;
         // hold the risen body a moment, then the card
@@ -1774,7 +1811,55 @@ export function createVaultView(canvas, opts = {}) {
         }
         return 0;
     }
+    /** H1: a failing pod is a bubble over its Cryo Bay: an ice crystal, its ring the time left. */
+    function failAt(s, px, py) {
+        for (const f of s.failing || []) {
+            const p = bubblePos(s, f);
+            if (p && (px - p.x) ** 2 + (py - (p.y + 4)) ** 2 <= (R + 6) ** 2) return f.id;
+        }
+        return 0;
+    }
+    function drawFailing(s, t) {
+        const now = s.wishes ? s.wishes.clock : 0;
+        let hover = null;
+        for (const f of s.failing || []) {
+            const p = bubblePos(s, f);
+            if (!p) continue;
+            const age = now - f.born, left = Math.max(0, 1 - age / f.life);
+            const x = p.x, y = p.y + 4 + Math.sin(t * 6 + f.id) * 1;
+            ctx.save();
+            ctx.translate(x, y);
+            const pulse = 0.5 + 0.5 * Math.sin(t * 8);
+            ctx.fillStyle = '#0d2233';
+            ctx.beginPath(); ctx.arc(0, 0, R + 1, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(-4, R - 1); ctx.lineTo(0, R + 7); ctx.lineTo(4, R - 1); ctx.fill();
+            ctx.strokeStyle = rgba(VT.cold, 0.5 + 0.4 * pulse); ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.arc(0, 0, R + 1, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = left < 0.35 ? VT.danger : VT.cold; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(0, 0, R + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left); ctx.stroke();
+            // the ice crystal
+            ctx.strokeStyle = VT.paper; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+            for (let k = 0; k < 3; k++) {
+                ctx.save(); ctx.rotate((k * Math.PI) / 3);
+                ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(0, 7);
+                ctx.moveTo(0, -4.5); ctx.lineTo(-2.5, -6.5); ctx.moveTo(0, -4.5); ctx.lineTo(2.5, -6.5);
+                ctx.moveTo(0, 4.5); ctx.lineTo(-2.5, 6.5); ctx.moveTo(0, 4.5); ctx.lineTo(2.5, 6.5);
+                ctx.stroke(); ctx.restore();
+            }
+            ctx.restore();
+            if ((pointer.x - x) ** 2 + (pointer.y - y) ** 2 <= (R + 6) ** 2) hover = { x, y };
+        }
+        if (hover) {
+            ctx.font = '11px system-ui, sans-serif';
+            const text = 'Failing pod';
+            const tw = ctx.measureText(text).width;
+            ctx.fillStyle = rgba(VT.steel, 0.95); ctx.fillRect(hover.x + R + 8, hover.y - 10, tw + 12, 20);
+            ctx.fillStyle = VT.paper; ctx.textAlign = 'left'; ctx.fillText(text, hover.x + R + 14, hover.y + 4);
+        }
+        ctx.lineWidth = 1;
+    }
     function drawWishes(s, t) {
+        drawFailing(s, t);
         const w = s.wishes;
         if (!w || !w.list.length) return;
         let hover = null;
@@ -1970,9 +2055,10 @@ export function createVaultView(canvas, opts = {}) {
     return {
         resize, frame, slotAt, slotRect,
         bubbleAt: (s, x, y) => bubbleAt(s, x, y),
+        failAt: (s, x, y) => failAt(s, x, y),
         setPointer: (x, y) => { pointer.x = x; pointer.y = y; },
         startDescent: (ms) => { descent = { t0: performance.now(), ms }; },
-        rise: (ms = 5200) => new Promise((resolve) => { riseAnim = { t0: performance.now(), ms, resolve }; }),
+        rise: (ms = 7200) => new Promise((resolve) => { riseAnim = { t0: performance.now(), ms, resolve }; }),
         /** True while something on screen moves on its own (the descent, the rise, effects). */
         get busy() { return !!descent || !!riseAnim || effects.length > 0; },
         get geo() { return geo; },

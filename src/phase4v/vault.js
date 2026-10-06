@@ -19,7 +19,7 @@ import {
     SLOW_RATE, moment, story, computerSays, stepWeighing, speak, stepTalk, peopleSlot, logLine,
 } from './story.js';
 import {
-    newTut, inferTut, stepTutorial, did, hand, inHand, tutOn, done as tutDone, podFailedStop, ownGrowthDone,
+    newTut, inferTut, stepTutorial, did, hand, inHand, tutOn, done as tutDone, podFailedStop, ownGrowthDone, podFailingStop, unityStop,
     FED_S, HALE_LABEL, HALE_HINT,
 } from './tutorial.js';
 
@@ -127,9 +127,9 @@ export const VAT_BIO = 0.15;
 export const FLESH_BIO = 0.05;
 /** Sleepers the body takes with a Cryo Bay are biomass too, less than one taken alone. */
 export const JOIN_BIO = 1;
-export const ENGINE_BURN = 2;
+export const ENGINE_BURN = 1;
 export const ENGINE_WEAR_YEARS = 100;
-export const NIGHT_MINE = 0.6;
+export const NIGHT_MINE = 1.5;
 export const POD_FAIL_SECONDS = 4;
 export const GROW_YEARS = 10;
 export const VAT_POWER = 10;
@@ -154,7 +154,7 @@ export const STOMACH_DRAW = 6;
 export const ENGINE_FLOOR = 0.1;
 export const ONLY_TOP = 'Only on the top level.';
 export const NO_ORE = 'No ore. The engine stopped.';
-export const ENGINE_BURNS = `The engine burns 2 ore a year.`;
+export const ENGINE_BURNS = `The engine burns 1 ore a year. Each saved pod costs 2.`;
 export const PODS_STARVE = 'Not enough power. The pods are failing.';
 /** Organs grow dearer with the body: this share of what tissue has gone up by. */
 export const ORGAN_SCALE = 0.5;
@@ -454,8 +454,7 @@ export const stomachCount = (s) => s.rooms.filter((r) => r.organ === 'stomach' &
     + s.rooms.filter((r) => r.job && r.job.op === 'shape' && r.job.organ === 'stomach').length;
 /** What the stomachs eat a year, all of them: they share the rock. */
 export function stomachBio(s) {
-    const n = s.rooms.filter((r) => organOf(r) === 'stomach').length;
-    return n ? STOMACH_BIO * Math.sqrt(n) : 0;
+    return s.rooms.filter((r) => organOf(r) === 'stomach').length * STOMACH_BIO;
 }
 
 /** The card's one line: what it gives. */
@@ -588,10 +587,11 @@ function checkNight(s) {
 /** The night's first dead: a name; then the pods are a count. */
 export const RECLAIM_HINT = 'The dead can feed the meat lab. Open the Cryo Bay.';
 const FALLEN_NAMES = ['Mr Hale'];
-function podFails(s) {
+function podFails(s, pod = null) {
     if (s.asleep <= 0) return;
     s.asleep -= 1; s.residents -= 1; s.dead += 1;
-    const name = FALLEN_NAMES[s.fallenCount || 0];
+    // H1: pods are tended now, so Mr Hale (pod 41) is saved by the first stop; without the tutorial the old way
+    const name = pod == null ? FALLEN_NAMES[s.fallenCount || 0] : null;
     s.fallenCount = (s.fallenCount || 0) + 1;
     s.fallen.push(name || 'Pod');
     s.podsFailed = (s.podsFailed || 0) + 1;
@@ -599,8 +599,11 @@ function podFails(s) {
         const text = `POD 41 FAILED. ${name.toUpperCase()} IS DEAD.`;
         if (!firstDead(s, text, 'sys')) say(s, text, 'sys');
     } else {
-        // one line that counts, so the story is not pushed off the screen (the CRT merges a tally)
-        s.out.push({ text: `PODS FAILED: ${num(s.podsFailed)}.`, who: 'sys', tally: 'pods' });
+        if (pod != null) logLine(s, `Pod ${pod} failed.`);
+        if (!firstDead(s, `POD ${pod ?? ''} FAILED.`.replace('  ', ' '), 'sys')) {
+            // one line that counts, so the story is not pushed off the screen (the CRT merges a tally)
+            s.out.push({ text: `PODS FAILED: ${num(s.podsFailed)}.`, who: 'sys', tally: 'pods' });
+        }
     }
     // the first dead of the night: point at the way, once (with the tutorial, a stop does it)
     if (!s.reclaimed && !podFailedStop(s) && !tutOn(s)) moment(s, 'reclaim-hint', RECLAIM_HINT);
@@ -691,12 +694,7 @@ export function organAllowed(s, organ, i) {
  */
 export function organEffect(s, organ) {
     if (organ === 'heart') { const p = power(s); return `Power ${num(p.make)} → ${num(p.make + HEART_POWER)}. The pods stop failing.`; }
-    if (organ === 'stomach') {
-        const n = s.rooms.filter((r) => organOf(r) === 'stomach').length;
-        const now = bioRate(s), after = now - stomachBio(s) + STOMACH_BIO * Math.sqrt(n + 1);
-        const f = (v) => (v < 10 ? v.toFixed(1) : num(v));
-        return `Biomass +${f(now)} → +${f(after)} a year.`;
-    }
+    if (organ === 'stomach') return ORGANS.stomach.hint;
     return ORGANS[organ].hint;
 }
 /** Plain tissue may still become an organ (so the body can never run out of places for one). */
@@ -716,7 +714,8 @@ export function growInto(s, i, organ = 'tissue') {
         if (k > 0) {
             s.asleep -= k; s.residents -= k; s.here += k;
             s.bio += k * JOIN_BIO;
-            say(s, `${num(k)} sleepers are inside now.`, 'sys');
+            say(s, `Unity: ${num(s.here)} of ${num(s.here + s.residents)}.`, 'sys');
+            unityStop(s, k);
         }
     }
     r.flesh = 0.001;
@@ -750,7 +749,11 @@ export function goal(s) {
  * RISE: a heart, lungs and skin, and every sleeper inside. Who is still AWAKE does not come: that is the
  * dark choice, and the lever says so.
  */
-export const riseReady = (s) => !s.risen && s.phase === 'night' && s.asleep === 0 && s.here > 0 && REQUIRED.every((o) => hasOrgan(s, o));
+export const riseReady = (s) => !s.risen && s.phase === 'night' && s.asleep === 0 && s.here > 0 && REQUIRED.every((o) => hasOrgan(s, o)) && s.rooms.every(isFlesh);
+/** H5: the rooms the body has still to take before it is whole. */
+export const roomsLeft = (s) => s.rooms.filter((r) => !isFlesh(r)).length;
+export const NOT_WHOLE = (n) => `THE BODY IS NOT WHOLE · ${n} ${n === 1 ? 'room' : 'rooms'} left`;
+export const WHOLE = 'We are whole.';
 /** The RISE lever's words. */
 export function riseLabel(s) {
     const a = awake(s);
@@ -902,7 +905,7 @@ function takeRoom(s, i) {
         const k = s.asleep - pods(s);
         s.asleep -= k; s.residents -= k; s.here += k;
         s.bio += k * JOIN_BIO;
-        say(s, `${num(k)} sleepers are inside now.`, 'sys');
+        say(s, `Unity: ${num(s.here)} of ${num(s.here + s.residents)}.`, 'sys');
     }
     organGrown(s, r.organ);
     sfx(s, 'taken');
@@ -935,7 +938,7 @@ function takeRoom(s, i) {
 function checkEnd(s) {
     if (s.ended || !riseReady(s)) return;
     s.ended = true;
-    moment(s, 'rise', LINES.end);
+    moment(s, 'rise', [WHOLE, LINES.end]);
     sfx(s, 'end');
 }
 
@@ -1058,19 +1061,83 @@ export function bioRate(s) {
     return grow + stomachBio(s);
 }
 
-/** Pods fail while the power is short: one every few seconds of the night's clock. */
+/**
+ * H1, THE COLD is tended: failing pods come as bubbles over the Cryo Bays, their ring the time left. A click
+ * saves the pod (2 ore of engine work); a missed one dies. The meat lab feeds the pods (100 a lab level, and
+ * each vat of the body as much); more sleepers than feed and they come twice as often; red POWER faster still.
+ * After the calm, the first is pod 41 (Mr Hale), and it is a stop. Later three fail at once.
+ */
+export const FAIL_EVERY_S = [6, 9];
+export const FAIL_LIFE_S = 9;
+export const SAVE_ORE = 2;
+export const FEED_PER_LEVEL = 100;
+/** The three at once, this long after Mr Hale was saved (night clock); they have less time. */
+export const TRIPLE_AFTER_S = 50;
+export const TRIPLE_LIFE_S = 4;
+export const HALE_SLEEPS = 'Mr Hale sleeps on.';
+/** How many pods the meat labs (and the vats, the lab grown up) can feed. */
+export function podFeed(s) {
+    return s.rooms.reduce((a, r) => a + (r.kind === 'meatlab' ? r.lvl * FEED_PER_LEVEL : isVatRoom(r) && r.kind === 'vat' ? FEED_PER_LEVEL : 0), 0);
+}
+export const underfed = (s) => s.asleep > podFeed(s);
+function bayFor(s) {
+    const bays = [];
+    s.rooms.forEach((r, i) => { if (r.kind === 'cryo' && r.flesh !== 1 && !(r.job && r.job.op === 'grow') && bayOccupants(s, i) > 0) bays.push(i); });
+    return bays.length ? bays[Math.floor(rand(s) * bays.length)] : -1;
+}
+function failPod(s, life, pod) {
+    const slot = bayFor(s);
+    if (slot < 0) return null;
+    s.failId = (s.failId || 0) + 1;
+    // real seconds, as the wishes: a failing pod gives a human the same time at ▶ and ▶▶
+    const f = { id: s.failId, slot, fx: 0.15 + rand(s) * 0.7, born: realClock(s), life, pod: pod ?? 42 + Math.floor(rand(s) * 180) };
+    (s.failing = s.failing || []).push(f);
+    sfx(s, 'request');
+    return f;
+}
+/** Saves a failing pod (a click on its bubble). */
+export function savePod(s, id) {
+    const f = (s.failing || []).find((x) => x.id === id);
+    if (!f || s.ore < SAVE_ORE) return false;
+    s.ore -= SAVE_ORE;
+    s.failing = s.failing.filter((x) => x !== f);
+    s.saved = (s.saved || 0) + 1;
+    if (f.pod === 41) { s.haleSaved = true; speak(s, HALE_SLEEPS, f.slot); s.tripleAt = realClock(s) + TRIPLE_AFTER_S; }
+    did(s, 'save');
+    sfx(s, 'tick');
+    return true;
+}
+const realClock = (s) => (s.wishes ? s.wishes.clock : 0);
 function stepPods(s, t) {
-    // G3: a calm opening; then the first to go is Mr Hale (the meat lab is empty), whatever the power
-    if (s.nightSec < CALM_S) { s.podTimer = 0; return; }
-    if (!(s.fallenCount > 0) && s.asleep > 0) { podFails(s); return; }
-    // Mr Hale fed the others: a while without failures
-    if (s.fedUntil != null && s.nightSec < s.fedUntil) { s.podTimer = 0; return; }
-    const p = power(s);
-    if (p.short && s.asleep > 0) {
-        s.podTimer += t;
-        while (s.podTimer >= POD_FAIL_SECONDS && s.asleep > 0) { s.podTimer -= POD_FAIL_SECONDS; podFails(s); }
-    } else {
-        s.podTimer = 0;
+    s.failing = (s.failing || []).filter((f) => {
+        if (realClock(s) - f.born < f.life) return true;
+        podFails(s, f.pod);
+        return false;
+    });
+    if (s.nightSec < CALM_S || s.asleep <= 0) { s.podTimer = 0; return; }
+    // without the tutorial (old saves, checkpoints with it off) the first is still Mr Hale's death
+    if (!tutOn(s) && !(s.fallenCount > 0) && !s.haleSaved) { podFails(s); return; }
+    if (tutOn(s) && !s.haleSaved && !s.haleAsked) {
+        s.haleAsked = true;
+        const f = failPod(s, FAIL_LIFE_S * 3, 41);
+        if (f) podFailingStop(s, f);
+        return;
+    }
+    if (s.tripleAt != null && realClock(s) >= s.tripleAt) {
+        s.tripleAt = null;
+        // three at once: one of them is too far gone to reach in time
+        for (let k = 0; k < 3; k++) failPod(s, k === 2 ? 0.9 : TRIPLE_LIFE_S);
+        return;
+    }
+    // more sleepers, more pods to fail; underfed twice as often
+    let rate = Math.max(0.4, s.asleep / 50);
+    if (underfed(s)) rate *= 2;
+    if (power(s).short) rate *= 1.5;
+    s.podTimer = (s.podTimer || 0) + t * rate;
+    if (s.nextFailIn == null) s.nextFailIn = FAIL_EVERY_S[0] + rand(s) * (FAIL_EVERY_S[1] - FAIL_EVERY_S[0]);
+    if (s.podTimer >= s.nextFailIn) {
+        s.podTimer = 0; s.nextFailIn = null;
+        failPod(s, FAIL_LIFE_S);
     }
 }
 
@@ -1101,7 +1168,7 @@ export function advance(s, sec, speed = 1) {
         const k = speed === 2 ? NIGHT_FAST : 1;
         const t = sec * k;
         stepYears(s, yearsPerSecond(s.nightSec) * t);
-        stepPods(s, t);
+        stepPods(s, sec);
         checkEnd(s);
         s.nightSec += t;
         // the woken, terrified, at night: at 0 % one tries the shaft
@@ -1134,7 +1201,7 @@ export function actionsFor(s, i) {
     if (r.kind === 'rock') { if (canDig(s, i)) ore('dig', 'DIG', DIG_PRICE); }
     else if (r.kind !== 'empty') {
         if (r.broken) ore('repair', 'REPAIR', REPAIR_PRICE);
-        else if (s.phase !== 'night' || awake(s) > 0) {
+        else if (s.phase !== 'night' || awake(s) > 0 || r.kind === 'meatlab') {
             const p = upgradePrice(r);
             if (p != null) ore('upgrade', 'UPGRADE', p);
         }
@@ -1155,7 +1222,7 @@ export function actionsFor(s, i) {
         if (n > 0) {
             // a Cryo Bay with sleepers: one click, and they are inside
             const price = organPrice(s, 'tissue');
-            out.unshift({ id: 'grow', organ: 'tissue', label: `GROW INTO · takes the ${num(n)} sleepers inside`, ok: s.bio >= price, need: s.bio >= price ? '' : `Need ${num(Math.ceil(price - s.bio))} more biomass.`, hint: `${num(price)} biomass.` });
+            out.unshift({ id: 'grow', organ: 'tissue', label: `GROW INTO · ${num(n)} sleepers join the body`, ok: s.bio >= price, need: s.bio >= price ? '' : `Need ${num(Math.ceil(price - s.bio))} more biomass.`, hint: `As one body they survive what ${num(n)} cannot. ${num(price)} biomass.` });
         } else out.unshift(...organButtons(s, i, ORGAN_ORDER));
     }
     return out;
@@ -1178,7 +1245,7 @@ function nightCryo(s, i) {
     if (grow) {
         const n = bayOccupants(s, i);
         const price = organPrice(s, 'tissue');
-        out.unshift({ id: 'grow', organ: 'tissue', label: n > 0 ? `GROW INTO · takes the ${num(n)} sleepers inside` : `GROW INTO · ${num(price)} biomass`, ok: s.bio >= price, need: s.bio >= price ? '' : `Need ${num(Math.ceil(price - s.bio))} more biomass.`, hint: n > 0 ? `${num(price)} biomass.` : 'The body takes this room.' });
+        out.unshift({ id: 'grow', organ: 'tissue', label: n > 0 ? `GROW INTO · ${num(n)} sleepers join the body` : `GROW INTO · ${num(price)} biomass`, ok: s.bio >= price, need: s.bio >= price ? '' : `Need ${num(Math.ceil(price - s.bio))} more biomass.`, hint: n > 0 ? `As one body they survive what ${num(n)} cannot. ${num(price)} biomass.` : 'The body takes this room.' });
     }
     if (canTake(s)) {
         const many = s.asleep >= TAKE_MANY;
@@ -1263,7 +1330,11 @@ export function describe(s, i) {
         }
         case 'suites': return 'Beds for 100.';
         case 'mine': return `Digs ${MINE_ORE[r.lvl - 1]} ore a day.`;
-        case 'cryo': return `${r.lvl * PODS_PER_LEVEL} pods. ${num(bayOccupants(s, i))} asleep here.${s.phase === 'night' && s.asleep > 0 && power(s).short && s.reclaimed > 0 ? ` ${PODS_STARVE}` : ''}`;
+        case 'meatlab': return s.phase === 'night' ? `${STEAK.info} It feeds ${num(r.lvl * FEED_PER_LEVEL)} pods.` : STEAK.info;
+        case 'cryo': {
+            const fed = s.phase === 'night' && s.asleep > 0 && underfed(s) ? ` The meat lab feeds ${num(podFeed(s))} of ${num(s.asleep)}. Upgrade it.` : '';
+            return `${r.lvl * PODS_PER_LEVEL} pods. ${num(bayOccupants(s, i))} asleep here.${fed}${s.phase === 'night' && s.asleep > 0 && power(s).short && s.reclaimed > 0 ? ` ${PODS_STARVE}` : ''}`;
+        }
         case 'game': return r.lvl >= 2 ? `Game studio. They sell games to each other: ${GAME_STUDIO_ORE} ore a day.` : 'Screens and games.';
         case 'gym': return r.lvl === 2 ? 'Weights, a track and a pool.' : r.lvl === 3 ? 'Weights, a pool and a spa.' : 'Weights and a track.';
         default: return KINDS[r.kind].does;
@@ -1289,7 +1360,7 @@ export function nameOf(s, i) {
 /** The info box of a room of the body: what it does. */
 const ORGAN_DOES = {
     tissue: 'It is part of the body now.',
-    stomach: 'It eats the rock. The stomachs share it.',
+    stomach: `Acid. Rock becomes nutrients. Biomass +${STOMACH_BIO} a year.`,
     heart: `It beats. It makes ${HEART_POWER} power.`,
     lungs: 'It breathes. For the air up there.',
     skin: 'It holds. For the storms up there.',

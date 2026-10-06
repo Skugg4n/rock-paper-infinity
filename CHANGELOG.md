@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.87.2 - 2026-10-06 (chapter IV, the vault: tending the cold, the mission, a whole body)
+
+After Ola played v1.87.1 ("KUL! SNYGGT! Love it!"), section H of docs/superpowers/specs/2026-10-05-deep-vault-pass3.md:
+- **The cold is tended.** After the calm 45 s, failing pods come as ice-crystal bubbles over the Cryo Bays ("Failing pod" on hover), their ring the time left in real seconds; a click saves the pod for 2 ore of engine work, a missed one dies ("Pod N failed." in the log, PODS FAILED on the SYSTEM box). The meat lab feeds 100 pods a level (a vat of the body as much); more sleepers than that and they fail twice as often, the lab is marked and can be upgraded in the night; red POWER faster still. The first is a stop, "POD 41 IS FAILING. Click it to save him.", saved: "Mr Hale sleeps on."; about 50 s later three fail at once and one is beyond reach: the first dead, "The meat lab cannot feed them all." and RECLAIM. The engine burns 1 ore a year, the mines give 1.5 a year a level. Sim: a tending player keeps about 100 %, one who ignores the pods loses about 50 %.
+- **The mission** is typed in the box line by line (40 ms a letter), OK at the end; the panel says "MISSION: GET THEM TO THE SURFACE. ALIVE."; the checklist: HEART · power, LUNGS · area, SKIN · silica, STOMACH · acid.
+- **The stomach** is acid: +3 biomass a year each (no more sharing), its words as Ola wrote them.
+- **Unity.** GROW INTO a Cryo Bay: "GROW INTO · 50 sleepers join the body" / "As one body they survive what 50 cannot."; the first time is a stop, "They cannot live up there as 50 small bodies. As one, they can."; the panel row is UNITY n / m and the SYSTEM box says "Unity: N of M.".
+- **A whole body.** RISE needs every room to be body as well as a heart, lungs and skin (skin on any top-level room, several allowed); until then the lever reads "THE BODY IS NOT WHOLE · N rooms left", dim. The last room says "We are whole.". Sim night: 8:48 heart first, 6:44 lungs first, 5:41 stomach first.
+- **The rise** takes 7 s: fibre and vessels up the shaft, the crust bulging and cracking with light between, rock and towers tumbling, a wet red surge with whipping vessels and the heartbeat, the city's remains riding on its back, the sky filled; it holds, then V · UNITY. Sound: the boom plus a wet rising swell on the sound bus.
+
 ## v1.87.1 - 2026-10-06 (chapter IV, the vault after the fourth test)
 
 After the fourth independent test (docs/playtests/2026-10-06-vault-human-test-4.md, almost):

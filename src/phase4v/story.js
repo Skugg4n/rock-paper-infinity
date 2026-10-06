@@ -15,11 +15,10 @@ export const STEAK = {
     different: 'The steak tastes different tonight.',
 };
 export const HYDRO_FAILING = 'The hydroponics are failing. The lamps are old.';
+/** On the SYSTEM box when the mission is given (the stop types the whole of it). */
 export const GOAL_LINES = [
-    'THE SURFACE WILL NOT RECOVER.',
-    'THEY CANNOT LIVE UP THERE.',
-    'THIS COULD.',
-    'GOAL: GET THEM TO THE SURFACE.',
+    'PRIMARY MISSION: GET HUMANITY TO THE SURFACE. ALIVE.',
+    'AT ANY COST.',
 ];
 export const COMPUTER = {
     missed: [
@@ -52,7 +51,7 @@ export const weighLine = (n, kg) => `Sleeper ${n}. ${kg} kg.`;
  */
 export const ORGANS = {
     tissue: { name: 'TISSUE', price: null, hint: 'Just more of the body.', done: null },
-    stomach: { name: 'STOMACH', price: 150, hint: 'Eats the rock. More biomass every year.', done: 'A stomach. It eats the rock.' },
+    stomach: { name: 'STOMACH', price: 150, hint: 'Acid turns rock and soil into minerals and nutrients. Biomass +3 a year.', done: 'A stomach. Acid turns the rock into nutrients.' },
     heart: { name: 'HEART', price: 250, hint: 'Power for everything. The engine can rest.', done: 'A heart. It beats for all of them.' },
     lungs: { name: 'LUNGS', price: 350, hint: 'The body grows twice as fast.', done: 'Lungs. The air up there is poison. Not to us.' },
     skin: { name: 'SKIN', price: 350, top: true, hint: 'Rooms cost half. Needed to rise.', done: 'Skin. Let the storms come.' },

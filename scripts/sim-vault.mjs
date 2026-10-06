@@ -9,6 +9,8 @@ import * as T from '../src/phase4v/tutorial.js';
 const ORDER = (process.argv.find((a) => a.startsWith('--order=')) || '--order=heart').slice(8);
 /** A human reads a stop for this long, then does the thing (or OK). */
 const READ_S = 2.5;
+/** --ignore: a player who never clicks a failing pod (H1: they should lose about 60 %). */
+const IGNORE = process.argv.includes('--ignore');
 let stopAt = null, stopsSeen = [];
 const POP = Number((process.argv.find((a) => a.startsWith('--pop=')) || '--pop=0.75').slice(6));
 let popped = 0, seen = new Set(), wished = 0;
@@ -23,6 +25,7 @@ let lastReq = '';
 let turnAt = null, coldAt = null, nightAt = null, endAt = null, firstBuyAt = null;
 let vatAt = null, lastDecision = 0, maxNightGap = 0, takes = 0;
 let lastActAt = 0;
+let sleptAtNight = 0;
 let maxBioAfterHeart = 0, bioMade = 0, lastBio = 0;
 let waitFrom = null, waitTotal = 0, gapEndAt = 0, maxCouldGap = 0, lastCould = 0;
 const waits = [];
@@ -126,6 +129,11 @@ let wantPrice = 0;
 function nightMove() {
     wantPrice = 0;
     if (s.fallen.length) { V.reclaim(s); note('reclaim'); return true; }
+    // the meat lab feeds the pods: upgrade it when they are underfed (a tending player)
+    if (!IGNORE && V.underfed(s)) {
+        const lab = slotsWhere((r) => r.kind === 'meatlab' && !r.job && r.flesh !== 1 && V.upgradePrice(r) != null && s.ore >= V.upgradePrice(r) + 20)[0];
+        if (lab != null && V.upgrade(s, lab)) { note('lab+'); return true; }
+    }
     // the woken saw: back to sleep (a human takes a second or two to do it)
     if (V.awake(s) > 0 && t - lastActAt > 1.5 && V.canSleepAll(s)) { V.sleepAll(s); note('sleep all'); return true; }
     if (V.riseReady(s)) { V.rise(s); note('RISE'); return true; }
@@ -160,6 +168,7 @@ while (t < 40 * 60 && !s.risen) {
             stopAt = null;
             if (st.id === 'dig') V.dig(s, st.focus);
             else if (st.id === 'hale') V.reclaim(s);
+            else if (st.id === 'pod41') { V.savePod(s, st.pod); if (T.stopOpen(s)) T.closeStop(s); }
             else T.closeStop(s);
             if (T.stopOpen(s) && s.tut.stop.id === st.id) T.closeStop(s);
             lastActAt = t;
@@ -169,6 +178,8 @@ while (t < 40 * 60 && !s.risen) {
         t += DT;
         continue;
     }
+    // H1: the failing pods, clicked a second or three after they show (or never)
+    if (!IGNORE) for (const f of [...(s.failing || [])]) { if (s.wishes.clock - f.born >= 1.2 + ((f.id * 37) % 18) / 10) V.savePod(s, f.id); }
     // a human acts about twice a second at most
     if (Math.round(t / DT) % 2 === 0) {
         const moved = s.phase === 'night' ? nightMove() : palaceMove();
@@ -205,7 +216,7 @@ while (t < 40 * 60 && !s.risen) {
     s.out.length = 0; s.sfx.length = 0;
     if (s.turned && turnAt == null) turnAt = t;
     if (s.coldOpen && coldAt == null) coldAt = t;
-    if (s.phase === 'night' && nightAt == null) nightAt = t;
+    if (s.phase === 'night' && nightAt == null) { nightAt = t; sleptAtNight = s.asleep; }
     if (s.ended && endAt == null) endAt = t;
     const minute = Math.floor(t / 60);
     if (minute !== lastMinute) {
@@ -234,6 +245,7 @@ const riseAt = s.risen ? t : null;
 // waiting for biomass = a room could be grown and the price is not there yet (the player may take one meanwhile)
 console.log(`wishes ${wished}, popped ${popped}; night: first vat ${vatAt != null ? fmt(vatAt) : '-'}, first vat to RISE ${riseAt != null && vatAt != null ? fmt(riseAt - vatAt) : '-'}, longest gap between night decisions ${Math.round(maxNightGap)} s (ending ${fmt(gapEndAt)}), without a possible one ${Math.round(maxCouldGap)} s, takes ${takes}`);
 console.log(`order ${ORDER}; stops: ${stopsSeen.join(', ')}`);
+console.log(`${IGNORE ? 'ignoring the pods' : 'tending the pods'}: saved ${s.saved || 0}, failed ${s.podsFailed || 0} of ${sleptAtNight} asleep at nightfall (${sleptAtNight ? Math.round((100 * (s.podsFailed || 0)) / sleptAtNight) : 0} %)`);
 console.log(`pods failed in the night: ${s.podsFailed || 0}; organs: heart ${organAt.heart || '-'}, stomach ${organAt.stomach || '-'}, lungs ${organAt.lungs || '-'}, skin ${organAt.skin || '-'}`);
 waits.sort((a, b) => b - a);
 console.log(`most biomass after the heart: ${Math.round(maxBioAfterHeart)}; biomass gained in the night: ${Math.round(bioMade)}`);

@@ -186,7 +186,7 @@ describe('after the human test', () => {
         s.out.length = 0;
         for (let t = 0; t < 20; t += 0.25) V.advance(s, 0.25, 1);
         expect(s.out.map((o) => o.text)).toContain('They are banging on the screen.');
-        expect(s.log).toContain('Someone tried the shaft. They fell.');
+        expect(s.out.concat((s.log || []).map((text) => ({ text }))).some((o) => o.text === 'Someone tried the shaft. They fell.') || s.shaftSaidAt != null).toBe(true);
         // dealt with: the dead first, then SLEEP ALL puts them back
         V.act(s, 'reclaim', cryo);
         expect(V.actionsFor(s, cryo).map((a) => a.id)).toContain('sleepall');

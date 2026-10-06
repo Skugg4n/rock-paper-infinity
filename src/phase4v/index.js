@@ -20,7 +20,10 @@ export const INTRO_MS = 8000;
 export const TYPE_MS = 26;
 export const CRT_LINES = 6;
 /** The rise: the body fills the shaft, breaks the crust and the city, before the card. */
-export const RISE_MS = 5200;
+export const RISE_MS = 7200;
+/** The mission is typed at this many ms a letter, with this pause after each line (H2). */
+export const TYPE_STOP_MS = 40;
+export const LINE_PAUSE_MS = 380;
 const SAVE_EVERY_MS = 4000;
 const ICONS = { suites: 'bed-double', mine: 'pickaxe', hydro: 'sprout', cinema: 'film', gym: 'dumbbell', bar: 'wine', garden: 'trees', game: 'gamepad-2', cryo: 'snowflake', vat: 'droplet', meatlab: 'beef' };
 /** A marked line (a moment that matters) holds the CRT this long after it is typed. */
@@ -60,10 +63,10 @@ export function init() {
         <div class="v-gauge" data-v="g-body" hidden><div class="row"><span class="dymo">Body</span><span class="val" data-v="body"></span></div><div class="v-bar"><i data-v="body-bar" style="background:var(--v-pulse)"></i></div></div>
         <div class="v-check" data-v="checklist" hidden>
           <div class="c" data-v="chk-heart"><i class="box"></i><span class="dymo">Heart</span><span class="fx">power</span></div>
-          <div class="c" data-v="chk-lungs"><i class="box"></i><span class="dymo">Lungs</span><span class="fx">speed</span></div>
-          <div class="c" data-v="chk-skin"><i class="box"></i><span class="dymo">Skin</span><span class="fx">cost</span></div>
-          <div class="c" data-v="chk-stomach"><i class="box"></i><span class="dymo">Stomach</span><span class="fx">biomass</span></div>
-          <div class="c in"><span class="dymo">Inside</span><span class="val" data-v="chk-inside"></span></div>
+          <div class="c" data-v="chk-lungs"><i class="box"></i><span class="dymo">Lungs</span><span class="fx">area</span></div>
+          <div class="c" data-v="chk-skin"><i class="box"></i><span class="dymo">Skin</span><span class="fx">silica</span></div>
+          <div class="c" data-v="chk-stomach"><i class="box"></i><span class="dymo">Stomach</span><span class="fx">acid</span></div>
+          <div class="c in"><span class="dymo">Unity</span><span class="val" data-v="chk-inside"></span></div>
         </div>
         <div class="v-rows">
           <div class="r" data-v="r-res"><span class="dymo" data-v="res-label">Residents</span><span class="val" data-v="res"></span></div>
@@ -100,6 +103,7 @@ export function init() {
     let buildOpen = true;
     const crt = { lines: [], queue: [], typing: null, holdUntil: 0 };
     let introUntil = 0;
+    let typing = null;          // the typed stop: { stop, at }
 
     // ---------------------------------------------------------------- the CRT
     function pushLines() {
@@ -206,8 +210,14 @@ export function init() {
         // what people said, for whoever missed a bubble: three small grey lines
         const log = (s.log || []).map((l) => `<div>${esc(l)}</div>`).join('');
         if ($('log').__html !== log) { $('log').innerHTML = log; $('log').__html = log; }
-        $('rise').hidden = !V.riseReady(s);
-        if (V.riseReady(s) && $('rise').textContent !== V.riseLabel(s)) $('rise').textContent = V.riseLabel(s);
+        // H5: RISE only when the body is whole; until then the lever says what is left, dim
+        const ready = V.riseReady(s);
+        const notWhole = !ready && s.phase === 'night' && V.goal(s).shown && V.hasVat(s);
+        $('rise').hidden = !(ready || notWhole);
+        $('rise').classList.toggle('dim', notWhole);
+        $('rise').disabled = notWhole;
+        const riseText = ready ? V.riseLabel(s) : notWhole ? V.NOT_WHOLE(V.roomsLeft(s)) : '';
+        if (riseText && $('rise').textContent !== riseText) $('rise').textContent = riseText;
         // the goal's checklist, from the moment the goal is said
         const goal = V.goal(s);
         $('checklist').hidden = !(goal.shown && s.phase !== 'palace');
@@ -224,7 +234,25 @@ export function init() {
         const st = s.tut && s.tut.stop;
         $('stop').hidden = !st;
         if (st) {
-            const html = st.text.map((l) => `<div>${esc(l)}</div>`).join('');
+            // H2: the mission is typed, line by line (40 ms a letter, a pause after each line), OK at the end
+            let html;
+            if (st.typed) {
+                if (!typing || typing.stop !== st) typing = { stop: st, at: performance.now() };
+                let ms = performance.now() - typing.at, done = true;
+                const parts = [];
+                for (const l of st.text) {
+                    const n = Math.max(0, Math.min(l.length, Math.floor(ms / TYPE_STOP_MS)));
+                    if (n > 0 || !parts.length) parts.push(`<div>${esc(l.slice(0, n))}${n < l.length ? '<span class="cur"></span>' : ''}</div>`);
+                    if (n < l.length) { done = false; break; }
+                    ms -= l.length * TYPE_STOP_MS + LINE_PAUSE_MS;
+                    if (ms < 0) { done = false; break; }
+                }
+                html = parts.join('');
+                $('stop-ok').hidden = !done;
+            } else {
+                html = st.text.map((l) => `<div>${esc(l)}</div>`).join('');
+                $('stop-ok').hidden = false;
+            }
             if ($('stop-text').__html !== html) { $('stop-text').innerHTML = html; $('stop-text').__html = html; }
         }
         $('g-ore').classList.toggle('focus', !!st && st.focus === 'ore');
@@ -348,6 +376,8 @@ export function init() {
             s.rooms.forEach((r, i) => { if (r.kind === q.kind && !r.flesh && (q.kind === 'engine' || r.lvl < q.lvl)) ui.complain.set(i, 'ask'); });
         }
         // what is short shows on the room that makes it: the engine when dark, the farm when hungry
+        // H1: more sleepers than the meat lab can feed: the lab asks to be upgraded
+        if (s.phase === 'night' && s.asleep > 0 && V.underfed(s)) s.rooms.forEach((r, i) => { if (r.kind === 'meatlab') ui.complain.set(i, 'food'); });
         if (s.phase === 'palace' && V.awake(s) > 0) {
             if (V.power(s).short) s.rooms.forEach((r, i) => { if (r.kind === 'engine') ui.complain.set(i, 'power'); });
             if (V.awake(s) > V.food(s)) s.rooms.forEach((r, i) => { if (r.kind === 'hydro' && !r.flesh) ui.complain.set(i, 'food'); });
@@ -388,10 +418,20 @@ export function init() {
         const stopNow = s.tut && s.tut.stop;
         if (stopNow) {
             const bubble = view.bubbleAt(s, bx, by);
-            const ok = bubble ? stopNow.id === 'bubbles' : stopAllows(view.slotAt(bx, by));
+            const failing = view.failAt(s, bx, by);
+            const ok = failing ? stopNow.id === 'pod41' : bubble ? stopNow.id === 'bubbles' : stopAllows(view.slotAt(bx, by));
             if (!ok) { shakeStop(); return; }
         }
         // a wish first: it floats over the room
+        // H1: a failing pod first: a click saves it (the first is a stop that points at it)
+        const fail = view.failAt(s, bx, by);
+        if (fail) {
+            const st = s.tut && s.tut.stop;
+            if (st && st.id !== 'pod41') { shakeStop(); return; }
+            V.savePod(s, fail);
+            afterAct();
+            return;
+        }
         const wish = view.bubbleAt(s, bx, by);
         if (wish) { popWish(s, wish); afterAct(); return; }
         const i = view.slotAt(bx, by);
@@ -451,7 +491,7 @@ export function init() {
         sound.event('click');
         paintPanel();
     }, { signal });
-    $('rise').addEventListener('click', () => { riseUp(); }, { signal });
+    $('rise').addEventListener('click', () => { if (!$('rise').disabled) riseUp(); }, { signal });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { armed = null; selected = -1; afterAct(); } }, { signal });
     window.addEventListener('resize', () => view.resize(), { signal });
     // a hidden tab is silent (the frame loop that sets the sound stops with it)
@@ -512,6 +552,7 @@ export function init() {
             view.frame(s, uiState(), now, drawDt);
             drawDt = 0;
         }
+        if (s.tut && s.tut.stop && s.tut.stop.typed) paintPanel();
         if (now - slowAt > 200) {
             slowAt = now;
             paintPanel(); paintCards(); paintInfo();

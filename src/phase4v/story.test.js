@@ -193,7 +193,7 @@ describe('the night: the goal and the organs', () => {
         expect(by.skin.need).toBe('Only on the top level.');
         expect(by.stomach.label).toBe(`STOMACH · ${V.organPrice(s, 'stomach')} biomass`);
         // G4: every organ says what it does, before → after
-        expect(by.stomach.hint).toMatch(/^Biomass \+[\d.]+ → \+[\d.]+ a year\.$/);
+        expect(by.stomach.hint).toBe('Acid turns rock and soil into minerals and nutrients. Biomass +3 a year.');
         expect(by.heart.hint).toBe(`Power ${V.power(s).make} → ${V.power(s).make + V.HEART_POWER}. The pods stop failing.`);
         expect(by.lungs.hint).toBe('The body grows twice as fast.');
         expect(by.skin.hint).toBe('Rooms cost half. Needed to rise.');
@@ -209,7 +209,8 @@ describe('the night: the goal and the organs', () => {
         run(s, 30, 2);
         expect(V.organOf(s.rooms[i])).toBe('stomach');
         expect(V.bioRate(s)).toBeCloseTo(rate + V.STOMACH_BIO - 0 + 0, 5);
-        const line = s.out.find((o) => o.text === 'A stomach. It eats the rock.');
+        const line = s.out.find((o) => o.text === 'A stomach. Acid turns the rock into nutrients.');
+        expect(V.describe(s, i)).toBe(`Acid. Rock becomes nutrients. Biomass +${V.STOMACH_BIO} a year.`);
         expect(line.mark).toBe(true);
         expect(V.goal(s).stomach).toBe(true);
         expect(V.nameOf(s, i)).toBe('Stomach');
@@ -258,7 +259,8 @@ describe('the night: the goal and the organs', () => {
         expect(V.goal(s).inside).toBeLessThan(V.goal(s).total);
         for (const b of bays) {
             s.bio = 1e4;
-            expect(V.actionsFor(s, b)[0].label).toMatch(/^GROW INTO · takes the \d+ sleepers inside$/);
+            expect(V.actionsFor(s, b)[0].label).toMatch(/^GROW INTO · \d+ sleepers join the body$/);
+            expect(V.actionsFor(s, b)[0].hint).toMatch(/^As one body they survive what \d+ cannot\./);
             expect(V.growInto(s, b)).toBe(true);
             run(s, 40, 2);
         }
@@ -342,7 +344,7 @@ describe('after the third test', () => {
         expect(V.stomachBio(s)).toBeCloseTo(V.STOMACH_BIO);
         expect(V.organPrice(s, 'stomach')).toBe(first + V.STOMACH_STEP);
         s.rooms[V.slotIndex(2, 0)].kind = 'rock'; s.rooms[V.slotIndex(2, 0)].organ = 'stomach';
-        expect(V.stomachBio(s)).toBeCloseTo(V.STOMACH_BIO * Math.sqrt(2));
+        expect(V.stomachBio(s)).toBeCloseTo(V.STOMACH_BIO * 2);
         const heart = V.organPrice(s, 'heart');
         s.grown += 4;
         expect(V.organPrice(s, 'heart')).toBeGreaterThan(heart);
