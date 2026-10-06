@@ -88,6 +88,42 @@ export function chooseArmoryPlot(buildings, pierRect, slots) {
     return null;
 }
 
+/** How high a home stands: the rich live highest (the chosen few, v1.88.0). */
+const HOME_RANK = { district: 4, skyscraper: 3, apartment: 2, home: 1 };
+/** Never more than this many go down the hatch. */
+export const CHOSEN_MAX = 15;
+
+/**
+ * How many go down at the end of the war: about one in five of the people we
+ * see, at least three, never more than twelve (and never more than there are).
+ * @param {number} total - people on the map
+ */
+export function chosenCount(total) {
+    if (!(total > 0)) return 0;
+    return Math.min(12, total, Math.max(3, Math.round(total / 5)));
+}
+
+/**
+ * The chosen few (v1.88.0): who goes down the hatch when the war is over. The
+ * shelter takes only a few, the richest: the people who live highest
+ * (districts, then skyscrapers, apartments, homes) first, and among those the
+ * ones who are at home. Cars stay behind. Ties fall to `rng`, so the same
+ * seed gives the same few.
+ *
+ * @param {Array<{home:(string|null), inside:boolean, kind:string}>} people
+ * @param {number} n - how many to take (capped at CHOSEN_MAX)
+ * @param {() => number} [rng=Math.random]
+ * @returns {number[]} indices into `people`, the most chosen first
+ */
+export function pickChosen(people, n, rng = Math.random) {
+    const take = Math.max(0, Math.min(CHOSEN_MAX, Math.floor(n) || 0));
+    const order = people
+        .map((p, i) => ({ i, key: rng(), score: (HOME_RANK[p.home] || 0) * 2 + (p.inside ? 1 : 0), car: p.kind === 'car' }))
+        .filter(o => !o.car);
+    order.sort((a, b) => b.score - a.score || a.key - b.key || a.i - b.i);
+    return order.slice(0, take).map(o => o.i);
+}
+
 /**
  * The way out of a plate to the coast road (B220: soldiers leave the armory):
  * down to the street under its row; a plate above the bottom row then takes the
@@ -446,6 +482,10 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     /** Weapon reach in px by tier: fists/swords fight in the clinch, gunpowder shoots. */
     const reach = (tier) => (tier <= 1 ? 0 : tier === 2 ? 40 : tier === 3 ? 70 : 110);
     let gather = null;       // { rect, onDone } — everyone walks to one plate (THE DEEP)
+    let chosen = null;       // { rect, onDone, few, done }: only the chosen few walk to the hatch, the rest stand still (v1.88.0)
+    // their pace: the first reaches the hatch 4 s after setting out, the rest about half a second apart, at 80 px/s
+    // at most (so nobody farther than CHOSEN_REACH_PX is asked while there are enough nearer); a short step into a building on the way
+    const CHOSEN_ARRIVE0 = 4, CHOSEN_ARRIVE_GAP = 0.45, CHOSEN_WAIT_GAP = 0.3, CHOSEN_STEP_IN = 0.3, CHOSEN_REACH_PX = 620;
     let withdrawing = null;  // { rect, onDone } — the enemy pulls back to its rocket
     let enemiesGone = false; // after the launch nobody comes back
     let peopleGone = false;  // after the descent nobody comes back
@@ -570,7 +610,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     }
 
     function reconcile() {
-        if (gather || withdrawing) return;
+        if (gather || withdrawing || chosen) return;
         if (peopleGone) { ants.length = 0; }
         if (enemiesGone) { enemies.length = 0; return; }
         // People: match count to population; cars once researched (30 %)
@@ -594,7 +634,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         if (!p1) { onArrive(d); return; }
         const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
         d.t += (speed * dt) / len;
-        if (d.t >= 1) { d.seg++; d.t = 0; if (d.seg >= d.path.length - 1) { d.path = null; d.wait = 0.6 + Math.random() * 1.6; } }
+        if (d.t >= 1) { d.seg++; d.t = 0; if (d.seg >= d.path.length - 1) { d.path = null; d.wait = d.chosen ? CHOSEN_STEP_IN : 0.6 + Math.random() * 1.6; } }
     }
 
     function pos(d) {
@@ -611,6 +651,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         // nearest building and stay in until the boat has left. Nobody fights.
         const scare = raidAlarm();
         for (const a of ants) {
+            if (chosen) { if (a.chosen) stepDot(a, dt, a.speed, toHatch); continue; }     // the others stand where they are
             const afraid = scare && a.kind === 'person' && Math.hypot((pos(a)?.x ?? 1e9) - scare.x, (pos(a)?.y ?? 1e9) - scare.y) < 170;
             stepDot(a, dt, speedOf(a.kind) * (afraid ? 2.4 : 1), (d) => {
                 if (gather) { if (d.at !== gather.rect) { const from = d.at?.rect ?? gather.rect.rect; d.path = streetsOurs(from, gather.rect.rect, getGap()); d.seg = 0; d.t = 0; d.at = gather.rect; d.wait = Math.random() * 0.8; } return; }
@@ -648,10 +689,11 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
             if (!d.path && !d.razing) continue;            // inside a building
             const p = pos(d); if (!p) continue;
             // Walk out of a plate: fade in on the first segment; walk in: fade out on the last.
+            // One of the chosen few crosses the facility and fades only in the hole.
             let edge = 1;
             if (d.path) {
                 if (d.seg === 0) edge = Math.min(1, d.t * 2.2);
-                if (d.seg === d.path.length - 2) edge = Math.min(1, (1 - d.t) * 2.2);
+                if (d.seg === d.path.length - 2) edge = Math.min(1, (1 - d.t) * (d.chosen && chosen && d.at === chosen.rect ? 2.8 : 2.2));
             }
             ctx.beginPath();
             ctx.fillStyle = COLORS[d.kind];
@@ -925,6 +967,66 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         ants.forEach(a => { a.path = null; a.wait = Math.random() * 1.2; });
         dismissGuards(rect);      // the guards leave the coast and go down with everyone
         if (!ants.length && !guards.length) { gather = null; peopleGone = true; onDone?.(); }
+    }
+
+    /**
+     * The end of the war as Ola wrote it (v1.88.0): the shelter takes only a
+     * few. `pickChosen` names them (the people who live highest, at home
+     * first); the ones inside a building leave from their home, the ones on a
+     * street finish their walk and turn for the hatch. Everyone else stands
+     * still where they are and stays behind. They walk at their own pace so
+     * they reach the hatch one by one (the nearest first, about half a second
+     * apart) and each fades into the hole. `onDone` once the last is down.
+     */
+    function gatherChosen(slotEl, n, onDone) {
+        measure();
+        const rect = { rect: layoutRect(slotEl, area), building: { id: 'hatch' } };
+        const homeOf = (a) => (a.at && HOUSING.has(a.at.building?.type) ? a.at : (a.from && HOUSING.has(a.from.building?.type) ? a.from : null));
+        const pathLen = (p) => p.reduce((s, q, i) => (i ? s + Math.hypot(q.x - p[i - 1].x, q.y - p[i - 1].y) : 0), 0);
+        // each one's way to the hatch: from home if inside (nobody sees them move), else
+        // the rest of the walk they are on, a step into that building, and on from there
+        const plans = ants.map(a => {
+            if (!a.path) {
+                const from = homeOf(a) || a.at;
+                const path = from ? streetsOurs(from.rect, rect.rect, getGap()) : null;
+                return { a, from, path, len: path ? pathLen(path) : 0 };
+            }
+            const rest = [pos(a), ...a.path.slice(a.seg + 1)];
+            return { a, walking: true, len: pathLen(rest) + (a.at ? pathLen(streetsOurs(a.at.rect, rect.rect, getGap())) : 0) };
+        });
+        // the ones too far away to walk it calmly in time are not asked, unless there are too few otherwise
+        const want = n ?? chosenCount(ants.length);
+        const near = plans.filter(p => p.len <= CHOSEN_REACH_PX && p.a.kind !== 'car');
+        const pool = near.length >= want ? near : plans;
+        const picked = pickChosen(pool.map(p => ({ home: homeOf(p.a)?.building.type || null, inside: !p.a.path, kind: p.a.kind })), want).map(i => pool[i]);
+        chosen = { rect, onDone, few: picked.map(p => p.a), done: false, at: performance.now() };
+        // the nearest reach the hatch first, then one by one
+        picked.sort((x, y) => x.len - y.len).forEach((p, i) => {
+            const { a } = p;
+            a.chosen = true;
+            if (!p.walking) {
+                if (!p.path) { a.at = rect; a.path = null; return; }
+                a.from = p.from; a.at = rect; a.path = p.path; a.seg = 0; a.t = 0;
+                a.wait = i * CHOSEN_WAIT_GAP;
+            }
+            const walk = Math.max(1, CHOSEN_ARRIVE0 + i * CHOSEN_ARRIVE_GAP - (a.wait || 0) - (p.walking ? CHOSEN_STEP_IN : 0));
+            a.speed = Math.max(18, Math.min(80, p.len / walk));
+        });
+        if (!picked.length || reduced) chosenDown();
+    }
+    /** One of the chosen arrived somewhere: on to the hatch, unless this is it. */
+    function toHatch(d) {
+        if (d.at === chosen.rect) return;
+        const from = d.at?.rect ?? chosen.rect.rect;
+        d.path = streetsOurs(from, chosen.rect.rect, getGap()); d.seg = 0; d.t = 0; d.from = d.at; d.at = chosen.rect; d.wait = 0;
+    }
+    function chosenDown() {
+        if (!chosen || chosen.done) return;
+        chosen.done = true;
+        chosen.downAfter = +((performance.now() - chosen.at) / 1000).toFixed(1);
+        const few = new Set(chosen.few);
+        for (let i = ants.length - 1; i >= 0; i--) if (few.has(ants[i])) ants.splice(i, 1);
+        chosen.onDone?.();
     }
 
     /**
@@ -1475,6 +1577,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         // withdraw: everyone home to the rocket; gather: everyone (guards too) into the hatch
         if (withdrawing && enemies.every(e => e.at === withdrawing.rect && !e.path)) { const cb = withdrawing.onDone; withdrawing = null; enemiesGone = true; enemies.length = 0; cb?.(); }
         if (gather && !guards.length && ants.every(a => a.at === gather.rect && !a.path)) { const cb = gather.onDone; gather = null; peopleGone = true; ants.length = 0; cb?.(); }
+        if (chosen && !chosen.done && chosen.few.every(a => a.at === chosen.rect && !a.path)) chosenDown();
     }
 
     // --- Guards: our defence, made visible ---------------------------------
@@ -1679,7 +1782,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     const boatInfo = (b) => ({ x: Math.round(b.x), y: Math.round(b.y), aboard: b.aboard, shown: +b.shown.toFixed(2), trip: !!b.trip, moored: b.moored, owner: !!b.owner });
     /** Debug: every guard, walker and watchman where it stands now (layout px), for the on-land check. */
     const _where = () => ({ guards: guardPositions().map(g => ({ x: g.x, y: g.y, leaving: !!g.leaving })), ants: ants.map(a => pos(a)).filter(Boolean), watchmen: watchmen.filter(m => !m.hidden).map(m => watchPos(m)).filter(Boolean), ring: ring(), grid: gridBox() });
-    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, musterLanding, cancelLanding, withdraw, gatherAt, measure, sailBoat, dockPoint, ourDockPoint, _where, _debug: () => ({ raid: raid?.phase, boat: boatInfo(boat), ourBoat: boatInfo(ourBoat),
+    return { start, stop, step, setState, startAttack, raiding, launchWave, launchStrike, musterLanding, cancelLanding, withdraw, gatherAt, gatherChosen, measure, sailBoat, dockPoint, ourDockPoint, _where, _debug: () => ({ raid: raid?.phase, boat: boatInfo(boat), ourBoat: boatInfo(ourBoat),
         landings: landings.map(l => ({ phase: l.phase, go: l.go, dots: l.dots.length, shore: l.shore && [Math.round(l.shore.x), Math.round(l.shore.y)], land: l.land && [Math.round(l.land.x), Math.round(l.land.y)] })),
-        sorties: sorties.map(s => ({ phase: s.phase, dots: s.dots.length, back: s.back?.length ?? 0, shore: s.shore && [Math.round(s.shore.x), Math.round(s.shore.y)] })), watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, guardsOut: guards.filter(g => g.out).length, guardsIn: guards.filter(g => g.leaving).length, armory: armoryPlate() ? c(armoryPlate().rect) : null, barracks: barracks() ? c(barracks().rect) : null, home: sorties.flatMap(s => (s.home || []).filter(d => !d.inside).map(d => (d.path ? pos(d) : d.end))), responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, fellAt: w.dots.filter(d => d.killed).map(d => +(d.fellAt ?? -1).toFixed(2)), segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
+        sorties: sorties.map(s => ({ phase: s.phase, dots: s.dots.length, back: s.back?.length ?? 0, shore: s.shore && [Math.round(s.shore.x), Math.round(s.shore.y)] })), watchmen: watchmen.map(m => ({ duty: m.duty, hidden: m.hidden, walk: !!m.walk })), guards: guards.length, guardsGone, guardsOut: guards.filter(g => g.out).length, guardsIn: guards.filter(g => g.leaving).length, armory: armoryPlate() ? c(armoryPlate().rect) : null, barracks: barracks() ? c(barracks().rect) : null, home: sorties.flatMap(s => (s.home || []).filter(d => !d.inside).map(d => (d.path ? pos(d) : d.end))), responding: guards.filter(g => g.resp).length, guardSample: guardPositions().slice(0, 3), ants: ants.length, enemies: enemies.length, withdrawing: !!withdrawing, rocket: withdrawing?.rect, sample: enemies.slice(0, 3).map(e => ({ at: e.at === withdrawing?.rect ? 'rocket' : (e.at?.building ? 'plate' : (e.at ? 'tile' : 'none')), atXY: e.at?.rect ? [e.at.rect.x, e.at.rect.y] : (e.at ? [e.at.x, e.at.y] : null), path: !!e.path, wait: e.wait, seg: e.seg })), atRocket: enemies.filter(e => withdrawing && e.at === withdrawing.rect && !e.path).length, gather: !!gather, chosen: chosen ? { few: chosen.few.length, down: chosen.few.filter(a => a.at === chosen.rect && !a.path).length, walking: chosen.few.filter(a => a.path).length, done: chosen.done, downAfter: chosen.downAfter ?? null, left: ants.filter(a => !a.chosen).length, leftVisible: ants.filter(a => !a.chosen && a.path).length } : null, inHatch: ants.filter(a => gather && a.at === gather.rect && !a.path).length, waves: waves.map(w => ({ kind: w.kind, done: w.done, dots: w.dots.length, dead: w.dots.filter(d => d.dead).length, killed: w.dots.filter(d => d.killed).length, fellAt: w.dots.filter(d => d.killed).map(d => +(d.fellAt ?? -1).toFixed(2)), segs: w.dots.map(d => d.path ? `${d.seg}/${d.path.length}:${d.t.toFixed(2)}${d.wait ? 'w' : ''}` : (d.dead ? 'dead' : 'at')) })) }) };
 }

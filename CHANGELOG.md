@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.88.0 - 2026-10-06 (chapter III, WAR: GO DEEP, the chosen few go down)
+
+After Ola played the whole war ("everyone walks down into the deep, but only 216 arrive"), the ending says why: only a chosen few go down. No rule changed (`sim-phase3.mjs 1` prints the same line).
+- **GO DEEP.** The shovel's tooltip is "GO DEEP", like the buttons before it: no act numeral, nothing that says the chapter changes. The "Unfinished. Continue at your own peril." gate is gone; the click is the choice.
+- **The controls leave.** Every button, the plates' buttons and the war counters fade and slide away one after another (0.8 s, 60 ms apart), the shovel last. The war room stays. Nothing answers a click while it plays.
+- **The hatch opens.** The bar slides off the facility's round hatch and the hole widens a little (1.2 s).
+- **The chosen few.** Twelve of the people walk to it (about one in five, never more than fifteen): the ones who live highest, districts and skyscrapers first, from their homes along the streets, the nearest first, and go down one by one, each fading into the hole. Everyone else stops where they stand and stays behind.
+- **The war room says it**, with a beat between: "Status: the shelter takes only a few. The richest. The most successful." / "Status: they go down to wait until the earth can be lived on again." The line before the shovel is now "But a few have a secret plan."
+- **The hatch closes** when the last one is down, 1.5 s of stillness, and the IV card comes as before; the people left behind dim as it fades in. About 14 s from the click to the card; it always comes by 25 s.
+
 ## v1.87.3 - 2026-10-06 (chapter IV, the vault: the burst)
 
 - **The burst is a mass.** A dome of the rooms' own muscle fibre and vessels (tiled at their scale, not stretched) pushes out of the crust and swells until it fills the top of the screen, with folds where one sheet of muscle lies over the next, wet highlights, thick branching vessels that whip with red light running along them, a ring of the heartbeat moving out through the whole of it, torn crust and tower pieces riding on its back and sliding off, and dust. The kit (tissue, vessel trees, riders) is made once when the rise starts; per frame only transforms and the pulse.

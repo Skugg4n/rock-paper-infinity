@@ -489,3 +489,39 @@ the three bottom-row plates nearest the pier, so our soldiers walked out of shop
 - Open (B210): the default HP, people who do not fit when a home is taken, the first steps of a
   soldier cross the plate from its middle like every walker's.
 
+
+## GO DEEP: the chosen few (2026-10-06, v1.88.0, B211 to B216)
+
+Ola played the whole war and was happy with it; the ending bounced: "Everyone walks down into the
+deep, but only 216 arrive." The story now says why: the shelter takes only a few, the richest and
+most successful. No rule changed (`sim-phase3.mjs 1` prints the same line).
+
+- **The shovel** says "GO DEEP" (aria-label "Go deep"), greyed with the salvage cost until ready as
+  before. Like the buttons before it, it never says the chapter changes. The "Unfinished" gate is no
+  longer asked (the markup and `deepGate.js` stay for the DEEP session, B217).
+- **The line before it** is "But a few have a secret plan." (then "Go deep." as before). No new lines
+  before the shovel.
+- **The click** (`goDownTogether`, once: `w.goingDown`, `shipChosen` saved first so a reload goes
+  straight down) runs on its own clock, the steps kept in `window.rpiGoDeep`:
+  0 s every control leaves (`leaveControls`: the war HUD, the doomsday clock, the plates' buttons
+  together, the button column, the shovel last; 0.8 s each, 60 ms apart, `translate` so their own
+  transforms stay; `#phase-city.going-deep` takes the clicks) → 1.3 s the hatch opens
+  (`.deep-facility.open`: the bar slides off, the hole widens 46 → 54 %, 1.2 s) → 1.7 s "Status: the
+  shelter takes only a few. The richest. The most successful." → 2.3 s the chosen few set out →
+  6.6 s "Status: they go down to wait until the earth can be lived on again." → the last one down
+  (and at least 2.5 s after the second line) the hatch closes → 1.2 s + 1.5 s of stillness → the card
+  path exactly as before (city.stop, war.finale('fall'), war.stop, goDeep), the people left behind
+  dimmed to 55 % as it fades in. Measured in headless Chrome from iii-end: last one down 11.3 s,
+  the card 14.0 s. A fallback brings the card at 25 s whatever happens.
+- **Who goes** (`ants.js`): `chosenCount(n)` is about one in five of the people on the map, at least
+  three, at most twelve; `pickChosen(people, n, rng)` (pure, tested) ranks by how high they live
+  (district, skyscraper, apartment, home) and then whether they are at home, never a car, never more
+  than 15, ties by `rng`. `gatherChosen(slot, n, onDone)` first leaves out anyone farther than 620 px
+  of street from the hatch (unless that leaves too few), so the walk stays calm. Someone inside a
+  building leaves from their home; someone on a street finishes the walk, steps in for 0.3 s and
+  turns for the hatch. Each walks at a pace (18 to 80 px/s) that brings the nearest in 4 s after
+  setting out and the next ones about 0.45 s apart, so they go down one by one; on the facility a
+  chosen dot fades only in the hole. Everyone else stops where they stand. `gatherAt` (everyone,
+  guards too) is unchanged for other callers.
+- Open: no sound for the hatch (B218); after a reload past the launch their red walkers come back on
+  the rubble island (B219, seen in iii-end).
