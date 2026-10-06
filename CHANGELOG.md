@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.88.1 - 2026-10-06 (the deep gate removed)
+
+- The gate before IV ("Unfinished. Continue at your own peril.") is gone: the war's GO DEEP (v1.88.0) leads straight down. #deep-gate in index.html, its CSS and src/deepGate.js (+ test) removed (B217).
+
 ## v1.88.0 - 2026-10-06 (chapter III, WAR: GO DEEP, the chosen few go down)
 
 After Ola played the whole war ("everyone walks down into the deep, but only 216 arrive"), the ending says why: only a chosen few go down. No rule changed (`sim-phase3.mjs 1` prints the same line).

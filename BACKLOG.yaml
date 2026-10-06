@@ -3449,7 +3449,9 @@ items:
     request: |
       The deep gate is unused since v1.88.0: the #deep-gate markup in index.html, its CSS in style.css and
       src/deepGate.js (+ test) can go.
-    status: open
+    status: done
+    done: 2026-10-06
+    version: 1.88.1
     notes: "For the DEEP session (it owns index.html markup and the gate)."
 
   - id: B218
