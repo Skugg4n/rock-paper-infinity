@@ -218,7 +218,7 @@ export function init() {
         $('rise').hidden = !(ready || notWhole);
         $('rise').classList.toggle('dim', notWhole);
         $('rise').disabled = notWhole;
-        const riseText = ready ? V.riseLabel(s) : notWhole ? V.NOT_WHOLE(V.roomsLeft(s)) : '';
+        const riseText = ready ? V.riseLabel(s) : notWhole ? V.notWholeText(s) : '';
         if (riseText && $('rise').textContent !== riseText) $('rise').textContent = riseText;
         // the goal's checklist, from the moment the goal is said
         const goal = V.goal(s);

@@ -10,7 +10,7 @@ export { VT };
 export const UNITY_CSS = VAULT_CSS.replaceAll('#phase-vault', '#phase-unity').replaceAll('in-vault', 'in-unity') + `
 #phase-unity .v-panel { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; gap: 8px; bottom: 84px; }
 #phase-unity .v-panel::-webkit-scrollbar { display: none; }
-#phase-unity .v-crt { min-height: 112px; font-size: 13px; line-height: 19px; }
+#phase-unity .v-crt { min-height: 80px; font-size: 13px; line-height: 19px; padding: 6px 10px; }
 #phase-unity .v-build { left: 332px; right: 16px; height: 92px; }
 #phase-unity .v-card { max-width: 190px; }
 #phase-unity .v-card .need { -webkit-line-clamp: 1; }
@@ -44,15 +44,19 @@ export const UNITY_CSS = VAULT_CSS.replaceAll('#phase-vault', '#phase-unity').re
 .u-btn.want { box-shadow: 0 0 0 2px var(--v-amber); }
 .u-edge-line { font-size: 11px; color: var(--v-mist); text-align: right; min-height: 14px; }
 .u-edge-line.bad { color: var(--v-amber); }
-.u-grow { display: flex; flex-direction: column; gap: 3px; }
-.u-row { display: grid; grid-template-columns: 74px 1fr 34px; align-items: center; gap: 6px; font-size: 11px; color: var(--v-plate); }
-.u-row .n { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 14px; letter-spacing: 0.08em; }
-.u-row .pc { text-align: right; font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 15px; color: var(--v-paper); }
+.u-grow { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+.u-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 4px; font-size: 11px; color: var(--v-plate); }
+.u-row input[type=range] { grid-column: 1 / -1; }
+.u-row .n { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 13px; letter-spacing: 0.08em; line-height: 14px; }
+.u-row .pc { text-align: right; font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 14px; color: var(--v-paper); }
+.u-sec .hint.warn { color: var(--v-amber); }
+#phase-unity .v-log > div { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+#phase-unity .v-build.paused .v-card, #phase-unity .v-build.paused .v-build-btn { filter: grayscale(1) brightness(0.6); pointer-events: none; }
 .u-row.zero, .u-row.locked { opacity: 0.38; }
 .u-row.locked .pc { color: var(--v-mist); }
 .u-row.red .n { color: var(--v-danger); }
 .u-row.yellow .n { color: var(--v-amber); }
-.u-row input[type=range] { width: 100%; height: 14px; margin: 0; accent-color: var(--v-pulse); cursor: pointer; }
+.u-row input[type=range] { width: 100%; height: 10px; margin: 0; accent-color: var(--v-pulse); cursor: pointer; }
 .u-row input[type=range]:disabled { cursor: default; }
 .u-minds { display: grid; grid-template-columns: 1fr; gap: 3px; }
 .u-minds .lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--v-mist); }
@@ -64,9 +68,12 @@ export const UNITY_CSS = VAULT_CSS.replaceAll('#phase-vault', '#phase-unity').re
 .u-guide .who { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 15px; letter-spacing: 0.12em; color: var(--v-amber); }
 .u-guide .txt { font-size: 13px; line-height: 18px; color: var(--v-plate); margin-top: 2px; }
 #phase-unity .v-card.ins .p { color: var(--v-pulse); }
-#phase-unity .v-card.join { background: var(--v-pulse); color: #f6e6e8; }
-#phase-unity .v-card.join .p, #phase-unity .v-card.join .d { color: #f6c9cf; }
+#phase-unity .v-card.join { background: var(--v-amber); color: var(--v-ink); box-shadow: 0 0 14px rgba(255,214,120,0.45); }
+#phase-unity .v-card.join .p, #phase-unity .v-card.join .d { color: var(--v-steel3); }
+#phase-unity .v-card.join.off { background: var(--v-steel3); color: var(--v-amber); box-shadow: inset 0 0 0 1.5px var(--v-amber); }
+#phase-unity .v-card.join.off .need { color: var(--v-amber); }
 #phase-unity .v-card.multi .n { font-weight: 600; }
+#phase-unity .v-card.answer { box-shadow: 0 0 0 2px var(--v-amber), 0 2px 6px rgba(0,0,0,0.5); }
 #phase-unity .v-build-btn.has { box-shadow: inset 0 0 0 2px var(--v-amber); }
 #phase-unity canvas.v-cut { cursor: crosshair; }
 #phase-unity.is-zooming .v-panel, #phase-unity.is-zooming .v-build { opacity: 0.25; transition: opacity 800ms ease; }

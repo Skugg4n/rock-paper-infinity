@@ -32,6 +32,8 @@ export const SCALES = [
 ];
 export const ZOOM_AT = 0.8;
 export const tileKm2 = (scale) => SCALES[scale].size / CELLS;
+/** Seconds on the current map (the weather counts from the arrival). */
+export const mapTime = (s) => s.t - (s.scale > 0 ? (s.scaleAt || 0) : 0);
 
 // ------------------------------------------------------------------ the organs
 /**
@@ -65,15 +67,17 @@ export const START_MEMORY = 100;
 /** Fas 1: the body that comes out of the vault, in cells. */
 export const START_MASS = { skin: 2, stomach: 1.5, heart: 1.5, tissue: 1 };
 /** A click bites while the body can stretch over the new ground: area up to this times its mass. */
-export const STRETCH = 1.35;
+export const STRETCH = 1.6;
 /** Mass needed per cell for the edge to push at full speed (the body is "full"). */
 export const DENS = 1;
 /** Stomach: gut digested per second per stomach mass. */
 export const DIG = 0.075;
+/** By hand the stomach keeps up with the hand: it digests this many times faster before AUTONOMIC EDGE. */
+export const HAND_DIG = 3;
 /** The edge: cells a second per edible edge cell at full skin, full power. */
 export const ACID0 = 0.07;
 /** The city is eaten by hand first and then slowly; the land faster. */
-export const ACID_SCALE = [0.8, 0.62, 0.62, 0.62, 1];
+export const ACID_SCALE = [0.7, 0.62, 0.62, 0.62, 0.75];
 /** Skin per edge cell for the whole edge to eat. */
 export const THICK0 = 0.5;
 /** Skin per edge cell the storm needs to find to not tear, by scale. */
@@ -83,7 +87,7 @@ export const TEAR = 0.03;
 /** Heart: power per heart mass. */
 export const HEART_K = 2.1;
 /** Thought: per processing mind a second; the nerve's share times this, by scale. */
-export const PROC_K = 0.045;
+export const PROC_K = 0.05;
 export const NERVE_RATE = [40, 80, 150, 260, 600];
 /** Memory: thought per memory mind; the brain's share times this, by scale. */
 export const MEM_K = 20;
@@ -101,7 +105,7 @@ export const EYE_K = 220;
 /** The body reshapes toward GROW AS at this share a second (so a turn of the dial is felt). */
 export const RESHAPE = 0.012;
 /** Fas 1 buttons: mass a buy, the price in mass-nutrient, rising. */
-export const BUY_MASS = 1;
+export const BUY_MASS = 1.5;
 export const BUY_RISE = 1.03;
 /** The minds in each vault (county, country, continent). */
 export const VAULT_MINDS = [0, 140, 260, 410, 0];
@@ -129,7 +133,7 @@ export const EXPERIMENTS = [
     { id: 'gravel', title: 'GRAVEL IN THE SKIN', line: 'Storms tear 60 % less.', price: 1200, when: (s) => s.torn > 0.5 || s.scale > 0 },
     { id: 'stomach2', title: 'A SECOND STOMACH', line: 'Twice the nutrient from what we eat.', price: 2000, when: (s) => s.ex.auto && (s.seenRed.stomach || s.ex.gravel) },
     { id: 'eyes', title: 'WE REMEMBER THE MAP', line: 'Eyes. We see past the edge.', ins: 1, when: (s) => s.ex.auto && (s.insight >= 0.5 || s.capHit) },
-    { id: 'edgeknows', title: 'THE EDGE KNOWS', line: 'The edge picks its own way to eat.', price: 2500, when: (s) => s.scale >= 1 },
+    { id: 'edgeknows', title: 'THE EDGE KNOWS', line: 'The edge picks its own way to eat.', price: 2500, when: (s) => s.scale >= 1 || (s.ex.gravel && s.ex.auto) },
     { id: 'lungs', title: 'FILTER LUNGS', line: 'Poison becomes food.', price: 3000, when: (s) => s.scale >= 1 },
     { id: 'gut', title: 'A LONGER GUT', line: 'Intestines carry food out to the far edge.', price: 3200, when: (s) => s.scale >= 1 && s.seenRed.intestines },
     { id: 'ears', title: 'WE HEAR THE WEATHER', line: 'Ears. The skin thickens before the storm.', price: 3600, when: (s) => s.scale >= 1 && s.torn > 30 },
@@ -248,9 +252,17 @@ export function big(n) {
 export function areaText(s, cells = area(s)) {
     const km = cells * tileKm2(s.scale);
     if (s.scale >= 4) return `${Math.max(1, Math.round((km / SCALES[4].size) * 100))} % of the surface`;
+    if (km < 1) return `${km.toFixed(2)} km²`;
     if (km < 10) return `${km.toFixed(1)} km²`;
     if (km < 1e6) return `${num(km)} km²`;
     return `${(km / 1e6).toFixed(1)} M km²`;
+}
+/** Growth a day in a unit that moves: m² while it is small (never "+0.00 km²"), km² after. */
+export function perDayText(km) {
+    const a = Math.abs(km), sign = km < 0 ? '-' : '+';
+    if (a < 0.1) return `${sign}${num(Math.round(a * 1e6 / 10) * 10)} m²`;
+    if (a < 10) return `${sign}${a.toFixed(1)} km²`;
+    return `${sign}${big(a)} km²`;
 }
 /** Nutrient in tonnes: a cell of mass is this many. */
 export const nutUnit = (s) => tileKm2(s.scale) * 50000;
@@ -403,7 +415,7 @@ export function flows(s) {
         const e = edible(s, m, i);
         if (e > 0) edibleN += e;
         else blockedBy[m.obst[i]] = (blockedBy[m.obst[i]] || 0) + 1;
-        stormSum += stormAt(m, i, s.t, s.scale);
+        stormSum += stormAt(m, i, mapTime(s), s.scale);
     }
     perim = Math.max(1, perim);
     const thick = s.mass.skin / perim;
@@ -413,7 +425,7 @@ export function flows(s) {
     // the storm: where it lies on the edge, the skin must be STORM_NEED thick or it tears
     let stormLoss = 0;
     for (const i of c.frontier) {
-        const st = stormAt(m, i, s.t, s.scale);
+        const st = stormAt(m, i, mapTime(s), s.scale);
         if (st > 0) stormLoss += st * Math.max(0, 1 - prot / (STORM_NEED[s.scale] * st));
     }
     stormLoss = Math.min(0.9, stormLoss / perim);
@@ -422,6 +434,11 @@ export function flows(s) {
     const mix = [0, 0, 0];
     for (const i of fr) mix[m.cls[i]]++;
     const at = fr.length ? mix.indexOf(Math.max(...mix)) : -1;
+    // the patch after this one: what the edge will meet a little further on
+    const ahead = front(s, 30).slice(8);
+    const mix2 = [0, 0, 0];
+    for (const i of ahead) mix2[m.cls[i]]++;
+    const nextAt = ahead.length ? mix2.indexOf(Math.max(...mix2)) : -1;
     let mode = 0;
     const effMode = s.ex.edgeknows ? (at >= 0 ? bestMode(at) : s.mode) : s.mode;
     for (const i of fr) mode += modeMult(effMode, m.cls[i]);
@@ -446,7 +463,7 @@ export function flows(s) {
     const gut = s.scale >= 1 ? Math.min(1, reach / Math.max(1, radius)) : 1;
     const night = s.scale >= 4 && Math.sin(s.t * 0.06) < -0.2;
     const fatMult = night ? Math.min(1, 0.45 + (s.unlocked.fat ? sh('fat') * 10 * mlt(s, 'dense', 1.25) : 0)) : 1;
-    const digestCap = mlt(s, 'walls') * s.mass.stomach * DIG * (L.stomach >= 2 ? 2 : 1) * (L.stomach >= 3 ? 1.3 : 1) * p * gut * fatMult;
+    const digestCap = (s.ex.auto ? 1 : HAND_DIG) * mlt(s, 'walls') * s.mass.stomach * DIG * (L.stomach >= 2 ? 2 : 1) * (L.stomach >= 3 ? 1.3 : 1) * p * gut * fatMult;
     const digest = Math.min(digestCap, s.pool * 0.5 + 0.0001);
 
     // thought
@@ -470,6 +487,7 @@ export function flows(s) {
     // ---------------------------------------------------- the factors: what slows the body
     const F = [];
     const add = (organ, value, why, fix = null) => F.push({ organ, value: Math.max(0, Math.min(1, value)), word: ORGANS[organ].word, flow: ORGANS[organ].flow, why, fix });
+    // (a factor's word can be more exact than its organ's: see the stomach below)
     const frac = (o) => blockedBy[o] / perim;
     // a block the organ cannot fix by growing: the fix is an experiment (granite, sea, cold, poison)
     // (it only bites once it holds a good part of the edge: under a quarter the rest of the edge eats on)
@@ -478,9 +496,15 @@ export function flows(s) {
     const gr = block(GRANITE, 'granite', 1.2), se = block(SEA, 'salt', 1.1), co = block(COLD, 'warm', 1.2);
     const digestVal = Math.min(digest >= digestCap * 0.98 && s.pool > digestCap * 6 ? 0.5 * fillMult + 0.3 : 1, fillMult);
     add('stomach', Math.min(digestVal, gr), 'gut', gr < digestVal ? 'granite' : null);
+    // a block says what it is, not a hunger (UNITY test 1: "Starving." with the gut full)
+    if (gr < digestVal) F[F.length - 1].word = BLOCK_WORDS.granite;
+    // a gut full of what we cannot digest yet is "Full.", not "Starving."
+    if (digest >= digestCap * 0.98 && s.pool > digestCap * 6 && digestVal <= gr) F[F.length - 1].word = 'Full.';
     const skinVal = Math.min(cover, 1 - stormLoss * 1.6);
     add('skin', Math.min(skinVal, se), 'edge', se < skinVal ? 'salt' : null);
+    if (se < skinVal) F[F.length - 1].word = BLOCK_WORDS.sea;
     add('heart', Math.min(p, co), 'power', co < p ? 'warm' : null);
+    if (co < p) F[F.length - 1].word = BLOCK_WORDS.cold;
     // the mind is red only when the body itself is not worse off (never under 0.7)
     if (s.ex.auto) add('nerve', nxt && !nxt.ins && nxt.price <= cap ? Math.max(0.7, Math.min(1, 90 / Math.max(1, eta))) : 1, 'thought');
     if (s.scale >= 1) add('intestines', gut, 'reach', s.unlocked.intestines ? null : 'gut');
@@ -507,6 +531,8 @@ export function flows(s) {
     // the bottleneck even when nothing is red: the lowest factor
     let low = null;
     for (const f of F) if (!low || f.value < low.value) low = f;
+    // nothing at the edge can be eaten: say that, with the block's own fix
+    if (s.ex.auto && edibleN < 0.5 && red) red = { ...red, word: 'Nowhere to grow.' };
     // the fix is an experiment we cannot hold in mind: then what is wrong is the memory
     if (red && red.fix) {
         const e = EXPERIMENTS.find((x) => x.id === red.fix);
@@ -514,19 +540,23 @@ export function flows(s) {
     }
     // before the edge eats by itself the only thing that holds the hand back is the stretch
     if (!s.ex.auto) {
+        // by hand the only things that hold the hand back: no room (with the nutrient to grow: "Full."), nothing to
+        // grow with ("Starving."), a weak heart
         const canBite = A < M * STRETCH;
-        red = !canBite ? F.find((f) => f.organ === 'stomach') : (p < 0.8 ? F.find((f) => f.organ === 'heart') : null);
-        if (red && red.organ === 'stomach') red = { ...red, value: 0.3 };
+        if (!canBite) red = s.nutrient >= cheapestBuy(s) ? { organ: null, flow: 'mass', word: 'Full.', value: 0.3, why: 'room' } : { ...F.find((f) => f.organ === 'stomach'), word: 'Starving.', value: 0.3 };
+        else red = p < 0.8 ? F.find((f) => f.organ === 'heart') : null;
     }
     return {
         p, make, use, perim, edibleN, thick, cover, prot, stormLoss, stormFrac, mix, at, effMode, mode, fill, fillMult, blockedFrac,
-        eat, tear, digest, digestCap, gut, reach, radius, thoughtRate, cap, insightRate, sight, eta, next: nxt, factors: F, red, yellow, low, night, sag,
+        nextAt, eat, tear, digest, digestCap, gut, reach, radius, thoughtRate, cap, insightRate, sight, eta, next: nxt, factors: F, red, yellow, low, night, sag,
         areaDay: (eat - tear) * tileKm2(s.scale), nutrientDay: digest * nutUnit(s),
     };
 }
 
 /** Experiments the player can see now: lit, not bought (the multipliers' next level, in their place). */
 export function visibleExperiments(s) {
+    // a price is set the moment its row lights and never moves after (UNITY test 1: GRAVEL 1 200 -> 360)
+    lightPrices(s, flows(s).thoughtRate);
     const out = [];
     for (const e of EXPERIMENTS) if (!s.ex[e.id] && e.when(s)) out.push({ ...e, price: priceOf(s, e), kind: 'ex' });
     // a vault reached and seen: JOIN
@@ -609,14 +639,23 @@ export function buyMass(s, o) {
     return true;
 }
 /** Fas 1 before AUTONOMIC EDGE: a click on the edge bites a block. Returns the cell or -1. */
+/** What a block is called when it is what slows the body (the experiment that ends it wears the mark). */
+export const BLOCK_WORDS = { granite: 'Mountains.', sea: 'Sea.', cold: 'Too cold.' };
+/** The cheapest of SKIN +, STOMACH +, HEART +. */
+export const cheapestBuy = (s) => Math.min(...['skin', 'stomach', 'heart'].map((o) => buyPrice(s, o)));
+/** Why a bite was refused, for the hand (UNITY test 1: 49 clicks, nothing said). */
+export const BITE_NO = { full: 'Full. Grow first.', starving: 'Still digesting. A moment.', blocked: 'We cannot eat that yet.', far: 'Click the edge.' };
 /** Fas 1: how many more blocks the body can stretch over before it must grow. */
 export const roomLeft = (s) => Math.max(0, Math.ceil(totalMass(s) * STRETCH - area(s)));
 export function bite(s, i) {
     if (s.ex.auto || s.tut.stop) return -1;
     const m = mapFor(s.seed, s.scale);
     const c = cache(s);
-    if (!c.frontier.has(i) || edible(s, m, i) <= 0) return -1;
-    if (area(s) >= totalMass(s) * STRETCH) { s.sfx.push('nobite'); return -1; }
+    const no = (why) => { s.lastBite = { ok: false, why, t: s.t }; s.sfx.push('nobite'); return -1; };
+    if (!c.frontier.has(i)) return no('far');
+    if (edible(s, m, i) <= 0) return no('blocked');
+    if (area(s) >= totalMass(s) * STRETCH) return no(s.nutrient >= cheapestBuy(s) ? 'full' : 'starving');
+    s.lastBite = { ok: true, t: s.t };
     eatCell(s, i);
     s.sfx.push('bite');
     s.bites = (s.bites || 0) + 1;
@@ -683,7 +722,8 @@ function join(s) {
     s.events.push({ t: s.t, what: `JOIN ${n}` });
     stop(s, `join${s.scale}`, [LINES.vault(n)]);
     const dream = ['They dreamed of the sea.', 'They dreamed of their own beds.', 'They dreamed of the sun on a wall.'][s.scale - 1];
-    s.log.push(dream);
+    // the dream is said once: by Mrs Vance in the box (and its log line), or in the log when Dr Okafor speaks
+    if (s.scale === 1) s.log.push(dream);
     guide(s, `joined${s.scale}`, s.scale === 1 ? 'Dr Okafor' : 'Mrs Vance', s.scale === 1 ? 'They did not choose this.' : dream, 10, true);
     return true;
 }
@@ -793,7 +833,7 @@ export function stop(s, id, text, focus = null) {
 export function closeStop(s) {
     const st = s.tut.stop;
     s.tut.stop = null;
-    if (st && st.id === 'zoom') doZoom(s);
+    void st;
 }
 
 // ------------------------------------------------------------------ the clock
@@ -801,7 +841,8 @@ export function closeStop(s) {
 export const progress = (s) => Math.min(1, area(s) / (CELLS * ZOOM_AT));
 
 export function advance(s, dt) {
-    if (s.ended || s.tut.stop || s.zoom) return;
+    if (s.ended) return;
+    if (s.tut.stop || s.zoom) { lightPrices(s, flows(s).thoughtRate); return; }
     s.t += dt;
     const f = flows(s);
     lightPrices(s, f.thoughtRate);
@@ -886,7 +927,7 @@ function stepStory(s, f) {
         VANCE.forEach((t, k) => { if (pr > 0.25 * (k + 1)) guide(s, `vance${k}`, 'Mrs Vance', t, 3); });
     }
     if (f.stormFrac > 0.1 && s.scale >= 1) guide(s, `storm${s.scale}`, 'Mr Lund', 'Storm from the west.', 4);
-    if (s.capHit) guide(s, 'cap', 'Ms Ito', 'We are full. What we think now becomes insight.', 5);
+    if (s.thought >= f.cap * 0.995 && f.cap > 0) guide(s, 'cap', 'Ms Ito', 'We are full. What we think now becomes insight.', 5);
     const nx = f.next;
     if (nx && !nx.ins && s.thought >= nx.price) guide(s, `afford-${nx.id}`, 'Ms Ito', `${nx.title} is within reach.`, 4);
 }
@@ -916,8 +957,11 @@ export function doZoom(s) {
 /** The zoom has played on the screen (or the sim skips it): the stop that says it. */
 export function zoomDone(s) {
     if (!s.zoom || s.tut.stop) return;
-    s.tut.done[`zoom${s.zoom.from}`] = true;
-    s.tut.stop = { id: 'zoom', text: [LINES.ours[s.zoom.from]], focus: null };
+    const from = s.zoom.from;
+    s.tut.done[`zoom${from}`] = true;
+    // the next map comes first, so it is there under the box (UNITY test 1: a black screen with a red dot)
+    doZoom(s);
+    s.tut.stop = { id: 'ours', text: [LINES.ours[from]], focus: null };
 }
 
 // ------------------------------------------------------------------ save

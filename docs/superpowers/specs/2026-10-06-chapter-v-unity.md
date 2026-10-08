@@ -385,3 +385,22 @@ Balanced, en rad i minuten:
 35:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 141%  THO 19 189/38 640 ins 155.2     red -
 35:21  planet    31 % of the surface NUT +1.0 M/d  MASS +0.3 M km²/d  POW 185%  THO 178/38 796 ins 147.9    red -
 ```
+
+## Built (unity), fas D
+
+Efter det oberoende testet (docs/playtests/2026-10-08-unity-human-test-1.md, NÄSTAN) och en egen körning i webbläsaren
+(docs/playtests/2026-10-08-unity-fas1.md). Nya ord: `Full. Grow first.`, `Still digesting. A moment.`, `We cannot eat
+that yet.`, `In the gut: N`, `Next: ROCK.`, `Full.` (magen kan inte ta mer), `Nowhere to grow.`, `Mountains.`, `Sea.`,
+`Too cold.` (ett hinder säger vad det är i stället för organets saknas-ord; avvikelse från tabellen, efter testet), och i
+valvet `NO SKIN YET · grow skin on the top level` (samt HEART/LUNGS). Kortet som svarar på det röda ordet bär den
+gula pricken och står först. Varje stormvåg på en karta är 30 % starkare än den förra.
+
+| Stil | Slut | Staden klar | Zoomar | Flaskhalsbyten fas 2 | Längsta flaskhals fas 2 | Längsta utan beslut |
+|---|---|---|---|---|---|---|
+| balanced | 38:45 | 8:53 | 8:53 16:30 24:30 30:51 | 166 | 115 s | 52 s |
+| skin | 37:17 | 8:55 | 8:55 16:18 23:05 29:30 | 94 | 93 s | 59 s |
+| heart | 34:07 | 8:19 | 8:19 14:52 21:12 27:22 | 131 | 85 s | 21 s |
+| mind | 38:49 | 8:24 | 8:24 15:29 21:13 27:22 | 77 | 79 s | 27 s |
+
+De längsta glappen ligger kring zoomarna (simmen räknar animationen och rutan); heart-stilen slutar 54 s under 35 min.
+

@@ -1,5 +1,6 @@
 /* eslint-env jest */
 import * as U from './unity.js';
+import { neighbours as neighboursOf } from './terrain.js';
 import { mapFor, stormAt, CELLS, RIM, ROCK, PAPER, SCISSORS, SEA, DEEP, GRANITE, POISON, CITY_WEATHER_AT, WAVE_S, WAVE_ON, idx } from './terrain.js';
 
 const closeAll = (s) => { while (s.tut.stop) U.closeStop(s); };
@@ -286,6 +287,60 @@ describe('chapter V, the rules', () => {
             expect(s.tut.stop.text[0]).toBe('212 MINDS. ONE BODY.');
             expect(U.fromVault(0).minds).toBe(197);
             expect(U.newUnity().minds).toBe(197);
+        });
+    });
+
+    describe('phase D: after the human test', () => {
+        test('a refused bite says why: full (grow first) or still digesting', () => {
+            const s = started();
+            while (U.bite(s, U.front(s, 1)[0]) >= 0);
+            expect(['full', 'starving']).toContain(s.lastBite.why);
+            s.nutrient = 1e6;
+            U.bite(s, U.front(s, 1)[0]);
+            expect(s.lastBite.why).toBe('full');
+            expect(U.BITE_NO.full).toBe('Full. Grow first.');
+            // by hand, with no room but the nutrient to grow, the red word is "Full." (not "Starving.")
+            expect(U.flows(s).red.word).toBe('Full.');
+        });
+        test('growth a day in a unit that moves', () => {
+            expect(U.perDayText(0.0004)).toBe('+400 m²');
+            expect(U.perDayText(-0.00002)).toBe('-20 m²');
+            expect(U.perDayText(2.8)).toBe('+2.8 km²');
+            expect(U.areaText(U.newUnity(), 20)).toBe('0.11 km²');
+        });
+        test('a price that has been shown never moves, even when the row lit during a stop', () => {
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            s.torn = 1;
+            s.tut.stop = { id: 'x', text: ['x'] };
+            const a = U.visibleExperiments(s).find((e) => e.id === 'gravel').price;
+            U.advance(s, 1);
+            U.closeStop(s);
+            s.mass.nerve *= 20;
+            U.advance(s, 1);
+            expect(U.visibleExperiments(s).find((e) => e.id === 'gravel').price).toBe(a);
+        });
+        test('the zoom: the next map is there before "The city is ours." is read', () => {
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            s.zoom = { from: 0, at: 0 };
+            U.zoomDone(s);
+            expect(s.scale).toBe(1);
+            expect(s.tut.stop.text).toEqual(['The city is ours.']);
+        });
+        test('a block names itself, not a hunger', () => {
+            // the country with its mountain chain all round the body, before ACID FOR GRANITE
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            s.scale = 2; s.scaleAt = s.t;
+            const m = mapFor(s.seed, 2);
+            const g = m.obst.findIndex((o) => o === GRANITE);
+            s.order = []; U.cache(s);
+            s.order = neighboursOf(g).filter((j) => m.obst[j] !== GRANITE);
+            U.cache(s);
+            const f = U.flows(s).factors.find((x) => x.fix === 'granite');
+            if (f) expect(f.word).toBe('Mountains.');
+            expect(U.BLOCK_WORDS.granite).toBe('Mountains.');
         });
     });
 });

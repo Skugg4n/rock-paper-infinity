@@ -217,6 +217,11 @@ describe('Ola after v1.87.1 (H)', () => {
         s.asleep = 0; s.residents = 0;
         expect(V.riseReady(s)).toBe(false);
         expect(V.NOT_WHOLE(V.roomsLeft(s))).toBe('THE BODY IS NOT WHOLE · 1 room left');
+        // the lever names a missing organ before it counts rooms
+        expect(V.notWholeText(s)).toBe('THE BODY IS NOT WHOLE · 1 room left');
+        s.rooms[V.slotIndex(0, 3)].organ = 'tissue';
+        expect(V.notWholeText(s)).toBe('NO SKIN YET · grow skin on the top level');
+        s.rooms[V.slotIndex(0, 3)].organ = 'skin';
         s.rooms[0].flesh = 1;
         expect(V.riseReady(s)).toBe(true);
     });

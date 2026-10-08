@@ -753,6 +753,11 @@ export const riseReady = (s) => !s.risen && s.phase === 'night' && s.asleep === 
 /** H5: the rooms the body has still to take before it is whole. */
 export const roomsLeft = (s) => s.rooms.filter((r) => !isFlesh(r)).length;
 export const NOT_WHOLE = (n) => `THE BODY IS NOT WHOLE · ${n} ${n === 1 ? 'room' : 'rooms'} left`;
+/** The first organ the rise still needs, or null. */
+export const missingOrgan = (s) => REQUIRED.find((o) => !hasOrgan(s, o)) || null;
+/** The lever says what is really missing: an organ first (UNITY test 1: "0 rooms left" while the skin was missing). */
+export const MISSING_ORGAN = { heart: 'NO HEART YET · grow a heart', lungs: 'NO LUNGS YET · grow lungs', skin: 'NO SKIN YET · grow skin on the top level' };
+export const notWholeText = (s) => { const o = missingOrgan(s); return o ? MISSING_ORGAN[o] : NOT_WHOLE(roomsLeft(s)); };
 export const WHOLE = 'We are whole.';
 /** The RISE lever's words. */
 export function riseLabel(s) {

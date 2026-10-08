@@ -12,7 +12,7 @@
  * Per frame: three images, the edge's light, the pulses, the organs' small motion, effects.
  */
 import { MAP_W, MAP_H, CELLS, cx, cy, neighbours, mapFor, stormAt, ROCK, PAPER, SCISSORS, POISON, GRANITE, SEA, COLD, RIVER, DEEP } from './terrain.js';
-import { cache, front, share } from './unity.js';
+import { cache, front, share, mapTime } from './unity.js';
 import { VT } from './style.js';
 
 const BEAT = 1.7;
@@ -38,6 +38,8 @@ export function createUnityView(canvas, opts = {}) {
     let storm = null;             // { c, g, img, at }
     let zoom = null;              // { t0, ms, snap, from: {x,y}, resolve }
     let fog = null;               // { key, at, c }
+    const cost = { body: 0 };     // ms a body redraw takes (smoothed)
+    let bodyGap = 250;
     const effects = [];
     const pointer = { x: -1, y: -1 };
     const view = { busy: false };
@@ -462,8 +464,8 @@ export function createUnityView(canvas, opts = {}) {
         const img = pg.createImageData ? pg.createImageData(MAP_W, MAP_H) : null;
         if (!img || !img.data) return null;
         for (let i = 0; i < CELLS; i++) {
-            const a = Math.max(0, Math.min(1, (d[i] - sight) / 5));
-            img.data.set([4, 5, 8, Math.round(a * 175)], i * 4);
+            const a = Math.max(0, Math.min(1, (d[i] - sight) / 7));
+            img.data.set([4, 5, 8, Math.round(a * 115)], i * 4);
         }
         pg.putImageData(img, 0, 0);
         return px;
@@ -482,7 +484,7 @@ export function createUnityView(canvas, opts = {}) {
         const d = storm.img.data;
         let any = false;
         for (let i = 0; i < CELLS; i++) {
-            const v = stormAt(m, i, s.t, s.scale);
+            const v = stormAt(m, i, mapTime(s), s.scale);
             if (v > 0) any = true;
             d[i * 4] = 4; d[i * 4 + 1] = 5; d[i * 4 + 2] = 8; d[i * 4 + 3] = Math.min(235, Math.round(v * 205));
         }
@@ -502,7 +504,7 @@ export function createUnityView(canvas, opts = {}) {
             const x = geo.x + ((hash(k) * geo.w + t * 140) % geo.w);
             const y = geo.y + ((hash(k + 50) * geo.h + t * 300) % geo.h);
             const i = cellAt(x, y);
-            if (i < 0 || stormAt(m, i, s.t, s.scale) < 0.3) continue;
+            if (i < 0 || stormAt(m, i, mapTime(s), s.scale) < 0.3) continue;
             ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 10);
         }
         ctx.stroke();
@@ -553,7 +555,12 @@ export function createUnityView(canvas, opts = {}) {
             }
             case 'intestines': {
                 if (!org.walk || org.walk.length < 2) break;
-                const path = () => { ctx.beginPath(); ctx.moveTo(org.walk[0][0] + geo.x, org.walk[0][1] + geo.y); for (const p of org.walk) ctx.lineTo(p[0] + geo.x, p[1] + geo.y); };
+                const w = org.walk;
+                const path = () => {
+                    ctx.beginPath(); ctx.moveTo(w[0][0] + geo.x, w[0][1] + geo.y);
+                    for (let q = 1; q < w.length - 1; q++) ctx.quadraticCurveTo(w[q][0] + geo.x, w[q][1] + geo.y, (w[q][0] + w[q + 1][0]) / 2 + geo.x, (w[q][1] + w[q + 1][1]) / 2 + geo.y);
+                    ctx.lineTo(w[w.length - 1][0] + geo.x, w[w.length - 1][1] + geo.y);
+                };
                 ctx.lineJoin = 'round'; ctx.lineCap = 'round';
                 // under the skin: dark, the tube a little sunk
                 path(); ctx.strokeStyle = VT.fDark; ctx.lineWidth = cs * 0.55; ctx.stroke();
@@ -561,10 +568,10 @@ export function createUnityView(canvas, opts = {}) {
                 path(); ctx.strokeStyle = 'rgba(255,170,175,0.16)'; ctx.lineWidth = cs * 0.12; ctx.stroke();
                 // food moving one way
                 const u = (t * 0.35 + org.seed) % 1;
-                const f = u * (org.walk.length - 1), k = Math.floor(f), w = f - k;
+                const f = u * (org.walk.length - 1), k = Math.floor(f), fr = f - k;
                 const a = org.walk[k], b = org.walk[Math.min(org.walk.length - 1, k + 1)];
                 ctx.fillStyle = rgba(VT.lamp, 0.55);
-                ctx.beginPath(); ctx.arc(geo.x + a[0] + (b[0] - a[0]) * w, geo.y + a[1] + (b[1] - a[1]) * w, cs * 0.16, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(geo.x + a[0] + (b[0] - a[0]) * fr, geo.y + a[1] + (b[1] - a[1]) * fr, cs * 0.16, 0, Math.PI * 2); ctx.fill();
                 break;
             }
             case 'lungs': {
@@ -652,7 +659,13 @@ export function createUnityView(canvas, opts = {}) {
         ctx.drawImage(ground.c, geo.x, geo.y, geo.w, geo.h);
         // the body, redrawn when it has grown (at most four times a second)
         const bk = `${s.scale}|${s.order.length}|${s.order[s.order.length - 1]}|${geo.cs}|${Object.keys(s.unlocked).length}|${Math.round(share(s, 'eyes') * 40)}|${Math.round(share(s, 'nails') * 40)}|${Math.round(share(s, 'brain') * 40)}`;
-        if (!body || (body.key !== bk && now - body.at > 250)) body = { key: bk, at: now, ...paintBody(s) };
+        // a slow machine keeps its frames: the body is redrawn no more often than eight times what it costs
+        if (!body || (body.key !== bk && now - body.at > bodyGap)) {
+            const t0 = performance.now();
+            body = { key: bk, at: now, ...paintBody(s) };
+            cost.body = cost.body * 0.7 + (performance.now() - t0) * 0.3;
+            bodyGap = Math.max(250, cost.body * 8);
+        }
         stepStorm(s, now);
         const hb = beat(t);
         // the sea shimmers, faintly
@@ -671,7 +684,7 @@ export function createUnityView(canvas, opts = {}) {
         if (s.scale >= 1) {
             const sight = Math.round(ui.sight || 3);
             const fk = `${body.key}|${sight}`;
-            if (!fog || (fog.key !== fk && now - fog.at > 400)) fog = { key: fk, at: now, c: paintFog(s, sight) };
+            if (!fog || (fog.key !== fk && now - fog.at > Math.max(400, bodyGap * 1.5))) fog = { key: fk, at: now, c: paintFog(s, sight) };
             if (fog.c) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(fog.c, geo.x - geo.cs * 0.5, geo.y - geo.cs * 0.5, geo.w + geo.cs, geo.h + geo.cs); ctx.restore(); }
         }
         ctx.drawImage(body.c, geo.x, geo.y, geo.w, geo.h);
@@ -860,5 +873,6 @@ export function createUnityView(canvas, opts = {}) {
     function cellCentre(i) { return geo ? centre(i) : [0, 0]; }
 
     resize();
+    view.cost = cost;
     return Object.assign(view, { resize, frame, cellAt, cellCentre, addBite, startZoom, setPointer, get geo() { return geo; }, get edgeCells() { return body ? body.edge : []; } });
 }

@@ -13,7 +13,7 @@ import { audio } from '../audio.js';
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from '../constants.js';
 
 export const TYPE_MS = 26;
-export const CRT_LINES = 5;
+export const CRT_LINES = 4;
 /** The camera pulls out this long at the end of a map. */
 export const ZOOM_MS = 3600;
 /** A guide's box stays this long. */
@@ -31,6 +31,8 @@ export const WORDS = {
     two: 'Eating at two thirds.',
     knows: 'The edge knows.',
     biteHint: 'Click the edge.',
+    gut: (v) => `In the gut: ${v}`,
+    next: (k) => ` Next: ${k}.`,
     dirHint: 'Click the map to grow that way.',
     perDay: (v) => `${v} a day`,
     insight: (v) => `Insight ${v}`,
@@ -138,11 +140,6 @@ export function init() {
 
     // ---------------------------------------------------------------- the panel
     const set = (k, v) => { const el = $(k); if (el && el.textContent !== v) el.textContent = v; };
-    function areaPerDay(v) {
-        const a = Math.abs(v);
-        const txt = a < 0.1 ? a.toFixed(2) : a < 10 ? a.toFixed(1) : U.big(a);
-        return `${v < 0 ? '-' : '+'}${txt} km²`;
-    }
     function paintPanel() {
         const f = U.flows(s);
         lastSight = s.unlocked.eyes ? f.sight : 3;
@@ -154,10 +151,11 @@ export function init() {
         set('body-sub', s.scale < 4 ? WORDS.of(Math.round((U.area(s) / U.CELLS) * 100), WHERE[s.scale]) : '');
         // the four flows
         const unit = U.nutUnit(s);
+        // the wallet stays: by hand the nutrient to spend, after that what waits in the gut
         set('f-nutrient', before ? U.big(s.nutrient * unit) : WORDS.perDay(`+${U.big(f.nutrientDay)}`));
-        set('fs-nutrient', before ? WORDS.perDay(`+${U.big(f.nutrientDay)}`) : '');
+        set('fs-nutrient', before ? WORDS.perDay(`+${U.big(f.nutrientDay)}`) : WORDS.gut(U.big(s.pool * unit)));
         // before the edge eats by itself MASS is what the body weighs, and how far it can stretch
-        set('f-mass', before ? `${U.big(U.totalMass(s) * unit)} t` : WORDS.perDay(areaPerDay(f.areaDay)));
+        set('f-mass', before ? `${U.big(U.totalMass(s) * unit)} t` : WORDS.perDay(U.perDayText(f.areaDay)));
         set('fs-mass', before ? U.LINES.room(U.roomLeft(s)) : '');
         set('f-power', `${Math.round(f.p * 100)} %`);
         set('fs-power', f.p >= 1 && f.use > 0 ? WORDS.spare(Math.max(0, Math.round((f.make / f.use - 1) * 100))) : '');
@@ -176,14 +174,20 @@ export function init() {
         // fas 1: the three buys
         $('buys-box').hidden = !before;
         if (before) {
-            set('buys-hint', WORDS.biteHint);
+            // the hint says why the hand cannot bite: full (grow first), or nothing to grow with
+            const lb = s.lastBite;
+            const room = U.roomLeft(s);
+            // a refusal is said while it is still true (no room) or, for the other reasons, for three seconds
+            const refused = lb && !lb.ok && s.t - lb.t < 3 && !((lb.why === 'full' || lb.why === 'starving') && room > 0);
+            set('buys-hint', refused ? U.BITE_NO[lb.why] : room > 0 ? WORDS.biteHint : U.BITE_NO[s.nutrient >= U.cheapestBuy(s) ? 'full' : 'starving']);
+            $('buys-hint').classList.toggle('warn', !!refused || room === 0);
             const st = s.tut.stop;
             for (const b of root.querySelectorAll('[data-buy]')) {
                 const o = b.dataset.buy;
                 const p = U.buyPrice(s, o);
-                b.querySelector('.p').textContent = `${U.big(p * unit)} t`;
+                b.querySelector('.p').textContent = U.big(p * unit);
                 b.disabled = s.nutrient < p || !!st;
-                b.classList.toggle('want', !!f.red && f.red.organ === o);
+                b.classList.toggle('want', !!f.red && (f.red.organ === o || (f.red.word === 'Full.' && s.nutrient >= p)));
                 b.classList.toggle('focus', !!st && st.focus === 'skin' && o === 'skin');
             }
         }
@@ -192,7 +196,7 @@ export function init() {
         $('edge-box').hidden = !showEdge;
         if (showEdge) {
             const knows = !!s.ex.edgeknows;
-            set('edge-at', f.at >= 0 ? WORDS.atEdge(U.CLASS_NAMES[f.at]) : '');
+            set('edge-at', f.at >= 0 ? WORDS.atEdge(U.CLASS_NAMES[f.at]) + (f.nextAt >= 0 && f.nextAt !== f.at ? WORDS.next(U.CLASS_NAMES[f.nextAt]) : '') : '');
             for (const b of root.querySelectorAll('[data-mode]')) {
                 b.classList.toggle('on', b.dataset.mode === f.effMode);
                 b.disabled = knows;
@@ -217,15 +221,17 @@ export function init() {
             set('proc-l', WORDS.processing(U.num(s.minds - s.memory)));
         }
         // the log: three grey lines
-        const log = (s.log || []).slice(-3).map((l) => `<div>${esc(l)}</div>`).join('');
+        // the log: three lines, two when GROW AS is long (so it never falls below the panel at 900 px)
+        const logN = growOrgans().length > 8 ? 2 : 3;
+        const log = (s.log || []).slice(-logN).map((l) => `<div>${esc(l)}</div>`).join('');
         if ($('log').__html !== log) { $('log').innerHTML = log; $('log').__html = log; }
         for (const b of root.querySelectorAll('[data-speed]')) b.classList.toggle('on', Number(b.dataset.speed) === speed);
         paintStop();
         paintGuide();
     }
     function growOrgans() {
-        const lit = new Set(U.visibleExperiments(s).filter((e) => e.kind === 'ex').map((e) => e.id));
-        return U.ORGAN_ORDER.filter((o) => (s.unlocked[o] && s.grow[o] != null) || (!s.unlocked[o] && lit.has(U.ORGAN_FROM[o])));
+        // only the organs grown (UNITY test 1: with locked rows MINDS and the log fell below the panel)
+        return U.ORGAN_ORDER.filter((o) => s.unlocked[o] && s.grow[o] != null);
     }
     function paintGrow(f) {
         const organs = growOrgans();
@@ -235,7 +241,7 @@ export function init() {
             growKey = key;
             host.innerHTML = organs.map((o) => {
                 const locked = !s.unlocked[o];
-                return `<div class="u-row${locked ? ' locked' : ''}" data-row="${o}"><span class="n">${U.ORGANS[o].name}</span><input type="range" min="0" max="100" step="5" data-grow="${o}" ${locked ? 'disabled' : ''} aria-label="${U.ORGANS[o].name}"><span class="pc"></span></div>`;
+                return `<div class="u-row${locked ? ' locked' : ''}" data-row="${o}"><span class="n">${U.ORGANS[o].name}</span><span class="pc"></span><input type="range" min="0" max="100" step="5" data-grow="${o}" ${locked ? 'disabled' : ''} aria-label="${U.ORGANS[o].name}"></div>`;
             }).join('');
         }
         for (const row of host.querySelectorAll('[data-row]')) {
@@ -254,21 +260,28 @@ export function init() {
     function paintCards() {
         // the big ones first, then the small ones; as many as the bar holds
         const all = U.visibleExperiments(s).filter((e) => e.kind !== 'seed');
-        const vis = [...all.filter((e) => e.kind !== 'multi'), ...all.filter((e) => e.kind === 'multi')].slice(0, MAX_CARDS);
+        const fr0 = U.flows(s).red;
+        const ans0 = fr0 && fr0.fix ? fr0.fix : null;
+        const vis = [...all.filter((e) => e.id === ans0), ...all.filter((e) => e.kind !== 'multi' && e.id !== ans0), ...all.filter((e) => e.kind === 'multi')].slice(0, MAX_CARDS);
         $('exbar').hidden = !vis.length || zooming;
         const ins = s.insight > 0 || s.capHit;
         set('wallet', `${U.num(Math.floor(s.thought))} thought${ins ? `\n${s.insight.toFixed(1)} insight` : ''}`);
         $('wallet').style.whiteSpace = 'pre';
         let any = false;
+        // the card that answers the red word wears the amber mark (UNITY test 1: which card helps?)
+        const fr = U.flows(s).red;
+        const answer = fr && fr.fix && !s.ex[fr.fix] ? fr.fix : null;
         const html = vis.map((e) => {
             const need = U.needText(s, e);
             if (!need) any = true;
             const price = e.kind === 'join' ? WORDS.free : e.ins ? `${e.ins} insight` : `${U.num(e.price)} thought`;
-            return `<button type="button" class="v-card${need ? ' off' : ''}${e.ins ? ' ins' : ''}${e.kind === 'join' ? ' join' : ''}${e.kind === 'multi' ? ' multi' : ''}" data-ex="${e.id}">
+            return `<button type="button" class="v-card${need ? ' off' : ''}${e.ins ? ' ins' : ''}${e.kind === 'join' ? ' join' : ''}${e.kind === 'multi' ? ' multi' : ''}${answer === e.id ? ' answer' : ''}" data-ex="${e.id}">${answer === e.id ? '<span class="mark"></span>' : ''}
                 <span class="top"><span class="p">${esc(price)}</span></span><span class="n">${esc(e.title)}</span><span class="d">${esc(e.line)}</span>${need ? `<span class="need">${esc(need)}</span>` : ''}</button>`;
         }).join('');
         const host = $('cards');
         if (host.__html !== html) { host.innerHTML = html; host.__html = html; }
+        // a stop holds the game: nothing in the bar can be bought then, and it looks it
+        $('exbar').classList.toggle('paused', !!s.tut.stop);
         $('ex-btn').classList.toggle('has', any);
     }
     let typingStop = null;

@@ -26,6 +26,10 @@ export const CONTINENTS = [[32, 20, 8], [9, 13, 5.5], [55, 12, 6], [11, 29, 5.5]
 export const WAVE_S = 60;
 export const WAVE_ON = 15;
 export const WAVE = [1.6, 1.6, 1.8, 2, 0];
+/** Each wave on a map is this much stronger than the one before (up to WAVE_MAX); on the land the first comes after WAVE_FIRST s. */
+export const WAVE_GROW = 0.3;
+export const WAVE_MAX = 3.2;
+export const WAVE_FIRST = 40;
 /** Seconds of play before the moving storms reach the city. */
 export const CITY_WEATHER_AT = 200;
 
@@ -74,6 +78,9 @@ export function mapFor(seed, scale) {
     if (cache.has(key)) return cache.get(key);
     const R = rng(seed * 977 + scale * 131 + 7);
     const n1 = noiseField(R, 9), n2 = noiseField(R, 5), n3 = noiseField(R, 14), n4 = noiseField(R, 3);
+    // the ground comes in districts: one kind over a patch, so a change of EDGE is a choice, not a chore
+    const nd = noiseField(R, 11);
+    const district = (x, y) => { const v = nd(x, y); return v < 0.4 ? PAPER : v < 0.6 ? ROCK : SCISSORS; };
     const cls = new Uint8Array(CELLS), obst = new Uint8Array(CELLS), rim = new Uint8Array(CELLS), noise = new Float32Array(CELLS);
     const land = new Uint8Array(CELLS);
     const mx = MAP_W / 2, my = MAP_H / 2;
@@ -86,11 +93,15 @@ export function mapFor(seed, scale) {
             let k;
             if (scale === 0) {
                 // the city: towers (steel) in the core, concrete around, parks between
-                k = b > 0.62 ? PAPER : d < 0.45 + a * 0.3 ? (b > 0.42 ? SCISSORS : ROCK) : (b > 0.5 ? SCISSORS : a > 0.45 ? ROCK : PAPER);
+                // a city district: towers, concrete or parks; a park block here and there anywhere
+                const dx = Math.floor(x / 8), dy = Math.floor(y / 6);
+                const h = Math.abs(Math.sin(dx * 12.9898 + dy * 78.233 + seed) * 43758.5453) % 1;
+                k = b > 0.8 ? PAPER : h < 0.36 ? SCISSORS : h < 0.7 ? ROCK : PAPER;
+                void a;
                 if (Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) < RIM) rim[i] = 1;
             } else if (scale === 1) {
                 // the county: fields and forest, rock hills, small towns
-                k = b > 0.68 ? SCISSORS : a > 0.62 ? ROCK : PAPER;
+                k = district(x, y);
                 if (c > 0.56 && d > 0.25) obst[i] = POISON;
                 // poison close to where the body arrives (it bites within a minute), on one side
                 const rs = Math.hypot(x - mx, (y - my) * 1.3);
@@ -99,20 +110,20 @@ export function mapFor(seed, scale) {
                 const rx = mx + 15 + 3 * Math.sin(y * 0.35 + seed);
                 if (Math.abs(x - rx) < 1.1) obst[i] = DEEP;
             } else if (scale === 2) {
-                k = b > 0.66 ? SCISSORS : a > 0.55 ? ROCK : PAPER;
+                k = district(x, y);
                 // a mountain chain across the country, halfway out, with a few passes
                 const ry = my - 9 + (x - mx) * 0.35 + 2.5 * Math.sin(x * 0.3 + seed);
                 if (Math.abs(y - ry) < 1.6 && c > 0.22) obst[i] = GRANITE;
                 else if (a > 0.66 && d > 0.3) obst[i] = GRANITE;
                 else if (c > 0.68 && d > 0.3) obst[i] = POISON;
             } else if (scale === 3) {
-                k = b > 0.64 ? SCISSORS : a > 0.5 ? ROCK : PAPER;
+                k = district(x, y);
                 const coast = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) < 2 + c * 3;
                 if (coast || (c < 0.22 && d > 0.3)) obst[i] = SEA;
                 else if (a > 0.66 && d > 0.25) obst[i] = GRANITE;
             } else {
                 // the planet: land in continents, sea between, cold at the poles
-                k = b > 0.6 ? SCISSORS : a > 0.5 ? ROCK : PAPER;
+                k = district(x, y);
                 const pole = y < 4 || y >= MAP_H - 4;
                 // six continents, seas between (the home one in the middle)
                 let landHere = false;
@@ -179,12 +190,14 @@ export function stormAt(m, i, t, scale) {
     if (scale === 0 && t < CITY_WEATHER_AT) return 0;
     const x = cx(i), y = cy(i);
     // the waves: every WAVE_S a front sweeps the map from the west for WAVE_ON seconds
-    const tw = t - (scale === 0 ? CITY_WEATHER_AT : 0);
+    // t is the time on this map; each wave a little stronger than the last, so the skin is asked again
+    const tw = t - (scale === 0 ? CITY_WEATHER_AT : WAVE_FIRST);
     let wave = 0;
     if (tw >= 0 && tw % WAVE_S < WAVE_ON) {
         const front = (tw % WAVE_S) / WAVE_ON * (MAP_W + 30) - 15;
         const dz = ((x + y * 0.3) - front) / 9;
-        wave = WAVE[scale] * Math.exp(-dz * dz);
+        const n = Math.floor(tw / WAVE_S);
+        wave = Math.min(WAVE_MAX, WAVE[scale] * (1 + WAVE_GROW * n)) * Math.exp(-dz * dz);
     }
     const s = Math.sin((x * 0.7 + y * 0.45) * 0.21 - t * 0.09 + m.seed) + Math.sin((x * 0.3 - y * 0.8) * 0.17 + t * 0.05);
     const v = (s - 1.2) / 0.8;
