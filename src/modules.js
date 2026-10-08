@@ -24,4 +24,5 @@ export const MODULE_PATHS = [
   'src/phase4d/autopilot.js', 'src/phase4d/dig.js', 'src/phase4d/index.js', 'src/phase4d/render.js', 'src/phase4d/sound.js', 'src/phase4d/world.js',
   'src/phase4/tree-view.js', 'src/phase4/tree.js', 'src/phase4/view-hooks.js', 'src/phase4/views.js', 'src/phase4/watcher.js',
   'src/phase4v/checkpoints.js', 'src/phase4v/index.js', 'src/phase4v/sound.js', 'src/phase4v/story.js', 'src/phase4v/style.js', 'src/phase4v/tutorial.js', 'src/phase4v/vault.js', 'src/phase4v/view.js', 'src/phase4v/wishes.js',
+  'src/phase5/terrain.js', 'src/phase5/unity.js',
 ];

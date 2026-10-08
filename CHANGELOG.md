@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (unity)
+
+Chapter V · UNITY begins (docs/superpowers/specs/2026-10-06-chapter-v-unity.md), v1.89.0 on the unity branch.
+- **The rules** (src/phase5/unity.js, terrain.js): the body eats the earth. Four flows (NUTRIENT, MASS, POWER, THOUGHT), GROW AS, the edge (perimeter against area, skin thickness, storms that tear), rock paper scissors at the edge (WRAP, CUT, CRUSH), MINDS (memory and processing), THOUGHT and INSIGHT, the experiments and the small I–V ones, thirteen organs, three vaults, five scales with their units, SEEDS. One red word: the single thing that slows the body most.
+- **The sim** (scripts/sim-unity.mjs): four styles end in 38 to 43 minutes, the city in 8 to 9; the table is in the spec under "Built (unity), fas A".
+
 ## v1.88.1 - 2026-10-06 (the deep gate removed)
 
 - The gate before IV ("Unfinished. Continue at your own peril.") is gone: the war's GO DEEP (v1.88.0) leads straight down. #deep-gate in index.html, its CSS and src/deepGate.js (+ test) removed (B217).
