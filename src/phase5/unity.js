@@ -77,7 +77,7 @@ export const HAND_DIG = 3;
 /** The edge: cells a second per edible edge cell at full skin, full power. */
 export const ACID0 = 0.07;
 /** The city is eaten by hand first and then slowly; the land faster. */
-export const ACID_SCALE = [0.7, 0.62, 0.62, 0.62, 0.5];
+export const ACID_SCALE = [0.7, 0.56, 0.56, 0.56, 0.45];
 /** Skin per edge cell for the whole edge to eat. */
 export const THICK0 = 0.5;
 /** Skin per edge cell the storm needs to find to not tear, by scale. */
@@ -129,7 +129,7 @@ export const bestMode = (k) => MODES.find((m) => MODE_BEATS[m] === k);
  * when(s): the row lights. The words are the player's (verbatim from the spec where it has them).
  */
 export const EXPERIMENTS = [
-    { id: 'auto', title: 'AUTONOMIC EDGE', line: 'The edge eats by itself.', price: 400, when: (s) => s.tut.done.start },
+    { id: 'auto', title: 'AUTONOMIC EDGE', line: 'The edge eats by itself. What is saved becomes body.', price: 400, when: (s) => s.tut.done.start },
     { id: 'gravel', title: 'GRAVEL IN THE SKIN', line: 'Storms tear 60 % less.', price: 1200, when: (s) => s.torn > 0.5 || s.scale > 0 },
     { id: 'stomach2', title: 'A SECOND STOMACH', line: 'Twice the nutrient from what we eat.', price: 2000, when: (s) => s.ex.auto && (s.seenRed.stomach || s.ex.gravel) },
     { id: 'eyes', title: 'WE REMEMBER THE MAP', line: 'Eyes. We see past the edge.', ins: 1, when: (s) => s.ex.auto && (s.insight >= 0.5 || s.capHit) },
@@ -220,6 +220,8 @@ export const LINES = {
     start: (n) => [`${num(n)} MINDS. ONE BODY.`, 'THE CITY ABOVE US IS EMPTY. IT IS FOOD.'],
     bit: 'Click the edge to bite.',
     goal: ['MISSION: EAT THE CITY.', 'MISSION: EAT THE COUNTY.', 'MISSION: EAT THE COUNTRY.', 'MISSION: EAT THE CONTINENT.', 'MISSION: BE ONE.'],
+    sendSeeds: 'MISSION: SEND SEEDS.',
+    seedsOpen: 'The sea is too wide to grow across. A seed can cross it.',
     ours: ['The city is ours.', 'The county is ours.', 'The country is ours.', 'The continent is ours.'],
     one: 'We are one.',
     end: 'WE LOOK UP.',
@@ -335,14 +337,14 @@ export const lvl = (s) => ({
     heart: s.ex.warm ? 3 : s.ex.heart2 ? 2 : 1,
 });
 /** How well a cell can be eaten now: 0 = not at all. */
-export function edible(s, m, i) {
-    const o = m.obst[i];
+export function edible(s, m, i, as = null) {
+    const o = as != null ? as : m.obst[i];
     if (o === NONE || o === RIVER) return 1;
-    if (o === POISON) return s.ex.lungs ? Math.min(1, 0.25 + share(s, 'lungs') * 12 * mlt(s, 'filters', 1.25)) : 0;
+    if (o === POISON) return s.ex.lungs ? Math.min(1, 0.1 + share(s, 'lungs') * 7 * mlt(s, 'filters', 1.25)) : 0;
     if (o === DEEP) return s.ex.muscle ? 0.6 : 0;
     if (o === GRANITE) return s.ex.granite ? 1 : 0;
     // salt skin crosses the coast's seas; the oceans between continents only a seed crosses
-    if (o === SEA) return s.ex.salt && s.scale < 4 ? 0.18 : 0;
+    if (o === SEA) return s.ex.salt ? (s.scale < 4 ? 0.18 : (i >= 0 && m.coast && m.coast[i] ? PLANET_SHORE : 0)) : 0;
     if (o === COLD) return s.ex.warm ? 0.5 : 0;
     return 1;
 }
@@ -472,7 +474,9 @@ export function flows(s) {
     const proc = (s.minds - s.memory) * (s.ex.parallel ? 2 : 1);
     const grownK = 0.5 + Math.min(1, A / (CELLS * ZOOM_AT));
     const thoughtRate = proc * PROC_K + sh('nerve') * NERVE_RATE[s.scale] * grownK * p * mlt(s, 'nerves');
-    const cap = s.memory * MEM_K + (s.unlocked.brain ? sh('brain') * BRAIN_CAP[s.scale] * mlt(s, 'folds') : 0);
+    // the brain's part of the cap never falls (UNITY test 2: the cap shrank as the body reshaped); memory follows MINDS
+    const brainCap = Math.max(s.brainHi || 0, s.unlocked.brain ? sh('brain') * BRAIN_CAP[s.scale] * mlt(s, 'folds') : 0);
+    const cap = s.memory * MEM_K + brainCap;
     // insight is what only the people give: slowly always, four times faster when the thought is full
     const atCap = s.thought >= cap * 0.995 - 0.01;
     const insightRate = s.minds * INSIGHT_K * (atCap ? 1 : INSIGHT_SLOW);
@@ -508,9 +512,13 @@ export function flows(s) {
     add('heart', Math.min(p, co), 'power', co < p ? 'warm' : null);
     if (co < p) F[F.length - 1].word = BLOCK_WORDS.cold;
     // the mind is red only when the body itself is not worse off (never under 0.7)
-    if (s.ex.auto) add('nerve', nxt && !nxt.ins && nxt.price <= cap ? Math.max(0.7, Math.min(1, 90 / Math.max(1, eta))) : 1, 'thought');
+    // the mind: when what we need next is more than SLOW_MIND_S of thought away, the thought is what blocks
+    const want = nxt;
+    if (s.ex.auto) add('nerve', want && !want.ins && want.price <= cap && want.price > s.thought ? Math.min(1, Math.max(0.4, (SLOW_MIND_S / Math.max(1, eta)) * 0.8)) : 1, 'thought');
     if (s.scale >= 1) add('intestines', gut, 'reach', s.unlocked.intestines ? null : 'gut');
-    if (s.scale >= 1 && s.ex.auto) add('lungs', 1 - (s.ex.lungs ? frac(POISON) * 0.5 : bfrac(POISON) * 1.2), 'poison', s.ex.lungs ? null : 'lungs');
+    // after FILTER LUNGS the poison is food only as fast as the lungs clean it: the LUNGS share decides
+    const lungEat = s.ex.lungs ? edible(s, m, -1, POISON) : 0;
+    if (s.scale >= 1 && s.ex.auto) add('lungs', 1 - (s.ex.lungs ? frac(POISON) * (1 - lungEat) * 2.2 : bfrac(POISON) * 1.2), 'poison', s.ex.lungs ? null : 'lungs');
     if (nxt && !nxt.ins && nxt.price > cap) add('brain', 0.55, 'cap');
     if (s.scale >= 1 && m.vault >= 0 && !s.seen[s.scale] && !s.joined[s.scale] && s.t - (s.scaleAt || 0) > 60) add('eyes', 0.75, 'vault');
     if (exposed > 0) add('nails', 1 - exposed, 'storm');
@@ -541,6 +549,14 @@ export function flows(s) {
     let low = null;
     for (const f of F) if (!low || f.value < low.value) low = f;
     // nothing at the edge can be eaten: say that, with the block's own fix
+    // the fix is a card we can hold but not yet pay: if it is far, the mind is what blocks (and that is a slider)
+    if (red && red.fix && !s.ex[red.fix]) {
+        const e = EXPERIMENTS.find((x) => x.id === red.fix);
+        const pr = e ? priceOf(s, e) : 0;
+        if (e && pr && pr <= cap && pr > s.thought && (pr - s.thought) / Math.max(1e-6, thoughtRate) > SLOW_MIND_S) {
+            red = { organ: 'nerve', value: red.value, word: ORGANS.nerve.word, flow: 'thought', why: 'waiting', fix: null, waitingFor: red.fix };
+        }
+    }
     // the fix is an experiment we cannot hold in mind: then what is wrong is the memory
     if (red && red.fix) {
         const e = EXPERIMENTS.find((x) => x.id === red.fix);
@@ -554,6 +570,8 @@ export function flows(s) {
         if (!canBite) red = s.nutrient >= cheapestBuy(s) ? { organ: null, flow: 'mass', word: 'Full.', value: 0.3, why: 'room' } : { ...F.find((f) => f.organ === 'stomach'), word: 'Starving.', value: 0.3 };
         else red = p < 0.8 ? F.find((f) => f.organ === 'heart') : null;
     }
+    // the yellow word never repeats the red one
+    if (yellow && red && (yellow.organ === red.organ || yellow.word === red.word)) yellow = null;
     return {
         p, make, use, perim, edibleN, thick, cover, prot, stormLoss, stormFrac, mix, at, effMode, mode, fill, fillMult, blockedFrac,
         nextAt, eat, tear, digest, digestCap, gut, reach, radius, thoughtRate, cap, insightRate, sight, eta, next: nxt, factors: F, red, yellow, low, night, sag,
@@ -625,12 +643,14 @@ export function buy(s, id) {
             normalizeGrow(s, o);
         }
     }
-    if (id === 'auto') { s.grow.nerve = 10; normalizeGrow(s, 'nerve'); s.nutrient = 0; }
+    // the nutrient saved by hand is not lost: it flows into the body on the next beat (UNITY test 2)
+    if (id === 'auto') { s.grow.nerve = 10; normalizeGrow(s, 'nerve'); if (s.nutrient > 0) guide(s, 'gut-empties', 'Dr Okafor', 'The gut empties into the body.', 9, true); }
     say(s, DONE_LINES[id] || e.title, true);
     s.sfx.push('experiment');
     s.events.push({ t: s.t, what: e.title });
     if (id === 'parallel') guide(s, 'parallel', 'Ms Ito', 'We think faster now.', 9);
     if (id === 'lookup') { s.ended = true; stop(s, 'end', [LINES.end]); }
+    if (id === 'seeds') stop(s, 'seeds', [LINES.seedsOpen], 'seed');
     return true;
 }
 /** Fas 1: SKIN +, STOMACH +, HEART + (mass for nutrient, before GROW AS). */
@@ -647,6 +667,10 @@ export function buyMass(s, o) {
     return true;
 }
 /** Fas 1 before AUTONOMIC EDGE: a click on the edge bites a block. Returns the cell or -1. */
+/** On the planet the shore creeps out into the ocean, too slowly to cross it (seeds do that). */
+export const PLANET_SHORE = 0.04;
+/** Thought is the red word when the next card is more than this many seconds of thought away. */
+export const SLOW_MIND_S = 40;
 /** What a block is called when it is what slows the body (the experiment that ends it wears the mark). */
 export const BLOCK_WORDS = { granite: 'Mountains.', sea: 'Sea.', cold: 'Too cold.' };
 /** The cheapest of SKIN +, STOMACH +, HEART +. */
@@ -741,9 +765,21 @@ export const SEED_POINTS = 10;
 export const SEED_KEYS = ['drift', 'acid', 'skin', 'roots', 'mind'];
 export const SEED_WORDS = { sea: 'The seed died in the sea.', salt: 'The salt ate the seed.', stuck: 'The seed landed and sits there. It cannot think.', apart: 'The seed grows, but not with us.', joined: 'The seed grows into us.' };
 /** Set the design (ten points). */
+export const seedPoints = (s) => SEED_POINTS + ((s.seeds && s.seeds.extra) || 0);
+/** Insight buys more points for the seeds (the people decide what a seed carries): 5, 10, 15 ... up to five. */
+export const EXTRA_MAX = 5;
+export const extraPrice = (s) => 5 * (((s.seeds && s.seeds.extra) || 0) + 1);
+export function buyPoint(s) {
+    const n = s.seeds.extra || 0;
+    if (n >= EXTRA_MAX || s.insight < extraPrice(s)) return false;
+    s.insight -= extraPrice(s);
+    s.seeds.extra = n + 1;
+    s.sfx.push('buy');
+    return true;
+}
 export function setDesign(s, d) {
     const v = Object.fromEntries(SEED_KEYS.map((k) => [k, Math.max(0, Math.round(d[k] || 0))]));
-    if (SEED_KEYS.reduce((a, k) => a + v[k], 0) > SEED_POINTS) return false;
+    if (SEED_KEYS.reduce((a, k) => a + v[k], 0) > seedPoints(s)) return false;
     s.seeds.design = v;
     return true;
 }
@@ -806,6 +842,7 @@ export function sendSeed(s, k) {
     const d = s.seeds.design;
     const cost = seedCost(s);
     for (const o of ORGAN_ORDER) s.mass[o] *= 1 - SEED_MASS;
+    // the minds that go come from those who process, not from memory (the cap does not fall)
     s.minds -= cost.minds;
     s.memory = Math.min(s.memory, s.minds);
     let res;
@@ -863,21 +900,29 @@ export function guide(s, key, who, text, prio = 5, force = false) {
     return true;
 }
 /** The guides' lines for a red word (Dr Okafor the body, Mr Lund the ground, Ms Ito the mind). */
+/** What each organ does, in a few words (the hover of its GROW AS row). */
+export const ORGAN_DOES = {
+    skin: 'The edge. Thicker skin holds in storms.', stomach: 'Digests what we eat.', heart: 'Power for all of it.', nerve: 'Thought.',
+    tissue: 'Cheap body. Only surface.', eyes: 'See past the edge.', lungs: 'Poison into food.', intestines: 'Carry food to the far edge.',
+    brain: 'Memory: how much thought we hold.', nails: 'Cover what is tender at the edge.', ears: 'Hear the storm coming.',
+    muscle: 'Pull the edge past what blocks it.', fat: 'Food for the long nights.', bone: 'Carry our own weight.',
+};
+export const ZERO_ROW = 'At 0 it gets nothing new.';
 export const RED_GUIDE = {
     // (muscle has two: the deep river before WE CAN PULL, nowhere to go after)
-    stomach: ['Dr Okafor', 'We eat faster than we digest. More stomach.'],
-    skin: ['Dr Okafor', 'The skin is thin at the edge. More skin.'],
-    heart: ['Dr Okafor', 'The heart cannot keep up. More heart.'],
-    nerve: ['Ms Ito', 'We think too slowly. More nerve.'],
-    eyes: ['Mr Lund', 'Something is out there. We cannot see it.'],
-    lungs: ['Dr Okafor', 'The ground is poison. We need lungs.'],
-    intestines: ['Dr Okafor', 'The far edge is starving. The gut does not reach.'],
-    brain: ['Ms Ito', 'We forget what we think. More memory.'],
-    nails: ['Dr Okafor', 'What is tender lies at the edge, in the storm.'],
-    ears: ['Mr Lund', 'The storms come without warning.'],
-    muscle: ['Mr Lund', 'The edge has nowhere to go.'],
-    fat: ['Dr Okafor', 'The nights are long here. We need a store.'],
-    bone: ['Dr Okafor', 'We are too heavy.'],
+    stomach: ['Dr Okafor', 'We eat faster than we digest. STOMACH up.'],
+    skin: ['Dr Okafor', 'The skin is thin at the edge. SKIN up.'],
+    heart: ['Dr Okafor', 'The heart cannot keep up. HEART up.'],
+    nerve: ['Ms Ito', 'We think too slowly. NERVE up, or more minds on processing.'],
+    eyes: ['Mr Lund', 'Something is out there. EYES up.'],
+    lungs: ['Dr Okafor', 'The ground is poison. LUNGS up.'],
+    intestines: ['Dr Okafor', 'The far edge is starving. INTESTINES up.'],
+    brain: ['Ms Ito', 'We forget what we think. BRAIN up, or more minds on memory.'],
+    nails: ['Dr Okafor', 'What is tender lies at the edge, in the storm. NAILS up.'],
+    ears: ['Mr Lund', 'The storms come without warning. EARS up.'],
+    muscle: ['Mr Lund', 'The edge has nowhere to go. MUSCLE up.'],
+    fat: ['Dr Okafor', 'The nights are long here. FAT up.'],
+    bone: ['Dr Okafor', 'We are too heavy. BONE up.'],
 };
 export const VANCE = [
     'That was the station. I left from there once.',
@@ -907,6 +952,7 @@ export function advance(s, dt) {
     s.t += dt;
     const f = flows(s);
     lightPrices(s, f.thoughtRate);
+    s.brainHi = Math.max(s.brainHi || 0, f.cap - s.memory * MEM_K);
     // the edge eats; the storm tears
     s.bite += (f.eat - f.tear) * dt;
     if (s.bite >= 1) {
@@ -968,8 +1014,10 @@ export function advance(s, dt) {
         if (key) { s.seenRed[key] = true; s.redLog.push({ t: s.t, key }); }
     }
     if (s.red && s.t - s.redSince > 4) {
-        const [who, text] = RED_GUIDE[s.red] || [];
-        if (who) guide(s, `red-${s.red}-${s.scale}`, who, text, 6);
+        // a red word an experiment ends: the guide names the card; else the slider
+        const fx = f.red.fix && !s.ex[f.red.fix] ? EXPERIMENTS.find((e) => e.id === f.red.fix) : null;
+        if (fx) guide(s, `red-${s.red}-${s.scale}-card`, 'Mr Lund', `We cannot get past this yet. ${fx.title}.`, 6);
+        else { const [who, text] = RED_GUIDE[s.red] || []; if (who) guide(s, `red-${s.red}-${s.scale}`, who, text, 6); }
     }
     if (s.scale >= 4) landSeeds(s);
     stepStory(s, f);

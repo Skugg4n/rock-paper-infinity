@@ -184,7 +184,8 @@ describe('chapter V, the rules', () => {
         const sea4 = m4.obst.findIndex((o) => o === SEA), sea3 = m3.obst.findIndex((o) => o === SEA);
         s.ex.salt = true;
         s.scale = 3; expect(U.edible(s, m3, sea3)).toBeGreaterThan(0);
-        s.scale = 4; expect(U.edible(s, m4, sea4)).toBe(0);
+        s.scale = 4; expect(U.edible(s, m4, sea4)).toBe(U.PLANET_SHORE);
+        s.ex.salt = false; expect(U.edible(s, m4, sea4)).toBe(0);
     });
 
     test('guides: one at a time, never more often than every 40 s, each line once', () => {
@@ -353,6 +354,43 @@ describe('chapter V, the rules', () => {
             const f = U.flows(s).factors.find((x) => x.fix === 'granite');
             if (f) expect(f.word).toBe('Mountains.');
             expect(U.BLOCK_WORDS.granite).toBe('Mountains.');
+        });
+    });
+
+    describe('v1.89.1: after the second human test', () => {
+        test('AUTONOMIC EDGE keeps what was saved: it becomes body', () => {
+            const s = started();
+            s.nutrient = 50; s.thought = 400;
+            const m0 = U.totalMass(s);
+            U.buy(s, 'auto');
+            U.advance(s, 0.25);
+            expect(U.totalMass(s)).toBeGreaterThan(m0 + 40);
+            expect(s.log.join(' ')).toContain('The gut empties into the body.');
+        });
+        test('when the next card is far, the mind is the red word', () => {
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            for (const o of Object.keys(s.mass)) s.mass[o] = 0;
+            Object.assign(s.mass, { skin: 20, stomach: 20, heart: 30, nerve: 0.01, tissue: 5 });
+            s.memory = 197; s.thought = 0; s.torn = 1;
+            const f = U.flows(s);
+            expect(f.red && f.red.word).toBe('Slow mind.');
+            expect(U.RED_GUIDE.nerve[1]).toBe('We think too slowly. NERVE up, or more minds on processing.');
+        });
+        test('the planet: the shore creeps only along the coasts; insight buys seed points; the cap does not fall', () => {
+            const s = U.newUnity();
+            const m = mapFor(s.seed, 4);
+            s.scale = 4; s.ex.salt = true;
+            const coast = m.coast.findIndex((c) => c === 1), open = m.obst.findIndex((o, i) => o === SEA && !m.coast[i]);
+            expect(U.edible(s, m, coast)).toBe(U.PLANET_SHORE);
+            expect(U.edible(s, m, open)).toBe(0);
+            s.ex.seeds = true; s.insight = 5;
+            expect(U.buyPoint(s)).toBe(true);
+            expect(U.seedPoints(s)).toBe(11);
+            expect(U.extraPrice(s)).toBe(10);
+            s.brainHi = 9000;
+            expect(U.flows(s).cap).toBeGreaterThanOrEqual(9000);
+            expect(U.LINES.sendSeeds).toBe('MISSION: SEND SEEDS.');
         });
     });
 });

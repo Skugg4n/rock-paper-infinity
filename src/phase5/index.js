@@ -42,13 +42,18 @@ export const WORDS = {
     memory: (n) => `Memory ${n}`,
     processing: (n) => `Processing ${n}`,
     free: 'free',
+    extra: (n) => `+1 POINT · ${n} insight`,
+    more: (n) => `+ ${n} more`,
+    fewer: 'Fold the small ones',
     pointsLeft: (n) => `${n} ${n === 1 ? 'point' : 'points'} left`,
     seedTo: (name, km) => `To ${name} · ${km} km of sea`,
     seedPick: 'Click a land across the sea.',
     seedApart: 'A seed grows there, but not with us.',
-    seedCost: (t, m) => (m > 0 ? `${t} t · ${m} minds` : `${t} t`),
+    seedCost: (pc, m) => (m > 0 ? `${pc} % of the body · ${m} minds` : `${pc} % of the body`),
     launch: 'LAUNCH',
 };
+/** What the three buys by hand give (UNITY test 2: the buttons did not say). */
+export const BUY_GIVES = { skin: 'more room to eat', stomach: 'digest faster', heart: 'power' };
 /** What each part of a seed does (one short line each). */
 export const SEED_ROWS = { drift: 'how far it flies', acid: 'how fast it eats', skin: 'salt and storms', roots: 'grows into us', mind: 'carries minds' };
 /** WE LOOK UP: the camera turns from the globe to the stars this long, then VI. */
@@ -86,16 +91,17 @@ export function init() {
           ${U.FLOWS.map((f) => `<div class="u-flow" data-f="${f}"><span class="dymo">${U.FLOW_NAMES[f]}</span><span class="val" data-v="f-${f}"></span>${f === 'thought' ? `<div class="v-bar"><i data-v="tbar" style="background:var(--v-cold)"></i></div>` : ''}<div class="sub" data-v="fs-${f}"></div><div class="word" data-v="fw-${f}"></div></div>`).join('')}
         </div>
         <div data-v="buys-box"><div class="u-sec"><span class="dymo">Grow</span><span class="hint" data-v="buys-hint"></span></div>
-          <div class="u-buys">${['skin', 'stomach', 'heart'].map((o) => `<button type="button" class="u-btn flesh" data-buy="${o}">${U.ORGANS[o].name} +<span class="p"></span></button>`).join('')}</div></div>
+          <div class="u-buys">${['skin', 'stomach', 'heart'].map((o) => `<button type="button" class="u-btn flesh" data-buy="${o}" title="${BUY_GIVES[o]}">${U.ORGANS[o].name} +<span class="g">${BUY_GIVES[o]}</span><span class="p"></span></button>`).join('')}</div></div>
         <div data-v="edge-box" hidden><div class="u-sec"><span class="dymo">Edge</span><span class="hint" data-v="edge-at"></span></div>
           <div class="u-buys">${U.MODES.map((m) => `<button type="button" class="u-btn" data-mode="${m}">${m}<span class="p">${MODE_SUB[m]}</span></button>`).join('')}</div>
           <div class="u-edge-line" data-v="edge-line"></div></div>
         <div data-v="seed-box" hidden><div class="u-sec"><span class="dymo">Seed</span><span class="hint" data-v="seed-left"></span></div>
           <div class="u-seed">${U.SEED_KEYS.map((k) => `<div class="u-srow" data-srow="${k}"><span class="n">${k.toUpperCase()}</span><button type="button" class="u-pm" data-sminus="${k}" aria-label="less ${k}">&minus;</button><span class="v"></span><button type="button" class="u-pm" data-splus="${k}" aria-label="more ${k}">+</button><span class="w">${SEED_ROWS[k]}</span></div>`).join('')}</div>
+          <button type="button" class="u-pm u-extra" data-v="extra"></button>
           <div class="u-seed-to" data-v="seed-to"></div>
           <button type="button" class="u-btn flesh u-launch" data-v="launch">${WORDS.launch}<span class="p" data-v="launch-cost"></span></button>
           <div class="u-seed-no" data-v="seed-no"></div></div>
-        <div data-v="grow-box" hidden><div class="u-sec"><span class="dymo">Grow as</span><span class="hint">sums to 100</span></div><div class="u-grow" data-v="grow"></div></div>
+        <div data-v="grow-box" hidden><div class="u-sec"><span class="dymo">Grow as</span><span class="hint">sums to 100</span></div><div class="u-grow" data-v="grow"></div><button type="button" class="u-more" data-v="grow-more" hidden></button></div>
         <div data-v="minds-box" hidden><div class="u-sec"><span class="dymo">Minds</span><span class="val" data-v="minds" style="font-family:'Bebas Neue','Arial Narrow',sans-serif;font-size:19px"></span></div>
           <div class="u-minds"><input type="range" min="0" data-v="mem" aria-label="Memory"><div class="lbl"><span data-v="mem-l"></span><span data-v="proc-l"></span></div></div></div>
         <div class="v-log" data-v="log"></div>
@@ -125,6 +131,7 @@ export function init() {
     let growKey = '';
     let dragging = false;
     let lastSight = 3;
+    let showZero = false;
     let endingStarted = false;
 
     // ---------------------------------------------------------------- the CRT and the sounds
@@ -161,7 +168,7 @@ export function init() {
         const f = U.flows(s);
         lastSight = s.unlocked.eyes ? f.sight : 3;
         const before = !s.ex.auto;
-        set('goal', U.LINES.goal[s.scale]);
+        set('goal', s.scale >= 4 && !(s.seeds.sent || []).length && !s.ended ? U.LINES.sendSeeds : U.LINES.goal[s.scale]);
         set('body', U.areaText(s));
         const pr = U.progress(s);
         $('prog').style.width = `${Math.round(pr * 100)}%`;
@@ -225,6 +232,7 @@ export function init() {
         }
         // SEED (fas 3): ten points, a land across the sea, LAUNCH
         $('seed-box').hidden = !(s.scale >= 4 && s.ex.seeds && !s.ended);
+        root.classList.toggle('is-planet', s.scale >= 4);
         if (s.scale >= 4 && s.ex.seeds) paintSeed();
         // GROW AS: the organs grown, and the ones about to be (dimmed)
         $('grow-box').hidden = !s.ex.auto;
@@ -252,23 +260,31 @@ export function init() {
     let seedTarget = 0;
     function seedSea() {
         const all = U.seas(s);
-        if (!all.some((x) => x.k === seedTarget)) seedTarget = (all.find((x) => s.seeds.continents[x.k] !== 'joined') || {}).k || 0;
+        // the target moves on by itself once its land is ours (UNITY run: the panel stayed on a joined land)
+        const cur = all.find((x) => x.k === seedTarget);
+        if (!cur || s.seeds.continents[cur.k] === 'joined') seedTarget = (all.find((x) => s.seeds.continents[x.k] !== 'joined') || {}).k || 0;
         return all.find((x) => x.k === seedTarget) || null;
     }
     function paintSeed() {
         const d = s.seeds.design;
         const used = U.SEED_KEYS.reduce((a, k) => a + d[k], 0);
-        set('seed-left', WORDS.pointsLeft(U.SEED_POINTS - used));
+        const total = U.seedPoints(s);
+        set('seed-left', WORDS.pointsLeft(total - used));
+        // insight buys points (the people decide what a seed carries)
+        const ex = s.seeds.extra || 0;
+        $('extra').hidden = ex >= U.EXTRA_MAX;
+        set('extra', WORDS.extra(U.extraPrice(s)));
+        $('extra').disabled = s.insight < U.extraPrice(s) || !!s.tut.stop;
         for (const k of U.SEED_KEYS) {
             const row = root.querySelector(`[data-srow="${k}"]`);
             row.querySelector('.v').textContent = String(d[k]);
             row.querySelector('[data-sminus]').disabled = d[k] <= 0;
-            row.querySelector('[data-splus]').disabled = used >= U.SEED_POINTS;
+            row.querySelector('[data-splus]').disabled = used >= total;
         }
         const sea = seedSea();
         set('seed-to', sea ? WORDS.seedTo(sea.name, U.num(sea.km)) + (s.seeds.continents[sea.k] === 'apart' ? ` ${WORDS.seedApart}` : '') : WORDS.seedPick);
         const c = U.seedCost(s);
-        set('launch-cost', WORDS.seedCost(U.big(c.mass * U.nutUnit(s)), c.minds));
+        set('launch-cost', WORDS.seedCost(Math.round(U.SEED_MASS * 100), c.minds));
         const no = sea ? U.seedRefusal(s, sea.k) : WORDS.seedPick;
         $('launch').disabled = !!no || !!s.tut.stop;
         set('seed-no', no && sea ? no : '');
@@ -281,11 +297,12 @@ export function init() {
         const organs = growOrgans();
         const key = organs.map((o) => o + (s.unlocked[o] ? '' : '?')).join(',');
         const host = $('grow');
+        host.classList.toggle('three', organs.length > 8);
         if (key !== growKey && !dragging) {
             growKey = key;
             host.innerHTML = organs.map((o) => {
                 const locked = !s.unlocked[o];
-                return `<div class="u-row${locked ? ' locked' : ''}" data-row="${o}"><span class="n">${U.ORGANS[o].name}</span><span class="pc"></span><input type="range" min="0" max="100" step="5" data-grow="${o}" ${locked ? 'disabled' : ''} aria-label="${U.ORGANS[o].name}"></div>`;
+                return `<div class="u-row${locked ? ' locked' : ''}" data-row="${o}" title="${U.ORGAN_DOES[o]}"><span class="n">${U.ORGANS[o].name}</span><span class="pc"></span><input type="range" min="0" max="100" step="5" data-grow="${o}" ${locked ? 'disabled' : ''} aria-label="${U.ORGANS[o].name}"></div>`;
             }).join('');
         }
         for (const row of host.querySelectorAll('[data-row]')) {
@@ -297,9 +314,21 @@ export function init() {
             const t = `${v}`;
             if (pc.textContent !== t) pc.textContent = t;
             row.classList.toggle('zero', s.unlocked[o] && v === 0);
+            const tip = v === 0 ? `${U.ORGAN_DOES[o]} ${U.ZERO_ROW}` : U.ORGAN_DOES[o];
+            if (row.title !== tip) row.title = tip;
             row.classList.toggle('red', !!f.red && f.red.organ === o);
             row.classList.toggle('yellow', !!f.yellow && f.yellow.organ === o && !(f.red && f.red.organ === o));
+            // with many organs the ones at 0 fold away (behind "+ N at 0") unless one is red or yellow
+            // (on the planet, with the SEED panel open, the small ones under 5 fold too)
+            const small = s.scale >= 4 && s.ex.seeds ? v < 5 : v === 0;
+            const fold = organs.length > 8 && !showZero && small && !row.classList.contains('red') && !row.classList.contains('yellow');
+            row.hidden = fold;
         }
+        const folded = host.querySelectorAll('[data-row][hidden]').length;
+        const more = $('grow-more');
+        more.hidden = organs.length <= 8 || (!folded && !showZero);
+        const mt = showZero ? WORDS.fewer : WORDS.more(folded);
+        if (more.textContent !== mt) more.textContent = mt;
     }
     function paintCards() {
         // the big ones first, then the small ones; as many as the bar holds
@@ -415,6 +444,8 @@ export function init() {
             d[k] = Math.max(0, d[k] + (pm.dataset.splus ? 1 : -1));
             U.setDesign(s, d); sound.event('click'); paintPanel(); return;
         }
+        if (e.target.closest('[data-v="grow-more"]')) { showZero = !showZero; paintPanel(); return; }
+        if (e.target.closest('[data-v="extra"]') && !$('extra').disabled) { U.buyPoint(s); paintPanel(); return; }
         if (e.target.closest('[data-v="launch"]') && !$('launch').disabled) {
             const sea = seedSea();
             if (sea && U.sendSeed(s, sea.k)) { pushLines(); paintPanel(); }

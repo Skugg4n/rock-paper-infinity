@@ -115,18 +115,39 @@ export function createUnityView(canvas, opts = {}) {
         g.filter = `blur(${Math.max(1, cs * 0.45)}px)`;
         g.drawImage(px, -cs * 0.5, -cs * 0.5, geo.w + cs, geo.h + cs);
         g.restore();
-        // granite: fine hatching; poison: spots
+        // what the ground is, before the word says it: mountains as ridges with snow, poison as a sick haze,
+        // forest as crowns, ruins as dark blocks with a lamp here and there (UNITY test 2)
+        for (let i = 0; i < CELLS; i++) {
+            const ob = m.obst[i];
+            if (ob !== POISON) continue;
+            const x = (cx(i) + 0.5) * cs, y = (cy(i) + 0.5) * cs;
+            const hz = g.createRadialGradient(x, y, 0, x, y, cs * 1.6);
+            hz.addColorStop(0, 'rgba(196,200,92,0.10)'); hz.addColorStop(1, 'rgba(196,200,92,0)');
+            g.fillStyle = hz; g.fillRect(x - cs * 1.6, y - cs * 1.6, cs * 3.2, cs * 3.2);
+        }
         for (let i = 0; i < CELLS; i++) {
             const x = cx(i) * cs, y = cy(i) * cs, ob = m.obst[i];
-            if (ob === GRANITE && R() < 0.7) {
-                g.strokeStyle = rgba(VT.mist, 0.14); g.lineWidth = 0.6;
-                g.beginPath(); g.moveTo(x + R() * cs * 0.3, y + cs * 0.8); g.lineTo(x + cs * (0.5 + R() * 0.4), y + cs * 0.2); g.stroke();
-            } else if (ob === POISON && R() < 0.5) {
-                g.fillStyle = rgba(VT.life, 0.22); g.beginPath(); g.arc(x + R() * cs, y + R() * cs, cs * 0.08, 0, Math.PI * 2); g.fill();
+            if (ob === GRANITE) {
+                // a ridge: a dark face, a lit face, snow on the high ones
+                const px2 = x + cs * (0.2 + R() * 0.6), top = y + cs * (0.05 + R() * 0.2), base = y + cs * 1.05, wl = cs * 0.55, wr = cs * 0.6;
+                g.fillStyle = rgba(VT.ink, 0.55); g.beginPath(); g.moveTo(px2 - wl, base); g.lineTo(px2, top); g.lineTo(px2, base); g.closePath(); g.fill();
+                g.fillStyle = rgba(VT.mist, 0.28); g.beginPath(); g.moveTo(px2, top); g.lineTo(px2 + wr, base); g.lineTo(px2, base); g.closePath(); g.fill();
+                if (m.noise[i] > 0.45) { g.fillStyle = rgba(VT.paper, 0.75); g.beginPath(); g.moveTo(px2, top); g.lineTo(px2 - wl * 0.3, top + (base - top) * 0.3); g.lineTo(px2 + wr * 0.3, top + (base - top) * 0.3); g.closePath(); g.fill(); }
+            } else if (ob === POISON && R() < 0.6) {
+                g.fillStyle = 'rgba(196,200,92,0.22)'; g.beginPath(); g.arc(x + R() * cs, y + R() * cs, cs * 0.08, 0, Math.PI * 2); g.fill();
+            } else if (!ob && m.cls[i] === PAPER && m.noise[i] > 0.35) {
+                // forest: small crowns, a shadow under each
+                for (let q = 0; q < 3; q++) {
+                    const tx = x + R() * cs, ty = y + R() * cs, tr = cs * (0.1 + R() * 0.08);
+                    g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.arc(tx + tr * 0.5, ty + tr * 0.5, tr, 0, Math.PI * 2); g.fill();
+                    g.fillStyle = rgba(VT.life, 0.38); g.beginPath(); g.arc(tx, ty, tr, 0, Math.PI * 2); g.fill();
+                }
             } else if (!ob && m.cls[i] === SCISSORS) {
-                // ruins: a few dark blocks, one lamp in many
-                for (let q = 0; q < 2; q++) { g.fillStyle = rgba(VT.ink, 0.55); g.fillRect(x + R() * cs * 0.7, y + R() * cs * 0.7, cs * 0.22, cs * 0.18); }
-                if (R() < 0.25) { g.fillStyle = rgba(VT.lamp, 0.6); g.fillRect(x + R() * cs, y + R() * cs, 1.3, 1.3); }
+                for (let q = 0; q < 2; q++) { g.fillStyle = rgba(VT.ink, 0.6); g.fillRect(x + R() * cs * 0.7, y + R() * cs * 0.7, cs * 0.24, cs * 0.18); }
+                if (R() < 0.3) { g.fillStyle = rgba(VT.lamp, 0.7); g.fillRect(x + R() * cs, y + R() * cs, 1.3, 1.3); }
+            } else if (!ob && m.cls[i] === ROCK && R() < 0.5) {
+                g.strokeStyle = rgba(VT.mist, 0.12); g.lineWidth = 0.6;
+                g.beginPath(); g.moveTo(x + R() * cs, y + R() * cs); g.lineTo(x + R() * cs, y + R() * cs); g.stroke();
             }
         }
         // rivers: a winding line through the river cells, row by row
@@ -190,23 +211,45 @@ export function createUnityView(canvas, opts = {}) {
                 continue;
             }
             if (s.scale === 0) {
-                // a block: streets are the gaps between
-                const pad = cs * 0.12, bw = cs - pad * 2;
+                // a block seen from above and a little south: roof, the south face with its windows, a shadow.
+                // Streets are the gaps between (UNITY test 2: the city should read as a city)
+                const pad = cs * 0.1, bw = cs - pad * 2;
                 const bx = x + pad, by = y + pad;
                 if (k === PAPER) {
-                    g.fillStyle = rgba(VT.life, 0.13); g.fillRect(bx, by, bw, bw);
-                    g.fillStyle = rgba(VT.life, 0.32);
-                    for (let t = 0; t < 3; t++) { g.beginPath(); g.arc(bx + R() * bw, by + R() * bw, cs * 0.09, 0, Math.PI * 2); g.fill(); }
-                } else if (k === ROCK) {
-                    g.fillStyle = VT.steel3; g.fillRect(bx, by, bw, bw);
-                    g.fillStyle = rgba(VT.mist, 0.12); g.fillRect(bx, by, bw, 1);
-                    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 0.6;
-                    g.beginPath(); g.moveTo(bx + R() * bw, by); g.lineTo(bx + R() * bw, by + bw); g.stroke();
+                    g.fillStyle = rgba(VT.life, 0.16); g.fillRect(bx, by, bw, bw);
+                    for (let q = 0; q < 4; q++) {
+                        const tx = bx + R() * bw, ty = by + R() * bw, tr = cs * (0.09 + R() * 0.07);
+                        g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.arc(tx + tr * 0.4, ty + tr * 0.4, tr, 0, Math.PI * 2); g.fill();
+                        g.fillStyle = rgba(VT.life, 0.42); g.beginPath(); g.arc(tx, ty, tr, 0, Math.PI * 2); g.fill();
+                        g.fillStyle = rgba(VT.life, 0.25); g.beginPath(); g.arc(tx - tr * 0.3, ty - tr * 0.3, tr * 0.45, 0, Math.PI * 2); g.fill();
+                    }
+                    continue;
+                }
+                const tall = k === SCISSORS ? 0.3 + R() * 0.35 : 0.08 + R() * 0.08;
+                const hh = cs * tall;
+                // shadow to the south east
+                g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(bx + hh * 0.7, by + hh * 0.7, bw, bw);
+                // the south face, with windows
+                const roofY = by - hh * 0.5;
+                g.fillStyle = k === SCISSORS ? VT.steel : '#20262f';
+                g.fillRect(bx, roofY + bw, bw, hh * 0.5 + 0.5);
+                if (k === SCISSORS) {
+                    for (let wy = roofY + bw + 1; wy < roofY + bw + hh * 0.5 - 1; wy += 2.6) {
+                        for (let wx = bx + 1.2; wx < bx + bw - 1.5; wx += 2.4) {
+                            g.fillStyle = R() < 0.14 ? rgba(VT.lamp, 0.85) : 'rgba(0,0,0,0.55)';
+                            g.fillRect(wx, wy, 1.2, 1.3);
+                        }
+                    }
+                }
+                // the roof
+                g.fillStyle = k === SCISSORS ? VT.steel3 : rgba(VT.slate, 0.95); g.fillRect(bx, roofY, bw, bw);
+                g.fillStyle = rgba(VT.plate, k === SCISSORS ? 0.16 : 0.08); g.fillRect(bx, roofY, bw, 1);
+                if (k === SCISSORS) {
+                    g.fillStyle = rgba(VT.slate, 1); g.fillRect(bx + bw * (0.2 + R() * 0.3), roofY + bw * (0.2 + R() * 0.3), bw * 0.25, bw * 0.2);
+                    if (R() < 0.2) { g.fillStyle = rgba(VT.lamp, 0.9); g.fillRect(bx + bw * 0.7, roofY + bw * 0.3, 1.4, 1.4); }
                 } else {
-                    g.fillStyle = VT.steel2; g.fillRect(bx, by, bw, bw);
-                    g.fillStyle = rgba(VT.slate, 0.9); g.fillRect(bx + bw * 0.2, by + bw * 0.2, bw * 0.6, bw * 0.6);
-                    // dead windows, one lamp still on here and there
-                    for (let t = 0; t < 4; t++) { g.fillStyle = R() < 0.12 ? rgba(VT.lamp, 0.8) : 'rgba(0,0,0,0.45)'; g.fillRect(bx + bw * (0.28 + (t % 2) * 0.3), by + bw * (0.28 + Math.floor(t / 2) * 0.3), Math.max(1, bw * 0.12), Math.max(1, bw * 0.12)); }
+                    g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.6;
+                    g.beginPath(); g.moveTo(bx, roofY + bw / 2); g.lineTo(bx + bw, roofY + bw / 2); g.stroke();
                 }
                 continue;
             }
@@ -226,6 +269,14 @@ export function createUnityView(canvas, opts = {}) {
                 g.strokeStyle = rgba(VT.mist, 0.28); g.lineWidth = 0.7;
                 g.beginPath(); g.moveTo(x, y + cs); g.lineTo(x + cs, y); g.moveTo(x + cs * 0.5, y + cs); g.lineTo(x + cs, y + cs * 0.5); g.stroke();
             }
+        }
+        // the streets: a faint dash down the middle of every eighth one (the avenues)
+        if (s.scale === 0) {
+            g.strokeStyle = rgba(VT.lamp, 0.07); g.lineWidth = 0.7; g.setLineDash([2, 3]);
+            g.beginPath();
+            for (let xx = 8; xx < MAP_W; xx += 8) { g.moveTo(xx * cs, 0); g.lineTo(xx * cs, geo.h); }
+            for (let yy = 6; yy < MAP_H; yy += 6) { g.moveTo(0, yy * cs); g.lineTo(geo.w, yy * cs); }
+            g.stroke(); g.setLineDash([]);
         }
         // a faint frame around the map
         g.strokeStyle = rgba(VT.mist, 0.12); g.lineWidth = 1; g.strokeRect(0.5, 0.5, geo.w - 1, geo.h - 1);

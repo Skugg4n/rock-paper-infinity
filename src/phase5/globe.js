@@ -15,6 +15,8 @@ import { VT } from './style.js';
 export const GLOBE_RES = 190;
 /** The axis leans toward the viewer this much (radians). */
 export const TILT = 0.32;
+/** The smooth texture the globe samples (the map's cells scaled up and softened, so no blocks show). */
+export const TW = 256, TH = 128;
 const BEAT = 1.7;
 const hex = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const mix = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
@@ -58,7 +60,7 @@ export function createGlobe() {
     const g = buf ? buf.getContext('2d') : null;
     const img = g && g.createImageData ? g.createImageData(N, N) : null;
     // per pixel, once: inside?, the row it shows, its longitude before the turn, its light
-    const inside = new Uint8Array(N * N), row = new Int32Array(N * N), lon0 = new Float32Array(N * N), lat0 = new Float32Array(N * N), light = new Float32Array(N * N);
+    const inside = new Uint8Array(N * N), row = new Int32Array(N * N), trow = new Int32Array(N * N), lon0 = new Float32Array(N * N), lat0 = new Float32Array(N * N), light = new Float32Array(N * N);
     const L = [-0.45, -0.55, 0.7];
     const ln = Math.hypot(...L);
     for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
@@ -69,8 +71,9 @@ export function createGlobe() {
         inside[k] = 1;
         lat0[k] = p.lat; lon0[k] = p.lon;
         row[k] = Math.max(0, Math.min(MAP_H - 1, Math.floor(((Math.PI / 2 - p.lat) / Math.PI) * MAP_H))) * MAP_W;
+        trow[k] = Math.max(0, Math.min(TH - 1, Math.floor(((Math.PI / 2 - p.lat) / Math.PI) * TH))) * TW;
         const z = Math.sqrt(Math.max(0, 1 - x * x - y * y));
-        light[k] = 0.28 + 0.72 * Math.max(0, (x * L[0] + y * L[1] + z * L[2]) / ln);
+        light[k] = 0.4 + 0.75 * Math.max(0, (x * L[0] + y * L[1] + z * L[2]) / ln);
     }
     // the colour of each cell (and whether it is body, sea), rebuilt when the body changes
     const col = new Float32Array(CELLS * 3);
@@ -95,10 +98,37 @@ export function createGlobe() {
             else if (o === COLD) { rgb = mix(base, plate, 0.55 + nz * 0.15); kind[i] = 3; }
             else {
                 kind[i] = 0;
-                rgb = o === POISON ? mix(bruise, life, 0.15) : o === GRANITE ? mix(slate, mist, 0.15) : m.cls[i] === PAPER ? mix(base, life, 0.35 + nz * 0.15) : m.cls[i] === ROCK ? mix(base, slate, 0.8) : mix(base, steel, 0.9);
+                rgb = o === POISON ? mix(bruise, life, 0.3) : o === GRANITE ? mix(slate, mist, 0.35) : m.cls[i] === PAPER ? mix(base, life, 0.6 + nz * 0.2) : m.cls[i] === ROCK ? mix(slate, mist, 0.2) : mix(steel, mist, 0.15);
             }
             col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
         }
+        smooth();
+    }
+    // the soft texture: colours and the body's mask, each drawn small and scaled up blurred
+    let tex = null, mask = null;
+    function smooth() {
+        if (typeof document === 'undefined') return;
+        const small = document.createElement('canvas'); small.width = MAP_W; small.height = MAP_H;
+        const sg = small.getContext('2d');
+        if (!sg || !sg.createImageData) return;
+        const big = document.createElement('canvas'); big.width = TW; big.height = TH;
+        const bg = big.getContext('2d');
+        const pass = (fill) => {
+            const im = sg.createImageData(MAP_W, MAP_H);
+            if (!im || !im.data) return null;
+            for (let i = 0; i < CELLS; i++) { const c = fill(i); im.data[i * 4] = c[0]; im.data[i * 4 + 1] = c[1]; im.data[i * 4 + 2] = c[2]; im.data[i * 4 + 3] = 255; }
+            sg.putImageData(im, 0, 0);
+            bg.clearRect(0, 0, TW, TH);
+            bg.imageSmoothingEnabled = true;
+            bg.filter = 'blur(1.2px)';
+            // wrap round: draw it three times side by side so the seam at the date line is soft too
+            for (const ox of [-TW, 0, TW]) bg.drawImage(small, ox, 0, TW, TH);
+            bg.filter = 'none';
+            const d = bg.getImageData ? bg.getImageData(0, 0, TW, TH) : null;
+            return d && d.data;
+        };
+        tex = pass((i) => [col[i * 3], col[i * 3 + 1], col[i * 3 + 2]]);
+        mask = pass((i) => (kind[i] === 2 ? [255, 255, 255] : kind[i] === 1 ? [0, 0, 255] : [0, 0, 0]));
     }
 
     /** Where the camera wants to look: our continent, or the middle of a seed's flight. */
@@ -135,25 +165,34 @@ export function createGlobe() {
             if (!inside[k]) { d[k * 4 + 3] = 0; continue; }
             const lon = lon0[k] + rot;
             const u = ((lon + Math.PI) / TWO) % 1;
-            const mx = Math.floor((u < 0 ? u + 1 : u) * MAP_W);
+            const uu = u < 0 ? u + 1 : u;
+            const mx = Math.floor(uu * MAP_W);
             const i = row[k] + mx;
-            let r = col[i * 3], gg = col[i * 3 + 1], b = col[i * 3 + 2];
-            const kd = kind[i];
+            let r, gg, b, body = kind[i] === 2 ? 1 : 0, sea = kind[i] === 1 ? 1 : 0;
+            if (tex) {
+                const ti = (trow[k] + Math.floor(uu * TW)) * 4;
+                r = tex[ti]; gg = tex[ti + 1]; b = tex[ti + 2];
+                body = mask[ti] / 255; sea = mask[ti + 2] / 255;
+            } else { r = col[i * 3]; gg = col[i * 3 + 1]; b = col[i * 3 + 2]; }
+            const kd = body > 0.5 ? 2 : sea > 0.5 ? 1 : kind[i];
             let li = light[k];
-            if (kd === 2 || red > 0) {
+            if (body > 0.02 || red > 0) {
                 // flesh: fine vessels and the heartbeat
-                const v = Math.abs(Math.sin(lon * 47 + Math.sin(lat0[k] * 39) * 2.2));
-                const vein = v < 0.09 ? 1 : 0;
-                const fr = kd === 2 ? 1 : red;
+                // muscle fibre in bundles, then the vessels on top
+                const fib = 0.8 + 0.2 * Math.sin(lon * 55 + Math.sin(lat0[k] * 40) * 3);
+                const v = Math.abs(Math.sin(lon * 16 + Math.sin(lat0[k] * 13) * 2.2));
+                const v2 = Math.abs(Math.sin(lat0[k] * 21 + Math.sin(lon * 11) * 2));
+                const vein = v < 0.08 || v2 < 0.06 ? 1 : 0;
+                const fr = Math.max(Math.min(1, body * 1.4), red);
                 const fr0 = 46 + 46 * (0.6 + 0.4 * hb), fg = 12, fb = 20;
-                r = r * (1 - fr) + (fr0 + vein * (80 + 60 * hb)) * fr;
+                r = r * (1 - fr) + (fr0 * fib + vein * (80 + 60 * hb)) * fr;
                 gg = gg * (1 - fr) + (fg + vein * 24) * fr;
                 b = b * (1 - fr) + (fb + vein * 30) * fr;
                 li = li * 0.85 + 0.15;
             } else if (kd === 1) {
                 // the sea shimmers a little where the light is
-                const sh = Math.sin(lon * 60 + lat0[k] * 25 + t * 1.6) * Math.sin(lat0[k] * 41 - t * 0.9);
-                if (sh > 0.82) { r += 18; gg += 26; b += 34; }
+                const sh = Math.sin(lon * 22 + lat0[k] * 9 + t * 0.9) * Math.sin(lat0[k] * 14 - t * 0.5);
+                if (sh > 0.86) { r += 14; gg += 22; b += 30; }
             }
             // storms: dark bands that drift
             const band = Math.sin(lat0[k] * 7 + lon * 2 - t * 0.35) + Math.sin(lon * 3 + t * 0.2);

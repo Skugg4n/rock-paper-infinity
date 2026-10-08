@@ -174,7 +174,18 @@ export function mapFor(seed, scale) {
         }
         if (vault >= 0) cls[vault] = SCISSORS;
     }
-    const m = { seed, scale, cls, obst, rim, noise, start, vault, land };
+    // the planet's coasts: sea within two cells of land (the shore creeps only there)
+    const coast = new Uint8Array(CELLS);
+    if (scale === 4) {
+        for (let i = 0; i < CELLS; i++) {
+            if (obst[i] !== SEA) continue;
+            for (let dy = -2; dy <= 2 && !coast[i]; dy++) for (let dx = -2; dx <= 2; dx++) {
+                const x = cx(i) + dx, y = cy(i) + dy;
+                if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H && land[idx(x, y)]) { coast[i] = 1; break; }
+            }
+        }
+    }
+    const m = { seed, scale, cls, obst, rim, noise, start, vault, land, coast };
     cache.set(key, m);
     return m;
 }

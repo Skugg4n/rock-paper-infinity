@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased (unity)
+## v1.89.1 - 2026-10-08 (chapter V · UNITY: the planet, the seeds, the mind as the red word)
 
-Chapter V · UNITY, fas 3 · THE PLANET (code and tests; not yet looked at in a browser).
+After the second human test (docs/playtests/2026-10-08-unity-human-test-2.md, NÄSTAN) and a run through the whole act in the browser (docs/playtests/2026-10-08-unity-fas1.md).
+- **The mind as the red word.** When the next card is more than 40 s of thought away, `Slow mind.` goes red (NERVE up, or more minds on processing); a block waiting for a far card says `Slow mind.` too. Never a silent five minutes.
+- **Red words that need a slider.** The guides name the slider ("The ground is poison. LUNGS up.", "SKIN up.", "INTESTINES up."); a red word an experiment ends names the card ("We cannot get past this yet. FILTER LUNGS."). After FILTER LUNGS the poison is food only as fast as the LUNGS share allows.
+- **The planet is no dead end.** "MISSION: SEND SEEDS." until the first seed; buying SEEDS stops the game once: "The sea is too wide to grow across. A seed can cross it."; the shore creeps into the ocean (never +0 a day); insight buys more points for the seeds (+1 POINT · 5, 10 ... insight, up to five); the brain's part of the thought cap never falls, and the minds a seed carries come from processing.
+- **The hand:** SKIN + · more room to eat, STOMACH + · digest faster, HEART + · power. AUTONOMIC EDGE keeps what was saved ("What is saved becomes body.", Dr Okafor: "The gut empties into the body.").
+- **The panel:** a GROW AS row says on hover what its organ does (and that at 0 it gets nothing new); three columns when there are more than eight organs, so the log does not clip on the continent.
+- **Looks:** the city as blocks seen from above with roofs, a south face with lit and dark windows, shadows, parks with crowns and avenues; the land with ridged mountains and snow, a sick yellow-green haze over the poison, forest crowns, ruins with a lamp here and there; the globe samples a softened texture (no blocks), the body on it as fibre and vessels.
+- **Seeds cost** 4 % of the body and the minds they carry ("4 % of the body · 30 minds").
+
 - **The globe** (src/phase5/globe.js): a 2D orthographic globe, no 3D library (the owner's machine is slow). A 190-pixel buffer knows once per pixel which latitude it shows and how much light it gets; each frame only adds the turn and looks up the colour, scaled up smooth. Continents in the house palette, the sea dark with a shimmer, ice at the poles, storms as dark drifting bands, the body as red flesh with fine vessels and the heartbeat, a thin atmosphere, the night side, stars behind. It turns slowly and settles on our continent; a seed in flight turns it to the sea it crosses.
 - **The zoom from the continent:** the map pulls back and the globe fades in as its face; "The continent is ours." stands over it.
 - **SEEDS on screen:** the SEED panel (DRIFT, ACID, SKIN, ROOTS, MIND with - and +, "N points left", "To THE WEST · 2 100 km of sea", LAUNCH with its cost "N t · 30 minds"); a click on the globe picks the land (an amber ring with its name). A seed flies 10 s as a red mote on an arc over the sea, then lands: a red ring where it grows, a grey one where it died; Mr Lund says its fate (the five lines of the rules). Minds go with a seed (15 a MIND point): back when it grows into us, lost when it does not. "THE SEED GROWS INTO US." on the CRT; all lands joined: "We are one.".

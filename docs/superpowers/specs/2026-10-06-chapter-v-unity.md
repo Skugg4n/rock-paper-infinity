@@ -424,3 +424,23 @@ osv.
 Kvar: balanced och skin över 90 s / 30 s. Glappen ligger i slutet av kontinenten när alla små experiment är på V och
 inget stort är nära, och kring zoomarna.
 
+## Built (unity), v1.89.1 (fas F)
+
+Efter test 2 (docs/playtests/2026-10-08-unity-human-test-2.md) och en körning genom hela akten i webbläsaren
+(docs/playtests/2026-10-08-unity-fas1.md). `Slow mind.` blir rött när nästa kort är mer än 40 s tanke bort; guiderna
+säger reglaget ("LUNGS up.") eller kortet ("We cannot get past this yet. FILTER LUNGS."); planeten: "MISSION: SEND
+SEEDS.", ett stopp när SEEDS köps, kusten kryper (bara längs kusterna), insikt köper fler fröpoäng, hjärnans del av taket
+sjunker aldrig. Nya ord: `SKIN + · more room to eat`, `STOMACH + · digest faster`, `HEART + · power`, `What is saved
+becomes body.`, `The gut empties into the body.`, `The sea is too wide to grow across. A seed can cross it.`, `MISSION: SEND
+SEEDS.`, `+1 POINT · 5 insight`, `+ N more`, `Fold the small ones`, organens hover-rader (`ORGAN_DOES`).
+
+| Stil | Slut | Staden klar | Zoomar | Flaskhalsbyten fas 2 | Längsta flaskhals fas 2 | Längsta utan beslut |
+|---|---|---|---|---|---|---|
+| balanced | 35:29 | 8:54 | 8:54 18:25 24:03 31:00 | 83 | 95 s | 28 s |
+| skin | 34:09 | 8:22 | 8:22 18:32 22:41 29:35 | 79 | 146 s | 40 s |
+| heart | 31:32 | 8:45 | 8:45 16:24 20:50 27:24 | 78 | 71 s | 30 s |
+| mind | 35:16 | 8:47 | 8:47 17:50 23:49 30:49 | 106 | 105 s | 30 s |
+
+Den längsta flaskhalsen är nu oftast `Slow mind.` (tanken som väntar på nästa stora kort), vilket är meningen; heart-stilen
+slutar under 35 min, skin-stilen står 146 s på en flaskhals.
+

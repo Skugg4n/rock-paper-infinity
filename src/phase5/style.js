@@ -85,5 +85,14 @@ export const UNITY_CSS = VAULT_CSS.replaceAll('#phase-vault', '#phase-unity').re
 .u-seed-to { font-size: 12px; color: var(--v-plate); margin-top: 2px; }
 .u-launch { flex-direction: row; justify-content: space-between; padding: 7px 10px; margin-top: 4px; width: 100%; }
 .u-seed-no { font-size: 11px; color: var(--v-amber); min-height: 0; }
+.u-extra { width: 100%; height: 22px; font-size: 11px; margin-top: 3px; letter-spacing: 0.04em; }
+.u-extra[hidden] { display: none; }
+.u-more { border: 0; background: none; color: var(--v-mist); font-size: 11px; padding: 2px 0; cursor: pointer; text-align: left; }
+.u-more:hover { color: var(--v-paper); }
+.u-row[hidden] { display: none; }
+#phase-unity.is-planet .v-crt { min-height: 46px; }
+.u-grow.three { grid-template-columns: 1fr 1fr 1fr; column-gap: 8px; }
+.u-grow.three .u-row .n { font-size: 11px; letter-spacing: 0.04em; }
+.u-btn .g { font-family: system-ui, sans-serif; font-size: 9px; letter-spacing: 0; line-height: 11px; opacity: 0.85; text-transform: none; }
 #phase-unity.is-zooming .v-panel, #phase-unity.is-zooming .v-build { opacity: 0.25; transition: opacity 800ms ease; }
 `;
