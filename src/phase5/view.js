@@ -14,6 +14,7 @@
 import { MAP_W, MAP_H, CELLS, cx, cy, neighbours, mapFor, stormAt, ROCK, PAPER, SCISSORS, POISON, GRANITE, SEA, COLD, RIVER, DEEP } from './terrain.js';
 import { cache, front, share, mapTime } from './unity.js';
 import { VT } from './style.js';
+import { createGlobe, latOf, lonOf } from './globe.js';
 
 const BEAT = 1.7;
 function hash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
@@ -38,6 +39,8 @@ export function createUnityView(canvas, opts = {}) {
     let storm = null;             // { c, g, img, at }
     let zoom = null;              // { t0, ms, snap, from: {x,y}, resolve }
     let fog = null;               // { key, at, c }
+    let globe = null;             // the planet (fas 3), made when it is first needed
+    let ending = null;            // WE LOOK UP: { t0, ms, resolve }
     const cost = { body: 0 };     // ms a body redraw takes (smoothed)
     let bodyGap = 250;
     const effects = [];
@@ -654,6 +657,7 @@ export function createUnityView(canvas, opts = {}) {
         if (zoom) { drawZoom(now); return; }
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = VT.ink; ctx.fillRect(0, 0, W, H);
+        if (s.scale >= 4) { drawPlanet(s, ui, now); return; }
         const gk = `${s.scale}|${s.seed}|${geo.w}x${geo.h}|${dpr}`;
         if (!ground || ground.key !== gk) ground = { key: gk, c: paintGround(s) };
         ctx.drawImage(ground.c, geo.x, geo.y, geo.w, geo.h);
@@ -743,6 +747,47 @@ export function createUnityView(canvas, opts = {}) {
         drawEffects(now);
     }
 
+    // ---------------------------------------------------------------- fas 3: the planet
+    function planetRect() {
+        const D = Math.min(geo.w, geo.h) * 0.94;
+        return { x: geo.x + (geo.w - D) / 2, y: geo.y + (geo.h - D) / 2, D };
+    }
+    /** The globe turning in the stars; at WE LOOK UP the camera leaves it for the stars. */
+    function drawPlanet(s, ui, now) {
+        if (!globe) globe = createGlobe();
+        const t = now / 1000;
+        let rect = planetRect();
+        let e = 0;
+        if (ending) {
+            const u = Math.min(1, (now - ending.t0) / ending.ms);
+            e = u * u * (3 - 2 * u);
+            rect = { x: rect.x + rect.D * 0.1 * e, y: rect.y + H * 0.9 * e, D: rect.D * (1 - 0.2 * e) };
+        }
+        globe.drawStars(ctx, W, H, t, 0.45 + e * 0.5, -e * H * 0.6);
+        globe.render(ctx, s, now, rect, { allRed: s.ended ? 1 : 0 });
+        // the chosen land for the next seed: a thin amber ring at its middle
+        if (ui.seedTarget && !s.ended) {
+            const sea = ui.seedSea;
+            if (sea) {
+                const p = globe.toScreen(latOf(sea.land), lonOf(sea.land), rect);
+                if (p.front) {
+                    ctx.strokeStyle = rgba(VT.amber, 0.6 + 0.3 * Math.sin(t * 3)); ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, rect.D * 0.06, 0, Math.PI * 2); ctx.stroke();
+                    ctx.fillStyle = VT.amber; ctx.font = "13px 'Bebas Neue', 'Arial Narrow', sans-serif"; ctx.textAlign = 'center';
+                    ctx.fillText(sea.name, p.x, p.y - rect.D * 0.075);
+                }
+            }
+        }
+        if (ending && now - ending.t0 >= ending.ms) { const r = ending.resolve; ending = null; view.busy = false; r(); }
+        void ui;
+    }
+    /** WE LOOK UP: the camera turns from the red globe to the stars (ms), then resolves. */
+    function lookUp(ms) {
+        view.busy = true;
+        return new Promise((resolve) => { ending = { t0: performance.now(), ms, resolve }; });
+    }
+    function landAt(s, px, py) { if (!globe) globe = createGlobe(); return globe.landAt(s, px, py, planetRect()); }
+
     function pulses(vessels, t, strength) {
         ctx.lineCap = 'round';
         for (const v of vessels) {
@@ -823,7 +868,16 @@ export function createUnityView(canvas, opts = {}) {
         snap.g.drawImage(canvas, 0, 0, W, H);
         const from = body ? [geo.x + body.mid[0], geo.y + body.mid[1]] : [geo.x + geo.w / 2, geo.y + geo.h / 2];
         let next = null, at = null;
-        if (s && s.scale < 4) {
+        if (s && s.scale === 3) {
+            // the continent pulls back and becomes the globe's face
+            if (!globe) globe = createGlobe();
+            const o = offscreen(geo.w, geo.h);
+            const r = planetRect();
+            globe.drawStars(o.g, geo.w, geo.h, 0, 0.45);
+            globe.render(o.g, { seed: s.seed, scale: 4, order: [], seeds: {} }, performance.now(), { x: r.x - geo.x, y: r.y - geo.y, D: r.D });
+            next = o.c;
+            at = [geo.w / 2, geo.h / 2];
+        } else if (s && s.scale < 4) {
             const ns = { seed: s.seed, scale: s.scale + 1 };
             next = paintGround(ns);
             const m = mapFor(s.seed, s.scale + 1);
@@ -874,5 +928,5 @@ export function createUnityView(canvas, opts = {}) {
 
     resize();
     view.cost = cost;
-    return Object.assign(view, { resize, frame, cellAt, cellCentre, addBite, startZoom, setPointer, get geo() { return geo; }, get edgeCells() { return body ? body.edge : []; } });
+    return Object.assign(view, { lookUp, landAt, resize, frame, cellAt, cellCentre, addBite, startZoom, setPointer, get geo() { return geo; }, get edgeCells() { return body ? body.edge : []; } });
 }

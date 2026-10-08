@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (unity)
+
+Chapter V · UNITY, fas 3 · THE PLANET (code and tests; not yet looked at in a browser).
+- **The globe** (src/phase5/globe.js): a 2D orthographic globe, no 3D library (the owner's machine is slow). A 190-pixel buffer knows once per pixel which latitude it shows and how much light it gets; each frame only adds the turn and looks up the colour, scaled up smooth. Continents in the house palette, the sea dark with a shimmer, ice at the poles, storms as dark drifting bands, the body as red flesh with fine vessels and the heartbeat, a thin atmosphere, the night side, stars behind. It turns slowly and settles on our continent; a seed in flight turns it to the sea it crosses.
+- **The zoom from the continent:** the map pulls back and the globe fades in as its face; "The continent is ours." stands over it.
+- **SEEDS on screen:** the SEED panel (DRIFT, ACID, SKIN, ROOTS, MIND with - and +, "N points left", "To THE WEST · 2 100 km of sea", LAUNCH with its cost "N t · 30 minds"); a click on the globe picks the land (an amber ring with its name). A seed flies 10 s as a red mote on an arc over the sea, then lands: a red ring where it grows, a grey one where it died; Mr Lund says its fate (the five lines of the rules). Minds go with a seed (15 a MIND point): back when it grows into us, lost when it does not. "THE SEED GROWS INTO US." on the CRT; all lands joined: "We are one.".
+- **WE LOOK UP** lights when we are one, WARM ALL THE WAY THROUGH is done and the body covers 41 % of the surface; then the globe turns red and pulses, the camera leaves it for the stars (3.6 s) and the card VI comes, no title yet.
+- **Rules:** seeds fly before they land (a person reads the fate and changes one thing; the sim does too), cost a 25th of the body; a landing seed brings flesh for the ground it takes; the ice is eaten at half speed after WARM; the planet is eaten more slowly; "Nowhere to grow." names the experiment for what walls the body in (the cold of the poles last); checkpoint v-planet starts with SEEDS done and the home continent half eaten.
+- **Sim:** 35:33 to 37:55 for the four styles (heart now over 35 min).
+
 ## v1.89.0 - 2026-10-08 (chapter V · UNITY, first build: the city and the county)
 
 Chapter V · UNITY begins (docs/superpowers/specs/2026-10-06-chapter-v-unity.md), v1.89.0 on the unity branch.

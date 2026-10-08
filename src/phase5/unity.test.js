@@ -152,18 +152,30 @@ describe('chapter V, the rules', () => {
 
     test('seeds: the design decides; too little drift dies in the sea, no mind sits stuck, enough of all joins', () => {
         const s = U.newUnity();
-        s.scale = 4; s.ex.seeds = true; s.order = []; s.mass.tissue = 100;
+        s.scale = 4; s.ex.seeds = true; s.ex.auto = true; s.order = []; s.mass.tissue = 100; s.tut.done.start = true;
         const seas = U.seas(s);
         expect(seas.length).toBeGreaterThanOrEqual(4);
         const sea = seas[0];
         expect(U.setDesign(s, { drift: 11 })).toBe(false);
+        const land = () => { for (let k = 0; k < (U.SEED_FLIGHT_S + 1) * 4; k++) { U.advance(s, 0.25); while (s.tut.stop) U.closeStop(s); } };
         U.setDesign(s, { drift: 0, acid: 10 });
         expect(U.sendSeed(s, sea.k)).toBe('sea');
+        // one seed at a time to the same land: it flies first
+        expect(U.seedRefusal(s, sea.k)).toBe('A seed is on its way there.');
+        land();
+        expect(s.landed.at(-1)).toMatchObject({ k: sea.k, res: 'sea' });
+        expect(s.log.at(-1)).toBe('Mr Lund: The seed died in the sea.');
         U.setDesign(s, { drift: sea.dist, skin: sea.salt, mind: 0, roots: 3 });
         expect(U.sendSeed(s, sea.k)).toBe('stuck');
+        land();
+        const minds = s.minds;
         U.setDesign(s, { drift: sea.dist, skin: sea.salt, mind: 1, roots: sea.join });
+        expect(U.seedCost(s).minds).toBe(U.MINDS_PER_POINT);
         expect(U.sendSeed(s, sea.k)).toBe('joined');
+        expect(s.minds).toBe(minds - U.MINDS_PER_POINT);
+        land();
         expect(s.seeds.continents[sea.k]).toBe('joined');
+        expect(s.minds).toBe(minds);
     });
 
     test('the oceans of the planet are not eaten; the coasts of the continent are, slowly, with SALT SKIN', () => {

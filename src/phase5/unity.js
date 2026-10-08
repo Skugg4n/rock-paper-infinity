@@ -77,7 +77,7 @@ export const HAND_DIG = 3;
 /** The edge: cells a second per edible edge cell at full skin, full power. */
 export const ACID0 = 0.07;
 /** The city is eaten by hand first and then slowly; the land faster. */
-export const ACID_SCALE = [0.7, 0.62, 0.62, 0.62, 0.75];
+export const ACID_SCALE = [0.7, 0.62, 0.62, 0.62, 0.5];
 /** Skin per edge cell for the whole edge to eat. */
 export const THICK0 = 0.5;
 /** Skin per edge cell the storm needs to find to not tear, by scale. */
@@ -147,7 +147,7 @@ export const EXPERIMENTS = [
     { id: 'bone', title: 'BONES FOR A CONTINENT', line: 'Bone. We can carry our own weight.', price: 10000, when: (s) => s.scale >= 3 && (s.seenRed.bone || s.scale >= 4) },
     { id: 'fat', title: 'A STORE OF FAT', line: 'Fat. Food for the long nights.', price: 15000, when: (s) => s.scale >= 4 && s.seenRed.fat },
     { id: 'warm', title: 'WARM ALL THE WAY THROUGH', line: 'The cold becomes food.', price: 30000, when: (s) => s.scale >= 4 && s.ex.seeds },
-    { id: 'lookup', title: 'WE LOOK UP', line: 'There is more above.', ins: 10, when: (s) => s.scale >= 4 && s.one && s.ex.warm },
+    { id: 'lookup', title: 'WE LOOK UP', line: 'There is more above.', ins: 10, when: (s) => s.scale >= 4 && s.one && s.ex.warm && area(s) >= CELLS * LOOK_UP_AT },
 ];
 /** The small ones: five levels each, cheap, and every level is felt at once. */
 export const MULTIS = [
@@ -203,6 +203,8 @@ function lightPrices(s, rate) {
 export const MULTI_RISE = 1.8;
 export const MULTI_MAX = 5;
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+/** WE LOOK UP lights when the body covers this much of the planet (the land and the ice: about 41 % of the surface). */
+export const LOOK_UP_AT = 0.41;
 /** Which experiment grows an organ (a new GROW AS row). */
 export const ORGAN_FROM = { nerve: 'auto', eyes: 'eyes', lungs: 'lungs', intestines: 'gut', brain: 'parallel', nails: 'nails', ears: 'ears', muscle: 'muscle', fat: 'fat', bone: 'bone' };
 /** A small multiplier's price for its next level (scaled up with the map). */
@@ -280,7 +282,7 @@ export function newUnity({ minds = START_MINDS, seed = 7 } = {}) {
         ex: {}, multi: {}, mode: 'CUT', target: -1,
         seen: {}, joined: {}, torn: 0, stuckFor: 0, seenRed: {},
         red: null, redSince: 0, redLog: [],
-        seeds: { design: { drift: 2, acid: 2, skin: 2, roots: 2, mind: 2 }, sent: [], continents: {} },
+        seeds: { design: { drift: 2, acid: 2, skin: 2, roots: 2, mind: 2 }, sent: [], continents: {}, flying: [] },
         one: false, ended: false, zoom: null,
         out: [], sfx: [], log: [],
         guide: null, guideAt: -GUIDE_GAP, said: {},
@@ -341,7 +343,7 @@ export function edible(s, m, i) {
     if (o === GRANITE) return s.ex.granite ? 1 : 0;
     // salt skin crosses the coast's seas; the oceans between continents only a seed crosses
     if (o === SEA) return s.ex.salt && s.scale < 4 ? 0.18 : 0;
-    if (o === COLD) return s.ex.warm ? 1 : 0;
+    if (o === COLD) return s.ex.warm ? 0.5 : 0;
     return 1;
 }
 /** Food in a cell. */
@@ -519,6 +521,13 @@ export function flows(s) {
     if (night) add('fat', fatMult, 'night');
     if (s.scale >= 3) add('bone', sag, 'weight', s.unlocked.bone ? null : 'bone');
     if (blockedBy[DEEP] > 0) s.seenDeep = true;
+    if (s.ex.auto && edibleN < 0.5) {
+        // nothing at the edge can be eaten: its own word, and the fix is the experiment for what walls us in
+        // (the cold of the poles last of all); a slider that helps now is still said first
+        const wall = blockedBy[COLD] && !s.ex.warm ? 'warm' : blockedBy[GRANITE] && !s.ex.granite ? 'granite' : blockedBy[POISON] && !s.ex.lungs ? 'lungs'
+            : blockedBy[DEEP] && !s.ex.muscle ? 'muscle' : blockedBy[SEA] && !s.ex.salt && s.scale < 4 ? 'salt' : blockedBy[SEA] && s.scale >= 4 && !s.ex.seeds ? 'seeds' : null;
+        F.push({ organ: 'muscle', value: 0.3, word: 'Nowhere to grow.', flow: 'mass', why: 'walled', fix: wall });
+    }
     // the red word: the lowest factor under 0.8; a block only an experiment fixes counts as a quarter better, so a
     // slider that can help now (a weak heart while the sea blocks) is said first
     let red = null;
@@ -532,7 +541,6 @@ export function flows(s) {
     let low = null;
     for (const f of F) if (!low || f.value < low.value) low = f;
     // nothing at the edge can be eaten: say that, with the block's own fix
-    if (s.ex.auto && edibleN < 0.5 && red) red = { ...red, word: 'Nowhere to grow.' };
     // the fix is an experiment we cannot hold in mind: then what is wrong is the memory
     if (red && red.fix) {
         const e = EXPERIMENTS.find((x) => x.id === red.fix);
@@ -739,6 +747,12 @@ export function setDesign(s, d) {
     s.seeds.design = v;
     return true;
 }
+/** A continent's name, from where it lies seen from ours. */
+export function landName(dx, dy) {
+    const a = Math.atan2(-dy, dx);
+    const names = ['THE EAST', 'THE NORTH EAST', 'THE NORTH', 'THE NORTH WEST', 'THE WEST', 'THE SOUTH WEST', 'THE SOUTH', 'THE SOUTH EAST'];
+    return names[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+}
 /** Each other continent, across its sea: how far, how salt, how hard to grow into us. */
 export function seas(s) {
     const m = mapFor(s.seed, 4);
@@ -756,36 +770,83 @@ export function seas(s) {
         if (Number(k) === home || c.n < 25) continue;
         const d = Math.hypot(c.x / c.n - h.x / h.n, c.y / c.n - h.y / h.n);
         const land = c.cells.reduce((b, i) => (Math.hypot(cx(i) - c.x / c.n, cy(i) - c.y / c.n) < Math.hypot(cx(b) - c.x / c.n, cy(b) - c.y / c.n) ? i : b), c.cells[0]);
-        out.push({ k: Number(k), cells: c.n, land, dist: Math.max(1, Math.min(6, Math.round(d / 8))), salt: 1 + (Number(k) % 3), join: 1 + (Number(k) % 2) * 2 });
+        const dx = c.x / c.n - h.x / h.n, dy = c.y / c.n - h.y / h.n;
+        const dist = Math.max(1, Math.min(6, Math.round(d / 8)));
+        out.push({ k: Number(k), cells: c.n, land, dist, salt: 1 + (Number(k) % 3), join: 1 + (Number(k) % 2) * 2, name: landName(dx, dy), km: dist * 700 });
     }
     return out;
 }
-/** Send a seed to a continent; the result is one of SEED_WORDS' keys. Costs a tenth of the body's mass. */
-export function sendSeed(s, k) {
-    if (!s.ex.seeds) return null;
+/** A seed flies this many seconds of play over the sea before it lands (the screen draws the flight). */
+export const SEED_FLIGHT_S = 10;
+/** Minds a seed carries per MIND point; they come back if it grows into us, and are lost if it does not. */
+export const MINDS_PER_POINT = 15;
+/** This part of the body goes with each seed. */
+export const SEED_MASS = 0.04;
+/** What a launch costs now: mass (in tonnes on the screen) and minds. */
+export function seedCost(s) {
+    return { mass: totalMass(s) * SEED_MASS, minds: (s.seeds.design.mind || 0) * MINDS_PER_POINT };
+}
+/** Can a seed go to continent k now? null when it can, else the reason in the player's words. */
+export function seedRefusal(s, k) {
+    if (!s.ex.seeds) return 'No seeds yet.';
     const sea = seas(s).find((x) => x.k === k);
-    if (!sea || s.seeds.continents[k] === 'joined') return null;
+    if (!sea) return 'Pick a land across the sea.';
+    if (s.seeds.continents[k] === 'joined') return 'That land is us already.';
+    if ((s.seeds.flying || []).some((f) => f.k === k)) return 'A seed is on its way there.';
+    if (s.minds - seedCost(s).minds < 50) return 'Too few minds to send.';
+    return null;
+}
+/**
+ * Send a seed to a continent. It costs a tenth of the body's mass and the minds it carries, flies SEED_FLIGHT_S
+ * seconds and lands in advance(); the outcome is decided now (by the design and the sea) and returned (for the sim).
+ */
+export function sendSeed(s, k) {
+    if (seedRefusal(s, k)) return null;
+    const sea = seas(s).find((x) => x.k === k);
     const d = s.seeds.design;
-    const M = totalMass(s);
-    for (const o of ORGAN_ORDER) s.mass[o] *= 0.9;
+    const cost = seedCost(s);
+    for (const o of ORGAN_ORDER) s.mass[o] *= 1 - SEED_MASS;
+    s.minds -= cost.minds;
+    s.memory = Math.min(s.memory, s.minds);
     let res;
     if (d.drift < sea.dist) res = 'sea';
     else if (d.skin < sea.salt) res = 'salt';
     else if (d.mind < 1) res = 'stuck';
     else if (d.roots < sea.join) res = 'apart';
     else res = 'joined';
+    s.seeds.flying = s.seeds.flying || [];
+    const m = mapFor(s.seed, 4);
+    s.seeds.flying.push({ k, res, t0: s.t, from: m.start, to: sea.land, minds: cost.minds, mass: cost.mass, design: { ...d } });
     s.seeds.sent.push({ t: s.t, k, res, design: { ...d } });
-    if (res === 'joined' || res === 'apart' || res === 'stuck') {
-        if (s.seeds.continents[k] !== 'apart' || res === 'joined') s.seeds.continents[k] = res;
-        seedBlob(s, sea.land, res === 'stuck' ? 2 : 4 + d.acid * 6);
-        s.mass.tissue += M * 0.02;
-    }
-    say(s, SEED_WORDS[res].toUpperCase());
-    s.sfx.push(res === 'joined' ? 'join' : 'seed');
+    s.sfx.push('seed');
     s.events.push({ t: s.t, what: `seed ${k} ${res}` });
-    s.one = seas(s).every((x) => s.seeds.continents[x.k] === 'joined');
-    if (s.one && !s.tut.done.one) stop(s, 'one', [LINES.one]);
     return res;
+}
+/** Seeds that have flown long enough land: they grow, sit, or die, and say so. */
+function landSeeds(s) {
+    const fl = s.seeds.flying || [];
+    for (let n = fl.length - 1; n >= 0; n--) {
+        const f = fl[n];
+        if (s.t - f.t0 < SEED_FLIGHT_S) continue;
+        fl.splice(n, 1);
+        const sea = seas(s).find((x) => x.k === f.k);
+        const res = f.res;
+        if (res === 'joined' || res === 'apart' || res === 'stuck') {
+            if (s.seeds.continents[f.k] !== 'apart' || res === 'joined') s.seeds.continents[f.k] = res;
+            // the seed lands as a small body of its own: the ground it takes comes with flesh enough to cover it
+            const a0 = area(s);
+            if (sea) seedBlob(s, sea.land, res === 'stuck' ? 2 : 4 + f.design.acid * 6);
+            s.mass.tissue += (area(s) - a0) * DENS * 1.1 + f.mass * 0.2;
+        }
+        if (res === 'joined') { s.minds += f.minds; say(s, 'THE SEED GROWS INTO US.', true); }
+        guide(s, `seed-${s.seeds.sent.length}-${n}-${Math.round(s.t)}`, 'Mr Lund', SEED_WORDS[res], 8, true);
+        s.sfx.push(res === 'joined' ? 'join' : res === 'sea' || res === 'salt' ? 'tear' : 'seed');
+        s.landed = s.landed || [];
+        s.landed.push({ k: f.k, res, t: s.t, to: f.to });
+        if (s.landed.length > 12) s.landed.shift();
+    }
+    s.one = seas(s).every((x) => s.seeds.continents[x.k] === 'joined');
+    if (s.one && !s.tut.done.one) { stop(s, 'one', [LINES.one]); say(s, LINES.one.toUpperCase(), true); }
 }
 
 // ------------------------------------------------------------------ voices
@@ -910,6 +971,7 @@ export function advance(s, dt) {
         const [who, text] = RED_GUIDE[s.red] || [];
         if (who) guide(s, `red-${s.red}-${s.scale}`, who, text, 6);
     }
+    if (s.scale >= 4) landSeeds(s);
     stepStory(s, f);
     // the map eaten: zoom out
     if (progress(s) >= 1 && !s.zoom && s.scale < 4 && !s.tut.stop) {

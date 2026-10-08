@@ -404,3 +404,23 @@ gula pricken och står först. Varje stormvåg på en karta är 30 % starkare ä
 
 De längsta glappen ligger kring zoomarna (simmen räknar animationen och rutan); heart-stilen slutar 54 s under 35 min.
 
+## Built (unity), fas E (fas 3 · THE PLANET)
+
+Globen är 2D (ortografisk, en liten buffert per pixel, ingen three.js) för Olas långsamma dator. Fröna flyger 10 s och
+landar sedan (utfallet bestäms när de skickas); ett frö kostar en tjugofemtedel av kroppen och 15 sinnen per MIND-poäng
+(de kommer tillbaka om fröet växer ihop med oss). WE LOOK UP kräver We are one, WARM och 41 % av ytan. Nya ord: `SEED`,
+`N points left`, `To THE WEST · 2 100 km of sea`, `LAUNCH`, `how far it flies`, `how fast it eats`, `salt and storms`,
+`grows into us`, `carries minds`, `Click a land across the sea.`, `A seed is on its way there.`, `That land is us
+already.`, `Too few minds to send.`, `A seed grows there, but not with us.`, `THE SEED GROWS INTO US.`, landnamn `THE NORTH`
+osv.
+
+| Stil | Slut | Staden klar | Zoomar | Flaskhalsbyten fas 2 | Längsta flaskhals fas 2 | Längsta utan beslut |
+|---|---|---|---|---|---|---|
+| balanced | 37:55 | 8:53 | 8:53 16:30 24:30 30:51 | 166 | 115 s | 52 s |
+| skin | 35:44 | 8:55 | 8:55 16:18 23:05 29:30 | 94 | 93 s | 59 s |
+| heart | 35:33 | 8:19 | 8:19 14:52 21:12 27:22 | 131 | 85 s | 21 s |
+| mind | 35:57 | 8:24 | 8:24 15:29 21:13 27:22 | 77 | 79 s | 48 s |
+
+Kvar: balanced och skin över 90 s / 30 s. Glappen ligger i slutet av kontinenten när alla små experiment är på V och
+inget stort är nära, och kring zoomarna.
+

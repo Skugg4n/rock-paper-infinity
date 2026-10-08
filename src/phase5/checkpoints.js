@@ -44,5 +44,10 @@ export const UNITY_CHECKPOINTS = {
     },
     'v-land': () => prepared(1, { ex: [...CITY], n: 18, thought: 1500 }),
     'v-continent': () => prepared(3, { ex: CONT, n: 32, joined: [1, 2], thought: 4000, insight: 2 }),
-    'v-planet': () => prepared(4, { ex: [...CONT, 'salt', 'nails', 'bone'], n: 36, joined: [1, 2, 3], thought: 8000, insight: 6 }),
+    // the planet: the home continent half eaten, SEEDS done, the ten points to share
+    'v-planet': () => {
+        const s = prepared(4, { ex: [...CONT, 'salt', 'nails', 'bone', 'seeds'], n: 110, joined: [1, 2, 3], thought: 8000, insight: 6 });
+        s.tut.done.zoom3 = true;
+        return s;
+    },
 };

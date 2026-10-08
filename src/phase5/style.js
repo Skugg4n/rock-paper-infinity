@@ -76,5 +76,14 @@ export const UNITY_CSS = VAULT_CSS.replaceAll('#phase-vault', '#phase-unity').re
 #phase-unity .v-card.answer { box-shadow: 0 0 0 2px var(--v-amber), 0 2px 6px rgba(0,0,0,0.5); }
 #phase-unity .v-build-btn.has { box-shadow: inset 0 0 0 2px var(--v-amber); }
 #phase-unity canvas.v-cut { cursor: crosshair; }
+.u-seed { display: flex; flex-direction: column; gap: 2px; }
+.u-srow { display: grid; grid-template-columns: 52px 22px 22px 22px 1fr; align-items: center; gap: 4px; font-size: 11px; color: var(--v-mist); }
+.u-srow .n { font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 14px; letter-spacing: 0.08em; color: var(--v-plate); }
+.u-srow .v { text-align: center; font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-size: 17px; color: var(--v-paper); }
+.u-pm { border: 0; border-radius: 4px; height: 20px; background: var(--v-steel3); color: var(--v-paper); cursor: pointer; font-size: 14px; line-height: 14px; padding: 0; }
+.u-pm:disabled { opacity: 0.35; cursor: default; }
+.u-seed-to { font-size: 12px; color: var(--v-plate); margin-top: 2px; }
+.u-launch { flex-direction: row; justify-content: space-between; padding: 7px 10px; margin-top: 4px; width: 100%; }
+.u-seed-no { font-size: 11px; color: var(--v-amber); min-height: 0; }
 #phase-unity.is-zooming .v-panel, #phase-unity.is-zooming .v-build { opacity: 0.25; transition: opacity 800ms ease; }
 `;

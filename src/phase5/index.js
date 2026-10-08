@@ -10,6 +10,7 @@ import { createUnityView } from './view.js';
 import { UNITY_CSS } from './style.js';
 import { createUnitySound } from './sound.js';
 import { audio } from '../audio.js';
+import { playChapterCard } from '../chapterCard.js';
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from '../constants.js';
 
 export const TYPE_MS = 26;
@@ -41,7 +42,17 @@ export const WORDS = {
     memory: (n) => `Memory ${n}`,
     processing: (n) => `Processing ${n}`,
     free: 'free',
+    pointsLeft: (n) => `${n} ${n === 1 ? 'point' : 'points'} left`,
+    seedTo: (name, km) => `To ${name} · ${km} km of sea`,
+    seedPick: 'Click a land across the sea.',
+    seedApart: 'A seed grows there, but not with us.',
+    seedCost: (t, m) => (m > 0 ? `${t} t · ${m} minds` : `${t} t`),
+    launch: 'LAUNCH',
 };
+/** What each part of a seed does (one short line each). */
+export const SEED_ROWS = { drift: 'how far it flies', acid: 'how fast it eats', skin: 'salt and storms', roots: 'grows into us', mind: 'carries minds' };
+/** WE LOOK UP: the camera turns from the globe to the stars this long, then VI. */
+export const LOOK_UP_MS = 3600;
 const WHERE = ['the city', 'the county', 'the country', 'the continent', 'the land'];
 
 let root = null, styleEl = null, rafId = 0, abort = null, sound = null, saveTimer = null, beforeUnload = null, view = null;
@@ -79,6 +90,11 @@ export function init() {
         <div data-v="edge-box" hidden><div class="u-sec"><span class="dymo">Edge</span><span class="hint" data-v="edge-at"></span></div>
           <div class="u-buys">${U.MODES.map((m) => `<button type="button" class="u-btn" data-mode="${m}">${m}<span class="p">${MODE_SUB[m]}</span></button>`).join('')}</div>
           <div class="u-edge-line" data-v="edge-line"></div></div>
+        <div data-v="seed-box" hidden><div class="u-sec"><span class="dymo">Seed</span><span class="hint" data-v="seed-left"></span></div>
+          <div class="u-seed">${U.SEED_KEYS.map((k) => `<div class="u-srow" data-srow="${k}"><span class="n">${k.toUpperCase()}</span><button type="button" class="u-pm" data-sminus="${k}" aria-label="less ${k}">&minus;</button><span class="v"></span><button type="button" class="u-pm" data-splus="${k}" aria-label="more ${k}">+</button><span class="w">${SEED_ROWS[k]}</span></div>`).join('')}</div>
+          <div class="u-seed-to" data-v="seed-to"></div>
+          <button type="button" class="u-btn flesh u-launch" data-v="launch">${WORDS.launch}<span class="p" data-v="launch-cost"></span></button>
+          <div class="u-seed-no" data-v="seed-no"></div></div>
         <div data-v="grow-box" hidden><div class="u-sec"><span class="dymo">Grow as</span><span class="hint">sums to 100</span></div><div class="u-grow" data-v="grow"></div></div>
         <div data-v="minds-box" hidden><div class="u-sec"><span class="dymo">Minds</span><span class="val" data-v="minds" style="font-family:'Bebas Neue','Arial Narrow',sans-serif;font-size:19px"></span></div>
           <div class="u-minds"><input type="range" min="0" data-v="mem" aria-label="Memory"><div class="lbl"><span data-v="mem-l"></span><span data-v="proc-l"></span></div></div></div>
@@ -109,6 +125,7 @@ export function init() {
     let growKey = '';
     let dragging = false;
     let lastSight = 3;
+    let endingStarted = false;
 
     // ---------------------------------------------------------------- the CRT and the sounds
     function pushLines() {
@@ -206,6 +223,9 @@ export function init() {
             set('edge-line', line);
             $('edge-line').classList.toggle('bad', !knows && mm < 1);
         }
+        // SEED (fas 3): ten points, a land across the sea, LAUNCH
+        $('seed-box').hidden = !(s.scale >= 4 && s.ex.seeds && !s.ended);
+        if (s.scale >= 4 && s.ex.seeds) paintSeed();
         // GROW AS: the organs grown, and the ones about to be (dimmed)
         $('grow-box').hidden = !s.ex.auto;
         if (s.ex.auto) paintGrow(f);
@@ -228,6 +248,30 @@ export function init() {
         for (const b of root.querySelectorAll('[data-speed]')) b.classList.toggle('on', Number(b.dataset.speed) === speed);
         paintStop();
         paintGuide();
+    }
+    let seedTarget = 0;
+    function seedSea() {
+        const all = U.seas(s);
+        if (!all.some((x) => x.k === seedTarget)) seedTarget = (all.find((x) => s.seeds.continents[x.k] !== 'joined') || {}).k || 0;
+        return all.find((x) => x.k === seedTarget) || null;
+    }
+    function paintSeed() {
+        const d = s.seeds.design;
+        const used = U.SEED_KEYS.reduce((a, k) => a + d[k], 0);
+        set('seed-left', WORDS.pointsLeft(U.SEED_POINTS - used));
+        for (const k of U.SEED_KEYS) {
+            const row = root.querySelector(`[data-srow="${k}"]`);
+            row.querySelector('.v').textContent = String(d[k]);
+            row.querySelector('[data-sminus]').disabled = d[k] <= 0;
+            row.querySelector('[data-splus]').disabled = used >= U.SEED_POINTS;
+        }
+        const sea = seedSea();
+        set('seed-to', sea ? WORDS.seedTo(sea.name, U.num(sea.km)) + (s.seeds.continents[sea.k] === 'apart' ? ` ${WORDS.seedApart}` : '') : WORDS.seedPick);
+        const c = U.seedCost(s);
+        set('launch-cost', WORDS.seedCost(U.big(c.mass * U.nutUnit(s)), c.minds));
+        const no = sea ? U.seedRefusal(s, sea.k) : WORDS.seedPick;
+        $('launch').disabled = !!no || !!s.tut.stop;
+        set('seed-no', no && sea ? no : '');
     }
     function growOrgans() {
         // only the organs grown (UNITY test 1: with locked rows MINDS and the log fell below the panel)
@@ -345,6 +389,12 @@ export function init() {
             return;
         }
         if (st) { shakeStop(); return; }
+        if (s.scale >= 4) {
+            // on the globe a click picks the land the next seed goes to
+            const k = view.landAt(s, e.clientX - r.left, e.clientY - r.top);
+            if (k && U.seas(s).some((x) => x.k === k)) { seedTarget = k; sound.event('click'); paintPanel(); }
+            return;
+        }
         if (i >= 0) { U.setTarget(s, i); sound.event('click'); }
     }, { signal });
     canvas.addEventListener('mousemove', (e) => {
@@ -358,6 +408,18 @@ export function init() {
     root.querySelector('.v-panel').addEventListener('click', (e) => {
         const b = e.target.closest('[data-buy]');
         if (b && !b.disabled) { if (s.tut.stop) { shakeStop(); return; } U.buyMass(s, b.dataset.buy); pushLines(); paintPanel(); return; }
+        const pm = e.target.closest('[data-splus], [data-sminus]');
+        if (pm && !pm.disabled) {
+            const k = pm.dataset.splus || pm.dataset.sminus;
+            const d = { ...s.seeds.design };
+            d[k] = Math.max(0, d[k] + (pm.dataset.splus ? 1 : -1));
+            U.setDesign(s, d); sound.event('click'); paintPanel(); return;
+        }
+        if (e.target.closest('[data-v="launch"]') && !$('launch').disabled) {
+            const sea = seedSea();
+            if (sea && U.sendSeed(s, sea.k)) { pushLines(); paintPanel(); }
+            return;
+        }
         const m = e.target.closest('[data-mode]');
         if (m && !m.disabled) { if (s.tut.stop) { shakeStop(); return; } U.setMode(s, m.dataset.mode); pushLines(); paintPanel(); }
     }, { signal });
@@ -406,6 +468,15 @@ export function init() {
         paintPanel(); paintCards();
     }
 
+    async function lookUp() {
+        root.classList.add('is-zooming');
+        sound.event('zoom');
+        save();
+        await view.lookUp(LOOK_UP_MS);
+        if (!root) return;
+        playChapterCard({ roman: 'VI', title: '', mode: 'to-come', dark: true });
+    }
+
     // ---------------------------------------------------------------- save
     function save() {
         if (!savingEnabled || window.__rpiSkipSave) return;
@@ -432,7 +503,10 @@ export function init() {
             drewAt = now;
             const m = U.mapFor(s.seed, s.scale);
             const look = m.vault >= 0 && s.seen[s.scale] && !s.joined[s.scale] ? view.cellCentre(m.vault) : s.target >= 0 ? view.cellCentre(s.target) : null;
-            view.frame(s, { hover, focusEdge: !!(s.tut.stop && s.tut.stop.focus === 'edge'), lookAt: look, target: s.target >= 0, sight: lastSight }, now);
+            const sea = s.scale >= 4 && s.ex.seeds ? seedSea() : null;
+            view.frame(s, { hover, focusEdge: !!(s.tut.stop && s.tut.stop.focus === 'edge'), lookAt: look, target: s.target >= 0, sight: lastSight, seedTarget: sea ? sea.k : 0, seedSea: sea }, now);
+            // WE LOOK UP: once its box is read, the camera turns to the stars, then VI
+            if (s.ended && !s.tut.stop && !endingStarted) { endingStarted = true; lookUp(); }
         }
         if (s.tut.stop) paintStop();
         if (now - slowAt > 200) {
@@ -459,6 +533,7 @@ export function init() {
         get state() { return s; }, view, U,
         buy: (id) => { U.buy(s, id); pushLines(); paintPanel(); paintCards(); },
         ok: closeStop,
+        paint: () => { paintPanel(); paintCards(); },
         setSpeed: (v) => { speed = v; },
     };
 }

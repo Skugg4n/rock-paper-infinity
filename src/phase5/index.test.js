@@ -88,4 +88,30 @@ describe('the unity screen', () => {
         for (let k = 0; k < 240 && !s.zoom; k++) { U.advance(s, 0.25); while (s.tut.stop) U.closeStop(s); }
         expect(s.zoom).toBeTruthy();
     });
+
+    test('fas 3: the planet shows the SEED panel; a launch spends points as set and the seed flies', async () => {
+        const { UNITY_CHECKPOINTS } = await import('./checkpoints.js');
+        const U = await import('./unity.js');
+        localStorage.setItem(U.SAVE_KEY, U.serialize(UNITY_CHECKPOINTS['v-planet']()));
+        const m = await import('./index.js');
+        mod = m;
+        m.init();
+        tick();
+        const root = document.getElementById('phase-unity');
+        const st = window.rpiUnity.state;
+        expect([st.scale, !!st.ex.seeds, !!st.ended, String(st.tut.stop && st.tut.stop.id)]).toEqual([4, true, false, 'null']);
+        window.rpiUnity.paint();
+        expect(root.querySelector('[data-v="seed-box"]').hidden).toBe(false);
+        expect(root.querySelector('[data-v="edge-box"]').hidden).toBe(true);
+        expect(root.querySelector('[data-v="seed-left"]').textContent).toBe('0 points left');
+        root.querySelector('[data-sminus="acid"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        tick();
+        expect(root.querySelector('[data-v="seed-left"]').textContent).toBe('1 point left');
+        expect(root.querySelector('[data-v="seed-to"]').textContent).toMatch(/^To THE /);
+        root.querySelector('[data-v="launch"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(window.rpiUnity.state.seeds.flying.length).toBe(1);
+        m.teardown();
+        mod = null;
+        localStorage.removeItem(U.SAVE_KEY);
+    });
 });

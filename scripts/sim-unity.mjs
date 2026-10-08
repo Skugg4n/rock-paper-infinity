@@ -114,13 +114,19 @@ while (s.t < LIMIT && !s.ended) {
     const m = U.mapFor(s.seed, s.scale);
     if (m.vault >= 0 && s.seen[s.scale] && !s.joined[s.scale] && s.target !== m.vault) { U.setTarget(s, m.vault); act('toward the vault'); }
     if (s.joined[s.scale] && s.target >= 0) U.setTarget(s, s.target);
-    // seeds: designed for each sea (a person who has read what the last one said)
-    if (s.scale >= 4 && s.ex.seeds && !s.one && now - (globalThis.seedAt || 0) > 6) {
+    // seeds: a person tries a design, reads what became of it (the fate line), and changes one thing
+    if (s.scale >= 4 && s.ex.seeds && !s.one && now - (globalThis.seedAt || 0) > 4) {
         globalThis.seedAt = now;
-        const sea = U.seas(s).find((x) => s.seeds.continents[x.k] !== 'joined');
+        const guess = (globalThis.guess ??= {});
+        for (const l of (s.landed || []).splice(0)) {
+            const g = guess[l.k];
+            if (!g) continue;
+            if (l.res === 'sea') g.drift++; else if (l.res === 'salt') g.skin++; else if (l.res === 'stuck') g.mind++; else if (l.res === 'apart') g.roots++;
+        }
+        const sea = U.seas(s).find((x) => s.seeds.continents[x.k] !== 'joined' && !U.seedRefusal(s, x.k));
         if (sea) {
-            const d = { drift: sea.dist, skin: sea.salt, roots: sea.join, mind: 1 };
-            d.acid = Math.max(0, U.SEED_POINTS - d.drift - d.skin - d.roots - d.mind);
+            const g = (guess[sea.k] ??= { drift: 2, skin: 1, mind: 1, roots: 1 });
+            const d = { ...g, acid: Math.max(0, U.SEED_POINTS - g.drift - g.skin - g.mind - g.roots) };
             U.setDesign(s, d);
             act(`seed ${sea.k}: ${U.sendSeed(s, sea.k)}`);
         }
