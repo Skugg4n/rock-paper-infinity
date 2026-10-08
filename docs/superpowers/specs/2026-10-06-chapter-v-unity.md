@@ -170,7 +170,46 @@ Guiderna i små rutor med namn, en i taget, aldrig oftare än var 40:e sekund, b
 5. Fas 3 (globen i 3D, frön, design). Test.
 6. Ljud: IV:s puls som rundorna, bitljud, djupare per skala.
 
-## Osäkert, att avgöra med Ola
+## Organen, hela listan (Ola 2026-10-08: "bara att köra på")
+
+Tretton organ. De kommer in ett i taget, ett per experiment, så att spelaren lär sig dem efter hand. Varje organ har
+ett flöde det gör, ett hinder det löser och ett ord i panelen när det saknas. Alla är massa: GROW AS får ett reglage till
+när organet är upplåst (reglagen som är noll syns dimmade, så listan växer utan att bli lång).
+
+| Organ | In | Gör | Hinder det löser | Saknas-ord | Nivåer |
+|---|---|---|---|---|---|
+| SKIN | start | yta; kanten äter där huden ligger; tjocklek skyddar | storm (I: grus), hav (III: salt) | `Thin.` | I–III |
+| STOMACH | start | näring av det vi äter | berg (II: granit) | `Starving.` | I–III |
+| HEART | start | kraft till allt | kontinent (II), kyla (III: varm) | `Weak pulse.` | I–III |
+| NERVE | fas 1, exp 1 | tankens takt; allt tickar fortare | `Slow mind.` | `Slow mind.` | I–III |
+| EYES | fas 1, exp 5 | ser utanför kanten: resurser, valv, storm på väg | hittar valven; III ser andra kontinenter | `Blind.` | I–III |
+| LUNGS | fas 2, exp 4 | filtrerar gift till näring | gift i marken | `Choking.` | I–II |
+| INTESTINES | fas 2, exp 6b | transport: näringen måste från kanten till hjärtat och ut igen; räckvidd i km | avstånd: en bred kropp svälter i utkanten | `Far from the gut.` | I–III |
+| BRAIN | fas 2, exp 9 | minne: taket för THOUGHT, utspritt; varje del av kroppen behöver hjärna nära | taket utan fler sinnen | `Forgetting.` | I–III |
+| NAILS | fas 2, exp 10b | hård billig massa som skyddar ömt (ögon, hjärna, tarm) i utkanten | storm och salt mot det ömma | `Exposed.` | I–II |
+| EARS | fas 2 | hör stormen innan den kommer: varning, så huden kan tjockna just där | stormar som river oväntat | `Deaf.` | I |
+| MUSCLE | fas 2 | flyttar massa från en sida till en annan (dra kanten) | kanter som står still mot berg eller hav | `Stuck.` | I–II |
+| FAT | fas 3 | lager av näring för natt och kyla | polernas natt, vintern | `Hungry at night.` | I–II |
+| BONE | fas 3 | hållfasthet; över en viss massa rasar kroppen utan ben | kontinentskalan: `We are too heavy.` | `Sagging.` | I–II |
+
+LIVER är struken (gör samma som LUNGS II). Priser: massa plus skalans resurs, satta med simuleringen så att nästa organ
+alltid är "nästan råd". Saknas-ordet är det som lyser rött i panelen; bara ett i taget, det som bromsar mest.
+
+**Grafik (Olas ord: "cool och galen"):** varje organ ritas i köttets stil som det organ det är, i kroppens skala på kartan:
+ögon som öppnar sig i huden och vrider sig mot det de ser, hjärnmassa som veckade fält med ljus som löper, tarmar som
+slingrar sig under huden och pulserar näring i en riktning, naglar som hårda blanka plattor i kanten, öron som trattar i
+stormens riktning, muskler som spänns när kanten dras, fett som gula mjuka lager, ben som vita bågar genom massan.
+Allt med IV:s puls. Ingen humor, inga ansikten.
+
+## Svar på frågorna (2026-10-08)
+
+1. Sinnena som trust: ja, men varmt. BRAIN gör att vi kan odla tanke själva; människorna ger INSIGHT, det bara de kan.
+   Valven tas in som i IV: ett stopp med en rad, och en guide som säger något om dem.
+2. Fas 1 med klick: ja, men kort (under två minuter) och med ett annat klick än IV: man klickar kanten, den biter.
+3. Fröna: ja, för havet. De är sonder, och det är rätt verktyg för den skalan.
+4. RPS på kanten: ja. Fas 1 byter man själv; från THE EDGE KNOWS är det känslan och hjärtslagen som rundor.
+
+## Osäkert, att avgöra med Ola (besvarat ovan)
 
 - MINDS som trust: att de 197 är minne och processorer gör dem viktiga, men också till en resurs. Är det rätt ton, eller för kallt?
 - Fas 1 med klick: akt I-känsla, men vi har redan klickat bubblor i IV. Alternativ: börja direkt med AUTONOMIC EDGE.
