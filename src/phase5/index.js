@@ -106,6 +106,7 @@ export function init() {
     const crt = { lines: [], queue: [], typing: null };
     let growKey = '';
     let dragging = false;
+    let lastSight = 3;
 
     // ---------------------------------------------------------------- the CRT and the sounds
     function pushLines() {
@@ -144,6 +145,7 @@ export function init() {
     }
     function paintPanel() {
         const f = U.flows(s);
+        lastSight = s.unlocked.eyes ? f.sight : 3;
         const before = !s.ex.auto;
         set('goal', U.LINES.goal[s.scale]);
         set('body', U.areaText(s));
@@ -382,7 +384,7 @@ export function init() {
         root.classList.add('is-zooming');
         sound.event('zoom');
         const ratio = Math.sqrt(U.SCALES[s.scale + 1].size / U.SCALES[s.scale].size) * 0.9;
-        await view.startZoom(ZOOM_MS, ratio);
+        await view.startZoom(ZOOM_MS, ratio, s);
         if (!root) return;
         U.zoomDone(s);
         zooming = false;
@@ -417,7 +419,7 @@ export function init() {
             drewAt = now;
             const m = U.mapFor(s.seed, s.scale);
             const look = m.vault >= 0 && s.seen[s.scale] && !s.joined[s.scale] ? view.cellCentre(m.vault) : s.target >= 0 ? view.cellCentre(s.target) : null;
-            view.frame(s, { hover, focusEdge: !!(s.tut.stop && s.tut.stop.focus === 'edge'), lookAt: look, target: s.target >= 0 }, now);
+            view.frame(s, { hover, focusEdge: !!(s.tut.stop && s.tut.stop.focus === 'edge'), lookAt: look, target: s.target >= 0, sight: lastSight }, now);
         }
         if (s.tut.stop) paintStop();
         if (now - slowAt > 200) {

@@ -15,7 +15,7 @@
  */
 import {
     mapFor, stormAt, neighbours, CELLS, MAP_W, cx, cy, idx,
-    ROCK, PAPER, SCISSORS, CLASS_NAMES, NONE, POISON, GRANITE, SEA, COLD, RIVER, RICH, OBST_RICH,
+    ROCK, PAPER, SCISSORS, CLASS_NAMES, NONE, POISON, GRANITE, SEA, COLD, RIVER, DEEP, RICH, OBST_RICH,
 } from './terrain.js';
 
 export const SAVE_KEY = 'rpi-unity';
@@ -73,7 +73,7 @@ export const DIG = 0.075;
 /** The edge: cells a second per edible edge cell at full skin, full power. */
 export const ACID0 = 0.07;
 /** The city is eaten by hand first and then slowly; the land faster. */
-export const ACID_SCALE = [0.8, 1, 1, 1, 1];
+export const ACID_SCALE = [0.8, 0.62, 0.62, 0.62, 1];
 /** Skin per edge cell for the whole edge to eat. */
 export const THICK0 = 0.5;
 /** Skin per edge cell the storm needs to find to not tear, by scale. */
@@ -90,6 +90,8 @@ export const MEM_K = 20;
 export const BRAIN_CAP = [0, 30000, 60000, 110000, 160000];
 /** At the cap the thought runs over into insight: per mind a second. */
 export const INSIGHT_K = 0.0005;
+/** Below the cap the people still give insight, at this part of the rate. */
+export const INSIGHT_SLOW = 0.25;
 /** Reach of the gut in cells without intestines; intestines add this times their share. */
 export const GUT0 = 14;
 export const GUT_K = 160;
@@ -126,14 +128,14 @@ export const EXPERIMENTS = [
     { id: 'auto', title: 'AUTONOMIC EDGE', line: 'The edge eats by itself.', price: 400, when: (s) => s.tut.done.start },
     { id: 'gravel', title: 'GRAVEL IN THE SKIN', line: 'Storms tear 60 % less.', price: 1200, when: (s) => s.torn > 0.5 || s.scale > 0 },
     { id: 'stomach2', title: 'A SECOND STOMACH', line: 'Twice the nutrient from what we eat.', price: 2000, when: (s) => s.ex.auto && (s.seenRed.stomach || s.ex.gravel) },
-    { id: 'eyes', title: 'WE REMEMBER THE MAP', line: 'Eyes. We see past the edge.', ins: 1, when: (s) => s.insight > 0 || s.capHit },
+    { id: 'eyes', title: 'WE REMEMBER THE MAP', line: 'Eyes. We see past the edge.', ins: 1, when: (s) => s.ex.auto && (s.insight >= 0.5 || s.capHit) },
     { id: 'edgeknows', title: 'THE EDGE KNOWS', line: 'The edge picks its own way to eat.', price: 2500, when: (s) => s.scale >= 1 },
     { id: 'lungs', title: 'FILTER LUNGS', line: 'Poison becomes food.', price: 3000, when: (s) => s.scale >= 1 },
     { id: 'gut', title: 'A LONGER GUT', line: 'Intestines carry food out to the far edge.', price: 3200, when: (s) => s.scale >= 1 && s.seenRed.intestines },
     { id: 'ears', title: 'WE HEAR THE WEATHER', line: 'Ears. The skin thickens before the storm.', price: 3600, when: (s) => s.scale >= 1 && s.torn > 30 },
     { id: 'granite', title: 'ACID FOR GRANITE', line: 'Mountains become food.', price: 6000, when: (s) => s.scale >= 2 },
     { id: 'parallel', title: 'WE THINK IN PARALLEL', line: 'Twice the processing. A brain to remember.', ins: 3, when: (s) => s.ex.eyes && s.scale >= 1 },
-    { id: 'muscle', title: 'WE CAN PULL', line: 'Muscle. The edge pulls past what blocks it.', price: 6500, when: (s) => s.scale >= 2 && s.stuckFor > 10 },
+    { id: 'muscle', title: 'WE CAN PULL', line: 'Muscle. The edge pulls past what blocks it.', price: 6500, when: (s) => s.scale >= 1 && (s.stuckFor > 10 || s.seenRed.muscle || s.seenDeep) },
     { id: 'heart2', title: 'A HEART FOR A COUNTRY', line: 'Three times the power. Twice the hunger.', price: 9000, when: (s) => s.scale >= 2 },
     { id: 'nails', title: 'HARD AT THE EDGE', line: 'Nails cover what is tender at the edge.', price: 8000, when: (s) => s.scale >= 3 && (s.ex.salt || s.seenRed.nails) },
     { id: 'salt', title: 'SALT SKIN', line: 'We can cross the sea, slowly.', price: 9000, when: (s) => s.scale >= 3 },
@@ -148,7 +150,52 @@ export const MULTIS = [
     { id: 'fibre', title: 'THICKER FIBRE', line: 'Skin holds 25 % more.', base: 250, when: (s) => s.ex.auto && (s.torn > 0.5 || s.scale > 0) },
     { id: 'acid', title: 'FASTER ACID', line: 'The edge eats 25 % faster.', base: 300, when: (s) => s.ex.auto },
     { id: 'vessels', title: 'WIDER VESSELS', line: '20 % more power.', base: 280, when: (s) => s.ex.auto && (s.seenRed.heart || s.scale > 0) },
+    // one for every organ that is grown (phase C: something small lights every 20 to 40 s)
+    { id: 'walls', organ: 'stomach', title: 'THICKER WALLS', line: 'The stomach digests 20 % more.', base: 300, when: (s) => s.ex.auto && (s.seenRed.stomach || s.scale > 0) },
+    { id: 'nerves', organ: 'nerve', title: 'QUICKER NERVES', line: 'The nerve thinks 20 % faster.', base: 300, when: (s) => s.ex.auto && s.scale > 0 },
+    { id: 'wide', organ: 'eyes', title: 'WIDER EYES', line: 'The eyes see 25 % further.', base: 300, when: (s) => s.ex.auto && s.unlocked.eyes },
+    { id: 'filters', organ: 'lungs', title: 'FINER FILTERS', line: 'The lungs clean 25 % more poison.', base: 300, when: (s) => s.ex.auto && s.unlocked.lungs },
+    { id: 'loops', organ: 'intestines', title: 'LONGER LOOPS', line: 'The gut reaches 20 % further.', base: 300, when: (s) => s.ex.auto && s.unlocked.intestines },
+    { id: 'folds', organ: 'brain', title: 'MORE FOLDS', line: 'The brain remembers 20 % more.', base: 300, when: (s) => s.ex.auto && s.unlocked.brain },
+    { id: 'hard', organ: 'nails', title: 'HARDER NAILS', line: 'Nails cover 25 % more.', base: 300, when: (s) => s.ex.auto && s.unlocked.nails },
+    { id: 'keen', organ: 'ears', title: 'KEENER EARS', line: 'The ears hear 25 % sooner.', base: 300, when: (s) => s.ex.auto && s.unlocked.ears },
+    { id: 'pull', organ: 'muscle', title: 'STRONGER PULL', line: 'Muscle pulls 25 % harder.', base: 300, when: (s) => s.ex.auto && s.unlocked.muscle },
+    { id: 'dense', organ: 'fat', title: 'DENSER FAT', line: 'Fat lasts 25 % longer.', base: 300, when: (s) => s.ex.auto && s.unlocked.fat },
+    { id: 'heavy', organ: 'bone', title: 'HEAVIER BONE', line: 'Bone carries 25 % more.', base: 300, when: (s) => s.ex.auto && s.unlocked.bone },
 ];
+/** A multiplier's effect: base ** level. */
+export const mlt = (s, id, base = 1.2) => base ** (s.multi[id] || 0);
+/** Phase C: prices follow the thought we make. A big experiment is about BIG_S seconds of thought away when it lights
+ *  (never more than its price in the spec, never under a third of it); a small one MULTI_S0 + MULTI_S1 a level. */
+export const BIG_S = 80;
+export const MULTI_S0 = 22;
+export const MULTI_S1 = 9;
+/** Two significant figures. */
+export function nice(n) {
+    if (n < 100) return Math.max(10, Math.round(n / 10) * 10);
+    const p = 10 ** (Math.floor(Math.log10(n)) - 1);
+    return Math.round(n / p) * p;
+}
+/** What an experiment costs now (frozen when it lit; the spec's price before). */
+export function priceOf(s, e) {
+    if (!e.price) return 0;
+    const k = s.prices && s.prices[e.id];
+    return k != null ? k : e.price;
+}
+/** Freeze the prices of what has just lit, from the thought rate of this moment. */
+function lightPrices(s, rate) {
+    s.prices = s.prices || {};
+    for (const e of EXPERIMENTS) {
+        if (!e.price || e.id === 'auto' || s.ex[e.id] || s.prices[e.id] != null || !e.when(s)) continue;
+        s.prices[e.id] = nice(Math.max(e.price * 0.3, Math.min(e.price, rate * BIG_S)));
+    }
+    for (const m of MULTIS) {
+        const lv = s.multi[m.id] || 0;
+        const k = `${m.id}:${lv}`;
+        if (lv >= MULTI_MAX || s.prices[k] != null || !m.when(s)) continue;
+        s.prices[k] = nice(Math.max(m.base * 0.5, rate * (MULTI_S0 + MULTI_S1 * lv)));
+    }
+}
 export const MULTI_RISE = 1.8;
 export const MULTI_MAX = 5;
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
@@ -157,6 +204,8 @@ export const ORGAN_FROM = { nerve: 'auto', eyes: 'eyes', lungs: 'lungs', intesti
 /** A small multiplier's price for its next level (scaled up with the map). */
 export function multiPrice(s, m) {
     const lv = s.multi[m.id] || 0;
+    const k = s.prices && s.prices[`${m.id}:${lv}`];
+    if (k != null) return k;
     return Math.round(m.base * MULTI_RISE ** lv * (1 + s.scale) / 10) * 10;
 }
 
@@ -275,7 +324,8 @@ export const lvl = (s) => ({
 export function edible(s, m, i) {
     const o = m.obst[i];
     if (o === NONE || o === RIVER) return 1;
-    if (o === POISON) return s.ex.lungs ? Math.min(1, 0.25 + share(s, 'lungs') * 12) : 0;
+    if (o === POISON) return s.ex.lungs ? Math.min(1, 0.25 + share(s, 'lungs') * 12 * mlt(s, 'filters', 1.25)) : 0;
+    if (o === DEEP) return s.ex.muscle ? 0.6 : 0;
     if (o === GRANITE) return s.ex.granite ? 1 : 0;
     // salt skin crosses the coast's seas; the oceans between continents only a seed crosses
     if (o === SEA) return s.ex.salt && s.scale < 4 ? 0.18 : 0;
@@ -347,7 +397,7 @@ export function flows(s) {
 
     // the edge
     let perim = 0, edibleN = 0, stormSum = 0;
-    const blockedBy = { [POISON]: 0, [GRANITE]: 0, [SEA]: 0, [COLD]: 0 };
+    const blockedBy = { [POISON]: 0, [GRANITE]: 0, [SEA]: 0, [COLD]: 0, [DEEP]: 0 };
     for (const i of c.frontier) {
         perim++;
         const e = edible(s, m, i);
@@ -358,7 +408,7 @@ export function flows(s) {
     perim = Math.max(1, perim);
     const thick = s.mass.skin / perim;
     const cover = Math.min(1, thick / THICK0);
-    const ears = s.unlocked.ears ? Math.min(1.6, 1 + sh('ears') * 12) : 1;
+    const ears = s.unlocked.ears ? Math.min(1.6 * mlt(s, 'keen', 1.1), 1 + sh('ears') * 12 * mlt(s, 'keen', 1.25)) : 1;
     const prot = thick * (s.ex.gravel ? 2.5 : 1) * 1.25 ** (s.multi.fibre || 0) * (s.ex.salt ? 1.4 : 1) * ears;
     // the storm: where it lies on the edge, the skin must be STORM_NEED thick or it tears
     let stormLoss = 0;
@@ -366,7 +416,7 @@ export function flows(s) {
         const st = stormAt(m, i, s.t, s.scale);
         if (st > 0) stormLoss += st * Math.max(0, 1 - prot / (STORM_NEED[s.scale] * st));
     }
-    stormLoss /= perim;
+    stormLoss = Math.min(0.9, stormLoss / perim);
     const stormFrac = stormSum / perim;
     const fr = front(s, 6);
     const mix = [0, 0, 0];
@@ -381,10 +431,10 @@ export function flows(s) {
     const fillMult = Math.max(0.12, Math.min(1, (fill - 0.55) / 0.4));
     // muscle pulls the edge past what blocks it
     const blockedFrac = 1 - Math.min(1, edibleN / perim);
-    const pull = s.unlocked.muscle ? Math.min(2, 1 + sh('muscle') * 10) : 1;
+    const pull = s.unlocked.muscle ? Math.min(2 * mlt(s, 'pull', 1.1), 1 + sh('muscle') * 10 * mlt(s, 'pull', 1.25)) : 1;
     // bone: on the planet the body sags without it
     const need = s.scale >= 3 ? A / CELLS : 0;
-    const support = (s.scale >= 4 ? 0.3 : 0.42) + (s.unlocked.bone ? sh('bone') * 8 : 0);
+    const support = (s.scale >= 4 ? 0.3 : 0.42) + (s.unlocked.bone ? sh('bone') * 8 * mlt(s, 'heavy', 1.25) : 0);
     const sag = need > support ? Math.max(0.2, support / need) : 1;
     const acid = ACID0 * ACID_SCALE[s.scale] * 1.25 ** acidLv;
     const eat = s.ex.auto ? edibleN * acid * cover * p * fillMult * mode * (1 - stormLoss) * pull * sag : 0;
@@ -392,24 +442,26 @@ export function flows(s) {
 
     // the gut: digest, and how far it reaches
     const radius = Math.sqrt(A / Math.PI);
-    const reach = GUT0 + (s.unlocked.intestines ? sh('intestines') * GUT_K : 0);
+    const reach = GUT0 + (s.unlocked.intestines ? sh('intestines') * GUT_K * mlt(s, 'loops') : 0);
     const gut = s.scale >= 1 ? Math.min(1, reach / Math.max(1, radius)) : 1;
     const night = s.scale >= 4 && Math.sin(s.t * 0.06) < -0.2;
-    const fatMult = night ? Math.min(1, 0.45 + (s.unlocked.fat ? sh('fat') * 10 : 0)) : 1;
-    const digestCap = s.mass.stomach * DIG * (L.stomach >= 2 ? 2 : 1) * (L.stomach >= 3 ? 1.3 : 1) * p * gut * fatMult;
+    const fatMult = night ? Math.min(1, 0.45 + (s.unlocked.fat ? sh('fat') * 10 * mlt(s, 'dense', 1.25) : 0)) : 1;
+    const digestCap = mlt(s, 'walls') * s.mass.stomach * DIG * (L.stomach >= 2 ? 2 : 1) * (L.stomach >= 3 ? 1.3 : 1) * p * gut * fatMult;
     const digest = Math.min(digestCap, s.pool * 0.5 + 0.0001);
 
     // thought
     const proc = (s.minds - s.memory) * (s.ex.parallel ? 2 : 1);
     const grownK = 0.5 + Math.min(1, A / (CELLS * ZOOM_AT));
-    const thoughtRate = proc * PROC_K + sh('nerve') * NERVE_RATE[s.scale] * grownK * p;
-    const cap = s.memory * MEM_K + (s.unlocked.brain ? sh('brain') * BRAIN_CAP[s.scale] : 0);
-    const insightRate = s.thought >= cap * 0.995 - 0.01 ? s.minds * INSIGHT_K : 0;
-    const sight = s.unlocked.eyes ? EYE0 + sh('eyes') * EYE_K : 0;
+    const thoughtRate = proc * PROC_K + sh('nerve') * NERVE_RATE[s.scale] * grownK * p * mlt(s, 'nerves');
+    const cap = s.memory * MEM_K + (s.unlocked.brain ? sh('brain') * BRAIN_CAP[s.scale] * mlt(s, 'folds') : 0);
+    // insight is what only the people give: slowly always, four times faster when the thought is full
+    const atCap = s.thought >= cap * 0.995 - 0.01;
+    const insightRate = s.minds * INSIGHT_K * (atCap ? 1 : INSIGHT_SLOW);
+    const sight = s.unlocked.eyes ? (EYE0 + sh('eyes') * EYE_K) * mlt(s, 'wide', 1.25) : 0;
 
     // tender organs at the edge (eyes, brain, gut) in a storm: nails cover them
     const tender = sh('eyes') + sh('brain') + sh('intestines');
-    const exposed = s.unlocked.nails || s.scale >= 3 ? Math.max(0, stormFrac * tender * 6 - (s.unlocked.nails ? sh('nails') * 25 : 0)) : 0;
+    const exposed = s.unlocked.nails || s.scale >= 3 ? Math.max(0, stormFrac * tender * 6 - (s.unlocked.nails ? sh('nails') * 25 * mlt(s, 'hard', 1.25) : 0)) : 0;
 
     // the next experiment and when we can pay it
     const nxt = nextExperiment(s);
@@ -420,7 +472,9 @@ export function flows(s) {
     const add = (organ, value, why, fix = null) => F.push({ organ, value: Math.max(0, Math.min(1, value)), word: ORGANS[organ].word, flow: ORGANS[organ].flow, why, fix });
     const frac = (o) => blockedBy[o] / perim;
     // a block the organ cannot fix by growing: the fix is an experiment (granite, sea, cold, poison)
-    const block = (o, ex, k) => (!s.ex[ex] ? 1 - frac(o) * k : 1);
+    // (it only bites once it holds a good part of the edge: under a quarter the rest of the edge eats on)
+    const bfrac = (o) => Math.max(0, frac(o) - 0.25) * 1.6;
+    const block = (o, ex, k) => (!s.ex[ex] ? 1 - bfrac(o) * k : 1);
     const gr = block(GRANITE, 'granite', 1.2), se = block(SEA, 'salt', 1.1), co = block(COLD, 'warm', 1.2);
     const digestVal = Math.min(digest >= digestCap * 0.98 && s.pool > digestCap * 6 ? 0.5 * fillMult + 0.3 : 1, fillMult);
     add('stomach', Math.min(digestVal, gr), 'gut', gr < digestVal ? 'granite' : null);
@@ -430,17 +484,22 @@ export function flows(s) {
     // the mind is red only when the body itself is not worse off (never under 0.7)
     if (s.ex.auto) add('nerve', nxt && !nxt.ins && nxt.price <= cap ? Math.max(0.7, Math.min(1, 90 / Math.max(1, eta))) : 1, 'thought');
     if (s.scale >= 1) add('intestines', gut, 'reach', s.unlocked.intestines ? null : 'gut');
-    if (s.scale >= 1 && s.ex.auto) add('lungs', 1 - frac(POISON) * 1.2, 'poison', s.ex.lungs ? null : 'lungs');
+    if (s.scale >= 1 && s.ex.auto) add('lungs', 1 - (s.ex.lungs ? frac(POISON) * 0.5 : bfrac(POISON) * 1.2), 'poison', s.ex.lungs ? null : 'lungs');
     if (nxt && !nxt.ins && nxt.price > cap) add('brain', 0.55, 'cap');
     if (s.scale >= 1 && m.vault >= 0 && !s.seen[s.scale] && !s.joined[s.scale] && s.t - (s.scaleAt || 0) > 60) add('eyes', 0.75, 'vault');
     if (exposed > 0) add('nails', 1 - exposed, 'storm');
     if (s.unlocked.ears && stormFrac > 0.15) add('ears', Math.min(1, 0.6 + sh('ears') * 12), 'storm');
     if (s.scale >= 4 && !s.ex.seeds && blockedFrac > 0.55) add('muscle', 1.2 - blockedFrac, 'sea', 'seeds');
+    if (s.scale >= 1 && s.ex.auto && !s.ex.muscle && frac(DEEP) > 0.02) add('muscle', 1 - bfrac(DEEP) * 2, 'river', 'muscle');
     if (s.scale >= 2 && s.scale < 4 && s.ex.auto) add('muscle', blockedFrac > 0.55 ? 1.4 - blockedFrac * (s.unlocked.muscle ? 1 / pull : 1) : 1, 'blocked');
     if (night) add('fat', fatMult, 'night');
     if (s.scale >= 3) add('bone', sag, 'weight', s.unlocked.bone ? null : 'bone');
+    if (blockedBy[DEEP] > 0) s.seenDeep = true;
+    // the red word: the lowest factor under 0.8; a block only an experiment fixes counts as a quarter better, so a
+    // slider that can help now (a weak heart while the sea blocks) is said first
     let red = null;
-    for (const f of F) if (f.value < 0.8 && (!red || f.value < red.value)) red = f;
+    const rank = (f) => f.value + (f.fix ? 0.25 : 0);
+    for (const f of F) if (f.value < 0.8 && (!red || rank(f) < rank(red))) red = f;
     // what will break next: the lowest of the rest, yellow, before it is red
     let yellow = null;
     for (const f of F) if (f.value < 0.92 && (!yellow || f.value < yellow.value) && (!red || f.organ !== red.organ)) yellow = f;
@@ -451,7 +510,7 @@ export function flows(s) {
     // the fix is an experiment we cannot hold in mind: then what is wrong is the memory
     if (red && red.fix) {
         const e = EXPERIMENTS.find((x) => x.id === red.fix);
-        if (e && e.price && e.price > cap) red = { organ: 'brain', value: red.value, word: ORGANS.brain.word, flow: 'thought', why: 'cap', fix: s.unlocked.brain ? null : 'parallel', blocked: red };
+        if (e && e.price && priceOf(s, e) > cap) red = { organ: 'brain', value: red.value, word: ORGANS.brain.word, flow: 'thought', why: 'cap', fix: s.unlocked.brain ? null : 'parallel', blocked: red };
     }
     // before the edge eats by itself the only thing that holds the hand back is the stretch
     if (!s.ex.auto) {
@@ -469,7 +528,7 @@ export function flows(s) {
 /** Experiments the player can see now: lit, not bought (the multipliers' next level, in their place). */
 export function visibleExperiments(s) {
     const out = [];
-    for (const e of EXPERIMENTS) if (!s.ex[e.id] && e.when(s)) out.push({ ...e, kind: 'ex' });
+    for (const e of EXPERIMENTS) if (!s.ex[e.id] && e.when(s)) out.push({ ...e, price: priceOf(s, e), kind: 'ex' });
     // a vault reached and seen: JOIN
     const m = mapFor(s.seed, s.scale);
     if (m.vault >= 0 && s.seen[s.scale] && !s.joined[s.scale]) {
@@ -488,7 +547,8 @@ export function nextExperiment(s) {
     let best = null;
     for (const e of EXPERIMENTS) {
         if (s.ex[e.id] || !e.when(s)) continue;
-        if (!best || (e.ins || 0) * 10000 + (e.price || 0) < (best.ins || 0) * 10000 + (best.price || 0)) best = e;
+        const pe = { ...e, price: priceOf(s, e) };
+        if (!best || (pe.ins || 0) * 10000 + (pe.price || 0) < (best.ins || 0) * 10000 + (best.price || 0)) best = pe;
     }
     return best;
 }
@@ -703,6 +763,7 @@ export function guide(s, key, who, text, prio = 5, force = false) {
 }
 /** The guides' lines for a red word (Dr Okafor the body, Mr Lund the ground, Ms Ito the mind). */
 export const RED_GUIDE = {
+    // (muscle has two: the deep river before WE CAN PULL, nowhere to go after)
     stomach: ['Dr Okafor', 'We eat faster than we digest. More stomach.'],
     skin: ['Dr Okafor', 'The skin is thin at the edge. More skin.'],
     heart: ['Dr Okafor', 'The heart cannot keep up. More heart.'],
@@ -743,6 +804,7 @@ export function advance(s, dt) {
     if (s.ended || s.tut.stop || s.zoom) return;
     s.t += dt;
     const f = flows(s);
+    lightPrices(s, f.thoughtRate);
     // the edge eats; the storm tears
     s.bite += (f.eat - f.tear) * dt;
     if (s.bite >= 1) {
@@ -780,7 +842,8 @@ export function advance(s, dt) {
     if (f.stormLoss > 0) s.mass.skin = Math.max(0.2, s.mass.skin - f.stormLoss * s.mass.skin * 0.01 * dt);
     // thought, its cap, the overflow
     s.thought = Math.min(f.cap, s.thought + f.thoughtRate * dt);
-    if (f.insightRate > 0) { s.capHit = true; s.insight += f.insightRate * dt; }
+    s.insight += f.insightRate * dt;
+    if (s.thought >= f.cap * 0.995 - 0.01) s.capHit = true;
     // what the eyes see: the vault of this map
     const m = mapFor(s.seed, s.scale);
     if (m.vault >= 0 && !s.seen[s.scale] && f.sight > 0) {

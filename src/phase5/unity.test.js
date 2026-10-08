@@ -1,6 +1,6 @@
 /* eslint-env jest */
 import * as U from './unity.js';
-import { mapFor, stormAt, CELLS, RIM, ROCK, PAPER, SCISSORS, SEA, CITY_WEATHER_AT } from './terrain.js';
+import { mapFor, stormAt, CELLS, RIM, ROCK, PAPER, SCISSORS, SEA, DEEP, GRANITE, POISON, CITY_WEATHER_AT, WAVE_S, WAVE_ON, idx } from './terrain.js';
 
 const closeAll = (s) => { while (s.tut.stop) U.closeStop(s); };
 function started() { const s = U.newUnity(); U.advance(s, 0.1); closeAll(s); return s; }
@@ -204,5 +204,88 @@ describe('chapter V, the rules', () => {
     test('player words have no em-dash', () => {
         const all = JSON.stringify([U.EXPERIMENTS.map((e) => [e.title, e.line]), U.MULTIS.map((e) => e.line), U.LINES.goal, U.LINES.ours, U.RED_GUIDE, U.VANCE, U.SEED_WORDS, U.DONE_LINES, Object.values(U.ORGANS).map((o) => o.word)]);
         expect(all).not.toMatch(/—/);
+    });
+
+    describe('phase C: pacing', () => {
+        test('storm waves: the first reaches the city at 3:20, one every minute, each on for 15 s', () => {
+            const m = mapFor(7, 0);
+            const i = idx(20, 20);
+            const peak = (t0) => Math.max(...Array.from({ length: WAVE_ON * 4 }, (_, k) => stormAt(m, i, t0 + k / 4, 0)));
+            expect(peak(CITY_WEATHER_AT - WAVE_ON - 1)).toBe(0);
+            expect(peak(CITY_WEATHER_AT)).toBeGreaterThan(1);
+            expect(peak(CITY_WEATHER_AT + WAVE_ON + 1)).toBeLessThan(0.5);
+            expect(peak(CITY_WEATHER_AT + WAVE_S)).toBeGreaterThan(1);
+        });
+
+        test('a wave makes thin skin red ("Thin."), and the edge loses ground', () => {
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            const c = U.cache(s);
+            for (let i = 0; i < CELLS && U.area(s) < 300; i++) if (!c.eaten[i] && mapFor(s.seed, 0).obst[i] === 0 && !mapFor(s.seed, 0).rim[i]) s.order.push(i);
+            U.cache(s);
+            for (const o of Object.keys(s.mass)) s.mass[o] = 0;
+            Object.assign(s.mass, { skin: 40, stomach: 120, heart: 100, nerve: 40 });
+            let red = false;
+            for (s.t = CITY_WEATHER_AT; s.t < CITY_WEATHER_AT + WAVE_ON; s.t += 0.5) if (U.flows(s).red && U.flows(s).red.word === 'Thin.') red = true;
+            expect(red).toBe(true);
+        });
+
+        test('prices follow the thought rate when an experiment lights, never above the spec', () => {
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            s.torn = 1;
+            U.advance(s, 0.25);
+            const rate = U.flows(s).thoughtRate;
+            const g = U.visibleExperiments(s).find((e) => e.id === 'gravel');
+            expect(g.price).toBeLessThanOrEqual(1200);
+            expect(g.price).toBeGreaterThanOrEqual(360);
+            expect(Math.abs(g.price - Math.min(1200, Math.max(360, rate * U.BIG_S)))).toBeLessThan(g.price * 0.06);
+            // frozen: a faster mind later does not move it
+            s.mass.nerve *= 10;
+            U.advance(s, 0.25);
+            expect(U.visibleExperiments(s).find((e) => e.id === 'gravel').price).toBe(g.price);
+        });
+
+        test('every grown organ gets its own I–V multiplier', () => {
+            const s = started();
+            s.thought = 400; U.buy(s, 'auto');
+            s.scale = 1; s.unlocked.lungs = true; s.unlocked.brain = true;
+            const ids = U.visibleExperiments(s).filter((e) => e.kind === 'multi').map((e) => e.title);
+            expect(ids).toEqual(expect.arrayContaining(['THICKER WALLS I', 'QUICKER NERVES I', 'FINER FILTERS I', 'MORE FOLDS I']));
+            expect(ids.some((t) => /HARDER NAILS/.test(t))).toBe(false);
+        });
+
+        test('the county: poison within reach of the start, and a deep river only WE CAN PULL crosses', () => {
+            const m = mapFor(7, 1);
+            const near = [];
+            for (let i = 0; i < CELLS; i++) if (m.obst[i] === POISON && Math.hypot((i % 64) - 32, (Math.floor(i / 64) - 20) * 1.3) < 8.5) near.push(i);
+            expect(near.length).toBeGreaterThan(5);
+            const deep = m.obst.findIndex((o) => o === DEEP);
+            expect(deep).toBeGreaterThanOrEqual(0);
+            const s = U.newUnity();
+            s.scale = 1;
+            expect(U.edible(s, m, deep)).toBe(0);
+            s.ex.muscle = true;
+            expect(U.edible(s, m, deep)).toBeGreaterThan(0);
+            // the country: a mountain chain
+            const m2 = mapFor(7, 2);
+            expect(m2.obst.filter((o) => o === GRANITE).length).toBeGreaterThan(150);
+        });
+
+        test('the people give insight slowly even below the cap', () => {
+            const s = started();
+            s.thought = 0;
+            const f = U.flows(s);
+            expect(f.insightRate).toBeCloseTo(197 * U.INSIGHT_K * U.INSIGHT_SLOW);
+        });
+
+        test('the vault hand-off: the minds are the people in the body; a fresh start is 197', () => {
+            const s = U.fromVault(212);
+            U.advance(s, 0.1);
+            expect(s.minds).toBe(212);
+            expect(s.tut.stop.text[0]).toBe('212 MINDS. ONE BODY.');
+            expect(U.fromVault(0).minds).toBe(197);
+            expect(U.newUnity().minds).toBe(197);
+        });
     });
 });

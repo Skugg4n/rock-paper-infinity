@@ -17,6 +17,8 @@ const ctxStub = new Proxy({}, {
 });
 
 let frames = [];
+let mod = null;
+afterAll(() => { try { mod?.teardown(); } catch { /* gone */ } });
 beforeAll(() => {
     HTMLCanvasElement.prototype.getContext = () => ctxStub;
     window.requestAnimationFrame = (f) => { frames.push(f); return frames.length; };
@@ -24,6 +26,7 @@ beforeAll(() => {
     globalThis.requestAnimationFrame = window.requestAnimationFrame;
     globalThis.cancelAnimationFrame = window.cancelAnimationFrame;
     globalThis.lucide = { createIcons() {} };
+    globalThis.Path2D = class { moveTo() {} lineTo() {} closePath() {} rect() {} };
 });
 function tick(n = 3) {
     for (let k = 0; k < n; k++) { const f = frames; frames = []; f.forEach((fn) => fn(performance.now())); }
@@ -33,6 +36,7 @@ describe('the unity screen', () => {
     test('fas 1: the start stop, a bite on the edge, the buys; then GROW AS; teardown leaves nothing', async () => {
         const U = await import('./unity.js');
         const m = await import('./index.js');
+        mod = m;
         m.init();
         tick();
         const root = document.getElementById('phase-unity');

@@ -67,7 +67,9 @@ while (s.t < LIMIT && !s.ended) {
     const big = vis.find((e) => e.kind === 'ex' || e.kind === 'join');
     const nx = f.next;
     const nearBig = nx && !nx.ins && f.eta < 25;
-    const pick = big || (!nearBig ? vis.find((e) => e.kind === 'multi') : null);
+    // a red word whose fix is an experiment: save for that one (a person reads the guide)
+    const saving = f.red && f.red.fix && !s.ex[f.red.fix] && U.visibleExperiments(s).some((e) => e.id === f.red.fix);
+    const pick = big || (!nearBig && !saving ? vis.find((e) => e.kind === 'multi') : null);
     if (pick && U.buy(s, pick.id)) act(pick.title);
     // GROW AS toward the red word
     if (s.ex.auto && now - lastTurn > 3) {
@@ -80,7 +82,8 @@ while (s.t < LIMIT && !s.ended) {
             // +10 to the red organ, taken from the biggest organ that is not in trouble
             const o = target;
             const ok = (k) => !f.factors.some((x) => x.organ === k && x.value < 0.95);
-            const donor = Object.keys(s.grow).filter((k) => k !== o && ok(k) && s.grow[k] >= 5).sort((a, b) => s.grow[b] - s.grow[a])[0];
+            const donors = (pred) => Object.keys(s.grow).filter((k) => k !== o && pred(k) && s.grow[k] >= 5).sort((a, b) => s.grow[b] - s.grow[a]);
+            const donor = donors(ok)[0] || donors(() => true)[0];
             if (donor) {
                 const take = Math.min(10, s.grow[donor]);
                 const g = { ...s.grow }; g[donor] -= take; g[o] += take;
@@ -104,7 +107,7 @@ while (s.t < LIMIT && !s.ended) {
     if (s.scale >= 1 || s.ex.parallel) {
         const need = nx && !nx.ins ? nx.price : 0;
         const brain = f.cap - s.memory * U.MEM_K;
-        const memWant = Math.min(s.minds, Math.max(STYLE === 'mind' ? s.minds * 0.6 : 0, Math.ceil((need - brain) / U.MEM_K) + 4));
+        const memWant = Math.min(s.minds, Math.max(STYLE === 'mind' ? s.minds * 0.6 : s.minds * 0.3, Math.ceil((need - brain) / U.MEM_K) + 4));
         if (Math.abs(memWant - s.memory) >= 5) { U.setMemory(s, memWant); act(`memory ${s.memory}`); }
     }
     // direction: the vault when it is seen
@@ -126,8 +129,10 @@ while (s.t < LIMIT && !s.ended) {
     s.out.length = 0; s.sfx.length = 0;
     const f2 = U.flows(s);
     if (decisionPossible(f2)) { if (s.t - gapFrom > maxGap) { maxGap = s.t - gapFrom; globalThis.gapAt = `${fmt(gapFrom)}-${fmt(s.t)} ${U.SCALES[s.scale].id}`; } gapFrom = s.t; }
-    // the bottleneck: the lowest factor, red or not; in fas 2 it should move at least every 90 s
-    const r = f2.low ? f2.low.organ : null;
+    // the bottleneck as the player sees it: the red word, else the yellow one, else the lowest factor;
+    // in fas 2 it should move at least every 90 s
+    const shown = f2.red || f2.yellow || f2.low;
+    const r = shown ? shown.organ : null;
     const fas2From = zoomAt.length ? zoomAt[0].t : Infinity;
     if (r !== lastRed && r) {
         const from = Math.max(lastRedAt, fas2From);

@@ -11,7 +11,7 @@
  * four times a second; the storm is a 64 x 40 field redrawn every 150 ms and scaled up soft.
  * Per frame: three images, the edge's light, the pulses, the organs' small motion, effects.
  */
-import { MAP_W, MAP_H, CELLS, cx, cy, neighbours, mapFor, stormAt, ROCK, PAPER, POISON, GRANITE, SEA, COLD, RIVER } from './terrain.js';
+import { MAP_W, MAP_H, CELLS, cx, cy, neighbours, mapFor, stormAt, ROCK, PAPER, SCISSORS, POISON, GRANITE, SEA, COLD, RIVER, DEEP } from './terrain.js';
 import { cache, front, share } from './unity.js';
 import { VT } from './style.js';
 
@@ -37,6 +37,7 @@ export function createUnityView(canvas, opts = {}) {
     let tissue = null;            // the pattern
     let storm = null;             // { c, g, img, at }
     let zoom = null;              // { t0, ms, snap, from: {x,y}, resolve }
+    let fog = null;               // { key, at, c }
     const effects = [];
     const pointer = { x: -1, y: -1 };
     const view = { busy: false };
@@ -60,7 +61,7 @@ export function createUnityView(canvas, opts = {}) {
         const cs = Math.max(4, Math.min(aw / MAP_W, ah / MAP_H));
         const w = cs * MAP_W, h = cs * MAP_H;
         geo = { x: Math.round(left + (aw - w) / 2), y: Math.round(16 + (ah - h) / 2), cs, w, h };
-        ground = null; body = null;
+        ground = null; body = null; fog = null;
     }
 
     const centre = (i) => [geo.x + (cx(i) + 0.5) * geo.cs, geo.y + (cy(i) + 0.5) * geo.cs];
@@ -71,7 +72,94 @@ export function createUnityView(canvas, opts = {}) {
     }
 
     // ---------------------------------------------------------------- the ground
+    /** Colour of a cell of land, as [r, g, b] (blended soft into fields; the house palette). */
+    function landColour(m, i) {
+        const hex = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+        const mix = (a, b, u) => a.map((v, k) => Math.round(v + (b[k] - v) * u));
+        const base = hex('#0d1013');
+        const ob = m.obst[i], k = m.cls[i], nz = m.noise[i];
+        if (ob === SEA) return mix(hex('#06101a'), hex('#0a1824'), nz);
+        if (ob === COLD) return mix(base, hex(VT.plate), 0.3 + nz * 0.1);
+        if (ob === DEEP || ob === RIVER) return hex('#0a1722');
+        if (ob === POISON) return mix(hex(VT.fBruise), hex(VT.life), 0.12 + nz * 0.1);
+        if (ob === GRANITE) return mix(hex(VT.slate), hex(VT.mist), 0.12 + nz * 0.12);
+        if (k === PAPER) return mix(base, hex(VT.life), 0.16 + nz * 0.12);
+        if (k === ROCK) return mix(base, hex(VT.slate), 0.55 + nz * 0.15);
+        return mix(base, hex(VT.steel3), 0.8);
+    }
+    /**
+     * The land (county and out): soft fields (the cells as one pixel each, scaled up smooth and blurred), then the
+     * fine detail on top: rivers as winding lines, roads between the ruins, the ruins as small dark blocks with a
+     * lamp here and there, hatching on the granite, spots in the poison. Drawn once per scale and size.
+     */
+    function paintLand(s) {
+        const m = mapFor(s.seed, s.scale);
+        const o = offscreen(geo.w, geo.h);
+        const g = o.g, cs = geo.cs;
+        const R = rng(s.scale * 31 + 5);
+        const px = document.createElement('canvas'); px.width = MAP_W; px.height = MAP_H;
+        const pg = px.getContext('2d');
+        const img = pg.createImageData ? pg.createImageData(MAP_W, MAP_H) : null;
+        if (img && img.data) {
+            for (let i = 0; i < CELLS; i++) { const c = landColour(m, i); img.data.set([c[0], c[1], c[2], 255], i * 4); }
+            pg.putImageData(img, 0, 0);
+        }
+        g.fillStyle = '#0d1013'; g.fillRect(0, 0, geo.w, geo.h);
+        g.imageSmoothingEnabled = true;
+        g.save();
+        g.filter = `blur(${Math.max(1, cs * 0.45)}px)`;
+        g.drawImage(px, -cs * 0.5, -cs * 0.5, geo.w + cs, geo.h + cs);
+        g.restore();
+        // granite: fine hatching; poison: spots
+        for (let i = 0; i < CELLS; i++) {
+            const x = cx(i) * cs, y = cy(i) * cs, ob = m.obst[i];
+            if (ob === GRANITE && R() < 0.7) {
+                g.strokeStyle = rgba(VT.mist, 0.14); g.lineWidth = 0.6;
+                g.beginPath(); g.moveTo(x + R() * cs * 0.3, y + cs * 0.8); g.lineTo(x + cs * (0.5 + R() * 0.4), y + cs * 0.2); g.stroke();
+            } else if (ob === POISON && R() < 0.5) {
+                g.fillStyle = rgba(VT.life, 0.22); g.beginPath(); g.arc(x + R() * cs, y + R() * cs, cs * 0.08, 0, Math.PI * 2); g.fill();
+            } else if (!ob && m.cls[i] === SCISSORS) {
+                // ruins: a few dark blocks, one lamp in many
+                for (let q = 0; q < 2; q++) { g.fillStyle = rgba(VT.ink, 0.55); g.fillRect(x + R() * cs * 0.7, y + R() * cs * 0.7, cs * 0.22, cs * 0.18); }
+                if (R() < 0.25) { g.fillStyle = rgba(VT.lamp, 0.6); g.fillRect(x + R() * cs, y + R() * cs, 1.3, 1.3); }
+            }
+        }
+        // rivers: a winding line through the river cells, row by row
+        const rivers = [];
+        for (let i = 0; i < CELLS; i++) if (m.obst[i] === DEEP || m.obst[i] === RIVER) rivers.push(i);
+        if (rivers.length) {
+            const byRow = new Map();
+            for (const i of rivers) { const y = cy(i); byRow.set(y, (byRow.get(y) || []).concat(cx(i))); }
+            const pts = [...byRow.entries()].sort((a, b) => a[0] - b[0]).map(([y, xs]) => [(xs.reduce((a, b) => a + b, 0) / xs.length + 0.5) * cs, (y + 0.5) * cs]);
+            for (const [w, c] of [[cs * 1.6, 'rgba(6,14,22,0.9)'], [cs * 0.7, rgba(VT.cold, 0.16)], [1, rgba(VT.cold, 0.3)]]) {
+                g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round';
+                g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+                for (let k = 1; k < pts.length - 1; k++) g.quadraticCurveTo(pts[k][0], pts[k][1], (pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2);
+                g.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+                g.stroke();
+            }
+        }
+        // roads: thin old lines from ruin to ruin
+        const towns = [];
+        for (let i = 0; i < CELLS; i++) if (!m.obst[i] && m.cls[i] === SCISSORS && R() < 0.08) towns.push(i);
+        g.strokeStyle = rgba(VT.mist, 0.13); g.lineWidth = 0.8; g.setLineDash([3, 2]);
+        for (let k = 0; k + 1 < towns.length; k += 1) {
+            const a = towns[k], b = towns[(k + 3) % towns.length];
+            if (Math.hypot(cx(a) - cx(b), cy(a) - cy(b)) > 14) continue;
+            g.beginPath(); g.moveTo((cx(a) + 0.5) * cs, (cy(a) + 0.5) * cs);
+            g.quadraticCurveTo((cx(a) + 0.5) * cs + (R() - 0.5) * cs * 3, (cy(b) + 0.5) * cs, (cx(b) + 0.5) * cs, (cy(b) + 0.5) * cs); g.stroke();
+        }
+        g.setLineDash([]);
+        g.strokeStyle = rgba(VT.mist, 0.12); g.lineWidth = 1; g.strokeRect(0.5, 0.5, geo.w - 1, geo.h - 1);
+        // where the sea shimmers (per frame)
+        const sea = [];
+        for (let i = 0; i < CELLS; i++) if (m.obst[i] === SEA && R() < 0.35) sea.push(i);
+        o.c.sea = sea;
+        return o.c;
+    }
+
     function paintGround(s) {
+        if (s.scale >= 1) return paintLand(s);
         const m = mapFor(s.seed, s.scale);
         const o = offscreen(geo.w, geo.h);
         const g = o.g, cs = geo.cs;
@@ -182,7 +270,85 @@ export function createUnityView(canvas, opts = {}) {
         return ctx.createPattern(o.c, 'repeat');
     }
 
-    /** The body's layer: membrane, tissue, vessels; and where the edge and the organs are. */
+    /**
+     * The body's outline: a soft field over the eaten cells (each grid corner the mean of its four cells, smoothed,
+     * then sampled twice as fine), cut at one half by marching squares. Returns the filled shape and the outline.
+     */
+    function contour(c, cs) {
+        const VW = MAP_W + 1, VH = MAP_H + 1;
+        let f = new Float32Array(VW * VH);
+        for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) {
+            let sum = 0;
+            for (const [dx, dy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) {
+                const X = x + dx, Y = y + dy;
+                if (X >= 0 && Y >= 0 && X < MAP_W && Y < MAP_H) sum += c.eaten[Y * MAP_W + X];
+            }
+            f[y * VW + x] = sum / 4;
+        }
+        // one soft pass: the corners of the blocks melt
+        const f2 = new Float32Array(VW * VH);
+        for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) {
+            let sum = 0, n = 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const X = x + dx, Y = y + dy;
+                if (X < 0 || Y < 0 || X >= VW || Y >= VH) continue;
+                const w = dx === 0 && dy === 0 ? 4 : dx === 0 || dy === 0 ? 2 : 1;
+                sum += f[Y * VW + X] * w; n += w;
+            }
+            f2[y * VW + x] = sum / n;
+        }
+        f = f2;
+        // twice as fine (bilinear), so the outline curves instead of stepping
+        const S = 2, GW = MAP_W * S + 1, GH = MAP_H * S + 1;
+        const g = new Float32Array(GW * GH);
+        for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+            const fx = x / S, fy = y / S, ix = Math.min(VW - 2, Math.floor(fx)), iy = Math.min(VH - 2, Math.floor(fy)), u = fx - ix, v = fy - iy;
+            g[y * GW + x] = f[iy * VW + ix] * (1 - u) * (1 - v) + f[iy * VW + ix + 1] * u * (1 - v) + f[(iy + 1) * VW + ix] * (1 - u) * v + f[(iy + 1) * VW + ix + 1] * u * v;
+        }
+        const step = cs / S, ISO = 0.42;
+        const fill = new Path2D(), line = new Path2D();
+        const at = (x, y) => g[y * GW + x];
+        for (let y = 0; y < GH - 1; y++) for (let x = 0; x < GW - 1; x++) {
+            const corners = [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]];
+            const vals = corners.map(([a, b]) => at(a, b));
+            const ins = vals.map((v) => v >= ISO);
+            const n = ins.filter(Boolean).length;
+            if (n === 0) continue;
+            if (n === 4) { fill.rect(x * step, y * step, step + 0.3, step + 0.3); continue; }
+            const poly = [], cut = [];
+            for (let k = 0; k < 4; k++) {
+                const [ax, ay] = corners[k], [bx, by] = corners[(k + 1) % 4];
+                if (ins[k]) poly.push([ax * step, ay * step]);
+                if (ins[k] !== ins[(k + 1) % 4]) {
+                    const t = (ISO - vals[k]) / (vals[(k + 1) % 4] - vals[k]);
+                    const p = [(ax + (bx - ax) * t) * step, (ay + (by - ay) * t) * step];
+                    poly.push(p); cut.push(p);
+                }
+            }
+            fill.moveTo(poly[0][0], poly[0][1]);
+            for (const p of poly.slice(1)) fill.lineTo(p[0], p[1]);
+            fill.closePath();
+            for (let k = 0; k + 1 < cut.length; k += 2) { line.moveTo(cut[k][0], cut[k][1]); line.lineTo(cut[k + 1][0], cut[k + 1][1]); }
+        }
+        return { fill, line, inside: (px, py) => { const X = Math.round(px / step), Y = Math.round(py / step); return X >= 0 && Y >= 0 && X < GW && Y < GH && at(X, Y) >= 0.55; } };
+    }
+
+    /** How many cells deep each body cell lies (0 = at the edge): organs sit deep, eyes at the rim. */
+    function depthOf(c) {
+        const d = new Int16Array(CELLS).fill(-1);
+        const q = [];
+        for (let i = 0; i < CELLS; i++) {
+            if (!c.eaten[i]) continue;
+            if (neighbours(i).some((j) => !c.eaten[j]) || neighbours(i).length < 4) { d[i] = 0; q.push(i); }
+        }
+        for (let h = 0; h < q.length; h++) {
+            const i = q[h];
+            for (const j of neighbours(i)) if (c.eaten[j] && d[j] < 0) { d[j] = d[i] + 1; q.push(j); }
+        }
+        return d;
+    }
+
+    /** The body's layer: membrane, tissue, vessels, the shading of its rim; and where the edge and the organs are. */
     function paintBody(s) {
         const c = cache(s), m = mapFor(s.seed, s.scale), cs = geo.cs;
         const o = offscreen(geo.w, geo.h);
@@ -190,64 +356,76 @@ export function createUnityView(canvas, opts = {}) {
         if (!tissue) tissue = makeTissue();
         const cells = s.order;
         const lx = (i) => (cx(i) + 0.5) * cs, ly = (i) => (cy(i) + 0.5) * cs;
-        // membrane, then tissue a little inside it: the union of discs reads as one soft mass
-        g.fillStyle = VT.fDark;
-        g.beginPath();
-        for (const i of cells) { g.moveTo(lx(i) + cs * 0.82, ly(i)); g.arc(lx(i), ly(i), cs * 0.82, 0, Math.PI * 2); }
-        g.fill();
-        g.fillStyle = tissue;
-        g.beginPath();
-        for (const i of cells) { g.moveTo(lx(i) + cs * 0.7, ly(i)); g.arc(lx(i), ly(i), cs * 0.7, 0, Math.PI * 2); }
-        g.fill();
-        // the edge cells (body next to ground) and the interior
-        const edge = [], inner = [];
-        for (const i of cells) {
-            let n = 0;
-            for (const j of neighbours(i)) n += c.eaten[j];
-            (n < neighbours(i).length ? edge : inner).push(i);
-        }
-        // vessels: from the heart out to the edge, branching a little
+        const shape = contour(c, cs);
+        // membrane: a dark lip around the mass
+        g.lineJoin = 'round'; g.lineCap = 'round';
+        g.strokeStyle = VT.fDark; g.lineWidth = Math.max(2, cs * 0.45); g.stroke(shape.line);
+        g.fillStyle = VT.fDark; g.fill(shape.fill);
+        g.save();
+        g.clip(shape.fill);
+        g.fillStyle = tissue; g.fillRect(0, 0, geo.w, geo.h);
+        // depth: the rim is darker, the middle wet
+        g.strokeStyle = 'rgba(8,2,4,0.45)'; g.lineWidth = cs * 1.6; g.stroke(shape.line);
+        g.strokeStyle = 'rgba(8,2,4,0.35)'; g.lineWidth = cs * 0.7; g.stroke(shape.line);
+        const depth = depthOf(c);
+        // vessels: trunks out from the heart that wander, branch and thin, the way the vault's do
         const heart = cells.length ? cells[0] : m.start;
         const hx = lx(heart), hy = ly(heart);
-        const R = rng(cells.length * 0.13 + s.scale);
-        const pick = edge.slice().sort((a, b) => Math.atan2(ly(a) - hy, lx(a) - hx) - Math.atan2(ly(b) - hy, lx(b) - hx));
-        const N = Math.min(pick.length, 16);
+        const R = rng(cells.length * 0.137 + s.scale + 0.5);
         const vessels = [];
-        for (let k = 0; k < N; k++) {
-            const tgt = pick[Math.floor((k / N) * pick.length)];
-            const tx = lx(tgt), ty = ly(tgt);
-            const pts = [[hx, hy]];
-            const steps = Math.max(3, Math.round(Math.hypot(tx - hx, ty - hy) / (cs * 1.5)));
-            for (let st = 1; st <= steps; st++) {
-                const u = st / steps;
-                const j = (1 - Math.abs(u - 0.5) * 2) * cs * 0.9;
-                pts.push([hx + (tx - hx) * u + (R() - 0.5) * j, hy + (ty - hy) * u + (R() - 0.5) * j]);
+        const maxLen = Math.max(4, Math.sqrt(cells.length) * 1.4);
+        function grow(x, y, a, wid, depthLeft, len) {
+            const pts = [[x, y]];
+            for (let st = 0; st < len; st++) {
+                a += (R() - 0.5) * 0.7;
+                const nx = x + Math.cos(a) * cs * 0.8, ny = y + Math.sin(a) * cs * 0.8;
+                if (!shape.inside(nx, ny)) break;
+                x = nx; y = ny; pts.push([x, y]);
+                if (depthLeft > 0 && st > 1 && R() < 0.22) grow(x, y, a + (R() < 0.5 ? -1 : 1) * (0.5 + R() * 0.5), wid * 0.62, depthLeft - 1, len * 0.6);
             }
-            vessels.push({ pts, wid: Math.max(1.2, Math.min(3.4, cs * 0.22)), delay: R() });
+            if (pts.length > 2) vessels.push({ pts, wid, delay: R() });
         }
-        g.lineJoin = 'round'; g.lineCap = 'round';
+        const trunks = Math.min(7, 3 + Math.floor(cells.length / 60));
+        for (let k = 0; k < trunks; k++) grow(hx, hy, (k / trunks) * Math.PI * 2 + R() * 0.6, Math.max(1.4, Math.min(3.6, cs * 0.24)), 3, Math.round(maxLen));
         for (const v of vessels) {
-            const path = () => { g.beginPath(); g.moveTo(v.pts[0][0], v.pts[0][1]); for (const p of v.pts) g.lineTo(p[0], p[1]); };
+            const path = () => {
+                g.beginPath(); g.moveTo(v.pts[0][0], v.pts[0][1]);
+                for (let k = 1; k < v.pts.length - 1; k++) g.quadraticCurveTo(v.pts[k][0], v.pts[k][1], (v.pts[k][0] + v.pts[k + 1][0]) / 2, (v.pts[k][1] + v.pts[k + 1][1]) / 2);
+                const l = v.pts[v.pts.length - 1]; g.lineTo(l[0], l[1]);
+            };
             path(); g.strokeStyle = VT.fArtery; g.lineWidth = v.wid + 2; g.stroke();
             path(); g.strokeStyle = VT.fCore; g.lineWidth = v.wid; g.stroke();
             g.save(); g.translate(-v.wid * 0.25, -v.wid * 0.25);
             path(); g.strokeStyle = 'rgba(255,170,175,0.2)'; g.lineWidth = Math.max(0.5, v.wid * 0.25); g.stroke();
             g.restore();
         }
-        // where the organs sit (seeded among the inner cells; nails and ears on the edge)
+        g.restore();
+        // a wet line along the top of the rim
+        g.save(); g.translate(-1, -1.5); g.strokeStyle = 'rgba(255,170,175,0.12)'; g.lineWidth = 1; g.stroke(shape.line); g.restore();
+        // where the organs sit: eyes in the rim, the rest deep in the mass
+        const edge = [], inner = [];
+        for (const i of cells) { if (depth[i] === 0) edge.push(i); else if (depth[i] >= 2) inner.push(i); }
+        const rim = cells.filter((i) => depth[i] === 1);
         const spots = inner.slice().sort((a, b) => hash(a * 1.7 + s.scale) - hash(b * 1.7 + s.scale));
+        const rimSpots = (rim.length ? rim : edge).slice().sort((a, b) => hash(a * 2.9) - hash(b * 2.9));
         const edgeSpots = edge.slice().sort((a, b) => hash(a * 2.3) - hash(b * 2.3));
         const organs = [];
-        let k = 0;
         const want = (o2, max) => (s.unlocked[o2] ? Math.max(1, Math.min(max, Math.round(share(s, o2) * 40))) : 0);
-        for (const [o2, max] of [['eyes', 8], ['brain', 4], ['intestines', 3], ['lungs', 3], ['stomach', 2], ['muscle', 4], ['fat', 5], ['bone', 4]]) {
+        let k = 0, r = 0, e = 0;
+        for (let q = 0; q < want('eyes', 8) && r < rimSpots.length; q++) organs.push({ o: 'eyes', i: rimSpots[r++], seed: hash(r * 3.7) });
+        for (const [o2, max] of [['brain', 3], ['intestines', 3], ['lungs', 3], ['stomach', 2], ['muscle', 4], ['fat', 5], ['bone', 4]]) {
             const n = want(o2, max);
             for (let q = 0; q < n && k < spots.length; q++) organs.push({ o: o2, i: spots[k++], seed: hash(k * 3.1) });
         }
-        let e = 0;
-        for (const [o2, max] of [['nails', 14], ['ears', 4]]) {
+        for (const [o2, max] of [['nails', 16], ['ears', 4]]) {
             const n = want(o2, max);
             for (let q = 0; q < n && e < edgeSpots.length; q++) organs.push({ o: o2, i: edgeSpots[e++], seed: hash(e * 5.7) });
+        }
+        // nails face out: the way to the nearest ground
+        for (const org of organs) {
+            if (org.o !== 'nails' && org.o !== 'ears') continue;
+            const out = neighbours(org.i).find((j) => !c.eaten[j]);
+            org.face = out != null ? Math.atan2(cy(out) - cy(org.i), cx(out) - cx(org.i)) : org.seed * 6.28;
         }
         // intestines: a winding path through neighbouring inner cells (a walk, seeded)
         for (const org of organs) {
@@ -255,19 +433,40 @@ export function createUnityView(canvas, opts = {}) {
             const walk = [org.i];
             let cur = org.i;
             const R2 = rng(org.i + 0.5);
-            for (let st = 0; st < 10; st++) {
-                const nb = neighbours(cur).filter((j) => c.eaten[j] && !walk.includes(j));
+            for (let st = 0; st < 12; st++) {
+                const nb = neighbours(cur).filter((j) => c.eaten[j] && depth[j] >= 1 && !walk.includes(j));
                 if (!nb.length) break;
                 cur = nb[Math.floor(R2() * nb.length)];
                 walk.push(cur);
             }
             org.walk = walk.map((j) => [lx(j) + (R2() - 0.5) * cs * 0.4, ly(j) + (R2() - 0.5) * cs * 0.4]);
         }
-        // the far points of the body, for the camera of the zoom
         let sx = 0, sy = 0;
         for (const i of cells) { sx += lx(i); sy += ly(i); }
         const n = Math.max(1, cells.length);
-        return { c: o.c, vessels, edge, organs, heart: [hx, hy], mid: [sx / n, sy / n] };
+        return { c: o.c, vessels, edge, organs, heart: [hx, hy], mid: [sx / n, sy / n], line: shape.line, fill: shape.fill, depth };
+    }
+
+    /** The unseen (county and out): a soft darkness past what the eyes reach. */
+    function paintFog(s, sight) {
+        const c = cache(s);
+        const d = new Float32Array(CELLS).fill(1e9);
+        const q = [];
+        for (let i = 0; i < CELLS; i++) if (c.eaten[i]) { d[i] = 0; q.push(i); }
+        for (let h = 0; h < q.length; h++) {
+            const i = q[h];
+            for (const j of neighbours(i)) if (d[j] > d[i] + 1) { d[j] = d[i] + 1; q.push(j); }
+        }
+        const px = document.createElement('canvas'); px.width = MAP_W; px.height = MAP_H;
+        const pg = px.getContext('2d');
+        const img = pg.createImageData ? pg.createImageData(MAP_W, MAP_H) : null;
+        if (!img || !img.data) return null;
+        for (let i = 0; i < CELLS; i++) {
+            const a = Math.max(0, Math.min(1, (d[i] - sight) / 5));
+            img.data.set([4, 5, 8, Math.round(a * 175)], i * 4);
+        }
+        pg.putImageData(img, 0, 0);
+        return px;
     }
 
     // ---------------------------------------------------------------- the storm
@@ -285,7 +484,7 @@ export function createUnityView(canvas, opts = {}) {
         for (let i = 0; i < CELLS; i++) {
             const v = stormAt(m, i, s.t, s.scale);
             if (v > 0) any = true;
-            d[i * 4] = 4; d[i * 4 + 1] = 5; d[i * 4 + 2] = 8; d[i * 4 + 3] = Math.round(v * 205);
+            d[i * 4] = 4; d[i * 4 + 1] = 5; d[i * 4 + 2] = 8; d[i * 4 + 3] = Math.min(235, Math.round(v * 205));
         }
         storm.any = any;
         storm.g.putImageData(storm.img, 0, 0);
@@ -356,8 +555,9 @@ export function createUnityView(canvas, opts = {}) {
                 if (!org.walk || org.walk.length < 2) break;
                 const path = () => { ctx.beginPath(); ctx.moveTo(org.walk[0][0] + geo.x, org.walk[0][1] + geo.y); for (const p of org.walk) ctx.lineTo(p[0] + geo.x, p[1] + geo.y); };
                 ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+                // under the skin: dark, the tube a little sunk
                 path(); ctx.strokeStyle = VT.fDark; ctx.lineWidth = cs * 0.55; ctx.stroke();
-                path(); ctx.strokeStyle = rgba(VT.fMuscle, 1); ctx.lineWidth = cs * 0.4; ctx.stroke();
+                path(); ctx.strokeStyle = rgba(VT.fMuscle, 0.8); ctx.lineWidth = cs * 0.4; ctx.stroke();
                 path(); ctx.strokeStyle = 'rgba(255,170,175,0.16)'; ctx.lineWidth = cs * 0.12; ctx.stroke();
                 // food moving one way
                 const u = (t * 0.35 + org.seed) % 1;
@@ -398,28 +598,42 @@ export function createUnityView(canvas, opts = {}) {
                 break;
             }
             case 'fat': {
-                ctx.fillStyle = rgba(VT.lamp, 0.28);
-                ctx.beginPath(); ctx.ellipse(x, y, r * 0.9, r * 0.7, org.seed, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = rgba(VT.lamp, 0.18);
-                ctx.beginPath(); ctx.ellipse(x + r * 0.4, y + r * 0.2, r * 0.6, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+                // pale soft layers, one over the other
+                for (let q = 0; q < 3; q++) {
+                    ctx.fillStyle = rgba(q % 2 ? VT.lamp : VT.fBone, 0.16 + q * 0.04);
+                    ctx.beginPath(); ctx.ellipse(x + (q - 1) * r * 0.35, y + (q - 1) * r * 0.15, r * (1.1 - q * 0.2), r * (0.75 - q * 0.12), org.seed, 0, Math.PI * 2); ctx.fill();
+                }
                 break;
             }
             case 'bone': {
-                ctx.strokeStyle = rgba(VT.fBone, 0.75); ctx.lineWidth = cs * 0.16; ctx.lineCap = 'round';
-                ctx.beginPath(); ctx.arc(x, y + r, r * 1.4, Math.PI * 1.15 + org.seed, Math.PI * 1.85 + org.seed); ctx.stroke();
+                // white arcs through the mass, two ribs
+                ctx.strokeStyle = rgba(VT.fBone, 0.8); ctx.lineCap = 'round';
+                for (let q = 0; q < 2; q++) {
+                    ctx.lineWidth = cs * (0.16 - q * 0.04);
+                    ctx.beginPath(); ctx.arc(x, y + r * (1 + q * 0.5), r * (1.4 + q * 0.4), Math.PI * 1.15 + org.seed, Math.PI * 1.85 + org.seed); ctx.stroke();
+                }
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.7;
+                ctx.beginPath(); ctx.arc(x, y + r, r * 1.4, Math.PI * 1.25 + org.seed, Math.PI * 1.6 + org.seed); ctx.stroke();
                 break;
             }
             case 'nails': {
-                // a hard plate at the edge, facing out
-                ctx.save(); ctx.translate(x, y); ctx.rotate(org.seed * 6.28);
-                ctx.fillStyle = rgba(VT.plate, 0.85); ctx.beginPath(); ctx.roundRect(-r * 0.6, -r * 0.4, r * 1.2, r * 0.8, r * 0.25); ctx.fill();
-                ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-r * 0.4, -r * 0.2); ctx.lineTo(r * 0.3, -r * 0.25); ctx.stroke();
+                // a hard plate set in the rim, facing out, glossy
+                ctx.save(); ctx.translate(x, y); ctx.rotate((org.face ?? 0) + Math.PI / 2);
+                ctx.fillStyle = VT.fDark; ctx.beginPath(); ctx.roundRect(-r * 0.7, -r * 0.5, r * 1.4, r * 0.95, r * 0.3); ctx.fill();
+                const lg = ctx.createLinearGradient(0, -r * 0.45, 0, r * 0.4);
+                lg.addColorStop(0, rgba(VT.plate, 0.95)); lg.addColorStop(1, rgba(VT.fBone, 0.55));
+                ctx.fillStyle = lg; ctx.beginPath(); ctx.roundRect(-r * 0.6, -r * 0.42, r * 1.2, r * 0.8, r * 0.25); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-r * 0.4, -r * 0.25); ctx.lineTo(r * 0.35, -r * 0.3); ctx.stroke();
                 ctx.restore();
                 break;
             }
             case 'ears': {
-                ctx.strokeStyle = rgba(VT.fBone, 0.6); ctx.lineWidth = 1.2;
-                for (let q = 1; q <= 3; q++) { ctx.beginPath(); ctx.arc(x, y, r * 0.3 * q, -0.8 + org.seed * 3, 1.4 + org.seed * 3); ctx.stroke(); }
+                // funnels turned toward where the storms come from (the west), the rings breathing
+                ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI);
+                ctx.fillStyle = rgba(VT.fMuscle, 0.9); ctx.beginPath(); ctx.moveTo(0, -r * 0.25); ctx.lineTo(r * 1.2, -r * 0.8); ctx.lineTo(r * 1.2, r * 0.8); ctx.lineTo(0, r * 0.25); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = rgba(VT.fBone, 0.45); ctx.lineWidth = 1;
+                for (let q = 1; q <= 3; q++) { const w = q / 3; ctx.beginPath(); ctx.ellipse(r * 1.2 * w, 0, r * 0.12, r * (0.25 + 0.55 * w) * (1 + Math.sin(t * 2 + q) * 0.04), 0, 0, Math.PI * 2); ctx.stroke(); }
+                ctx.restore();
                 break;
             }
             default: break;
@@ -441,6 +655,25 @@ export function createUnityView(canvas, opts = {}) {
         if (!body || (body.key !== bk && now - body.at > 250)) body = { key: bk, at: now, ...paintBody(s) };
         stepStorm(s, now);
         const hb = beat(t);
+        // the sea shimmers, faintly
+        if (ground.c.sea && ground.c.sea.length) {
+            ctx.strokeStyle = rgba(VT.cold, 0.10); ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (const i of ground.c.sea) {
+                const ph = Math.sin(t * 0.8 + i * 1.7);
+                if (ph < 0.6) continue;
+                const [x, y] = centre(i);
+                ctx.moveTo(x - geo.cs * 0.3, y + ph); ctx.lineTo(x + geo.cs * 0.3, y + ph);
+            }
+            ctx.stroke();
+        }
+        // the unseen: soft darkness past what the eyes reach (county and out)
+        if (s.scale >= 1) {
+            const sight = Math.round(ui.sight || 3);
+            const fk = `${body.key}|${sight}`;
+            if (!fog || (fog.key !== fk && now - fog.at > 400)) fog = { key: fk, at: now, c: paintFog(s, sight) };
+            if (fog.c) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(fog.c, geo.x - geo.cs * 0.5, geo.y - geo.cs * 0.5, geo.w + geo.cs, geo.h + geo.cs); ctx.restore(); }
+        }
         ctx.drawImage(body.c, geo.x, geo.y, geo.w, geo.h);
         // the heart: a dark knot that beats where the body came up
         const [hx, hy] = [geo.x + body.heart[0], geo.y + body.heart[1]];
@@ -449,22 +682,47 @@ export function createUnityView(canvas, opts = {}) {
         rg.addColorStop(0, rgba(VT.pulse, 0.55 + hb * 0.35)); rg.addColorStop(0.5, rgba(VT.fCore, 0.5)); rg.addColorStop(1, rgba(VT.fCore, 0));
         ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(hx, hy, hr * 1.6, 0, Math.PI * 2); ctx.fill();
         // the pulse running out along the vessels to the edge
+        ctx.save(); ctx.beginPath(); ctx.translate(geo.x, geo.y); ctx.clip(body.fill); ctx.translate(-geo.x, -geo.y);
         pulses(body.vessels, t, 0.55 + 0.45 * hb);
-        // the edge: a red line of light that breathes with the heart; brighter where it eats
-        ctx.save();
-        ctx.strokeStyle = rgba(VT.pulse, 0.22 + 0.3 * hb); ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        for (const i of body.edge) { const [x, y] = centre(i); ctx.moveTo(x + geo.cs * 0.78, y); ctx.arc(x, y, geo.cs * 0.78, 0, Math.PI * 2); }
-        ctx.stroke();
-        if (s.ex && s.ex.auto) {
-            for (const i of front(s, 6)) {
-                const [x, y] = centre(i);
-                const gl = ctx.createRadialGradient(x, y, 1, x, y, geo.cs * 1.1);
-                gl.addColorStop(0, `rgba(255,80,96,${0.35 + 0.35 * hb})`); gl.addColorStop(1, 'rgba(255,80,96,0)');
-                ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, geo.cs * 1.1, 0, Math.PI * 2); ctx.fill();
-            }
-        }
         ctx.restore();
+        // the edge: a red line of light that breathes with the heart
+        ctx.save();
+        ctx.translate(geo.x, geo.y);
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = rgba(VT.pulse, 0.25 + 0.35 * hb); ctx.lineWidth = 1.6;
+        ctx.stroke(body.line);
+        ctx.strokeStyle = rgba(VT.pulse, 0.08 + 0.1 * hb); ctx.lineWidth = 6;
+        ctx.stroke(body.line);
+        ctx.restore();
+        // where it eats: the flesh bulges into the next cells and nibbles at them
+        if (s.ex && s.ex.auto) {
+            const bite = Math.max(0, Math.min(1, s.bite || 0));
+            ctx.save();
+            for (const [k, i] of front(s, 6).entries()) {
+                const [x, y] = centre(i);
+                const near = neighbours(i).find((j) => cache(s).eaten[j]);
+                const [nx, ny] = near != null ? centre(near) : [x, y];
+                const u = 0.35 + 0.55 * ((bite + k * 0.17) % 1);
+                const bx = nx + (x - nx) * u, by = ny + (y - ny) * u;
+                const r = geo.cs * (0.45 + 0.15 * Math.sin(t * 6 + k));
+                ctx.fillStyle = VT.fDark; ctx.beginPath(); ctx.arc(bx, by, r * 1.15, 0, Math.PI * 2); ctx.fill();
+                ctx.save(); ctx.translate(geo.x, geo.y); ctx.fillStyle = tissue; ctx.beginPath(); ctx.arc(bx - geo.x, by - geo.y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                const gl = ctx.createRadialGradient(bx, by, 1, bx, by, geo.cs * 1.2);
+                gl.addColorStop(0, `rgba(255,80,96,${0.3 + 0.35 * hb})`); gl.addColorStop(1, 'rgba(255,80,96,0)');
+                ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(bx, by, geo.cs * 1.2, 0, Math.PI * 2); ctx.fill();
+                // the nibble: a ragged lip toward the ground
+                const a = Math.atan2(y - ny, x - nx);
+                ctx.strokeStyle = `rgba(255,120,130,${0.4 + 0.4 * Math.abs(Math.sin(t * 9 + k))})`; ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                for (let q = -3; q <= 3; q++) {
+                    const aa = a + q * 0.25, rr = r * (q % 2 ? 0.85 : 1.05);
+                    const px2 = bx + Math.cos(aa) * rr, py2 = by + Math.sin(aa) * rr;
+                    if (q === -3) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
         ui.organScale = Math.max(1, Math.min(2.6, Math.sqrt(s.order.length) / 12));
         for (const org of body.organs) organ(org, t, hb, s, ui);
         drawStorm(s, t);
@@ -543,34 +801,57 @@ export function createUnityView(canvas, opts = {}) {
     }
 
     // ---------------------------------------------------------------- the zoom out
-    /** The camera pulls out (ms): the map shrinks around the body until the body is a dot. */
-    function startZoom(ms, ratio) {
+    /**
+     * The camera pulls out (ms): the map shrinks around the body until the body is a dot with the body's own shape,
+     * and the next map fades in around it, so the dot sits where it will be on the new ground.
+     */
+    function startZoom(ms, ratio, s) {
         const snap = offscreen(W, H);
         snap.g.drawImage(canvas, 0, 0, W, H);
         const from = body ? [geo.x + body.mid[0], geo.y + body.mid[1]] : [geo.x + geo.w / 2, geo.y + geo.h / 2];
+        let next = null, at = null;
+        if (s && s.scale < 4) {
+            const ns = { seed: s.seed, scale: s.scale + 1 };
+            next = paintGround(ns);
+            const m = mapFor(s.seed, s.scale + 1);
+            at = [(cx(m.start) + 0.5) * geo.cs, (cy(m.start) + 0.5) * geo.cs];
+        }
         view.busy = true;
-        return new Promise((resolve) => { zoom = { t0: performance.now(), ms, snap: snap.c, from, ratio: ratio || 10, resolve }; });
+        return new Promise((resolve) => { zoom = { t0: performance.now(), ms, snap: snap.c, body: body ? body.c : null, from, ratio: ratio || 10, next, at, resolve }; });
     }
     function drawZoom(now) {
         const u = Math.min(1, (now - zoom.t0) / zoom.ms);
         const e = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
         const k = 1 / (1 + (zoom.ratio - 1) * e);
         const [fx, fy] = zoom.from;
-        const tx = fx + (geo.x + geo.w / 2 - fx) * e, ty = fy + (geo.y + geo.h / 2 - fy) * e;
+        // the anchor moves from where the body is to where it will be on the next map
+        const end = zoom.at ? [geo.x + zoom.at[0], geo.y + zoom.at[1]] : [geo.x + geo.w / 2, geo.y + geo.h / 2];
+        const tx = fx + (end[0] - fx) * e, ty = fy + (end[1] - fy) * e;
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = VT.ink; ctx.fillRect(0, 0, W, H);
+        // the next map: from very near (its cells as big as the city) to where it belongs, fading in
+        if (zoom.next) {
+            const kn = zoom.ratio * k;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, e * 1.3);
+            ctx.translate(tx, ty); ctx.scale(kn, kn); ctx.translate(-zoom.at[0], -zoom.at[1]);
+            ctx.drawImage(zoom.next, 0, 0, geo.w, geo.h);
+            ctx.restore();
+        }
+        // the old picture shrinks and fades; the body stays, the same shape, smaller
         ctx.save();
         ctx.translate(tx, ty); ctx.scale(k, k); ctx.translate(-fx, -fy);
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = 1 - e;
         ctx.drawImage(zoom.snap, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+        if (zoom.body) ctx.drawImage(zoom.body, geo.x, geo.y, geo.w, geo.h);
         ctx.restore();
-        // the body becomes a dot: a red point that beats where it was
         const hb = beat(now / 1000);
-        ctx.fillStyle = rgba(VT.pulse, Math.min(1, e * 1.5) * (0.6 + 0.4 * hb));
-        ctx.beginPath(); ctx.arc(tx, ty, 2 + 3 * e + hb * 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = rgba(VT.pulse, e * (0.35 + 0.35 * hb));
+        ctx.beginPath(); ctx.arc(tx, ty, 2 + 2 * e + hb, 0, Math.PI * 2); ctx.fill();
         if (u >= 1) {
             const r = zoom.resolve;
-            zoom = null; view.busy = false; body = null; ground = null;
+            zoom = null; view.busy = false; body = null; ground = null; fog = null;
             r();
         }
     }

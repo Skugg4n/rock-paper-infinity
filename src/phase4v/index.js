@@ -521,12 +521,14 @@ export function init() {
         selected = -1; paintInfo();
         root.classList.add('is-rising');
         await view.rise(RISE_MS);
-        toUnity();
+        toUnity(true);
     }
     /** The card, then chapter V with the people in the body as its minds. */
-    function toUnity() {
+    function toUnity(fresh = false) {
         save();
-        try { if (!localStorage.getItem(UNITY_KEY)) localStorage.setItem(UNITY_KEY, serializeUnity(fromVault(s.here))); } catch { /* full */ }
+        // the rise just happened: a new chapter V with the people in the body (s.here) as its minds; a reload after
+        // the rise keeps the chapter V that is already there
+        try { if (fresh || !localStorage.getItem(UNITY_KEY)) localStorage.setItem(UNITY_KEY, serializeUnity(fromVault(s.here))); } catch { /* full */ }
         playChapterCard({ roman: 'V', title: 'UNITY', dark: true, hold: 2200, onMidpoint: () => setPhase(phases.UNITY) });
     }
 
@@ -570,7 +572,7 @@ export function init() {
 
     // ---------------------------------------------------------------- the arrival
     if (s.risen) {
-        timers.push(setTimeout(toUnity, 0));
+        timers.push(setTimeout(() => toUnity(false), 0));
     } else if (fresh || !s.introDone) {
         introUntil = performance.now() + INTRO_MS;
         s.introDone = true;

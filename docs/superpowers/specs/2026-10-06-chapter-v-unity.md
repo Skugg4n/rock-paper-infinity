@@ -305,3 +305,83 @@ Balanced, en rad i minuten:
 38:00  planet    35 % of the surface NUT +23 B/d  MASS +0.3 M km²/d  POW 127%  THO 11 130/26 532 ins 7.1    red -
 38:54  planet    45 % of the surface NUT +52 B/d  MASS +0.8 M km²/d  POW 138%  THO 26 923/26 924            red -
 ```
+
+## Built (unity), fas C
+
+Tempo och utseende efter koordinatorns lista (2026-10-08). Regler och ritkod; ingen webbläsare än.
+
+**Tempo (regler).**
+- Ett litet I–V-experiment för varje odlat organ (THICKER WALLS, QUICKER NERVES, WIDER EYES, FINER FILTERS, LONGER LOOPS,
+  MORE FOLDS, HARDER NAILS, KEENER EARS, STRONGER PULL, DENSER FAT, HEAVIER BONE), utöver FIBRE/ACID/VESSELS.
+- Priser följer tanken: när ett experiment tänds fryses priset till tankens takt just då gånger 80 s för de stora
+  (aldrig över specens pris, aldrig under en tredjedel av det; AUTONOMIC EDGE behåller 400) och 22 + 9 per nivå sekunder
+  för de små. Ett stort experiment är alltså ungefär en och en halv minut bort när det tänds.
+- Stormvågor: var 60:e sekund sveper en front från väster i 15 s, starkare än vanlig storm (1,6 till 2 gånger). Den första
+  når staden vid 3:20, så `Thin.` blir rött och GRAVEL IN THE SKIN är svaret.
+- Länet: gift i en båge 6–8 rutor från starten (biter inom en minut) och en djup flod halvvägs ut som bara WE CAN PULL
+  korsar (`Stuck.`). Landet: en bergskedja tvärs över med några pass.
+- Ett hinder som bara ett experiment löser biter först när det täcker mer än en fjärdedel av kanten, och ett ord som ett
+  reglage kan hjälpa sägs före ett som väntar på ett experiment.
+- Insikt: människorna ger den alltid, en fjärdedel så fort under taket som vid taket.
+- Länet, landet och kontinenten äts lite långsammare (ACID 0,62 av staden-skalan gånger 1/0,8), så att fas 2 blir längre igen.
+- Simmen mäter nu flaskhalsen som spelaren ser den: det röda ordet, annars det gula, annars den lägsta faktorn.
+
+| Stil | Slut | Staden klar | Zoomar | Flaskhalsbyten fas 2 | Längsta flaskhals fas 2 | Längsta utan beslut |
+|---|---|---|---|---|---|---|
+| balanced | 35:21 | 7:58 | 7:58 13:18 19:55 26:09 | 108 | 99 s | 24 s |
+| skin | 35:28 | 8:33 | 8:33 16:09 22:12 28:10 | 69 | 113 s | 36 s |
+| heart | 37:05 | 8:16 | 8:16 13:28 19:58 26:29 | 109 | 92 s | 31 s |
+| mind | 34:45 | 7:57 | 7:57 14:29 20:40 26:25 | 54 | 101 s | 24 s |
+
+Nära målen men inte helt: flaskhalsen står som längst 92–113 s (mål 90), längsta glapp 24–36 s (mål 30), mind-stilen
+slutar 15 s under 35 min. De längsta flaskhalsarna är nu `Starving.` mot bergskedjan medan ACID FOR GRANITE tänks fram.
+
+**Utseende (ritkod).** Kroppen är en mjuk form: ett fält över de uppätna rutorna, utjämnat och samplat dubbelt så fint,
+skuret med marching squares; köttet klipps till formen, kanten är mörk och glöder i hjärtats takt, och där kanten äter
+buktar köttet ut och nafsar. Kärlen växer som i valvet: stammar från hjärtat som vandrar, grenar sig och tunnas ut, ritade
+som kurvor. Ögonen sitter i kanten och vänder sig mot det de ser; övriga organ djupt i massan; naglar i kanten vända utåt;
+öron som trattar mot väster (stormarna); fett som bleka mjuka lager; ben som vita bågar; tarmen under huden. Länet och
+utåt: mjuka fält (rutorna som en pixel var, uppskalade och suddade) med floder, vägar, ruiner, granitstreck och giftfläckar
+som fin detalj; havet mörkt med svagt skimmer. Det osedda bortom ögonens räckvidd är ett mjukt mörker som drar sig undan när
+ögonen växer. Zoomen: nästa karta tonar in runt kroppen medan den krymper, och kroppen behåller sin form.
+
+Balanced, en rad i minuten:
+
+```
+ 1:00  city      0.2 km²            NUT +357/d  MASS +0 km²/d  POW 94%  THO 250/2 000 ins 1.4              red Starving.
+ 2:00  city      0.6 km²            NUT +244/d  MASS +0 km²/d  POW 90%  THO 131/2 000 ins 1.9              red -
+ 3:00  city      1.2 km²            NUT +1 245/d  MASS +0 km²/d  POW 102%  THO 45/2 000 ins 3.4            red -
+ 4:00  city      2.2 km²            NUT +1 047/d  MASS +0 km²/d  POW 118%  THO 123/2 000 ins 4.8           red -
+ 5:00  city      3.8 km²            NUT +2 550/d  MASS +0 km²/d  POW 146%  THO 6/2 000 ins 6.3             red -
+ 6:00  city      5.8 km²            NUT +2 572/d  MASS +0 km²/d  POW 147%  THO 57/2 000 ins 7.7            red -
+ 7:00  city      8.5 km²            NUT +3 006/d  MASS +0 km²/d  POW 173%  THO 13/2 000 ins 9.2            red -
+ 8:04  county    11 km²             NUT +2 805/d  MASS +1 km²/d  POW 165%  THO 266/1 778 ins 7.6           red Thin.
+ 9:00  county    66 km²             NUT +86 686/d  MASS +1 km²/d  POW 115%  THO 281/4 775 ins 9.5          red Choking.
+10:00  county    151 km²            NUT +0.1 M/d  MASS +3 km²/d  POW 122%  THO 920/3 487 ins 12.1          red Choking.
+11:00  county    337 km²            NUT +0.2 M/d  MASS +3 km²/d  POW 151%  THO 322/2 904 ins 14.6          red -
+12:00  county    583 km²            NUT +0.1 M/d  MASS +5 km²/d  POW 193%  THO 2 681/2 934 ins 17.1        red -
+13:00  county    1 121 km²          NUT +0.8 M/d  MASS +7 km²/d  POW 82%  THO 1 488/4 459 ins 19.6         red Far from the gut.
+14:00  country   5 906 km²          NUT +13 M/d  MASS +135 km²/d  POW 74%  THO 2 239/4 629 ins 22.6        red Starving.
+15:00  country   11 977 km²         NUT +6.2 M/d  MASS +72 km²/d  POW 59%  THO 1 208/4 977 ins 27.1        red Starving.
+16:00  country   16 023 km²         NUT +4.6 M/d  MASS +79 km²/d  POW 74%  THO 224/4 979 ins 31.6          red Starving.
+17:00  country   23 844 km²         NUT +22 M/d  MASS +338 km²/d  POW 100%  THO 1 495/4 926 ins 36.1       red -
+18:00  country   46 922 km²         NUT +30 M/d  MASS +443 km²/d  POW 313%  THO 1 108/3 620 ins 40.6       red -
+19:00  country   78 258 km²         NUT +44 M/d  MASS +517 km²/d  POW 380%  THO 2 119/3 593 ins 45.0       red -
+20:02  continent 112 500 km²        NUT +40 M/d  MASS +4 096 km²/d  POW 479%  THO 1 433/9 089 ins 49.2     red Thin.
+21:00  continent 815 625 km²        NUT +937 M/d  MASS +15 314 km²/d  POW 194%  THO 3 602/7 381 ins 55.5   red Thin.
+22:00  continent 1.8 M km²          NUT +1.1 B/d  MASS +19 759 km²/d  POW 175%  THO 5 505/8 080 ins 63.0   red -
+23:00  continent 3.3 M km²          NUT +491 M/d  MASS +25 664 km²/d  POW 235%  THO 2 352/6 040 ins 70.6   red -
+24:00  continent 4.6 M km²          NUT +824 M/d  MASS +17 942 km²/d  POW 275%  THO 2 504/6 040 ins 78.1   red -
+25:00  continent 6.1 M km²          NUT +1.0 B/d  MASS +26 719 km²/d  POW 172%  THO 2 807/10 889 ins 85.7  red -
+26:00  continent 7.1 M km²          NUT +561 M/d  MASS +13 791 km²/d  POW 127%  THO 4 185/8 613 ins 93.3   red -
+27:00  planet    5 % of the surface NUT +2.4 B/d  MASS +80 052 km²/d  POW 81%  THO 7 619/21 248 ins 94.7   red Starving.
+28:00  planet    6 % of the surface NUT +2.2 B/d  MASS +37 919 km²/d  POW 24%  THO 10 067/20 513 ins 102.2 red Starving.
+29:00  planet    6 % of the surface NUT +5.3 B/d  MASS +42 856 km²/d  POW 27%  THO 10 405/20 299 ins 109.8 red Starving.
+30:00  planet    8 % of the surface NUT +7.1 B/d  MASS +0.2 M km²/d  POW 100%  THO 10 866/20 191 ins 117.3 red Starving.
+31:00  planet    11 % of the surface NUT +62 B/d  MASS +1.0 M km²/d  POW 128%  THO 11 096/20 152 ins 124.9  red Starving.
+32:00  planet    28 % of the surface NUT +85 B/d  MASS +1.4 M km²/d  POW 111%  THO 252/32 382 ins 132.5     red -
+33:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 122%  THO 14 369/36 451 ins 140.1     red -
+34:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 134%  THO 9 430/37 924 ins 147.6      red -
+35:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 141%  THO 19 189/38 640 ins 155.2     red -
+35:21  planet    31 % of the surface NUT +1.0 M/d  MASS +0.3 M km²/d  POW 185%  THO 178/38 796 ins 147.9    red -
+```

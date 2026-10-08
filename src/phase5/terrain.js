@@ -13,15 +13,19 @@ export const CELLS = MAP_W * MAP_H;
 export const ROCK = 0, PAPER = 1, SCISSORS = 2;
 export const CLASS_NAMES = ['ROCK', 'PAPER', 'SCISSORS'];
 /** Obstacles in the ground. */
-export const NONE = 0, POISON = 1, GRANITE = 2, SEA = 3, COLD = 4, RIVER = 5;
-export const OBST_NAMES = ['', 'poison', 'granite', 'sea', 'cold', 'river'];
+export const NONE = 0, POISON = 1, GRANITE = 2, SEA = 3, COLD = 4, RIVER = 5, DEEP = 6;
+export const OBST_NAMES = ['', 'poison', 'granite', 'sea', 'cold', 'river', 'deep river'];
 /** What a cell gives when eaten, by class, and the obstacles that replace it. */
 export const RICH = [1.0, 1.6, 1.3];
-export const OBST_RICH = { [POISON]: 1.9, [GRANITE]: 1.3, [SEA]: 0.6, [COLD]: 1.1, [RIVER]: 0.8 };
+export const OBST_RICH = { [POISON]: 1.9, [GRANITE]: 1.3, [SEA]: 0.6, [COLD]: 1.1, [RIVER]: 0.8, [DEEP]: 0.9 };
 /** The city's storm wall: this many cells in from the map's rim. */
 export const RIM = 4;
 /** The planet: continents' centres and sizes, in cells. */
 export const CONTINENTS = [[32, 20, 8], [9, 13, 5.5], [55, 12, 6], [11, 29, 5.5], [53, 29, 6], [32, 7, 4]];
+/** Storm waves: one every WAVE_S seconds, on for WAVE_ON, this strong by scale (more than 1 = more than a plain storm). */
+export const WAVE_S = 60;
+export const WAVE_ON = 15;
+export const WAVE = [1.6, 1.6, 1.8, 2, 0];
 /** Seconds of play before the moving storms reach the city. */
 export const CITY_WEATHER_AT = 200;
 
@@ -88,14 +92,23 @@ export function mapFor(seed, scale) {
                 // the county: fields and forest, rock hills, small towns
                 k = b > 0.68 ? SCISSORS : a > 0.62 ? ROCK : PAPER;
                 if (c > 0.56 && d > 0.25) obst[i] = POISON;
+                // poison close to where the body arrives (it bites within a minute), on one side
+                const rs = Math.hypot(x - mx, (y - my) * 1.3);
+                if (rs > 5.5 && rs < 8 && x > mx - 2 && a > 0.3) obst[i] = POISON;
+                // the deep river: halfway out, across the county; only muscle pulls the edge over it
+                const rx = mx + 15 + 3 * Math.sin(y * 0.35 + seed);
+                if (Math.abs(x - rx) < 1.1) obst[i] = DEEP;
             } else if (scale === 2) {
                 k = b > 0.66 ? SCISSORS : a > 0.55 ? ROCK : PAPER;
-                if (a > 0.64 && d > 0.3) obst[i] = GRANITE;
+                // a mountain chain across the country, halfway out, with a few passes
+                const ry = my - 9 + (x - mx) * 0.35 + 2.5 * Math.sin(x * 0.3 + seed);
+                if (Math.abs(y - ry) < 1.6 && c > 0.22) obst[i] = GRANITE;
+                else if (a > 0.66 && d > 0.3) obst[i] = GRANITE;
                 else if (c > 0.68 && d > 0.3) obst[i] = POISON;
             } else if (scale === 3) {
                 k = b > 0.64 ? SCISSORS : a > 0.5 ? ROCK : PAPER;
-                const coast = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) < 3 + c * 5;
-                if (coast || (c < 0.3 && d > 0.3)) obst[i] = SEA;
+                const coast = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y) < 2 + c * 3;
+                if (coast || (c < 0.22 && d > 0.3)) obst[i] = SEA;
                 else if (a > 0.66 && d > 0.25) obst[i] = GRANITE;
             } else {
                 // the planet: land in continents, sea between, cold at the poles
@@ -165,7 +178,15 @@ export function stormAt(m, i, t, scale) {
     // the city's own weather starts when the body is out in it (after the hand)
     if (scale === 0 && t < CITY_WEATHER_AT) return 0;
     const x = cx(i), y = cy(i);
+    // the waves: every WAVE_S a front sweeps the map from the west for WAVE_ON seconds
+    const tw = t - (scale === 0 ? CITY_WEATHER_AT : 0);
+    let wave = 0;
+    if (tw >= 0 && tw % WAVE_S < WAVE_ON) {
+        const front = (tw % WAVE_S) / WAVE_ON * (MAP_W + 30) - 15;
+        const dz = ((x + y * 0.3) - front) / 9;
+        wave = WAVE[scale] * Math.exp(-dz * dz);
+    }
     const s = Math.sin((x * 0.7 + y * 0.45) * 0.21 - t * 0.09 + m.seed) + Math.sin((x * 0.3 - y * 0.8) * 0.17 + t * 0.05);
     const v = (s - 1.2) / 0.8;
-    return v > 0 ? Math.min(1, v) : 0;
+    return Math.max(wave, v > 0 ? Math.min(1, v) : 0);
 }
