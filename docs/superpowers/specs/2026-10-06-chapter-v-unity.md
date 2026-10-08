@@ -249,56 +249,59 @@ Valv: 140 (länet), 260 (landet), 410 (kontinenten). Kartor: staden 14 km², lä
 
 | Stil | Slut | Staden klar | Zoomar | Flaskhalsbyten fas 2 | Längsta flaskhals fas 2 | Längsta utan beslut |
 |---|---|---|---|---|---|---|
-| balanced | 38:33 | 8:38 | 8:38 15:20 23:46 30:28 | 74 | 91 s | 43 s |
-| skin | 41:21 | 8:43 | 8:43 15:25 22:58 30:50 | 100 | 126 s | 58 s |
-| heart | 41:53 | 8:20 | 8:20 13:58 21:59 29:06 | 67 | 77 s | 59 s |
-| mind | 42:39 | 8:51 | 8:51 15:05 25:47 33:38 | 66 | 172 s | 51 s |
+| balanced | 38:54 | 8:21 | 8:21 14:28 22:20 29:12 | 69 | 121 s | 72 s |
+| skin | 41:15 | 8:48 | 8:48 16:12 24:45 32:16 | 68 | 151 s | 46 s |
+| heart | 38:57 | 8:29 | 8:29 14:22 22:11 29:29 | 75 | 185 s | 57 s |
+| mind | 42:55 | 8:21 | 8:21 14:04 25:48 33:15 | 54 | 231 s | 44 s |
 
-Mål: 35–45 min (ja, alla), staden 8–10 min (ja), flaskhalsen flyttar sig minst var 90:e s i fas 2 (balanced 91 s, heart
-77 s; hud- och tankestilen håller sin vikt mot det röda ordet och får längre perioder, skin-stilen mest `Thin.` mot havet
-på kontinenten), inget glapp över 30 s utan beslut (NEJ: 43–59 s, oftast i länet medan tanken räcker till FILTER LUNGS,
-och i slutet av kontinenten). Beslut räknas som: ett köp som går, ett rött eller gult ord med ett reglage, fel EDGE-läge.
+(Efter fas B: tankens faktor har ett golv på 0,7 så att `Slow mind.` bara lyser rött när kroppen själv inte har det
+värre. Det gör att flaskhalsen oftare ligger kvar på tanken, därav längre perioder än i första körningen, 91 s.)
+
+Mål: 35–45 min (ja, alla), staden 8–10 min (ja; i webbläsaren med en spelare som klickar: 8:06), flaskhalsen flyttar sig
+minst var 90:e s i fas 2 (NEJ: 121–231 s, oftast tanken som väntar på nästa stora experiment, och `Thin.` mot havet på
+kontinenten), inget glapp över 30 s utan beslut (NEJ: 44–72 s, oftast i länet medan tanken räcker till FILTER LUNGS, och
+i slutet av kontinenten). Beslut räknas som: ett köp som går, ett rött eller gult ord med ett reglage, fel EDGE-läge.
 
 Balanced, en rad i minuten:
 
 ```
  1:00  city      0.2 km²            NUT +357/d  MASS +0 km²/d  POW 94%  THO 250/2 000                      red Starving.
- 2:00  city      0.6 km²            NUT +280/d  MASS +0 km²/d  POW 77%  THO 152/2 000                      red Slow mind.
- 3:00  city      0.9 km²            NUT +500/d  MASS +0 km²/d  POW 55%  THO 134/2 000                      red Slow mind.
- 4:00  city      1.4 km²            NUT +798/d  MASS +0 km²/d  POW 106%  THO 88/2 000                      red -
- 5:00  city      2.5 km²            NUT +640/d  MASS +0 km²/d  POW 193%  THO 198/2 000                     red Starving.
- 6:00  city      4.3 km²            NUT +2 245/d  MASS +0 km²/d  POW 141%  THO 239/2 000                   red -
- 7:00  city      6.7 km²            NUT +3 560/d  MASS +0 km²/d  POW 116%  THO 53/2 000                    red Slow mind.
- 8:00  city      9.4 km²            NUT +2 689/d  MASS +0 km²/d  POW 120%  THO 715/2 000                   red -
- 9:00  county    17 km²             NUT +8 209/d  MASS +1 km²/d  POW 123%  THO 1 478/2 000                 red Thin.
-10:00  county    50 km²             NUT +19 411/d  MASS +0 km²/d  POW 28%  THO 325/2 580                   red Slow mind.
-11:00  county    77 km²             NUT +68 337/d  MASS +1 km²/d  POW 39%  THO 927/2 580                   red Weak pulse.
-12:00  county    216 km²            NUT +97 405/d  MASS +4 km²/d  POW 158%  THO 2 288/2 580                red Blind.
-13:00  county    443 km²            NUT +0.3 M/d  MASS +5 km²/d  POW 86%  THO 1 364/3 080                  red Blind.
-14:00  county    771 km²            NUT +0.3 M/d  MASS +8 km²/d  POW 106%  THO 80/80 ins 1.4               red Forgetting.
-15:00  county    1 156 km²          NUT +0.1 M/d  MASS +5 km²/d  POW 63%  THO 292/3 731                    red Weak pulse.
-16:00  country   2 023 km²          NUT +0.1 M/d  MASS +27 km²/d  POW 108%  THO 3 569/6 074                red Thin.
-17:00  country   4 047 km²          NUT +3.1 M/d  MASS +51 km²/d  POW 44%  THO 2 056/6 038                 red Weak pulse.
-18:00  country   10 500 km²         NUT +2.9 M/d  MASS +35 km²/d  POW 44%  THO 4 257/6 035                 red Starving.
-19:00  country   11 703 km²         NUT +0.5 M/d  MASS +12 km²/d  POW 31%  THO 1 565/6 081                 red Thin.
-20:00  country   11 484 km²         NUT +273/d  MASS -5 km²/d  POW 24%  THO 3 646/6 059                    red Thin.
-21:00  country   14 820 km²         NUT +9.0 M/d  MASS +143 km²/d  POW 75%  THO 5 742/6 047                red Starving.
-22:00  country   32 867 km²         NUT +23 M/d  MASS +298 km²/d  POW 76%  THO 2 777/9 082                 red Slow mind.
-23:00  country   70 109 km²         NUT +67 M/d  MASS +893 km²/d  POW 140%  THO 2 462/9 080                red -
-24:00  continent 147 656 km²        NUT +46 M/d  MASS +5 109 km²/d  POW 205%  THO 88/9 080                 red Thin.
-25:00  continent 457 031 km²        NUT +886 M/d  MASS +11 998 km²/d  POW 59%  THO 4 795/9 080             red Weak pulse.
-26:00  continent 1.7 M km²          NUT +2.0 B/d  MASS +27 818 km²/d  POW 195%  THO 2 240/8 080            red -
-27:00  continent 3.0 M km²          NUT +773 M/d  MASS +19 261 km²/d  POW 187%  THO 5 886/8 080            red -
-28:00  continent 4.5 M km²          NUT +595 M/d  MASS +22 032 km²/d  POW 188%  THO 80/80 ins 24.2         red -
-29:00  continent 5.6 M km²          NUT +490 M/d  MASS +17 753 km²/d  POW 121%  THO 10 028/14 351 ins 30.2 red Sagging.
-30:00  continent 6.8 M km²          NUT +398 M/d  MASS +11 770 km²/d  POW 80%  THO 6 159/6 139 ins 42.7    red Weak pulse.
-31:02  planet    5 % of the surface NUT +1.5 B/d  MASS +56 723 km²/d  POW 139%  THO 7 494/23 732 ins 51.8  red Thin.
-32:00  planet    6 % of the surface NUT +14 B/d  MASS +0.3 M km²/d  POW 222%  THO 11 018/20 831 ins 51.8   red Starving.
-33:00  planet    11 % of the surface NUT +60 B/d  MASS +0.9 M km²/d  POW 194%  THO 12 194/20 250 ins 51.8   red Starving.
-34:00  planet    27 % of the surface NUT +79 B/d  MASS +1.3 M km²/d  POW 161%  THO 3 192/15 015 ins 51.8    red -
-35:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 146%  THO 2 695/24 273 ins 51.9       red Forgetting.
-36:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 176%  THO 2 297/30 013 ins 51.9       red Slow mind.
-37:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 94%  THO 3 136/30 056 ins 51.9        red Slow mind.
-38:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 112%  THO 20 649/30 119 ins 51.9      red -
-38:33  planet    31 % of the surface NUT +1.0 M/d  MASS +0.3 M km²/d  POW 170%  THO 106/15 972 ins 41.9     red -
+ 2:00  city      0.6 km²            NUT +236/d  MASS +0 km²/d  POW 81%  THO 132/2 000                      red Slow mind.
+ 3:00  city      1.0 km²            NUT +581/d  MASS +0 km²/d  POW 94%  THO 286/2 000                      red Slow mind.
+ 4:00  city      1.8 km²            NUT +996/d  MASS +0 km²/d  POW 92%  THO 133/2 000                      red -
+ 5:00  city      3.1 km²            NUT +1 135/d  MASS +0 km²/d  POW 110%  THO 285/2 000                   red -
+ 6:00  city      5.0 km²            NUT +1 398/d  MASS +0 km²/d  POW 110%  THO 551/2 000                   red -
+ 7:00  city      7.4 km²            NUT +8 182/d  MASS +0 km²/d  POW 152%  THO 465/2 000                   red -
+ 8:00  city      10 km²             NUT +2 999/d  MASS +0 km²/d  POW 169%  THO 708/2 000                   red -
+ 9:00  county    39 km²             NUT +41 001/d  MASS +1 km²/d  POW 101%  THO 1 522/2 000                red Starving.
+10:00  county    169 km²            NUT +0.2 M/d  MASS +4 km²/d  POW 190%  THO 1 887/2 000                 red Blind.
+11:00  county    408 km²            NUT +0.4 M/d  MASS +6 km²/d  POW 115%  THO 351/2 580 ins 0.2           red Blind.
+12:00  county    670 km²            NUT +0.3 M/d  MASS +5 km²/d  POW 76%  THO 2 143/2 580 ins 0.2          red Forgetting.
+13:00  county    888 km²            NUT +0.2 M/d  MASS +3 km²/d  POW 67%  THO 1 805/3 080 ins 0.2          red Choking.
+14:00  county    1 119 km²          NUT +0.6 M/d  MASS +7 km²/d  POW 70%  THO 80/80 ins 2.8                red Forgetting.
+15:00  country   2 242 km²          NUT +1.1 M/d  MASS +72 km²/d  POW 90%  THO 282/8 425                   red Thin.
+16:00  country   8 313 km²          NUT +18 M/d  MASS +245 km²/d  POW 100%  THO 3 796/6 061                red Starving.
+17:00  country   14 492 km²         NUT +3.4 M/d  MASS +52 km²/d  POW 43%  THO 1 938/6 019                 red Starving.
+18:00  country   17 883 km²         NUT +10 M/d  MASS +120 km²/d  POW 64%  THO 4 261/5 999                 red Forgetting.
+19:00  country   29 641 km²         NUT +12 M/d  MASS +165 km²/d  POW 71%  THO 1 860/6 010                 red Starving.
+20:00  country   37 352 km²         NUT +15 M/d  MASS +198 km²/d  POW 49%  THO 4 357/6 066                 red Starving.
+21:00  country   56 930 km²         NUT +41 M/d  MASS +466 km²/d  POW 85%  THO 1 114/6 589                 red -
+22:00  country   97 180 km²         NUT +54 M/d  MASS +819 km²/d  POW 98%  THO 745/9 082                   red -
+23:00  continent 495 703 km²        NUT +1.2 B/d  MASS +18 098 km²/d  POW 112%  THO 4 896/9 081            red Starving.
+24:00  continent 1.3 M km²          NUT +1.5 B/d  MASS +22 130 km²/d  POW 118%  THO 926/9 080              red Thin.
+25:00  continent 2.3 M km²          NUT +701 M/d  MASS +9 349 km²/d  POW 103%  THO 3 782/9 024             red Thin.
+26:00  continent 2.9 M km²          NUT +590 M/d  MASS +19 824 km²/d  POW 113%  THO 4 800/8 201            red -
+27:00  continent 4.4 M km²          NUT +726 M/d  MASS +23 389 km²/d  POW 194%  THO 7 671/7 680 ins 4.1    red -
+28:00  continent 5.9 M km²          NUT +680 M/d  MASS +21 258 km²/d  POW 157%  THO 6 350/19 069 ins 12.1  red -
+29:00  continent 7.0 M km²          NUT +449 M/d  MASS +16 629 km²/d  POW 124%  THO 6 783/25 663 ins 12.1  red -
+30:00  planet    5 % of the surface NUT +523 M/d  MASS +65 108 km²/d  POW 142%  THO 175/30 017 ins 7.1     red Thin.
+31:00  planet    7 % of the surface NUT +11 B/d  MASS +0.2 M km²/d  POW 153%  THO 3 973/24 829 ins 7.1     red Starving.
+32:00  planet    10 % of the surface NUT +36 B/d  MASS +0.7 M km²/d  POW 136%  THO 4 639/20 837 ins 7.1     red Starving.
+33:00  planet    20 % of the surface NUT +24 B/d  MASS +0.4 M km²/d  POW 52%  THO 8 357/31 390 ins 7.1      red Hungry at night.
+34:00  planet    30 % of the surface NUT +49 B/d  MASS +0.8 M km²/d  POW 191%  THO 14 055/32 787 ins 7.1    red -
+35:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 167%  THO 6 690/30 103 ins 7.1        red Slow mind.
+36:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 122%  THO 4 735/29 979 ins 7.1        red Forgetting.
+37:00  planet    31 % of the surface NUT +1.0 M/d  MASS +0 km²/d  POW 104%  THO 21 901/30 154 ins 7.1       red -
+38:00  planet    35 % of the surface NUT +23 B/d  MASS +0.3 M km²/d  POW 127%  THO 11 130/26 532 ins 7.1    red -
+38:54  planet    45 % of the surface NUT +52 B/d  MASS +0.8 M km²/d  POW 138%  THO 26 923/26 924            red -
 ```

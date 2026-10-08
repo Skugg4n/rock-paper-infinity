@@ -13,6 +13,8 @@ import { createVaultSound } from './sound.js';
 import { audio } from '../audio.js';
 import { playChapterCard } from '../chapterCard.js';
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from '../constants.js';
+import { setPhase, phases } from '../gamePhase.js';
+import { SAVE_KEY as UNITY_KEY, serialize as serializeUnity, fromVault } from '../phase5/unity.js';
 
 /** The arrival: nothing to do, something to see. */
 export const INTRO_MS = 8000;
@@ -519,7 +521,13 @@ export function init() {
         selected = -1; paintInfo();
         root.classList.add('is-rising');
         await view.rise(RISE_MS);
-        playChapterCard({ roman: 'V', title: 'UNITY', mode: 'to-come', dark: true });
+        toUnity();
+    }
+    /** The card, then chapter V with the people in the body as its minds. */
+    function toUnity() {
+        save();
+        try { if (!localStorage.getItem(UNITY_KEY)) localStorage.setItem(UNITY_KEY, serializeUnity(fromVault(s.here))); } catch { /* full */ }
+        playChapterCard({ roman: 'V', title: 'UNITY', dark: true, hold: 2200, onMidpoint: () => setPhase(phases.UNITY) });
     }
 
     // ---------------------------------------------------------------- save
@@ -562,7 +570,7 @@ export function init() {
 
     // ---------------------------------------------------------------- the arrival
     if (s.risen) {
-        playChapterCard({ roman: 'V', title: 'UNITY', mode: 'to-come', dark: true });
+        timers.push(setTimeout(toUnity, 0));
     } else if (fresh || !s.introDone) {
         introUntil = performance.now() + INTRO_MS;
         s.introDone = true;

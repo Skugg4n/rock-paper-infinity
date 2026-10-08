@@ -172,6 +172,8 @@ export const LINES = {
     blocked: 'Nothing here we can eat.',
     vault: (n) => `${num(n)} minds join us.`,
     torn: 'STORM. THE EDGE IS TORN.',
+    out: 'THE HATCH IS OPEN. WE ARE OUT.',
+    room: (n) => (n > 0 ? `Room for ${n} more ${n === 1 ? 'block' : 'blocks'}.` : ''),
 };
 /** What the system says when an experiment is done (the CRT). */
 export const DONE_LINES = {
@@ -230,8 +232,8 @@ export function newUnity({ minds = START_MINDS, seed = 7 } = {}) {
     seedBlob(s, m.start, 6);
     return s;
 }
-/** Eat n cells around a cell, closest first (a zoom, a landing seed). */
-function seedBlob(s, at, n, edibleOnly = true) {
+/** Eat n cells around a cell, closest first (a zoom, a landing seed, a checkpoint). */
+export function seedBlob(s, at, n, edibleOnly = true) {
     const m = mapFor(s.seed, s.scale);
     const c = cache(s);
     const want = [];
@@ -309,9 +311,9 @@ export function front(s, k = 6) {
         let n = 0;
         for (const j of neighbours(i)) n += c.eaten[j];
         const x = cx(i), y = cy(i);
-        let score = m.noise[i] * 1.6 - n * 0.9;
+        let score = m.noise[i] * 2.2 - n * 0.6;
         if (tx >= 0) score += Math.hypot(x - tx, y - ty) * 0.9;
-        else score += Math.hypot(x - cx(m.start), (y - cy(m.start)) * 1.3) * 0.25;
+        else score += Math.hypot(x - cx(m.start), (y - cy(m.start)) * 1.3) * 0.55;
         score += (1 - e) * 4;
         sc.push([score, i]);
     }
@@ -425,7 +427,8 @@ export function flows(s) {
     const skinVal = Math.min(cover, 1 - stormLoss * 1.6);
     add('skin', Math.min(skinVal, se), 'edge', se < skinVal ? 'salt' : null);
     add('heart', Math.min(p, co), 'power', co < p ? 'warm' : null);
-    if (s.ex.auto) add('nerve', nxt && !nxt.ins && nxt.price <= cap ? Math.min(1, 70 / Math.max(1, eta)) : 1, 'thought');
+    // the mind is red only when the body itself is not worse off (never under 0.7)
+    if (s.ex.auto) add('nerve', nxt && !nxt.ins && nxt.price <= cap ? Math.max(0.7, Math.min(1, 90 / Math.max(1, eta))) : 1, 'thought');
     if (s.scale >= 1) add('intestines', gut, 'reach', s.unlocked.intestines ? null : 'gut');
     if (s.scale >= 1 && s.ex.auto) add('lungs', 1 - frac(POISON) * 1.2, 'poison', s.ex.lungs ? null : 'lungs');
     if (nxt && !nxt.ins && nxt.price > cap) add('brain', 0.55, 'cap');
@@ -440,7 +443,8 @@ export function flows(s) {
     for (const f of F) if (f.value < 0.8 && (!red || f.value < red.value)) red = f;
     // what will break next: the lowest of the rest, yellow, before it is red
     let yellow = null;
-    for (const f of F) if (f !== red && f.value < 0.92 && (!yellow || f.value < yellow.value) && (!red || f.organ !== red.organ)) yellow = f;
+    for (const f of F) if (f.value < 0.92 && (!yellow || f.value < yellow.value) && (!red || f.organ !== red.organ)) yellow = f;
+    if (!s.ex.auto) yellow = null;
     // the bottleneck even when nothing is red: the lowest factor
     let low = null;
     for (const f of F) if (!low || f.value < low.value) low = f;
@@ -545,6 +549,8 @@ export function buyMass(s, o) {
     return true;
 }
 /** Fas 1 before AUTONOMIC EDGE: a click on the edge bites a block. Returns the cell or -1. */
+/** Fas 1: how many more blocks the body can stretch over before it must grow. */
+export const roomLeft = (s) => Math.max(0, Math.ceil(totalMass(s) * STRETCH - area(s)));
 export function bite(s, i) {
     if (s.ex.auto || s.tut.stop) return -1;
     const m = mapFor(s.seed, s.scale);
@@ -810,7 +816,7 @@ export function advance(s, dt) {
 
 /** The stops and the guides that are not about the red word. */
 function stepStory(s, f) {
-    if (!s.tut.done.start) stop(s, 'start', [...LINES.start(s.minds), LINES.bit], 'edge');
+    if (!s.tut.done.start) { stop(s, 'start', [...LINES.start(s.minds), LINES.bit], 'edge'); say(s, LINES.out); }
     if (s.scale === 0 && s.torn > 0.5 && !s.tut.done.storm) stop(s, 'storm', [LINES.torn, 'It tears the edge where the skin is thin.'], 'skin');
     if (s.scale === 0) {
         const pr = progress(s);
@@ -867,4 +873,4 @@ export function deserialize(raw) {
 /** The vault's end hands over this many minds (the people in the body). */
 export function fromVault(here) { return newUnity({ minds: Math.max(1, Math.round(here || START_MINDS)) }); }
 
-export { CLASS_NAMES, MAP_W, idx, cx, cy, mapFor, stormAt };
+export { CLASS_NAMES, CELLS, MAP_W, idx, cx, cy, mapFor, stormAt };

@@ -6,6 +6,7 @@ export const phases = {
   CITY: 'CITY',
   WAR: 'WAR',
   DEEP: 'DEEP',
+  UNITY: 'UNITY',
   ESCAPE: 'ESCAPE'
 };
 
@@ -54,6 +55,10 @@ export async function setPhase(phase) {
         document.getElementById('phase-deep')?.classList.remove('hidden');
         currentModule = await import('./phase4/index.js');
       }
+      return currentModule.init();
+    case phases.UNITY:
+      // chapter V builds its own screen on the body, like the vault
+      currentModule = await import('./phase5/index.js');
       return currentModule.init();
     case phases.WAR:
     case phases.ESCAPE:
