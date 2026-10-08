@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (unity)
+## v1.89.0 - 2026-10-08 (chapter V · UNITY, first build: the city and the county)
 
 Chapter V · UNITY begins (docs/superpowers/specs/2026-10-06-chapter-v-unity.md), v1.89.0 on the unity branch.
 - **The rules** (src/phase5/unity.js, terrain.js): the body eats the earth. Four flows (NUTRIENT, MASS, POWER, THOUGHT), GROW AS, the edge (perimeter against area, skin thickness, storms that tear), rock paper scissors at the edge (WRAP, CUT, CRUSH), MINDS (memory and processing), THOUGHT and INSIGHT, the experiments and the small I–V ones, thirteen organs, three vaults, five scales with their units, SEEDS. One red word: the single thing that slows the body most.
