@@ -63,6 +63,9 @@ export function createRenderer(canvas) {
     const r = { cam: { x: 0, y: -6 * TS }, originX: 0, ending: 0, rising: null };
     const pops = [];
     const trail = [], labels = [];
+    /** The machine's thought: typed slowly high over the dark, held, then gone (it is not a status line). */
+    let thinking = null;
+    function thought(text) { thinking = { text, t: 0 }; }
     /** A name that floats over a tile for a few seconds. */
     function label(i, text) { labels.push({ i, text, life: 3.5 }); }
     /** Up into rock: a puff of dust over the drone. */
@@ -129,7 +132,7 @@ export function createRenderer(canvas) {
             // on the heart while the lines are read; then the camera follows the stream of sleepers down
             focusY = HEART.cy - 0.5; mid = 0.5;
             if (s.flowT != null && view.flowPath && view.flowPath.length > 1) {
-                const lead = flowAt(view.flowPath, Math.min(1, s.flowT / (FLOW_S * 0.85)));
+                const lead = flowAt(view.flowPath, leadK(s));
                 focusY = lead[1]; mid = 0.5;
             }
         }
@@ -216,7 +219,7 @@ export function createRenderer(canvas) {
         const under = 1;
         // the flow at the end: the dark again, a soft light round the stream's lead
         const flowing = s.ended && s.flowT != null && view.flowPath && view.flowPath.length > 1;
-        const lead = flowing ? flowAt(view.flowPath, Math.min(1, s.flowT / (FLOW_S * 0.85))) : null;
+        const lead = flowing ? flowAt(view.flowPath, leadK(s)) : null;
         if (!s.ended || flowing) {
             const dx = flowing ? r.originX + lead[0] * TS + TS / 2 : r.originX + p.x * TS + TS / 2;
             const dy = flowing ? lead[1] * TS + TS / 2 - camY : p.y * TS + TS / 2 - camY;
@@ -364,6 +367,25 @@ export function createRenderer(canvas) {
                 const k = Math.min(1, s.heat / heatHold(s.levels.hull));
                 ctx.fillStyle = '#0b0c0e'; ctx.fillRect(dx - 22, dy - 36, 44, 7);
                 ctx.fillStyle = k > 0.7 ? C.danger : '#ff9a3a'; ctx.fillRect(dx - 21, dy - 35, 42 * k, 5);
+            }
+        }
+        // the machine's thought, high over the dark: typed slowly, held about ten seconds, faded
+        if (thinking) {
+            thinking.t += dt;
+            const T = thinking.t, n = Math.min(thinking.text.length, Math.floor(T / 0.07));
+            const a = Math.min(1, T / 0.8) * Math.min(1, Math.max(0, (14 - T) / 1.5));
+            if (a <= 0 && T > 2) thinking = null;
+            else {
+                ctx.globalAlpha = a;
+                ctx.font = 'italic 22px ui-monospace, "SF Mono", Menlo, monospace'; ctx.textAlign = 'center';
+                const cx2 = r.originX + W * TS / 2, cy2 = Math.max(70, vh * 0.16);
+                const tw = ctx.measureText(thinking.text).width;
+                const bg2 = ctx.createRadialGradient(cx2, cy2 - 6, 10, cx2, cy2 - 6, tw * 0.7);
+                bg2.addColorStop(0, 'rgba(7,8,10,0.75)'); bg2.addColorStop(1, 'rgba(7,8,10,0)');
+                ctx.fillStyle = bg2; ctx.fillRect(cx2 - tw, cy2 - 60, tw * 2, 100);
+                ctx.fillStyle = '#c9d6e6'; ctx.shadowColor = 'rgba(143,208,255,0.35)'; ctx.shadowBlur = 10;
+                ctx.fillText(thinking.text.slice(0, n), cx2, cy2);
+                ctx.shadowBlur = 0; ctx.textAlign = 'left'; ctx.globalAlpha = 1;
             }
         }
         // the death beat: a flash, the lamp flickering out, the cause by the dead drone
@@ -816,6 +838,16 @@ export function createRenderer(canvas) {
     function drawBase(s, groundY, t, view) {
         const img = baseImage(s);
         ctx.drawImage(img.c, r.originX, groundY + CITY_ROW * TS, W * TS, -CITY_ROW * TS);
+        // the end: the hatch is open, red light from below, and they go down
+        if (s.flowT != null) {
+            const hx2 = r.originX + HOME_X * TS, fy = groundY;
+            const og = ctx.createRadialGradient(hx2 + TS / 2, fy, 2, hx2 + TS / 2, fy, TS * 2.5);
+            og.addColorStop(0, 'rgba(200,20,45,0.75)'); og.addColorStop(1, 'rgba(200,20,45,0)');
+            ctx.fillStyle = og; ctx.fillRect(hx2 - TS * 2, fy - TS * 2.5, TS * 5, TS * 3);
+            ctx.fillStyle = '#2a313b';
+            ctx.save(); ctx.translate(hx2 + 2, fy - 2); ctx.rotate(-1.2); ctx.fillRect(0, -2, TS / 2 - 2, 4); ctx.restore();
+            ctx.save(); ctx.translate(hx2 + TS - 2, fy - 2); ctx.rotate(Math.PI + 1.2); ctx.fillRect(0, -2, TS / 2 - 2, 4); ctx.restore();
+        }
         // the generator hums: its window glows and breathes
         const [ga, gb] = ROOMS.generator;
         const gw = (gb - ga + 1) * TS, top = groundY + ROOM_TOP * TS;
@@ -1089,9 +1121,32 @@ export function createRenderer(canvas) {
     }
     /** Lub-dub: a strong squeeze and a second, smaller; the beat comes every 1.1 s. */
     const lubdub = (t) => { const ph = (t % 1.1) / 1.1; return 0.09 * Math.exp(-((ph - 0.05) ** 2) / 0.002) + 0.05 * Math.exp(-((ph - 0.25) ** 2) / 0.002); };
+    // the heart in 3D (heart3d.js), loaded when the heart first comes into view; the 2D one until then
+    let h3 = null, h3Loading = false;
+    function heart3d() {
+        if (!h3Loading) {
+            h3Loading = true;
+            import('./heart3d.js').then((m) => m.createHeart3D()).then((h) => { h3 = h; }).catch(() => { h3 = null; });
+        }
+        return h3;
+    }
     function drawHeart(hx, hy, t, dt) {
         r.swell = Math.max(0, (r.swell || 0) - dt * 0.05);
         const sq = lubdub(t), sc = 1 + (r.swell || 0) - sq * 0.6;
+        const h = heart3d();
+        if (h) {
+            // a red light spreading through the flesh round it on each beat, then the organ itself
+            const ph3 = (t % 1.1) / 1.1;
+            if (ph3 < 0.6) {
+                const rr = HEART.rx * TS * (1.2 + ph3 * 3);
+                const lg = ctx.createRadialGradient(hx, hy, rr * 0.7, hx, hy, rr);
+                lg.addColorStop(0, 'rgba(168,19,44,0)'); lg.addColorStop(0.8, `rgba(200,30,50,${(0.28 * (1 - ph3 / 0.6)).toFixed(3)})`); lg.addColorStop(1, 'rgba(168,19,44,0)');
+                ctx.fillStyle = lg; ctx.fillRect(hx - rr, hy - rr, rr * 2, rr * 2);
+            }
+            const c = h.render(sq, r.swell || 0);
+            ctx.drawImage(c, hx - c.width / 2, hy - h.cy);
+            return;
+        }
         // a red light spreading through the flesh round it on each beat
         const ph = (t % 1.1) / 1.1;
         if (ph < 0.6) {
@@ -1120,6 +1175,9 @@ export function createRenderer(canvas) {
         ctx.drawImage(img.c, -HW / 2, -HH * 0.45, HW, HH);
         ctx.restore();
     }
+    /** How far the stream's lead has come (0 to 1): the camera first holds on the hatch as it opens. */
+    const FLOW_HOLD = 2;
+    const leadK = (s) => Math.max(0, Math.min(1, (s.flowT - FLOW_HOLD) / (FLOW_S * 0.85 - FLOW_HOLD)));
     /** A point along the flow's path, k from 0 (the base) to 1 (the heart): [x, y] in tiles. */
     function flowAt(path, k) {
         const f = Math.max(0, Math.min(1, k)) * (path.length - 1), i = Math.floor(f), u = f - i;
@@ -1131,8 +1189,8 @@ export function createRenderer(canvas) {
     function drawFlow(s, path, camY) {
         const T0 = s.flowT;
         for (let k = 0; k < FLOW_N; k++) {
-            const start = (k / FLOW_N) * FLOW_S * 0.5 + Math.floor(k / 36) * 0.15 + hash(k, 11) * 0.35;
-            const prog = (T0 - start) / (FLOW_S * 0.42);
+            const start = FLOW_HOLD - 0.4 + (k / FLOW_N) * FLOW_S * 0.4 + Math.floor(k / 36) * 0.15 + hash(k, 11) * 0.35;
+            const prog = (T0 - start) / (FLOW_S * 0.38);
             if (prog <= 0) continue;
             if (prog >= 1) { if (!r.arrived) r.arrived = new Set(); if (!r.arrived.has(k)) { r.arrived.add(k); r.swell = Math.min(0.12, (r.swell || 0) + 0.004); } continue; }
             const [px, py] = flowAt(path, prog);
@@ -1200,5 +1258,5 @@ export function createRenderer(canvas) {
     function fullFlash() { r.fullUntil = performance.now() / 1000 + 0.35; }
     /** The DUPLICATOR: the doubled piece's cell flashes on the gauge. */
     function dupFlash(at) { r.dup = { at, until: performance.now() / 1000 + 0.6 }; }
-    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, arms, hitFlash, fullFlash, dupFlash, worldWidth: W * TS };
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, arms, hitFlash, fullFlash, dupFlash, thought, worldWidth: W * TS };
 }

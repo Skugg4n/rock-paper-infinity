@@ -89,6 +89,9 @@ const CSS = `
 .dig-crt .l + .l { margin-top: 4px; }
 .dig-crt .l.is-voice { color: #ff8a9a; text-shadow: 0 0 6px rgba(255,120,140,.4); }
 .dig-crt .l.is-alarm, .dig-crt .l.is-turnback { color: #ff6b5a; text-shadow: 0 0 6px rgba(255,107,90,.4); }
+.dig-crt .l.is-thought { color: #b8c4d6; font-style: italic; opacity: .7; text-shadow: none; }
+.dig-stop.is-heart { box-shadow: 0 0 0 1.5px #c8142d, 0 20px 60px rgba(0,0,0,.7), 0 0 40px rgba(200,20,45,.35); color: #ff6a7d; text-shadow: 0 0 8px rgba(255,60,90,.4); }
+.dig-stop.is-heart .ok { background: #a8132c; color: #f6e6e8; }
 .dig-crt .l.is-find { color: #ffd678; text-shadow: 0 0 6px rgba(255,214,120,.4); }
 .dig-crt .cur { display: inline-block; width: 8px; height: 14px; background: currentColor; vertical-align: -1px; animation: dig-cur 1s steps(1) infinite; }
 @keyframes dig-cur { 50% { opacity: 0; } }
@@ -521,12 +524,12 @@ export function init() {
             }
             // a line whose time is up goes (it is no longer true)
             const cur = lineNow(s);
-            crt.lines = crt.lines.filter((l) => l.kind === 'sys'
+            crt.lines = crt.lines.filter((l) => l.kind === 'sys' || l.kind === 'thought'
                 || (l.ttl === Infinity ? !!cur && cur.n === l.n : nowMs - l.at < (l.ttl ?? 6) * 1000 + 1500));
             const on = lineNow(s);
             html = crt.lines.map((l, k) => {
-                if (l.n >= 0 && l.shown < l.text.length) l.shown = Math.min(l.text.length, Math.floor((nowMs - l.at) / (TYPE_MS * 0.6)));
-                const now = k === crt.lines.length - 1 && on && on.n === l.n;
+                if ((l.n >= 0 || l.kind === 'thought') && l.shown < l.text.length) l.shown = Math.min(l.text.length, Math.floor((nowMs - l.at) / (TYPE_MS * (l.kind === 'thought' ? 1.6 : 0.6))));
+                const now = l.kind !== 'thought' && k === crt.lines.length - 1 && on && on.n === l.n;
                 return `<div class="l is-${l.kind}${now ? ' is-now' : ''}">${esc(l.text.slice(0, l.shown))}${l.shown < l.text.length ? '<span class="cur"></span>' : ''}</div>`;
             }).join('');
         }
@@ -544,6 +547,7 @@ export function init() {
         if (st !== stopSeen) { stopSeen = st; stopSince = performance.now(); }
         const box = !!st && !st.crt && !beat;
         ui.stop.hidden = !box;
+        ui.stop.classList.toggle('is-heart', box && st.voice === 'heart');
         ui.root.classList.toggle('has-stop', box);
         const html = box ? st.text.map((l) => `<div>${esc(l)}</div>`).join('') : '';
         if (html !== stopHtml) { stopHtml = html; ui.stopText.innerHTML = html; }
@@ -725,6 +729,13 @@ export function init() {
                 if (e.type === 'dup') rnd.dupFlash(e.at);
                 if (e.type === 'bump') rnd.bump(s);
                 if (e.type === 'q-named') rnd.label(e.i, 'QUANTUM OBJECT');
+                // the machine's own thought: over the dark, and kept in the CRT's history
+                if (e.type === 'thought') {
+                    rnd.thought(e.text);
+                    crt.lines = crt.lines.filter((l) => l.kind !== 'sys');
+                    crt.lines.push({ text: e.text, kind: 'thought', shown: 0, n: -2, at: performance.now(), ttl: Infinity });
+                    if (crt.lines.length > 4) crt.lines.splice(0, crt.lines.length - 4);
+                }
                 if (e.type === 'heart') ui.root.classList.add('dig-ending');
                 if (e.type === 'flow') {
                     // the way the drone came, from the base down to the heart

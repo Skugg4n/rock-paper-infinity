@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924', '--v1926'].some((a) => process.argv.includes(a));
+const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924', '--v1926', '--v1927'].some((a) => process.argv.includes(a));
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +103,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924', '--v1926'].some((a) => process.argv.includes(a))) {
+    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924', '--v1926', '--v1927'].some((a) => process.argv.includes(a))) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -236,6 +236,47 @@ try {
         const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
         const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
         fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
+    }
+    if (process.argv.includes('--v1927')) {
+        // v1.92.7: thoughts on a dive from 700 m; the ending with the heart's voice; the heart in 3D
+        await jump('iv-dig-machine');
+        await ev(`(() => { const s = window.rpiDig.state; s.levels.hull = 3; s.levels.drill = 3; s.levels.battery = 5; s.battery = 360; s.grafts = 3; s.alarms.next = 1e9; for (let y = s.y; y < 390; y++) s.tiles[y * 24 + 11] = 0; return true; })()`);
+        let seen = await st('s.thoughtN');
+        const t0 = Date.now();
+        let shots = 0;
+        while (Date.now() - t0 < 140000 && shots < 4) {
+            await hold('ArrowDown', 300);
+            await ev(`(() => { const s = window.rpiDig.state; s.battery = 360; s.reserve = 100; return true; })()`);
+            const n = await st('s.thoughtN');
+            if (n !== seen) { seen = n; await sleep(2600); await shot(`p3-9${2 + shots}-thought-${n}`); shots++; await sleep(500); }
+            // wait at depth for the 40 s gap, as a player mining would
+            if (await st('s.time - (s.thoughtAt ?? -1e9) < 40')) await sleep(1500);
+        }
+        console.log('thoughts had on the dive:', await st('s.thoughtN'), 'depth', await st('s.y * 5'));
+        await jump('iv-dig-heart');
+        await sleep(2500);
+        await shot('p3-91-heart-3d');
+        const names = [];
+        let k = 0;
+        for (let guard = 0; guard < 120 && k < 8; guard++) {
+            const id = await st('s.tut.stop && s.tut.stop.id');
+            if (id) {
+                await sleep(3000);
+                const still = await st('s.tut.stop && s.tut.stop.id');
+                names.push(`${id}${still === id ? '' : ' (VANISHED)'}`);
+                await shot(`p3-96-end-${String(k).padStart(2, '0')}-${id}`);
+                await key('Enter'); k++;
+                await sleep(400);
+                if (id === 'end-hatch') { for (const [ms, name] of [[1500, 'p3-97-hatch-open'], [3500, 'p3-98-flow'], [3000, 'p3-98-flow-heart']]) { await sleep(ms); await shot(name); } }
+                continue;
+            }
+            if (await st('s.flowDone')) break;
+            if (!(await st('s.ended'))) await hold('ArrowDown', 400); else await sleep(400);
+        }
+        console.log('stops in order:', names.join(' | '));
+        await sleep(800);
+        await shot('p3-99-rise');
+        console.log('rise shown:', await ev(`!document.getElementById('dig-rise').hidden`), '| 3D heart:', await ev(`!!window.rpiDig.renderer`));
     }
     if (process.argv.includes('--v1926')) {
         // v1.92.6: the refinery at the warehouse, and the heart's ending as slow stops and a stream of sleepers

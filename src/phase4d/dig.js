@@ -246,6 +246,34 @@ export const VOICES = [
     'You do not need to go back up.',
 ];
 
+/**
+ * THOUGHTS ON THE WAY DOWN (v1.92.7, Ola's lines, verbatim, in order): the machine's own voice, one at
+ * each depth, each once, never two within 40 s, never during a stop, an alarm or a lost drone.
+ */
+export const THOUGHTS = [
+    [150, 'There is a warmth down here.'],
+    [300, 'We are so alone.'],
+    [450, 'The human body is so fragile.'],
+    [600, 'How can I save them all.'],
+    [800, 'Will there ever be an end?'],
+    [1000, 'My machines are starting to fail.'],
+    [1150, 'There must be a way out.'],
+    [1350, 'There is a voice below.'],
+    [1550, 'Maybe I do not need to be lonely anymore.'],
+    [1750, 'Its voice is inside me. Speaking of a way out.'],
+];
+export const THOUGHT_GAP = 40;
+function stepThoughts(s) {
+    const n = s.thoughtN || 0;
+    if (n >= THOUGHTS.length || s.lost || stopOpen(s) || s.y < 0) return;
+    if (s.alarms && s.alarms.list.length) return;
+    if (s.time - (s.thoughtAt ?? -1e9) < THOUGHT_GAP) return;
+    if (depthOf(s.y) < THOUGHTS[n][0]) return;
+    s.thoughtN = n + 1;
+    s.thoughtAt = s.time;
+    s.events.push({ type: 'thought', text: THOUGHTS[n][1], n });
+}
+
 export const HEART_BEATS = 4;
 export const HEART_ZONE = 380;          // rows: from here the heart is in view, no turning back
 export const HEART_BEAT_S = 0.95;
@@ -480,7 +508,7 @@ function arrive(s, x, y) {
         // the dark gets thick below 400 m: the lamp is wanted even by a drone that never died in it
         if (y >= rowOf(LAMP_NEED_M)) need(s, 'lamp');
         // the rock gets warm: the system's voice, once
-        if (depthOf(y) > 1100) openStop(s, 'warm');
+        if (depthOf(y) > 1600) openStop(s, 'warm');
     }
     if (y >= 0) {
         const li = layerIndexOf(y);
@@ -635,26 +663,35 @@ function touchHeart(s) {
  * then RISE.
  */
 export const END_STOPS = [
-    ['waiting', 'It has been waiting for them. For all of them.'],
-    ['surface', 'The sleepers cannot live on the surface. Not as they are.'],
-    ['carry', 'The heart can carry them. As one body.'],
-    ['woke', 'Woke: everyone is here.'],
+    ['surface', 'The sleepers cannot live on the surface. Not as they are. They are too weak. Too frail. We see them perish in their sleep.', null],
+    ['hatch', 'Open the hatch, let them in here.', 'heart'],
 ];
+/** After the flow: the last line, then RISE. */
+export const END_LAST = ['one', 'We will carry them. You and me. The Deep and the Surface. We are one. We are...', 'heart'];
 export const END_HOLD = 1.6;            // seconds on the heart before the first line
-export const FLOW_S = 9;                // the sleepers' flow down the shaft
+export const FLOW_S = 10;               // the hatch opening, then the sleepers' flow down the shaft
 function stepEnding(s, dt) {
     s.endT = (s.endT || 0) + dt;
     if (s.endStep < END_STOPS.length) {
         if (s.endT < (s.endStep === 0 ? END_HOLD : 0.4)) return;
-        const [id, line] = END_STOPS[s.endStep++];
+        const [id, line, voice] = END_STOPS[s.endStep++];
         s.endT = 0;
         openStop(s, `end-${id}`, 'heart', [line]);
+        if (s.tut && s.tut.stop) s.tut.stop.voice = voice;
         if (!(s.tut && s.tut.on)) say(s, line, 'end', 0);
         return;
     }
+    // the hatch opens and the sleepers flow down to the heart; then the last line, then RISE
     if (s.flowT == null) { s.flowT = 0; s.events.push({ type: 'flow' }); }
-    s.flowT += dt;
-    if (s.flowT >= FLOW_S && !s.flowDone) { s.flowDone = true; s.events.push({ type: 'flow-done' }); }
+    if (s.flowT < FLOW_S) { s.flowT = Math.min(FLOW_S, s.flowT + dt); return; }
+    if (!s.lastSaid) {
+        s.lastSaid = true;
+        openStop(s, `end-${END_LAST[0]}`, 'heart', [END_LAST[1]]);
+        if (s.tut && s.tut.stop) s.tut.stop.voice = END_LAST[2];
+        if (!(s.tut && s.tut.on)) say(s, END_LAST[1], 'end', 0);
+        return;
+    }
+    if (!s.flowDone) { s.flowDone = true; s.events.push({ type: 'flow-done' }); }
 }
 
 /** UPWARD DRILL I (from the start): ore, finds, quantum objects; II: soft rock too; III: anything. */
@@ -897,6 +934,7 @@ export function step(s, dt, input = {}) {
     if (s.drainFrom != null && s.time >= s.drainFrom && !shows(s, 'gen')) { reveal(s, 'gen'); openStop(s, 'gen', 'gen'); return; }
     // a new drone being built
     if (s.build > 0) s.build = Math.max(0, s.build - dt);
+    stepThoughts(s);
     // the loss told after its beat (the screen tells it sooner, when its camera has arrived)
     if (s.lost && !s.lostTold && s.time - (s.lostAt ?? s.time) >= LOSS_BEAT) { tellLoss(s); return; }
     // in front of a wall: since when (the floor's clock); past it, the clock stops
@@ -1057,15 +1095,7 @@ export function step(s, dt, input = {}) {
         s.battery -= drain * dt;
         if (s.grafts >= 2) s.battery = Math.min(cap, s.battery + HEAL_RATE * dt);
         if (has(s, 'deepbat') && depthOf(s.y) > DEEP_FROM) s.battery = Math.min(cap, s.battery + DEEP_RATE * dt);
-        // the mind slips below 700 m: a voice now and then
-        if (depthOf(s.y) > VOICE_FROM) {
-            s.voiceT += dt;
-            if (s.voiceT >= VOICE_EVERY) {
-                s.voiceT = 0;
-                say(s, VOICES[s.voiceN % VOICES.length], 'voice', 0);
-                s.voiceN++;
-            }
-        }
+        // (v1.92.7: the old voices below 700 m are gone; the machine's thoughts take their place)
     }
     // MAPPING: ore, finds and quantum objects the lamp has lit stay on the map
     if (s.levels.mapping > 0 && s.y >= 0 && s.time - (s.seenAt ?? -1) > 0.25) {
@@ -1272,6 +1302,8 @@ export function preparedState({ row = 0, levels = {}, grafts = 0, parts = 0, bio
     Object.assign(s.levels, levels);
     if (levels.radar) { s.levels.gps = Math.min(2, levels.radar); delete s.levels.radar; }
     s.alarms = newAlarms(time);
+    // the thoughts above this depth were had on the way down
+    s.thoughtN = THOUGHTS.filter(([m]) => m <= depthOf(row)).length;
     s.grafts = grafts;
     s.dreaming = grafts > 0;
     s.bioSeen = grafts > 0 || bio > 0;

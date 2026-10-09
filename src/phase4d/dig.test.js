@@ -3,7 +3,7 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
-    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, buyRefinery, LOST_WHY, maxHp, mendPlates, PAINTS, priceOf, STUCK_S, isOre, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
+    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, buyRefinery, THOUGHTS, LOST_WHY, maxHp, mendPlates, PAINTS, priceOf, STUCK_S, isOre, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
 } from './dig.js';
 import { CAVE_WARN, LAVA_STEP, heatHold } from './hazards.js';
 import { qOrder, has, LAB_S, Q_LINES, coolOf } from './quantum.js';
@@ -229,8 +229,9 @@ describe('the rules', () => {
             step(s, 0.05, { dir: 'down' });
         }
         expect(stops).toEqual(['Something is beating down here.', 'It beats.', 'Come home.', 'Almost.',
-            'It has been waiting for them. For all of them.', 'The sleepers cannot live on the surface. Not as they are.',
-            'The heart can carry them. As one body.', 'Woke: everyone is here.']);
+            'The sleepers cannot live on the surface. Not as they are. They are too weak. Too frail. We see them perish in their sleep.',
+            'Open the hatch, let them in here.',
+            'We will carry them. You and me. The Deep and the Surface. We are one. We are...']);
         expect(s.ended).toBe(true);
         expect(s.flowDone).toBe(true);
     });
@@ -565,11 +566,11 @@ describe('pass 3, step 3: things from the other side, the flesh', () => {
         expect(s.battery).toBeGreaterThan(without);
     });
     test('the warm rock stops the game once; the first biomass at the base: the lab speaks, GRAFT lights', () => {
-        const s = preparedState({ row: 218, levels: { hull: 2, drill: 3 } });
+        const s = preparedState({ row: 318, levels: { hull: 3, drill: 3 }, grafts: 1 });
         s.tut.done.warm = false;
-        s.y = 218; s.x = HOME_X;
+        s.y = 318; s.x = HOME_X;
         for (let i = 0; i < 80 && !stopOpen(s); i++) step(s, 0.05, { dir: 'down' });
-        expect(s.tut.stop.text).toEqual(['The rock is warm. Warm like skin. We should not be here.']);
+        expect(s.tut.stop.text).toEqual(['Soft. It gives under the drill. It is flesh.']);
         const t = started();
         t.bioHome = false; t.bioSeen = false; t.delivered = 5; t.tut.rows = ['battery'];
         t.cargo = [T.BIO]; t.y = -1; t.x = roomSpot('warehouse');
@@ -877,5 +878,28 @@ describe('v1.92.6: falling is free; BOOSTER II and III', () => {
         expect(coolOf(s, 'booster')).toBe(30);
         s.levels.booster = 2;
         expect(coolOf(s, 'booster')).toBe(12);
+    });
+});
+
+describe('v1.92.7: thoughts on the way down', () => {
+    test('ten thoughts, in order, by depth, each once, never two within 40 s, not while an alarm is on', () => {
+        const s = preparedState({ row: 395, levels: { drill: 3, hull: 3 }, grafts: 3 });
+        const got = [];
+        s.x = HOME_X; s.thoughtAt = -1e9; s.thoughtN = 0;
+        for (let y = 0; y < 380; y += 2) {
+            s.y = y; s.time += 50;
+            step(s, 0.05, {});
+            for (const e of s.events) if (e.type === 'thought') got.push(e.text);
+            s.events.length = 0;
+        }
+        expect(got).toEqual(THOUGHTS.map((t) => t[1]));
+        const a = preparedState({ row: 60 });
+        a.y = 40; a.thoughtN = 0; a.alarms.list.push({ id: 'c1', at: 0, until: 999, cost: 9 });
+        step(a, 0.05, {});
+        expect(a.events.some((e) => e.type === 'thought')).toBe(false);
+        a.alarms.list = []; step(a, 0.05, {});
+        expect(a.events.find((e) => e.type === 'thought').text).toBe('There is a warmth down here.');
+        a.events.length = 0; a.y = 70; step(a, 0.05, {});
+        expect(a.events.some((e) => e.type === 'thought')).toBe(false);   // within 40 s
     });
 });

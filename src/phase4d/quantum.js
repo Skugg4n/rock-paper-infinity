@@ -38,7 +38,8 @@ export const Q_LINES = {
         other: 'It is us. It is not us.',
     },
     bio: 'This is not rock. It is growing in the tank.',
-    warm: 'The rock is warm. Warm like skin. We should not be here.',
+    // v1.92.7: the warmth is the first of the machine's thoughts now; the stop is for the flesh itself
+    warm: 'Soft. It gives under the drill. It is flesh.',
 };
 
 /** The order the lab finds them in: shuffled, BOOSTER or SHOCK WAVE first, THE OTHER DRONE never first. */
