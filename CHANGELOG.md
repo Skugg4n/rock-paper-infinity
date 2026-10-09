@@ -13,6 +13,15 @@ From Ola's notes (docs/superpowers/specs/2026-10-09-deep-dig-pass3.md). Built in
 - **The base under the ground.** The ruined city faint in the storm on top, a shaft down through the rock, six cryo chambers (36 windows each, 216 in all), life support pipes, a generator that hums, lamps. The rooms are on the drone's own row: GENERATOR, WAREHOUSE (the cargo is unloaded here only: "Drive into the WAREHOUSE to unload." the first time, an amber arrow while carrying), WORKSHOP (dark and unnamed until it opens), LAB (dark until later). The drone goes down and comes up only through the hatch; pressing down in a room drives it to the hatch.
 - **The slow machine:** the base, the city and the ground (16-row chunks) are drawn once into offscreen canvases and redrawn only when they change; the picture is drawn at 30 fps at most, 10 while a stop holds the world.
 
+**Step 2 (C + D): gauges and tools as upgrades, a base that breaks.**
+- **The depth ruler** right of the shaft once DEPTH shows: a tick every 25 m, a number every 100 m, each layer's top and name (amber) once reached, the drone (a cold arrow) and its best (a white bar).
+- **GPS** (ground penetrating sonar) replaces RADAR: PING (key G, or the button in the panel, with its charge) shows the ore and the finds below in a cone for 4 s; ready again in 20 s. GPS II (the old radar folded in): a wider, longer cone, ready in 12 s. Ore that is not there never shows. Its row comes after two dives without ore, 20 tiles dug without ore, or the first "It was not there."
+- **HOMING LINE** (35): the dotted way home is an upgrade now; its row comes with the first "Turn back."
+- **SHORT WAVE RADIO** (45): without it the base's alarms are heard only at the base; with it the panel shows them anywhere with time left ("CHAMBER 3 · 40 s"). Its row comes with the first failure.
+- **The base breaks.** About 3 min in, then every 2 to 5 min (closer together the deeper the drone has been), a chamber or (from the second failure on, now and then) the generator starts to fail: a red lamp blinks on it. Stand under it at home for 2 s to mend it (10 parts, more the deeper the record; "Repair needs 25 PARTS." when short), an amber arrow shows where and a bar how far. Missed (75 s, longer the deeper): "Chamber 3 went dark. 10 sleepers died." (ten in that chamber), or "The generator stopped. POWER does not charge." (it trickles to 15 % so the drone is never stuck). Without the radio that news waits for the drone's return. The first failure is a stop at home: "A chamber is failing. Return to base and repair it."
+- **Rows that a wall asks for (DRILL, HULL) go first** in the queue of new workshop rows; LAMP also comes at 400 m (a careful player who never dies would otherwise never see it). Heat drain 0.3 a second (was 0.4), BATTERY III holds 420 (was 340).
+- Checkpoint `iv-dig-alarm`: at the base, 155 m best, a chamber failing (the first failure's stop).
+
 ## v1.91.0 - 2026-10-09 (the interim counts to three, the winner chooses the path, IV · DEEP)
 
 After Ola's first look at the interim. No rule changed (`sim-phase3.mjs 1` prints the same line).

@@ -2,16 +2,19 @@
  * Chapter IV · THE DEEP, the dig: a plausible player, for scripts/sim-dig.mjs and the tests. It
  * dives, mines the nearest ore it can see, goes home when the battery or the cargo says so, and at
  * home buys the cheapest useful upgrade (the one a gate asked for first). It sees what a player
- * sees: ore in the lamp's circle, and on the radar. Ghost ore fools it like it fools a player.
+ * sees: ore in the lamp's circle, and in a GPS ping. Ghost ore fools it like it fools a player.
+ * At home it unloads, mends what is failing, shops; with the radio it comes home in time for an alarm.
  */
 
 import { W, H, T } from './world.js';
 import {
-    tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, radarRange,
+    tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, pingShows, ping, gpsReady,
     priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST, rowShown, maxLevel, ROWS, roomOf,
     stopOpen, closeStop, STOPS,
 } from './dig.js';
 import { HOME_X, roomSpot } from './base.js';
+import { spotOf, repairCost, worstAlarm } from './alarms.js';
+import { depthOf } from './world.js';
 
 /** Into the base only through the hatch. */
 const passUp = (x, ny) => ny !== -1 || x === HOME_X;
@@ -77,17 +80,20 @@ export function pathHome(s) {
     return out.reverse();
 }
 
-/** Is this tile one the player would go for: ore or a find, seen in the lamp or on the radar. */
+/** Is this tile one the player would go for: ore or a find, seen in the lamp or in the last ping. */
 function wanted(s, x, y, t) {
     if (s.__explore && (isOre(t) || t === T.FIND) && Math.abs(x - s.x) + Math.abs(y - s.y) <= 70) return true;
     const d = Math.hypot(x - s.x, y - s.y);
     const lit = d <= lampRadius(s);
-    const onRadar = d <= radarRange(s);
-    if (t === T.FIND) return lit || (s.levels.radar >= 3 && onRadar);
-    if (t === T.GHOST) return lit && !onRadar;        // the radar shows it is not there
+    const onRadar = pingShows(s, x, y) || (s.pingSeen && s.pingSeen.has(y * W + x));
+    if (t === T.FIND) return lit || onRadar;
+    if (t === T.GHOST) return lit && !(s.pingSeen && s.pingSeen.size);  // a ping shows it is not there
     if (!isOre(t)) return false;
     // with nothing left to buy, parts are only worth it for the colony
-    const maxed = ROWS.every((r) => s.levels[r] >= maxLevel(r));
+    // (nothing it can see in the workshop that the parts in hand do not already pay for)
+    let left = 0;
+    for (const r of ROWS) if (rowShown(s, r)) for (let lv = s.levels[r]; lv < maxLevel(r); lv++) left += priceFor(r, lv);
+    const maxed = s.parts >= left && s.levels.drill >= 3 && s.levels.hull >= 3;
     if (maxed && t !== T.BIO && s.reserve > 50) return false;
     return lit || onRadar;
 }
@@ -152,7 +158,7 @@ function blocker(s) {
     return null;
 }
 
-const USEFUL = ['steering', 'drill', 'cargo', 'battery', 'radar', 'lamp', 'hull'];
+const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'homing', 'lamp', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
@@ -161,6 +167,23 @@ function nextGate(s) {
     const best = (s.record + 1) * 5;
     for (const [m, row, lv] of GATES) if (rowShown(s, row) && s.levels[row] < lv && best >= m - 120) return row;
     return null;
+}
+
+/**
+ * Steering I goes two steps a press: a player who swings back and forth past a target presses down
+ * (or up) instead, to come at it from another side.
+ */
+function unswing(s, mem, dir) {
+    if (s.levels.steering || (dir !== 'left' && dir !== 'right')) return dir;
+    mem.hist = (mem.hist || []).filter((h) => s.time - h[1] < 3);
+    const last = mem.hist[mem.hist.length - 1];
+    if (!last || last[0] !== dir) mem.hist.push([dir, s.time]);
+    if (mem.hist.length >= 4) {
+        mem.hist = [];
+        const below = tileAt(s, s.x, s.y + 1);
+        if (below === T.AIR || (below > 0 && !gateOf(s, below, s.y + 1) && below !== T.HEART)) return 'down';
+    }
+    return dir;
 }
 
 /** Would the player walk to the workshop now: something there they can pay. */
@@ -209,10 +232,17 @@ export function shop(s, mem) {
 export function decide(s, mem) {
     if (s.ended) return { dir: null };
     if (isHome(s)) {
-        mem.going = null; mem.target = null;
+        mem.going = null; mem.target = null; s.pingSeen = null; mem.hist = [];
         const toward = (x) => (s.x < x ? 'right' : s.x > x ? 'left' : null);
         // the cargo to the warehouse
         if (s.cargo.length) return { dir: roomOf(s) === 'warehouse' ? null : toward(roomSpot('warehouse')) };
+        // something failing: stand under it while it is mended
+        const al = s.alarms;
+        const broken = al && (al.list[0] || (al.genDown ? { id: 'gen' } : null));
+        if (broken && !mem.noRepair && s.parts >= repairCost(depthOf(s.record))) {
+            const x = spotOf(broken.id);
+            return { dir: toward(x) };
+        }
         // something to buy: to the workshop
         if (wantsToShop(s, mem)) {
             if (roomOf(s) !== 'workshop') return { dir: toward(roomSpot('workshop')) };
@@ -224,9 +254,18 @@ export function decide(s, mem) {
     }
     const home = wayHome(s);
     const homeNeed = (home ? home.cost : homeCost(s) * 1.5) * 1.12 + 2.5;
+    // the radio: an alarm, and not much time to spare
+    const worst = s.levels.radio > 0 ? worstAlarm(s) : null;
+    const tripS = (s.y + 1) * 0.05 + 4;
+    if (worst && worst.until - s.time < tripS + 25) mem.going = 'home';
     if (mem.going === 'home' || s.cargo.length >= cargoCap(s) || s.battery < homeNeed + 3) {
         mem.going = 'home';
         return { dir: home ? home.dir : 'up' };
+    }
+    // a ping whenever the GPS is ready: it costs nothing (what it showed is remembered for this dive)
+    if (gpsReady(s) && s.y > 1 && !s.act && ping(s)) {
+        s.pingSeen = s.pingSeen || new Set();
+        for (let y = s.y; y < Math.min(H, s.y + 20); y++) for (let x = 0; x < W; x++) if (pingShows(s, x, y) && (isOre(tileAt(s, x, y)) || tileAt(s, x, y) === T.FIND)) s.pingSeen.add(y * W + x);
     }
     // a target is kept until it is dug: no dithering between two
     let tgt = null;
@@ -234,8 +273,12 @@ export function decide(s, mem) {
     // saving for a gate it cannot pay yet: it explores sideways for ore, as a player would
     const saving = mem.need && mem.need !== 'graft' && s.levels[mem.need] < maxLevel(mem.need) && s.parts < priceFor(mem.need, s.levels[mem.need]);
     s.__explore = saving;
-    if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < (saving ? 90 : 6) ? { x: tgt.x, y: tgt.y } : null; }
-    if (tgt && tgt.cost < (saving ? 90 : 6)) return { dir: tgt.dir };
+    // with parts enough for what the workshop shows, a player wants depth: only ore on the way
+    let cheapest = Infinity;
+    for (const r of ROWS) if (rowShown(s, r) && s.levels[r] < maxLevel(r)) cheapest = Math.min(cheapest, priceFor(r, s.levels[r]));
+    const near = saving ? 90 : s.parts >= cheapest * 1.5 && s.reserve > 60 && depthOf(s.y) < 1600 ? 1.2 : 6;
+    if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < near ? { x: tgt.x, y: tgt.y } : null; }
+    if (tgt && tgt.cost < near) return { dir: unswing(s, mem, tgt.dir) };
     // nothing in sight: down; at the bottom, toward the heart
     const below = tileAt(s, s.x, s.y + 1);
     if (below === -1 || (s.y >= 393 && below !== T.HEART)) {

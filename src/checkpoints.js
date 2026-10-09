@@ -311,10 +311,11 @@ export const CHECKPOINTS = [
         } })),
     // the dig (src/phase4d): jumping there chooses that version of chapter IV
     { id: 'iv-dig-start', label: 'IV · dig: start', apply: () => digJump({ row: -1 }) },
+    { id: 'iv-dig-alarm', label: 'IV · dig: a chamber failing', apply: () => digJump({ row: 30, levels: { battery: 1 }, parts: 40, time: 200, found: 1, alarm: true }) },
     { id: 'iv-dig-war', label: 'IV · dig: 300 m', apply: () => digJump({ row: 58, levels: { drill: 2, battery: 1, cargo: 1, lamp: 1 }, parts: 20, time: 240, found: 3, at: true }) },
-    { id: 'iv-dig-machine', label: 'IV · dig: 700 m', apply: () => digJump({ row: 138, levels: { drill: 3, battery: 2, cargo: 2, lamp: 2, hull: 1, radar: 2 }, parts: 60, time: 660, found: 5, at: true }) },
-    { id: 'iv-dig-flesh', label: 'IV · dig: the flesh', apply: () => digJump({ row: 320, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, radar: 3 }, grafts: 1, bio: 3, parts: 150, time: 1200, found: 9, at: true }) },
-    { id: 'iv-dig-heart', label: 'IV · dig: 1 990 m', apply: () => digJump({ row: 397, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, radar: 3 }, grafts: 3, bio: 10, parts: 300, time: 1400, found: 11, at: true }) },
+    { id: 'iv-dig-machine', label: 'IV · dig: 700 m', apply: () => digJump({ row: 138, levels: { drill: 3, battery: 2, cargo: 2, lamp: 2, hull: 1, gps: 2, homing: 1, radio: 1 }, parts: 60, time: 660, found: 5, at: true }) },
+    { id: 'iv-dig-flesh', label: 'IV · dig: the flesh', apply: () => digJump({ row: 320, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, gps: 2, homing: 1, radio: 1 }, grafts: 1, bio: 3, parts: 150, time: 1200, found: 9, at: true }) },
+    { id: 'iv-dig-heart', label: 'IV · dig: 1 990 m', apply: () => digJump({ row: 397, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, gps: 2, homing: 1, radio: 1 }, grafts: 3, bio: 10, parts: 300, time: 1400, found: 11, at: true }) },
     // chapter V · UNITY (docs/superpowers/specs/2026-10-06-chapter-v-unity.md)
     ...Object.entries({ 'v-start': 'V · unity: the city', 'v-city-done': 'V · the city almost eaten', 'v-land': 'V · the county', 'v-continent': 'V · the continent', 'v-planet': 'V · the planet' })
         .map(([id, label]) => ({ id, label, apply: () => {
@@ -323,10 +324,12 @@ export const CHECKPOINTS = [
             set(PHASE_KEY, 'UNITY');
         } })),
 ];
-function digJump({ at = false, ...opts }) {
+function digJump({ at = false, alarm = false, ...opts }) {
     clearAll();
     const s = preparedState(opts);
     if (at) { s.y = opts.row; s.x = 11; }
+    // a chamber failing, the drone at the base: the first failure's stop comes at once
+    if (alarm) { s.alarms.list.push({ id: 'c2', at: s.time, until: s.time + 110 }); s.tut.done.failing = false; s.tut.rows = s.tut.rows.filter((r) => r !== 'radio' && r !== 'homing' && r !== 'gps'); }
     set(DIG_KEY, serializeDig(s));
     set(DEEP_VERSION_KEY, 'dig');
     set(PHASE_KEY, 'DEEP');

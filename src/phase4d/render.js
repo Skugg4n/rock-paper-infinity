@@ -8,8 +8,9 @@
  * into offscreen canvases and redrawn only when what they show changes; per frame only what moves.
  */
 
-import { W, H, T, HEART, layerIndexOf } from './world.js';
-import { lampRadius, radarRange, isOre, SLEEPERS, HOME_X } from './dig.js';
+import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
+import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows } from './dig.js';
+import { spotOf, REPAIR_S } from './alarms.js';
 import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
 
 export const TS = 32;
@@ -227,22 +228,36 @@ export function createRenderer(canvas) {
                 view.path.forEach(([x, y], i) => { const px = r.originX + x * TS + TS / 2, py = y * TS + TS / 2 - camY; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
                 ctx.stroke(); ctx.setLineDash([]);
             }
-            // the radar: true ore as faint dots outside the light
-            const rr = radarRange(s);
-            if (rr > 0) {
-                for (let y = Math.max(0, Math.floor(p.y - rr)); y <= Math.min(H - 1, Math.ceil(p.y + rr)); y++) {
+            // the GPS ping: a cone below, the ore and the finds in it for a few seconds
+            const pg = s.ping;
+            if (pg && s.time - pg.at < GPS_SHOW) {
+                const age = s.time - pg.at, g = GPS[pg.lv];
+                const fade = 1 - age / GPS_SHOW;
+                const ox = r.originX + pg.x * TS + TS / 2, oy = pg.y * TS + TS / 2 - camY;
+                const reach = g.range * TS * Math.min(1, age / 0.6);
+                ctx.save();
+                ctx.beginPath(); ctx.rect(r.originX, 0, W * TS, vh); ctx.clip();
+                ctx.beginPath(); ctx.moveTo(ox, oy); ctx.arc(ox, oy, reach, Math.PI / 2 - g.half, Math.PI / 2 + g.half); ctx.closePath();
+                const cg = ctx.createRadialGradient(ox, oy, 4, ox, oy, g.range * TS);
+                cg.addColorStop(0, `rgba(143,208,255,${(0.16 * fade).toFixed(3)})`); cg.addColorStop(1, 'rgba(143,208,255,0)');
+                ctx.fillStyle = cg; ctx.fill();
+                ctx.strokeStyle = `rgba(143,208,255,${(0.5 * fade).toFixed(3)})`; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(ox, oy, reach, Math.PI / 2 - g.half, Math.PI / 2 + g.half); ctx.stroke();
+                ctx.restore();
+                for (let y = pg.y; y <= Math.min(H - 1, pg.y + g.range); y++) {
                     for (let x = 0; x < W; x++) {
                         const tt = s.tiles[y * W + x];
-                        const real = isOre(tt) || (tt === T.FIND && s.levels.radar >= 3);
-                        if (!real) continue;
-                        const d = Math.hypot(x - p.x, y - p.y);
-                        if (d > rr || d < lampRadius(s) * 0.8) continue;
-                        ctx.fillStyle = tt === T.FIND ? 'rgba(255,220,120,0.55)' : `rgba(${tt === T.BIO ? '255,90,110' : '140,220,255'},${(0.5 - 0.35 * d / rr).toFixed(3)})`;
-                        ctx.fillRect(r.originX + x * TS + TS / 2 - 3, y * TS + TS / 2 - camY - 3, 6, 6);
+                        if (!(isOre(tt) || tt === T.FIND) || !pingShows(s, x, y)) continue;
+                        if (Math.hypot(x - pg.x, y - pg.y) * TS > reach) continue;
+                        ctx.fillStyle = tt === T.FIND ? `rgba(255,214,120,${(0.9 * fade).toFixed(3)})` : tt === T.BIO ? `rgba(255,90,110,${(0.9 * fade).toFixed(3)})` : `rgba(160,225,255,${(0.9 * fade).toFixed(3)})`;
+                        ctx.fillRect(r.originX + x * TS + TS / 2 - 4, y * TS + TS / 2 - camY - 4, 8, 8);
                     }
                 }
             }
         }
+
+        // ---- the depth ruler, right of the shaft: metres down, the layers marked once they are known
+        if (shows(s, 'depth') && vw - (r.originX + W * TS) >= 64) drawRuler(s, vw, vh, camY, p);
 
         // ---- the city in the storm and the base with its own lamps, over the dark
         if (groundY + TOP_ROW * TS < vh && groundY > -2 * TS) {
@@ -400,6 +415,43 @@ export function createRenderer(canvas) {
             ctx.beginPath(); ctx.arc(sx + 16, sy + 16, 7, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#ffd0d8'; ctx.beginPath(); ctx.arc(sx + 14, sy + 14, 2, 0, Math.PI * 2); ctx.fill();
         }
+    }
+
+    /** The ruler: a tick every 25 m, a number every 100 m, the layers' tops once reached, the drone and its best. */
+    function drawRuler(s, vw, vh, camY, p) {
+        const x0 = r.originX + W * TS + 16;
+        const yTop = Math.max(0, -camY), yBot = vh;
+        if (yBot <= yTop) return;
+        ctx.fillStyle = 'rgba(11,13,16,0.85)'; ctx.fillRect(x0 - 6, yTop, 52, yBot - yTop);
+        ctx.strokeStyle = 'rgba(143,161,182,0.5)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x0 + 0.5, yTop); ctx.lineTo(x0 + 0.5, yBot); ctx.stroke();
+        ctx.font = '600 11px "Bebas Neue", "Arial Narrow", sans-serif'; ctx.textBaseline = 'middle';
+        const m0 = Math.max(0, Math.floor((camY / TS) * 5 / 25) * 25), m1 = ((camY + vh) / TS + 1) * 5;
+        for (let m = m0; m <= m1 && m <= 2000; m += 25) {
+            const y = (m / 5) * TS - camY;
+            if (y < yTop) continue;
+            const big = m % 100 === 0;
+            ctx.strokeStyle = big ? 'rgba(213,219,227,0.7)' : 'rgba(143,161,182,0.45)';
+            ctx.beginPath(); ctx.moveTo(x0, y + 0.5); ctx.lineTo(x0 + (big ? 10 : 5), y + 0.5); ctx.stroke();
+            if (big) { ctx.fillStyle = C.mist; ctx.fillText(`${m} m`, x0 + 13, y); }
+        }
+        // the layers the drone has reached: a line and the name
+        for (let li = 1; li <= s.layerSeen && li < LAYERS.length; li++) {
+            const y = (LAYERS[li].from / 5) * TS - camY;
+            if (y < yTop || y > yBot) continue;
+            ctx.strokeStyle = 'rgba(255,214,120,0.6)';
+            ctx.beginPath(); ctx.moveTo(x0 - 6, y + 0.5); ctx.lineTo(x0 + 46, y + 0.5); ctx.stroke();
+            ctx.fillStyle = C.amber; ctx.fillText(LAYERS[li].name, x0 + 2, y + 9);
+        }
+        // the best so far, and the drone
+        const by = (s.record + 1) * TS - camY;
+        if (s.record >= 0 && by > yTop && by < yBot) { ctx.fillStyle = C.paper; ctx.fillRect(x0 - 6, by - 1, 12, 2); }
+        const dy = (p.y + 0.5) * TS - camY;
+        if (p.y >= 0 && dy > yTop && dy < yBot) {
+            ctx.fillStyle = C.cold;
+            ctx.beginPath(); ctx.moveTo(x0 - 6, dy - 5); ctx.lineTo(x0, dy); ctx.lineTo(x0 - 6, dy + 5); ctx.fill();
+        }
+        ctx.textBaseline = 'alphabetic';
     }
 
     /** An amber arrow pointing down (dir 1) or up (-1): look here. */
@@ -580,9 +632,37 @@ export function createRenderer(canvas) {
         // the generator hums: its window glows and breathes
         const [ga, gb] = ROOMS.generator;
         const gw = (gb - ga + 1) * TS, top = groundY + ROOM_TOP * TS;
-        const hum = 0.55 + 0.25 * Math.sin(t * 6) + 0.1 * Math.sin(t * 17);
+        const al = s.alarms;
+        const genDown = al && al.genDown;
+        const hum = genDown ? 0 : 0.55 + 0.25 * Math.sin(t * 6) + 0.1 * Math.sin(t * 17);
         ctx.fillStyle = `rgba(143,208,255,${(0.35 * hum).toFixed(3)})`;
         ctx.fillRect(r.originX + ga * TS + 58, top + 46, gw - 74, 18);
+        // what is failing: a red lamp that blinks (the generator stopped: a steady one)
+        const blink = Math.floor(performance.now() / 350) % 2 === 0;
+        const redLamp = (x, y, on) => {
+            ctx.fillStyle = on ? C.danger : '#4a1a16';
+            ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+            if (on) { const rg = ctx.createRadialGradient(x, y, 2, x, y, 34); rg.addColorStop(0, 'rgba(255,107,90,0.45)'); rg.addColorStop(1, 'rgba(255,107,90,0)'); ctx.fillStyle = rg; ctx.fillRect(x - 34, y - 34, 68, 68); }
+        };
+        if (al) {
+            for (const f of al.list) {
+                if (f.id === 'gen') redLamp(r.originX + ga * TS + gw / 2 + 30, top + 28, blink);
+                else {
+                    const [a, b] = CHAMBERS[Number(f.id.slice(1))];
+                    redLamp(r.originX + (a + b) / 2 * TS, groundY + CHAMBER_TOP * TS + 4, blink);
+                }
+            }
+            if (genDown) redLamp(r.originX + ga * TS + gw / 2 + 30, top + 28, true);
+            // at home: an arrow to the first thing to mend
+            const first = al.list[0] || (genDown ? { id: 'gen' } : null);
+            if (first && s.y === -1 && !s.cargo.length) arrow(r.originX + spotOf(first.id) * TS + TS / 2, top + 46 + 4 * Math.sin(t * 5), 1);
+            // mending: a bar over the drone
+            if (al.repair) {
+                const k = Math.min(1, al.repair.t / REPAIR_S), bx = r.originX + s.x * TS + TS / 2 - 22, byy = groundY - TS - 30;
+                ctx.fillStyle = '#0b0c0e'; ctx.fillRect(bx, byy, 44, 6);
+                ctx.fillStyle = C.amber; ctx.fillRect(bx + 1, byy + 1, 42 * k, 4);
+            }
+        }
         // look here: the warehouse with cargo aboard, the workshop with something new
         const home = s.y === -1, rx = s.x;
         if (home && s.cargo.length && !(rx >= ROOMS.warehouse[0] && rx <= ROOMS.warehouse[1])) {

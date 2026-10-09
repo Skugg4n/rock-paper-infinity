@@ -11,6 +11,7 @@
 
 import { W, H, T, ORE, depthOf, layerIndexOf, LAYERS, FINDS, FIND_PARTS, FIND_BIO, makeWorld, rng, rowOf } from './world.js';
 import { HOME_X, roomAt } from './base.js';
+import { newAlarms, stepAlarms, ALARM_LINES } from './alarms.js';
 
 export { HOME_X };
 export const SAVE_KEY = 'rpi-deep-dig';
@@ -22,6 +23,7 @@ export const STOPS = {
     arrive: [INTRO, '216 SLEEPERS.'],
     dig: ['The generators burn ore. Dig.'],
     power: ['Power. It takes you down and brings you home.'],
+    failing: [ALARM_LINES.first],
 };
 export const LINES = {
     unload: 'Drive into the WAREHOUSE to unload.',
@@ -30,13 +32,16 @@ export const LINES = {
 };
 /** Seconds, at least, between two new workshop rows; and from the first purchase to the generators' gauge. */
 export const ROW_GAP = 45;
+export const LAMP_NEED_M = 400;
+/** Tiles dug in a row without ore before the GPS row is wanted (besides two dives without ore). */
+export const EMPTY_DIG = 20;
 export const GEN_AFTER = 60;
 /** The panel's gauges, shown one at a time as they come to matter. */
 export const SHOWS = ['power', 'cargo', 'depth', 'parts', 'gen', 'finds'];
 export function newTut() {
     return {
         on: true, stop: { id: 'arrive', text: STOPS.arrive, focus: 'crt', crt: true }, done: {},
-        show: {}, rows: [], needs: [], revealDive: -1, fresh: null, fulls: 0, dry: 0, diveOre: 0, dug: false,
+        show: {}, rows: [], needs: [], revealDive: -1, fresh: null, fulls: 0, dry: 0, diveOre: 0, dug: false, empty: 0,
     };
 }
 export const shows = (s, what) => !s.tut || !s.tut.on || !!s.tut.show[what];
@@ -64,30 +69,38 @@ function reveal(s, what) {
 /** A need arose: its workshop row comes, one a dive, the next time the drone is home. */
 export function need(s, row) {
     const t = s.tut;
-    if (!t || !t.on || t.rows.includes(row) || t.needs.includes(row) || !PRICE[row]) return;
-    t.needs.push(row);
+    if (!t || !t.on || t.rows.includes(row) || !PRICE[row]) return;
+    // a row that a wall asks for (the drone cannot go on without it) goes first in the queue
+    const gate = row === 'drill' || row === 'hull';
+    if (t.needs.includes(row)) { if (gate && t.needs[0] !== row) { t.needs.splice(t.needs.indexOf(row), 1); t.needs.unshift(row); } return; }
+    if (gate) t.needs.unshift(row); else t.needs.push(row);
 }
 
 // ---- the workshop -----------------------------------------------------------------------------
 /** Prices per row and level: a little different per row, so the list does not all say the same. */
 export const PRICE = {
     battery: [20, 60, 380], steering: [15], drill: [20, 70, 420], cargo: [25, 60, 340],
-    lamp: [25, 50, 280], radar: [40, 80, 360], hull: [30, 90, 440],
+    lamp: [25, 50, 280], gps: [40, 90], homing: [35], radio: [45], hull: [30, 90, 440],
 };
 /** Kept for old callers: the drill's prices. */
 export const PRICES = PRICE.drill;
 export const maxLevel = (row) => PRICE[row].length;
 export const priceFor = (row, lv) => (lv >= maxLevel(row) ? null : PRICE[row][lv]);
 /** The workshop's rows, in the order they are listed when shown. */
-export const ROWS = ['battery', 'steering', 'drill', 'cargo', 'lamp', 'radar', 'hull'];
-export const ROW_NAME = { drill: 'DRILL', battery: 'BATTERY', cargo: 'CARGO', lamp: 'LAMP', hull: 'HULL', radar: 'RADAR', steering: 'STEERING' };
+export const ROWS = ['battery', 'steering', 'drill', 'cargo', 'lamp', 'gps', 'homing', 'radio', 'hull'];
+export const ROW_NAME = {
+    drill: 'DRILL', battery: 'BATTERY', cargo: 'CARGO', lamp: 'LAMP', hull: 'HULL', steering: 'STEERING',
+    gps: 'GPS', homing: 'HOMING LINE', radio: 'SHORT WAVE RADIO',
+};
 export const DRILL_MULT = [1, 0.7, 0.5, 0.36];
-export const BATTERY_CAP = [40, 90, 180, 340];
+export const BATTERY_CAP = [40, 90, 180, 420];
 export const CARGO_CAP = [8, 14, 22, 34];
 export const LAMP_RADIUS = [3, 4.5, 6, 8];
 /** The deepest a hull can go, metres. */
 export const HULL_MAX = [500, 900, 1200, Infinity];
-export const RADAR_RANGE = [0, 9, 14, 22];
+/** GPS (ground penetrating sonar), by level: a ping shows ore below in a cone. GPS II is the old radar folded in. */
+export const GPS = [null, { range: 11, half: 0.62, recharge: 20 }, { range: 17, half: 0.98, recharge: 12 }];
+export const GPS_SHOW = 4;           // seconds a ping's picture lasts
 /** What the next level gives, one sentence, by row and the level it brings (1 to 3). */
 export const NEXT_TEXT = {
     drill: ['Digs faster.', 'Digs faster. Breaks hard rock.', 'Digs faster. Breaks basalt.'],
@@ -95,7 +108,6 @@ export const NEXT_TEXT = {
     cargo: [`Carries ${CARGO_CAP[1]}.`, `Carries ${CARGO_CAP[2]}.`, `Carries ${CARGO_CAP[3]}.`],
     lamp: ['Sees farther.', 'Sees farther.', 'Sees farther.'],
     hull: ['Goes below 500 m.', 'Goes below 900 m.', 'Takes the heat below 1 200 m.'],
-    radar: ['Shows ore in the dark.', 'Shows ore farther.', 'Shows ore and finds far off.'],
 };
 /** The workshop row's line: what the drone has now, and what the next level gives. */
 export function rowText(row, lv) {
@@ -108,7 +120,9 @@ export function rowText(row, lv) {
         case 'cargo': return next(`Carries ${CARGO_CAP[lv]}.`) + (top ? '' : `${CARGO_CAP[lv + 1]}.`);
         case 'lamp': return next(`Lights ${LAMP_RADIUS[lv]} tiles.`) + (top ? '' : `${LAMP_RADIUS[lv + 1]}.`);
         case 'hull': return top ? 'Takes the heat.' : `Safe to ${HULL_MAX[lv]} m. Next: ${lv === 2 ? 'the heat below 1 200 m' : `${HULL_MAX[lv + 1]} m`}.`;
-        case 'radar': return top ? 'Ore and finds far off.' : ['No radar. Next: ore in the dark.', 'Ore nearby. Next: farther.', 'Ore far off. Next: finds too.'][lv];
+        case 'gps': return top ? 'A wide ping. Ready again in 12 s.' : ['A ping shows ore below. Key G.', 'Pings ore below. Next: wider, ready sooner.'][lv];
+        case 'homing': return lv ? 'Shows the way home when power runs low.' : 'The way home, dotted, when power runs low.';
+        case 'radio': return lv ? 'You hear the base anywhere.' : 'Hear the base\'s alarms anywhere.';
         default: return '';
     }
 }
@@ -128,7 +142,7 @@ export const MOVE_TIME = 0.13, MOVE_COST = 0.3;
 export const UP_TIME = 0.075, UP_MIN = 0.03, UP_COST = 0.4;
 export const IDLE_DRAIN = 0.1;          // per second below the surface
 export const HEAT_FROM = 1200;          // metres
-export const HEAT_DRAIN = 0.4;          // per second in the heat, without SKIN
+export const HEAT_DRAIN = 0.3;          // per second in the heat, without SKIN
 export const HEAL_RATE = 0.6;           // per second below, with the HEALING CELL
 export const CHARGE_RATE = 0.6;         // share of the battery per second, at home
 export const UNLOAD_EVERY = 0.08;       // seconds a piece
@@ -169,8 +183,8 @@ export function newState(seed = 7) {
         x: HOME_X, y: -1, act: null, fallStreak: 0, face: 1,
         battery: BATTERY_CAP[0], cargo: [], unloadT: 0,
         parts: 0, bio: 0, bioSeen: false, delivered: 0,
-        levels: { drill: 0, battery: 0, cargo: 0, lamp: 0, hull: 0, radar: 0, steering: 0 }, grafts: 0, dreaming: false,
-        tut: newTut(), dives: 0, commit: null,
+        levels: { drill: 0, battery: 0, cargo: 0, lamp: 0, hull: 0, steering: 0, gps: 0, homing: 0, radio: 0 }, grafts: 0, dreaming: false,
+        tut: newTut(), dives: 0, commit: null, alarms: newAlarms(0), ping: null,
         reserve: 100, podOrder: pods, dark: [], podT: 0,
         time: 0, record: -1, layerSeen: 0, voiceT: 0, voiceN: 0,
         line: { text: '', at: 0, n: 1, kind: 'line', ttl: 0 },
@@ -189,7 +203,24 @@ export const sleepers = (s) => SLEEPERS - s.dark.length;
 export const batteryCap = (s) => BATTERY_CAP[s.levels.battery];
 export const cargoCap = (s) => CARGO_CAP[s.levels.cargo];
 export const lampRadius = (s) => LAMP_RADIUS[s.levels.lamp] + (s.grafts >= 3 ? 0.5 : 0);
-export const radarRange = (s) => RADAR_RANGE[s.levels.radar];
+/** The GPS: can it ping now, and is (x, y) in the picture of the last ping (still showing). */
+export const gpsReady = (s) => s.levels.gps > 0 && (!s.ping || s.time - s.ping.at >= GPS[s.levels.gps].recharge);
+export const gpsCharge = (s) => (s.levels.gps > 0 ? (!s.ping ? 1 : Math.min(1, (s.time - s.ping.at) / GPS[s.levels.gps].recharge)) : 0);
+export function pingShows(s, x, y) {
+    const p = s.ping;
+    if (!p || s.time - p.at > GPS_SHOW) return false;
+    const g = GPS[p.lv];
+    const dx = x - p.x, dy = y - p.y;
+    if (dy < 0 || Math.hypot(dx, dy) > g.range) return false;
+    return Math.abs(Math.atan2(dx, dy)) <= g.half;
+}
+/** A ping: for a few seconds the ore and finds below show in a cone. */
+export function ping(s) {
+    if (!gpsReady(s) || isHome(s) || s.ended || stopOpen(s)) return false;
+    s.ping = { at: s.time, x: s.x, y: s.y, lv: s.levels.gps };
+    s.events.push({ type: 'ping' });
+    return true;
+}
 export const depthM = (s) => depthOf(s.y);
 export const isHome = (s) => s.y === -1;
 /** The room of the base the drone stands in, or null (away, or between rooms). */
@@ -268,6 +299,8 @@ function arrive(s, x, y) {
         // a new record every 50 m is worth a sound, the first time
         if (Math.floor(depthOf(y) / 50) > Math.floor(depthOf(before) / 50) && before >= 0) s.events.push({ type: 'record', m: depthOf(y) });
         if (y >= rowOf(20)) reveal(s, 'depth');
+        // the dark gets thick below 400 m: the lamp is wanted even by a drone that never died in it
+        if (y >= rowOf(LAMP_NEED_M)) need(s, 'lamp');
     }
     if (y >= 0) {
         const li = layerIndexOf(y);
@@ -300,7 +333,7 @@ function finishDig(s, tx, ty) {
         if (s.cargo.length < cargoCap(s)) {
             s.cargo.push(t);
             reveal(s, 'cargo');
-            if (s.tut) s.tut.diveOre++;
+            if (s.tut) { s.tut.diveOre++; s.tut.empty = 0; }
             s.events.push({ type: 'ore', kind: ORE[t].kind });
             if (s.cargo.length === cargoCap(s)) {
                 say(s, 'Cargo full. Go home.', 'line', 2);
@@ -313,6 +346,8 @@ function finishDig(s, tx, ty) {
     } else if (t === T.GHOST) {
         s.events.push({ type: 'ghost' });
         say(s, 'It was not there.', 'ghost', 6);
+        // ore that is not there: a way to see what is real is wanted
+        need(s, 'gps');
     } else if (t === T.FIND) {
         const n = s.finds[i];
         if (n !== undefined && !s.found.includes(n)) {
@@ -327,6 +362,8 @@ function finishDig(s, tx, ty) {
         }
     } else {
         s.events.push({ type: 'dug', t });
+        // a long dig through nothing: a way to see ore in the dark is wanted
+        if (s.tut && ++s.tut.empty >= EMPTY_DIG) need(s, 'gps');
     }
     arrive(s, tx, ty);
     // the first tile dug: POWER, and what it is
@@ -410,11 +447,13 @@ function tryDir(s, dir) {
 
 /** The drone is back in the base: a dive without ore counts; one new workshop row a dive. */
 function homeAgain(s) {
+    // what happened at the base while the drone was away, without the radio
+    if (s.alarms && s.alarms.unseen.length) { say(s, s.alarms.unseen.join(' '), 'alarm', 0); s.alarms.unseen = []; }
     const t = s.tut;
     if (!t || !t.on) return;
     if (s.dives > 0) {
         t.dry = t.diveOre > 0 || s.cargo.length ? 0 : t.dry + 1;
-        if (t.dry >= 2) need(s, 'radar');
+        if (t.dry >= 2) need(s, 'gps');
     }
     if (t.rows.length && t.needs.length && t.revealDive !== s.dives && s.time - (t.revealAt ?? -1e9) >= ROW_GAP) {
         const row = t.needs.shift();
@@ -461,12 +500,26 @@ export function step(s, dt, input = {}) {
         s.podT += dt;
         while (s.podT >= POD_EVERY && sleepers(s) > 0) {
             s.podT -= POD_EVERY;
-            const pod = s.podOrder[s.dark.length];
+            const pod = s.podOrder.find((p) => !s.dark.includes(p));
             s.dark.push(pod);
             s.events.push({ type: 'pod', pod });
             say(s, `Pod ${pod} went dark.`, 'alarm', 0);
         }
     } else s.podT = 0;
+    // the base breaks now and then (spec D)
+    if (s.alarms) {
+        stepAlarms(s, dt, {
+            home: isHome(s), recordM: depthOf(s.record), radio: s.levels.radio > 0,
+            say: (text, kind) => say(s, text, kind, kind === 'gate' ? 6 : 0),
+            event: (e) => s.events.push(e),
+            alive: (p) => !s.dark.includes(p),
+        });
+        if (isHome(s) && s.alarms.list.some((f) => f.id !== 'gen') && s.tut && s.tut.on && !s.tut.done.failing) {
+            openStop(s, 'failing', 'alarm');
+            need(s, 'radio');
+            return;
+        }
+    }
     const cap = batteryCap(s);
     if (isHome(s)) { s.warned = false; s.hoverSaid = false; }
     // a hint is about where the drone was: it goes when the drone moves, or at the base
@@ -482,7 +535,10 @@ export function step(s, dt, input = {}) {
     if (isHome(s) && s.line?.kind === ROUTE_TURN) clearLine(s);
     if (isHome(s) && !s.cargo.length && /^Cargo full/.test(s.line?.text || '')) clearLine(s);
     if (isHome(s) && !s.act) {
-        s.battery = Math.min(cap, s.battery + cap * CHARGE_RATE * dt);
+        // a stopped generator does not charge (only a little, so the drone is never stuck at home)
+        const genDown = s.alarms && s.alarms.genDown;
+        if (!genDown) s.battery = Math.min(cap, s.battery + cap * CHARGE_RATE * dt);
+        else if (s.battery < cap * 0.15) s.battery = Math.min(cap * 0.15, s.battery + cap * CHARGE_RATE * 0.2 * dt);
         if (s.cargo.length && roomOf(s) !== 'warehouse' && s.tut && s.tut.on && !s.tut.done.unload) {
             s.tut.done.unload = true;
             say(s, LINES.unload, 'line', 0);
@@ -506,7 +562,7 @@ export function step(s, dt, input = {}) {
         // the turn-back line is on while it is true, and only then
         const low = s.y > 2 && s.battery < turnBackAt(s);
         if (low && s.line?.kind !== ROUTE_TURN && s.line?.kind !== 'end') {
-            if (!s.warned) s.events.push({ type: 'warn' });
+            if (!s.warned) { s.events.push({ type: 'warn' }); need(s, 'homing'); }
             s.warned = true;
             say(s, 'Turn back. Just enough power to fly home.', ROUTE_TURN, 0);
         } else if (!low && s.line?.kind === ROUTE_TURN) clearLine(s);
@@ -631,6 +687,8 @@ export function deserialize(raw) {
         for (let i = 0; i < tiles.length; i++) tiles[i] = o.tiles.charCodeAt(i) - 65;
         const base = newState(o.seed || 7);
         const s = { ...base, ...o, tiles, levels: { ...base.levels, ...o.levels }, act: null, commit: null, events: [] };
+        if (o.levels && o.levels.radar) { s.levels.gps = Math.min(2, o.levels.radar); delete s.levels.radar; }
+        if (!o.alarms) s.alarms = newAlarms(s.time);
         if (!o.tut) inferTut(s);
         else if (s.tut.stop && s.tut.stop.crt) s.tut.stop = { ...newTut().stop };
         return s;
@@ -647,6 +705,8 @@ export function preparedState({ row = 0, levels = {}, grafts = 0, parts = 0, bio
     const s = newState(7);
     if (row >= 0) s.levels.steering = 1;
     Object.assign(s.levels, levels);
+    if (levels.radar) { s.levels.gps = Math.min(2, levels.radar); delete s.levels.radar; }
+    s.alarms = newAlarms(time);
     s.grafts = grafts;
     s.dreaming = grafts > 0;
     s.bioSeen = grafts > 0 || bio > 0;
@@ -671,13 +731,13 @@ export function preparedState({ row = 0, levels = {}, grafts = 0, parts = 0, bio
 export function inferTut(s) {
     const t = newTut();
     t.stop = null;
-    for (const id of ['arrive', 'dig', 'power', 'unload']) t.done[id] = true;
+    for (const id of ['arrive', 'dig', 'power', 'unload', 'failing']) t.done[id] = true;
     for (const w of SHOWS) t.show[w] = true;
     t.dug = true;
     const m = depthOf(s.record);
     const rows = ['battery', 'steering'];
     if (m >= 300 || s.levels.drill > 0) rows.push('drill');
-    for (const r of ['cargo', 'lamp', 'radar']) if (s.levels[r] > 0 || m >= 300) rows.push(r);
+    for (const r of ['cargo', 'lamp', 'gps', 'homing', 'radio']) if (s.levels[r] > 0 || m >= 300) rows.push(r);
     if (m >= 500 || s.levels.hull > 0) rows.push('hull');
     t.rows = ROWS.filter((r) => rows.includes(r));
     t.revealDive = s.dives || 0;

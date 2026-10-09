@@ -12,8 +12,9 @@ import { playChapterCard } from '../chapterCard.js';
 import {
     SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, ROW_NAME, rowText, GRAFTS, graftShown,
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
-    shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf,
+    shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady,
 } from './dig.js';
+import { worstAlarm, ALARM_LINES } from './alarms.js';
 import { depthOf, FINDS } from './world.js';
 import { createRenderer, RISE_S } from './render.js';
 import { pathHome } from './autopilot.js';
@@ -99,6 +100,16 @@ const CSS = `
 .dig-stop[hidden] { display: none; }
 .dig-stop .ok { align-self: flex-end; border: 0; border-radius: 6px; padding: 6px 20px; background: #ffd678; color: #07080a; font: 600 18px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .12em; cursor: pointer; }
 #dig-root.has-stop #dig-canvas { filter: brightness(.82); }
+.dig-alarm { margin: 6px 0 4px; padding: 6px 8px; border-radius: 4px; background: rgba(255,107,90,.12); box-shadow: inset 0 0 0 1px rgba(255,107,90,.6); color: #ff6b5a; font: 600 17px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .08em; animation: dig-alarm 1s steps(2) infinite; }
+.dig-alarm.is-calm { animation: none; font: 13px/1.3 system-ui, sans-serif; letter-spacing: 0; }
+.dig-alarm[hidden] { display: none; }
+@keyframes dig-alarm { 50% { background: rgba(255,107,90,.28); } }
+.dig-ping { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 8px 0 2px; padding: 7px 10px; border: 0; border-radius: 6px; background: #2a313b; color: #f1efe8; cursor: pointer; overflow: hidden;
+  font: 600 16px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .14em; }
+.dig-ping[hidden] { display: none; }
+.dig-ping > i { position: absolute; left: 0; bottom: 0; height: 3px; background: #8fd0ff; }
+.dig-ping.is-ready { background: #3a4350; box-shadow: inset 0 0 0 1px #8fd0ff; }
+.dig-ping small { font: 11px/1 system-ui; letter-spacing: 0; color: #8fa1b6; }
 #dig-help { position: absolute; right: 16px; bottom: 16px; font: 12px/1.4 system-ui; color: #5d6a78; text-align: right; pointer-events: none; }
 `;
 
@@ -113,6 +124,7 @@ function buildDom(host) {
     // pass 3: everything after the CRT is shown one at a time (data-show), as it comes to matter
     panel.innerHTML = `
       <div class="dig-crt" id="dig-crt"></div>
+      <div class="dig-alarm" id="dig-alarm" hidden></div>
       <div data-show="sleepers"><div class="dig-row"><span class="dymo is-small">SLEEPERS</span><span class="dig-val" id="dig-sleepers">216</span></div>
       <canvas class="dig-pods" id="dig-pods" width="240" height="26"></canvas></div>
       <div data-show="power" id="dig-power-box"><div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val" id="dig-power">100 %</span></div>
@@ -123,7 +135,8 @@ function buildDom(host) {
       <div data-show="gen"><div class="dig-row"><span class="dymo is-small">GENERATORS</span><span class="dig-val" id="dig-colony">100 %</span></div>
       <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div></div>
       <div class="dig-row" id="dig-bio-row" hidden><span class="dymo is-small">BIOMASS</span><span class="dig-val" id="dig-bio">0</span></div>
-      <div data-show="finds" class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>`;
+      <div data-show="finds" class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>
+      <button type="button" class="dig-ping" id="dig-ping" hidden><span>PING</span><small>G</small><i id="dig-ping-bar"></i></button>`;
     const shop = el('div', 'dig-card dig-shop');
     shop.innerHTML = `<h3><span class="dymo is-small">WORKSHOP</span><span class="dig-val" id="dig-shop-note"></span></h3><div id="dig-shop-rows"></div>`;
     col.append(panel, shop);
@@ -143,6 +156,7 @@ function buildDom(host) {
         crt: $('dig-crt'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
         stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'),
         showEls: [...panel.querySelectorAll('[data-show]')],
+        alarm: $('dig-alarm'), ping: $('dig-ping'), pingBar: $('dig-ping-bar'),
     };
 }
 
@@ -194,10 +208,12 @@ export function init() {
             closeStop(s);
             if (!d) return;
         }
+        if ((e.key === 'g' || e.key === 'G') && !stopOpen(s)) { e.preventDefault(); ping(s); return; }
         if (!d) return;
         e.preventDefault();
         press(d);
     }, { signal });
+    ui.ping.addEventListener('click', () => ping(s), { signal });
     window.addEventListener('keyup', (e) => { const d = KEYS[e.key]; if (d) release(d); }, { signal });
     window.addEventListener('blur', () => { held.length = 0; mouse = null; }, { signal });
     ui.canvas.addEventListener('pointerdown', (e) => { mouse = { x: e.clientX, y: e.clientY }; ui.canvas.setPointerCapture?.(e.pointerId); }, { signal });
@@ -208,7 +224,7 @@ export function init() {
     // the way home is drawn when the power is short; worked out a few times a second
     let path = null, pathAt = -1;
     const view = () => {
-        const short = !isHome(s) && !s.ended && s.y > 2 && s.battery < turnBackAt(s) * 1.4 + 4;
+        const short = s.levels.homing > 0 && !isHome(s) && !s.ended && s.y > 2 && s.battery < turnBackAt(s) * 1.4 + 4;
         if (!short) path = null;
         else if (s.time - pathAt > 0.4) { pathAt = s.time; path = pathHome(s); }
         const st = s.tut && s.tut.stop;
@@ -286,10 +302,18 @@ export function init() {
         if (!crtDoneAt) crtAt = -1e9;
         else { crtDoneAt = -1e9; }
     }
-    if (stopOpen(s) && s.tut.stop.crt) ui.crt.classList.add('is-arriving');
+    // the act comes in under the IV · DEEP card: the CRT waits until the card has lifted
+    const cardUp = () => !!document.getElementById('chapter-card')?.classList.contains('is-active');
+    let crtLit = false;
     function stepCrt(nowMs) {
         let html;
         const st = s.tut && s.tut.stop;
+        if (st && st.crt && cardUp()) {
+            crtAt = nowMs; crtDoneAt = 0;
+            ui.crt.style.opacity = '0';
+            return;
+        }
+        if (st && st.crt && !crtLit) { crtLit = true; crtAt = Math.max(crtAt, nowMs); ui.crt.style.opacity = ''; ui.crt.classList.add('is-arriving'); }
         if (st && st.crt) {
             // the arrival: line after line, 40 ms a letter, a short pause between
             let ms = nowMs - crtAt - 900, done = true;
@@ -399,6 +423,23 @@ export function init() {
         ui.bioRow.hidden = !(s.bioSeen || s.grafts > 0);
         put('bio', ui.bio, String(s.bio));
         put('finds', ui.finds, `${s.found.length} / ${FINDS.length}`);
+        // the base's alarm: at home, or anywhere with the radio
+        const al = s.alarms;
+        const hear = isHome(s) || s.levels.radio > 0;
+        const worst = worstAlarm(s);
+        let alarm = '', calm = false;
+        if (hear && worst) alarm = ALARM_LINES.tag(worst.id, worst.until - s.time) + (al.list.length > 1 ? ` +${al.list.length - 1}` : '');
+        else if (hear && al && al.genDown) { alarm = ALARM_LINES.genStop; calm = true; }
+        put('alarm', ui.alarm, alarm);
+        ui.alarm.hidden = !alarm || (stopOpen(s) && s.tut.stop.crt);
+        ui.alarm.classList.toggle('is-calm', calm);
+        ui.alarm.classList.toggle('dig-focus', !!(s.tut && s.tut.stop && s.tut.stop.focus === 'alarm'));
+        // the GPS: a button with its charge
+        ui.ping.hidden = !(s.levels.gps > 0);
+        if (s.levels.gps > 0) {
+            ui.pingBar.style.width = `${Math.round(100 * gpsCharge(s))}%`;
+            ui.ping.classList.toggle('is-ready', gpsReady(s) && !isHome(s));
+        }
     }
 
     // ---- the pods, small: one goes dark where you can see it

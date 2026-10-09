@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = process.argv.includes('--pass3');
+const PASS3 = process.argv.includes('--pass3') || process.argv.includes('--step2') || process.argv.includes('--step3');
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -95,7 +95,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3) {
+    if (PASS3 && !process.argv.includes('--step2')) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -147,7 +147,34 @@ try {
         const fps = await ev(`new Promise((r) => { let n = 0; const t = performance.now(); const f = () => { n++; if (performance.now() - t < 1000) requestAnimationFrame(f); else r(n); }; requestAnimationFrame(f); })`);
         console.log('rAF per second', fps, t0 > 0);
     }
-    if (!process.argv.includes('--long') && !PASS3) {
+    if (process.argv.includes('--step2')) {
+        // step 2: a chamber failing at home, the repair; the GPS ping, the ruler, the radio's alarm, the homing line
+        await jump('iv-dig-alarm');
+        await sleep(800);
+        await shot('p3-20-failing-stop');
+        await key('Enter');
+        await sleep(300);
+        await shot('p3-21-failing-arrow');
+        const spot = await ev(`import('/src/phase4d/alarms.js').then((m) => m.spotOf('c2'))`);
+        for (let i = 0; i < 12 && (await st('s.x')) !== spot; i++) await hold((await st('s.x')) < spot ? 'ArrowRight' : 'ArrowLeft', 140);
+        await sleep(900);
+        await shot('p3-22-repairing');
+        await sleep(2000);
+        await shot('p3-23-repaired');
+        await jump('iv-dig-machine');
+        await hold('ArrowDown', 900);
+        await key('g');
+        await sleep(900);
+        await shot('p3-24-ping');
+        await ev(`(() => { const s = window.rpiDig.state; s.alarms.list.push({ id: 'c2', at: s.time, until: s.time + 40 }); return true; })()`);
+        await sleep(600);
+        await shot('p3-25-radio-alarm');
+        await ev(`(() => { const s = window.rpiDig.state; s.battery = 60; return true; })()`);
+        await hold('ArrowLeft', 900);
+        await sleep(500);
+        await shot('p3-26-homing-line');
+    }
+    if (!process.argv.includes('--long') && !PASS3 && !process.argv.includes('--step2')) {
     // 1. the start: dig down, mine sideways, come home, buy
     await jump('iv-dig-start');
     await shot('01-start');

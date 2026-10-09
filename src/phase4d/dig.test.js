@@ -2,8 +2,9 @@
 import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from './world.js';
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
-    closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES,
+    closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
 } from './dig.js';
+import { FIRST_FAIL, REPAIR_S, spotOf, repairCost, ALARM_LINES } from './alarms.js';
 import { decide, readStop } from './autopilot.js';
 import { roomSpot, roomAt, chamberOf, chamberOver } from './base.js';
 
@@ -308,3 +309,83 @@ describe('pass 3: one thing at a time', () => {
     });
 });
 const SHOWS_AT_START = (s) => Object.keys(s.tut.show).filter((k) => s.tut.show[k]);
+
+describe('pass 3, step 2: the base breaks, the tools are upgrades', () => {
+    const at = (s, x) => { s.y = -1; s.x = x; };
+    test('the first failure comes after about three minutes; missed, ten sleepers in that chamber die', () => {
+        const s = started();
+        s.tut.on = false;
+        s.y = 10;
+        let failAt = null;
+        for (let i = 0; i < 20 * 60 * 6 && !s.alarms.lost; i++) {
+            step(s, 0.05, {});
+            for (const e of s.events) if (e.type === 'fail' && failAt === null) failAt = s.time;
+            s.events.length = 0;
+            s.battery = 40; s.reserve = 100;
+        }
+        expect(failAt).toBeGreaterThanOrEqual(FIRST_FAIL - 1);
+        expect(failAt).toBeLessThan(FIRST_FAIL + 1);
+        expect(s.alarms.lost).toBe(10);
+        expect(sleepers(s)).toBe(206);
+        // away without the radio: the news waits for the base
+        expect(s.alarms.unseen[0]).toMatch(/^Chamber \d went dark\. 10 sleepers died\.$/);
+        at(s, HOME_X); s.wasHome = false;
+        step(s, 0.05, {});
+        expect(s.line.text).toMatch(/went dark\. 10 sleepers died\./);
+    });
+    test('home with a chamber failing: a stop the first time; mended in two seconds under it, for parts', () => {
+        const s = started();
+        s.tut.dug = true;
+        s.alarms.list.push({ id: 'c3', at: 0, until: 500 });
+        at(s, HOME_X); s.parts = 50;
+        step(s, 0.05, {});
+        expect(s.tut.stop.text).toEqual(['A chamber is failing. Return to base and repair it.']);
+        expect(s.tut.needs).toContain('radio');
+        closeStop(s);
+        at(s, spotOf('c3'));
+        for (let i = 0; i < Math.ceil(REPAIR_S / 0.05) + 2; i++) step(s, 0.05, {});
+        expect(s.alarms.list).toEqual([]);
+        expect(s.parts).toBe(50 - repairCost(depthOf(s.record)));
+    });
+    test('a stopped generator: POWER does not charge at home until it is mended', () => {
+        const s = started();
+        s.tut.on = false;
+        s.alarms.genDown = true;
+        at(s, HOME_X); s.battery = 20;
+        for (let i = 0; i < 40; i++) step(s, 0.05, {});
+        expect(s.battery).toBe(20);
+        s.parts = 100;
+        at(s, spotOf('gen'));
+        for (let i = 0; i < 60; i++) step(s, 0.05, {});
+        expect(s.alarms.genDown).toBe(false);
+        expect(s.battery).toBeGreaterThan(20);
+    });
+    test('the alarm tag says what and how long', () => {
+        expect(ALARM_LINES.tag('c2', 39.2)).toBe('CHAMBER 3 · 40 s');
+        expect(ALARM_LINES.tag('gen', 5)).toBe('GENERATOR · 5 s');
+    });
+    test('GPS: a ping shows ore below in a cone, not above; it recharges; GPS II is wider and quicker', () => {
+        const s = preparedState({ row: 40 });
+        s.y = 40; s.x = HOME_X;
+        expect(ping(s)).toBe(false);                     // no GPS yet
+        s.levels.gps = 1;
+        expect(ping(s)).toBe(true);
+        expect(pingShows(s, HOME_X, 46)).toBe(true);
+        expect(pingShows(s, HOME_X, 35)).toBe(false);
+        expect(pingShows(s, HOME_X + 9, 41)).toBe(false);
+        expect(ping(s)).toBe(false);                     // recharging
+        s.time += GPS[1].recharge; expect(gpsReady(s)).toBe(true);
+        expect(GPS[2].range).toBeGreaterThan(GPS[1].range);
+        expect(GPS[2].recharge).toBeLessThan(GPS[1].recharge);
+    });
+    test('the first turn back asks for the HOMING LINE; ore that was not there for the GPS', () => {
+        const s = preparedState({ row: 30 });
+        s.tut.rows = ['battery']; s.tut.needs = [];
+        s.y = 30; s.battery = 8;
+        step(s, 0.05, {});
+        expect(s.tut.needs).toContain('homing');
+        s.tiles[31 * W + HOME_X] = T.GHOST; s.battery = 40;
+        for (let i = 0; i < 30; i++) step(s, 0.05, { dir: 'down' });
+        expect(s.tut.needs).toContain('gps');
+    });
+});
