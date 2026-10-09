@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.92.6 - 2026-10-09 (chapter IV, the dig: the refinery and the duplicator)
+
+Ola: "there aren't enough PARTS", "falling should be free", and the heart: "PAUSE. Always take it calmer."
+- **The heart's ending, slow.** Every line is a stop (paused, amber, OK/Enter/Space only, 0.8 s at least), nothing goes by itself: at the heart's wall "Something is beating down here."; each beat of the wall "It beats." / "Come home." / "Almost."; through it, the camera holds on the heart, then "It has been waiting for them. For all of them.", "The sleepers cannot live on the surface. Not as they are.", "The heart can carry them. As one body.", "Woke: everyone is here."
+- **The sleepers flow down.** Then a 9 s scene: the chamber windows go dark from the top, a row across all six at a time, each row a soft sound; 216 small lights (one a sleeper) run down the way the drone dug, from the base to the heart, the camera following their lead in the dark; the heart swells a little as they arrive. Then RISE, into chapter V as before. (The old red band is gone.)
+- **The heart, a body:** big, tilted, two lobes and the apex, lit from above and dark underneath, muscle fibre in curved bands, the groove and the coronary vessels on it, wet light; the great vessels arch out of the top into the rock and pull with the beat; a strong lub-dub squeezes the whole mass; a red light spreads through the flesh round it on every beat. The body is drawn once and cached.
+- **REFINERY** at the WAREHOUSE (like the generator's levels at the generator), from the third delivery ("The warehouse can refine. Stop in it." and an arrow): REFINERY I to IV, "+25 % PARTS per ore." (30, 70, 140, 260). Unloading says it: "8 ORE → 3 to the generators, 30 PARTS (+6 refined)".
+- **DUPLICATOR** in the lab's pool (never first; a seventh quantum object, low in the old rock): "One piece of ore in four comes out twice."; fitted in the workshop; the doubled piece's cell flashes on the drone's cargo gauge.
+- **Ore worth more the deeper:** ROCK 2, PAPER 5 (was 4), SCISSORS 10 (was 8). The first time the lamp shows PAPER or SCISSORS: "PAPER ore. Worth 5." / "SCISSORS ore. Worth 10."
+- **Falling costs no POWER** (gravity does the work); digging, driving, climbing and hovering cost.
+- **BOOSTER II and III** in the workshop once it is fitted: "Recharges faster." (30 s → 20 s → 12 s; 60, 140 parts).
+- **Fixes:** a drone lost to gas no longer dies a second time at the base; a drone sealed in with a full cargo claws out through ore above it (the ore is lost); the simulated player uses the 3 s SHOCK WAVE only when the power is plenty.
+- Sim: the heart (now with the ending's stops and flow, about 30 s) at 25.7 / 25.2 / 21.6 / 23.9 / 15.8 min (seeds 7 / 11 / 3 / 5 / 9), a careful player loses at most one drone; the unlucky player passes every wall (longest wait 225 s). Headless: `node scripts/play-dig.mjs --v1926` (each stop held 3.5 s and still there, the refinery, the flow, RISE).
+
 ## v1.92.5 - 2026-10-09 (chapter IV, the dig: the shock wave reloads in 3 s)
 
 - SHOCK WAVE reloads in 3 s instead of 8 (Ola).

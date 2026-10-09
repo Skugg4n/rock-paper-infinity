@@ -16,7 +16,7 @@ import { coolLeft } from './quantum.js';
 import { caveOver, risky } from './hazards.js';
 
 export { risky };
-import { buildDrone, genOpen, buyGen, GEN_PRICE } from './dig.js';
+import { buildDrone, genOpen, buyGen, GEN_PRICE, REF_PRICE, refOpen, buyRefinery } from './dig.js';
 
 
 import { HOME_X, roomSpot } from './base.js';
@@ -166,7 +166,7 @@ function blocker(s) {
     return null;
 }
 
-const USEFUL = ['steering', 'warning', 'radio', 'drill', 'cargo', 'battery', 'armour', 'gps', 'mapping', 'updrill', 'homing', 'lamp', 'hull'];
+const USEFUL = ['steering', 'warning', 'radio', 'drill', 'cargo', 'battery', 'armour', 'gps', 'mapping', 'updrill', 'homing', 'lamp', 'booster', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
@@ -278,6 +278,12 @@ export function decide(s, mem) {
             if (roomOf(s) !== 'workshop') return { dir: toward(roomSpot('workshop')) };
             shop(s, mem);
         }
+        // the REFINERY at the warehouse, when it is offered and can be paid
+        const rp = REF_PRICE[s.levels.refinery || 0];
+        if (refOpen(s) && rp !== undefined && s.parts >= rp && !mem.wrongFirst) {
+            if (roomOf(s) !== 'warehouse') return { dir: toward(roomSpot('warehouse')) };
+            buyRefinery(s);
+        }
         // the generator's next level, when the parts are plenty
         const gp = GEN_PRICE[s.levels.gen || 0];
         if (genOpen(s) && gp !== undefined && s.parts >= gp * 1.6 && s.reserve < 70) {
@@ -332,7 +338,9 @@ export function decide(s, mem) {
     if (tgt && tgt.cost < near) return { dir: unswing(s, mem, tgt.dir) };
     // the BOOSTER on the way down; the SHOCK WAVE when solid ground is in the way
     if (coolLeft(s, 'booster') === 0 && s.y > 3) boost(s);
-    if (coolLeft(s, 'shock') === 0 && s.y > 3) {
+    // (the shock wave costs power: a player uses it when the power is plenty, not every time it is ready)
+    if (coolLeft(s, 'shock') === 0 && s.y > 3 && s.battery > homeNeed * 1.6 + 15 && s.time - (mem.shockAt ?? -99) > 8) {
+        mem.shockAt = s.time;
         const below = tileAt(s, s.x, s.y + 1);
         if (below > 0 && below !== T.HEART && !gateOf(s, below, s.y + 1)) shock(s);
     }

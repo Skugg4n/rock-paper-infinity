@@ -3,10 +3,10 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
-    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, LOST_WHY, maxHp, mendPlates, PAINTS, priceOf, STUCK_S, isOre, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
+    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, buyRefinery, LOST_WHY, maxHp, mendPlates, PAINTS, priceOf, STUCK_S, isOre, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
 } from './dig.js';
 import { CAVE_WARN, LAVA_STEP, heatHold } from './hazards.js';
-import { qOrder, has, LAB_S, Q_LINES } from './quantum.js';
+import { qOrder, has, LAB_S, Q_LINES, coolOf } from './quantum.js';
 import { FIRST_FAIL, REPAIR_S, spotOf, ALARM_LINES } from './alarms.js';
 import { decide, readStop } from './autopilot.js';
 import { roomSpot, roomAt, chamberOf, chamberOver } from './base.js';
@@ -216,14 +216,23 @@ describe('the rules', () => {
         expect(s.dreaming).toBe(true);
         expect(s.line.text).toBe('The sleepers are dreaming of you.');
     });
-    test('touching the heart ends it: Woke: everyone is here.', () => {
+    test('the heart: a slow row of stops, one line each, nothing gone before it is read; then the flow; then RISE', () => {
         const s = preparedState({ row: 397, levels: { drill: 3, hull: 3 }, grafts: 3 });
         s.y = 397; s.x = HOME_X;
-        const said = [];
-        for (let i = 0; i < 200 && !s.ended; i++) { step(s, 0.05, { dir: 'down' }); if (!said.includes(s.line.text)) said.push(s.line.text); }
-        expect(said).toEqual(expect.arrayContaining(['It beats.', 'Come home.', 'Almost.']));
+        const stops = [];
+        for (let i = 0; i < 2000 && !s.flowDone; i++) {
+            if (stopOpen(s)) {
+                // a stop holds: the world does not move on while it is open
+                const t0 = s.time; step(s, 1, { dir: 'down' }); expect(s.time).toBe(t0);
+                stops.push(s.tut.stop.text[0]); closeStop(s); continue;
+            }
+            step(s, 0.05, { dir: 'down' });
+        }
+        expect(stops).toEqual(['Something is beating down here.', 'It beats.', 'Come home.', 'Almost.',
+            'It has been waiting for them. For all of them.', 'The sleepers cannot live on the surface. Not as they are.',
+            'The heart can carry them. As one body.', 'Woke: everyone is here.']);
         expect(s.ended).toBe(true);
-        expect(s.line.text).toBe('Woke: everyone is here.');
+        expect(s.flowDone).toBe(true);
     });
     test('a save comes back the same', () => {
         const s = preparedState({ row: 20, parts: 40 });
@@ -477,14 +486,15 @@ describe('pass 3, step 2: the base breaks, the tools are upgrades', () => {
 });
 
 describe('pass 3, step 3: things from the other side, the flesh', () => {
-    test('six quantum objects in the rock, none in the city; BOOSTER or SHOCK WAVE first, never THE OTHER DRONE', () => {
+    test('seven quantum objects in the rock, none in the city; BOOSTER or SHOCK WAVE first, never THE OTHER DRONE', () => {
         for (const seed of [1, 3, 7, 11, 42]) {
             const w = makeWorld(seed);
-            expect(w.quantum).toHaveLength(6);
+            expect(w.quantum).toHaveLength(7);
             for (const i of w.quantum) { expect(w.tiles[i]).toBe(T.QUANTUM); expect(depthOf(Math.floor(i / W))).toBeGreaterThan(60); }
             const o = qOrder(seed);
             expect(['booster', 'shock']).toContain(o[0]);
-            expect(new Set(o).size).toBe(6);
+            expect(new Set(o).size).toBe(7);
+            expect(o[0]).not.toBe('duplicator');
         }
     });
     test('dug, it is carried (not cargo); in the LAB it takes 60 s; told at the base as a stop; then it is the drone\'s', () => {
@@ -724,7 +734,7 @@ describe('v1.92.2: hazards, lost drones, ore and parts', () => {
         t.cargo = [T.ROCK, T.PAPER]; t.y = -1; t.x = roomSpot('warehouse');
         const ev = [];
         for (let k = 0; k < 10; k++) { step(t, 0.05, {}); ev.push(...t.events); t.events.length = 0; }
-        expect(ev.find((e) => e.type === 'unloaded')).toMatchObject({ ore: 2, parts: 6 });
+        expect(ev.find((e) => e.type === 'unloaded')).toMatchObject({ ore: 2, parts: 7 });
     });
 });
 
@@ -819,5 +829,53 @@ describe('v1.92.4: never stuck', () => {
         expect(priceOf(s, 'drill')).toBe(PRICES[0]);
         s.time += STUCK_S + 1;
         expect(priceOf(s, 'drill')).toBe(9);
+    });
+});
+
+describe('v1.92.6: the refinery and the duplicator', () => {
+    test('the REFINERY at the WAREHOUSE after the third delivery: +25 % parts a level, said on unloading', () => {
+        const s = started();
+        s.tut.dug = true; s.y = -1; s.x = roomSpot('warehouse'); s.reserve = 100; s.parts = 100;
+        expect(buyRefinery(s)).toBe(false);                  // not before the third delivery
+        s.deliveries = 3;
+        expect(buyRefinery(s)).toBe(true);
+        s.levels.refinery = 4;                               // +100 %
+        s.cargo = [T.SCISSORS, T.SCISSORS];
+        const ev = [];
+        for (let k = 0; k < 3; k++) { step(s, 0.05, {}); ev.push(...s.events); s.events.length = 0; }
+        expect(ev.find((e) => e.type === 'unloaded')).toMatchObject({ ore: 2, parts: 40, refined: 20 });
+        expect(LINES.unloaded(8, 4, 28, 6)).toBe('8 ORE → 4 to the generators, 28 PARTS (+6 refined)');
+    });
+    test('the DUPLICATOR: one piece of ore in four comes out twice', () => {
+        const s = preparedState({ row: 20 });
+        s.y = 20; s.x = HOME_X; s.levels.cargo = 2; s.quantum.got.push('duplicator'); s.quantum.fit.push('duplicator');
+        for (let y = 21; y < 29; y++) s.tiles[y * W + HOME_X] = T.ROCK;
+        run(s, 80, { dir: 'down' });
+        expect(s.cargo.length).toBe(10);                     // eight dug, two doubled
+    });
+    test('the lamp on a new kind of ore says what it is worth', () => {
+        expect(LINES.oreWorth('SCISSORS', 8)).toBe('SCISSORS ore. Worth 8.');
+    });
+});
+
+describe('v1.92.6: falling is free; BOOSTER II and III', () => {
+    test('falling costs no power', () => {
+        const s = preparedState({ row: 40 });
+        s.y = 2; s.x = HOME_X; s.levels.battery = 3; s.battery = batteryCap(s);
+        const b0 = s.battery;
+        for (let i = 0; i < 400 && s.y < 40; i++) step(s, 0.01, {});
+        expect(s.y).toBe(40);
+        expect(b0 - s.battery).toBeLessThan(0.05);         // (a breath of idle between falls)
+    });
+    test('BOOSTER levels in the workshop once fitted: 30 s, 20 s, 12 s', () => {
+        const s = started();
+        s.quantum.got.push('booster');
+        s.y = -1; s.x = roomSpot('workshop');
+        expect(rowShown(s, 'booster')).toBe(false);
+        fit(s, 'booster');
+        expect(rowShown(s, 'booster')).toBe(true);
+        expect(coolOf(s, 'booster')).toBe(30);
+        s.levels.booster = 2;
+        expect(coolOf(s, 'booster')).toBe(12);
     });
 });

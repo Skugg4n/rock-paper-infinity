@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924'].some((a) => process.argv.includes(a));
+const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924', '--v1926'].some((a) => process.argv.includes(a));
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +103,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924'].some((a) => process.argv.includes(a))) {
+    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924', '--v1926'].some((a) => process.argv.includes(a))) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -236,6 +236,40 @@ try {
         const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
         const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
         fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
+    }
+    if (process.argv.includes('--v1926')) {
+        // v1.92.6: the refinery at the warehouse, and the heart's ending as slow stops and a stream of sleepers
+        await jump('iv-dig-war');
+        await ev(`(() => { const s = window.rpiDig.state; s.y = -1; s.x = 9; s.deliveries = 3; s.parts = 120; s.reserve = 60; s.cargo = [9, 9, 10, 10, 8, 8, 8, 9]; return true; })()`);
+        await sleep(900);
+        await shot('p3-80-warehouse-refinery');
+        await key('Enter');
+        await ev(`(() => { const s = window.rpiDig.state; s.cargo = [9, 9, 10, 10, 8, 8, 8, 9]; return true; })()`);
+        await sleep(600);
+        await shot('p3-81-refined');
+        await jump('iv-dig-heart');
+        await ev(`(() => { const s = window.rpiDig.state; s.tut.done.heartWall = false; return true; })()`);
+        let n = 0;
+        const names = [];
+        for (let guard = 0; guard < 80 && n < 9; guard++) {
+            const id = await st('s.tut.stop && s.tut.stop.id');
+            if (id) {
+                await sleep(3500);                              // nothing vanishes while unread
+                const still = await st('s.tut.stop && s.tut.stop.id');
+                names.push(`${id}${still === id ? '' : ' (VANISHED)'}`);
+                await shot(`p3-82-end-${String(n).padStart(2, '0')}-${id}`);
+                await key('Enter'); n++;
+                await sleep(400);
+                continue;
+            }
+            if (await st('s.ended')) { await sleep(500); if (await st('s.flowT != null')) break; continue; }
+            await hold('ArrowDown', 400);
+        }
+        console.log('stops in order:', names.join(' | '));
+        for (const [ms, name] of [[2000, 'p3-83-flow-a'], [3000, 'p3-84-flow-b'], [3500, 'p3-85-flow-c']]) { await sleep(ms); await shot(name); }
+        await sleep(1500);
+        await shot('p3-86-rise');
+        console.log('rise shown:', await ev(`!document.getElementById('dig-rise').hidden`));
     }
     if (process.argv.includes('--v1924')) {
         // v1.92.4: stops that stay, the cargo gauge, armour, the warning, the death beat, the arms

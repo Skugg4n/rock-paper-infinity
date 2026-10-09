@@ -10,8 +10,10 @@
  */
 import { rng } from './world.js';
 
-export const QUANTUM_IDS = ['booster', 'teleport', 'shock', 'lamp2', 'deepbat', 'other'];
-export const Q_NAME = { booster: 'BOOSTER', teleport: 'TELEPORT', shock: 'SHOCK WAVE', lamp2: 'SECOND LAMP', deepbat: 'DEEP BATTERY', other: 'THE OTHER DRONE' };
+export const QUANTUM_IDS = ['booster', 'teleport', 'shock', 'lamp2', 'deepbat', 'duplicator', 'other'];
+export const Q_NAME = { booster: 'BOOSTER', teleport: 'TELEPORT', shock: 'SHOCK WAVE', lamp2: 'SECOND LAMP', deepbat: 'DEEP BATTERY', duplicator: 'DUPLICATOR', other: 'THE OTHER DRONE' };
+/** DUPLICATOR (v1.92.6): one piece of ore in this many comes out twice. */
+export const DUP_EVERY = 4;
 /** The keys and the panel's buttons: the ones you use. */
 export const Q_KEY = { booster: 'B', teleport: 'T', shock: 'Q' };
 export const LAB_S = 60;
@@ -32,6 +34,7 @@ export const Q_LINES = {
         shock: 'Eats the ground two tiles round. Key Q.',
         lamp2: 'The lamp shines two ways now.',
         deepbat: 'Below 1 200 m the heat charges the battery.',
+        duplicator: 'One piece of ore in four comes out twice.',
         other: 'It is us. It is not us.',
     },
     bio: 'This is not rock. It is growing in the tank.',
@@ -51,7 +54,10 @@ export function newQuantum(seed) {
 }
 /** The drone has it: opened by the lab and fitted in the workshop. */
 export const has = (s, id) => !!(s.quantum && (s.quantum.fit || s.quantum.got).includes(id));
-export const coolLeft = (s, id) => (has(s, id) ? Math.max(0, (s.quantum.cool[id] ?? -1e9) + COOL[id] - s.time) : Infinity);
+/** BOOSTER II and III (v1.92.6, in the workshop once fitted) recharge faster. */
+export const BOOST_COOL = [30, 20, 12];
+export const coolOf = (s, id) => (id === 'booster' ? BOOST_COOL[(s.levels && s.levels.booster) || 0] : COOL[id]);
+export const coolLeft = (s, id) => (has(s, id) ? Math.max(0, (s.quantum.cool[id] ?? -1e9) + coolOf(s, id) - s.time) : Infinity);
 export const boosting = (s) => !!(s.quantum && s.time < s.quantum.boostUntil);
 
 /** Each tick: the lab works on what it has (game time, wherever the drone is). */

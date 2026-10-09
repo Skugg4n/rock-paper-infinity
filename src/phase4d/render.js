@@ -9,7 +9,7 @@
  */
 
 import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
-import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE, BUILD_S, PAINTS, maxHp, cargoCap } from './dig.js';
+import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE, BUILD_S, PAINTS, maxHp, cargoCap, FLOW_S } from './dig.js';
 import { spotOf, REPAIR_S } from './alarms.js';
 import { has, boosting, LAB_S } from './quantum.js';
 import { heatHold } from './hazards.js';
@@ -126,18 +126,18 @@ export function createRenderer(canvas) {
         if (p.y >= 380) { focusY = HEART.cy - 0.5; mid = 0.5; }
         if (r.rising !== null) { focusY = riseY(); mid = 0.5; }
         else if (s.ended) {
-            if (r.ending < 2.6) focusY = -3;
-            else {
-                const k = Math.min(1, (r.ending - 2.6) / 6);
-                focusY = -1 + (HEART.cy + 0.5) * k;
-                mid = 0.5;
+            // on the heart while the lines are read; then the camera follows the stream of sleepers down
+            focusY = HEART.cy - 0.5; mid = 0.5;
+            if (s.flowT != null && view.flowPath && view.flowPath.length > 1) {
+                const lead = flowAt(view.flowPath, Math.min(1, s.flowT / (FLOW_S * 0.85)));
+                focusY = lead[1]; mid = 0.5;
             }
         }
         // the bottom may scroll past the world's end, so the heart can sit in the middle
         const want = Math.max(TOP_ROW * TS, Math.min((H + 6) * TS - vh * 0.5, focusY * TS - vh * mid));
         r.cam.y += (want - r.cam.y) * Math.min(1, dt * 6);
-        if (Math.abs(want - r.cam.y) > vh && !(s.ended && r.ending > 2.6)) r.cam.y = want;
-        if ((s.ended && r.ending > 2.6) || r.rising !== null || view.beat) r.cam.y = want;
+        if (Math.abs(want - r.cam.y) > vh && !(s.ended && s.flowT != null)) r.cam.y = want;
+        if (r.rising !== null || view.beat) r.cam.y = want;
         const camY = r.cam.y;
         const t = s.time;
         const deep = p.y * 5;                            // metres, roughly
@@ -205,58 +205,29 @@ export function createRenderer(canvas) {
             }
         }
 
-        // ---- the heart, big, under everything else it touches
+        // ---- the heart (v1.92.6): big, a body; lub-dub; the flesh round it pulled and lit on each beat
         const hy = HEART.cy * TS - camY, hx = r.originX + HEART.cx * TS;
-        if (hy - 6 * TS < vh) {
-            const beat = 1 + 0.06 * Math.pow(Math.max(0, Math.sin(t * 3.2)), 8) + 0.03 * Math.pow(Math.max(0, Math.sin(t * 3.2 - 0.6)), 8);
-            ctx.save();
-            ctx.translate(hx, hy);
-            ctx.scale(beat, beat);
-            const hg = ctx.createRadialGradient(-20, -30, 10, 0, 0, HEART.rx * TS * 1.2);
-            hg.addColorStop(0, '#d23a4f'); hg.addColorStop(0.6, '#8e1426'); hg.addColorStop(1, '#3a0610');
-            ctx.fillStyle = hg;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, HEART.rx * TS * 1.1, HEART.ry * TS * 1.25, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(40,0,8,0.7)'; ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.moveTo(-60, -HEART.ry * TS); ctx.bezierCurveTo(-90, -140, -40, -200, -20, -260);
-            ctx.moveTo(50, -HEART.ry * TS); ctx.bezierCurveTo(90, -150, 60, -210, 80, -270);
-            ctx.stroke();
-            ctx.restore();
-        }
+        if (hy - 8 * TS < vh) drawHeart(hx, hy, t, dt);
 
-        // ---- the red band at the end, from the base down the way the drone came
-        if (s.ended) {
-            r.ending += dt;
-            const k = Math.max(0, Math.min(1, (r.ending - 2.6) / 6));
-            const pts = [{ x: HOME_X, y: -1 }, ...s.trail.map((i) => ({ x: i % W, y: Math.floor(i / W) })), { x: s.x, y: s.y + 1 }];
-            const n = Math.min(pts.length, Math.max(2, Math.ceil(pts.length * k)));
-            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            ctx.beginPath();
-            for (let i = 0; i < n; i++) {
-                const q = pts[i];
-                const qx = r.originX + q.x * TS + TS / 2, qy = q.y * TS + TS / 2 - camY;
-                if (i === 0) ctx.moveTo(qx, qy); else ctx.lineTo(qx, qy);
-            }
-            ctx.strokeStyle = 'rgba(255,40,70,0.25)'; ctx.lineWidth = 24; ctx.stroke();
-            ctx.strokeStyle = '#c8142d'; ctx.lineWidth = 12; ctx.stroke();
-            ctx.strokeStyle = `rgba(255,150,165,${(0.35 + 0.35 * Math.max(0, Math.sin(t * 3.2))).toFixed(3)})`; ctx.lineWidth = 3; ctx.stroke();
-        }
 
         // ---- the dark: a circle of light around the drone; daylight near the top
         const dx = r.originX + p.x * TS + TS / 2, dy = p.y * TS + TS / 2 - camY;
         // dark from the start (pass 3): only the base's lamps and the drone's
         const under = 1;
-        if (!s.ended) {
+        // the flow at the end: the dark again, a soft light round the stream's lead
+        const flowing = s.ended && s.flowT != null && view.flowPath && view.flowPath.length > 1;
+        const lead = flowing ? flowAt(view.flowPath, Math.min(1, s.flowT / (FLOW_S * 0.85))) : null;
+        if (!s.ended || flowing) {
+            const dx = flowing ? r.originX + lead[0] * TS + TS / 2 : r.originX + p.x * TS + TS / 2;
+            const dy = flowing ? lead[1] * TS + TS / 2 - camY : p.y * TS + TS / 2 - camY;
             // no drone (lost, or not yet built): no lamp
-            let rad = s.lost || s.build > 0 ? 4 : lampRadius(s) * TS;
+            let rad = flowing ? 7 * TS : s.lost || s.build > 0 ? 4 : lampRadius(s) * TS;
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);
             const top = Math.max(0, groundY + CITY_ROW * TS);
             ctx.save();
             ctx.beginPath(); ctx.rect(0, top, vw, vh - top); ctx.clip();
             // the SECOND LAMP: the circle of light becomes an oval that reaches down
-            const two = has(s, 'lamp2') && p.y >= 0;
+            const two = has(s, 'lamp2') && p.y >= 0 && !flowing;
             ctx.translate(dx, dy + (two ? rad * 0.8 : 0));
             if (two) ctx.scale(1, 1.8);
             const g = ctx.createRadialGradient(0, 0, rad * 0.45, 0, 0, rad);
@@ -335,6 +306,9 @@ export function createRenderer(canvas) {
 
         // ---- the depth ruler, right of the shaft: metres down, the layers marked once they are known
         if (shows(s, 'depth') && vw - (r.originX + W * TS) >= 64) drawRuler(s, vw, vh, camY, p);
+
+        // ---- the sleepers flow down the dug shaft to the heart (after "Woke"), lights over the dark
+        if (flowing) drawFlow(s, view.flowPath, camY);
 
         // ---- the city in the storm and the base with its own lamps, over the dark
         if (groundY + TOP_ROW * TS < vh && groundY > -2 * TS) {
@@ -704,7 +678,7 @@ export function createRenderer(canvas) {
 
     /** The base under the ground: rock and the shaft, the six chambers, the rooms. Cached; redrawn when it changes. */
     function baseImage(s) {
-        const dark = s.dark.length, emptied = s.ended ? Math.floor(Math.min(1, r.ending / 2.4) * SLEEPERS) : 0;
+        const dark = s.dark.length, emptied = s.flowT != null ? Math.floor(Math.min(1, s.flowT / (FLOW_S * 0.7)) * SLEEPERS) : 0;
         const shop = !s.tut || !s.tut.on || s.tut.rows.length > 0;
         const lab = !!(s.quantum && s.quantum.labOpen);
         const other = has(s, 'other');
@@ -747,7 +721,9 @@ export function createRenderer(canvas) {
                 const pod = k * PER_CHAMBER + i + 1;
                 const wx = gx + (i % 6) * pitch, wy = gy + Math.floor(i / 6) * pitch;
                 let col = s.dreaming ? '#d33a4a' : C.cold;
-                if (deadSet.has(pod) || pod <= emptied) col = '#151a20';
+                // the windows go dark from the top, a row across all six chambers at a time
+                const rank = Math.floor(i / 6) * 36 + k * 6 + (i % 6);
+                if (deadSet.has(pod) || rank < emptied) col = '#151a20';
                 x.fillStyle = col; x.fillRect(wx, wy, 9, 9);
                 if (col !== '#151a20') { x.fillStyle = 'rgba(255,255,255,0.25)'; x.fillRect(wx + 1, wy + 1, 3, 2); }
             }
@@ -893,6 +869,8 @@ export function createRenderer(canvas) {
             ctx.fillStyle = '#0b0c0e'; ctx.fillRect(lx + 10, top + 34, lw - 70, 6);
             ctx.fillStyle = C.cold; ctx.fillRect(lx + 11, top + 35, (lw - 72) * k, 4);
         }
+        // the warehouse can refine: an arrow there until the drone has been
+        if (s.refFresh && !(s.y === -1 && s.x >= ROOMS.warehouse[0] && s.x <= ROOMS.warehouse[1])) arrow(r.originX + roomSpot('warehouse') * TS - TS, top + 46 + 4 * Math.sin(t * 5), 1);
         // the generator can be built up: an arrow there until the drone has been
         if (s.genFresh && !(s.y === -1 && s.x >= ROOMS.generator[0] && s.x <= ROOMS.generator[1])) arrow(r.originX + 2 * TS, top + 46 + 4 * Math.sin(t * 5), 1);
         // the carried object goes to the lab: an arrow there
@@ -1041,7 +1019,8 @@ export function createRenderer(canvas) {
             ctx.fillStyle = 'rgba(11,12,14,0.8)'; ctx.fillRect(gx - 1, gy - 1, cols * pitch + 1, rows * pitch + 1);
             for (let i = 0; i < cap; i++) {
                 const t = s.cargo[i];
-                ctx.fillStyle = flash ? '#ffffff' : t ? (ORE_COL[t] || '#ccc') : '#2a313b';
+                const dup = r.dup && i === r.dup.at && now < r.dup.until && Math.floor(now * 10) % 2 === 0;
+                ctx.fillStyle = flash || dup ? '#ffffff' : t ? (ORE_COL[t] || '#ccc') : '#2a313b';
                 ctx.fillRect(gx + (i % cols) * pitch, gy + Math.floor(i / cols) * pitch, pitch - 1, pitch - 1);
             }
         }
@@ -1049,6 +1028,120 @@ export function createRenderer(canvas) {
         if (now < (r.hitUntil || 0)) { ctx.fillStyle = `rgba(255,255,255,${((r.hitUntil - now) / 0.3).toFixed(3)})`; roundRect(-22, -16, 44, 32, 9); ctx.fill(); }
         ctx.restore();
     }
+    // ---- the heart --------------------------------------------------------------------------------
+    let heartCache = null;
+    const HW = HEART.rx * TS * 2.6, HH = HEART.ry * TS * 3.6;
+    /** The heart's body, drawn once: two lobes, the apex, shading lit from above, fibres, coronary vessels, wet light. */
+    function heartImage() {
+        if (heartCache) return heartCache;
+        heartCache = off(HW, HH);
+        const x = heartCache.x, cx = HW / 2, cy = HH * 0.45, R = HEART.rx * TS;
+        const shape = () => {
+            x.beginPath();
+            x.moveTo(cx - R * 0.15, cy - R * 0.55);
+            x.bezierCurveTo(cx - R * 0.55, cy - R * 0.95, cx - R * 1.15, cy - R * 0.6, cx - R * 1.0, cy - R * 0.05);
+            x.bezierCurveTo(cx - R * 0.95, cy + R * 0.4, cx - R * 0.45, cy + R * 0.8, cx - R * 0.15, cy + R * 1.05);
+            x.bezierCurveTo(cx + R * 0.15, cy + R * 1.15, cx + R * 1.15, cy + R * 0.55, cx + R * 1.05, cy - R * 0.2);
+            x.bezierCurveTo(cx + R * 0.95, cy - R * 0.75, cx + R * 0.35, cy - R * 0.9, cx - R * 0.15, cy - R * 0.55);
+            x.closePath();
+        };
+        // the volume: lit from above left (the drone's lamp), dark underneath
+        shape();
+        const g = x.createRadialGradient(cx - R * 0.35, cy - R * 0.45, R * 0.1, cx, cy + R * 0.2, R * 1.3);
+        g.addColorStop(0, '#c8394d'); g.addColorStop(0.35, '#8e1426'); g.addColorStop(0.75, '#4a0a16'); g.addColorStop(1, '#1a0307');
+        x.fillStyle = g; x.fill();
+        x.save(); shape(); x.clip();
+        // muscle fibre in curved bands, following the form
+        for (let k = 0; k < 26; k++) {
+            const u = k / 26;
+            x.strokeStyle = `rgba(${k % 2 ? '30,0,8' : '200,70,90'},${k % 2 ? 0.28 : 0.12})`; x.lineWidth = 2.5;
+            x.beginPath();
+            x.moveTo(cx - R * 1.1, cy - R * 0.7 + u * R * 2);
+            x.bezierCurveTo(cx - R * 0.4, cy - R * 1.0 + u * R * 2.2, cx + R * 0.3, cy - R * 0.2 + u * R * 1.6, cx + R * 1.1, cy - R * 0.9 + u * R * 2.1);
+            x.stroke();
+        }
+        // the groove between the two sides, and the coronary vessels running in it and branching
+        x.strokeStyle = 'rgba(25,0,6,0.7)'; x.lineWidth = 7;
+        x.beginPath(); x.moveTo(cx + R * 0.05, cy - R * 0.6); x.bezierCurveTo(cx + R * 0.2, cy - R * 0.1, cx - R * 0.05, cy + R * 0.5, cx - R * 0.05, cy + R * 1.05); x.stroke();
+        const vessel = (pts, w) => {
+            x.lineCap = 'round';
+            x.strokeStyle = '#2c1219'; x.lineWidth = w + 2; x.beginPath(); x.moveTo(...pts[0]); x.bezierCurveTo(...pts[1], ...pts[2], ...pts[3]); x.stroke();
+            x.strokeStyle = '#7a1a2a'; x.lineWidth = w; x.stroke();
+            x.strokeStyle = 'rgba(255,170,180,0.35)'; x.lineWidth = Math.max(1, w / 3); x.stroke();
+        };
+        vessel([[cx + R * 0.1, cy - R * 0.55], [cx + R * 0.3, cy - R * 0.1], [cx, cy + R * 0.4], [cx - R * 0.05, cy + R]], 5);
+        vessel([[cx - R * 0.2, cy - R * 0.5], [cx - R * 0.7, cy - R * 0.3], [cx - R * 0.8, cy + R * 0.2], [cx - R * 0.55, cy + R * 0.6]], 4);
+        vessel([[cx + R * 0.15, cy - R * 0.2], [cx + R * 0.5, cy], [cx + R * 0.75, cy + R * 0.1], [cx + R * 0.8, cy + R * 0.3]], 3);
+        vessel([[cx - R * 0.35, cy - R * 0.1], [cx - R * 0.3, cy + R * 0.3], [cx - R * 0.45, cy + R * 0.45], [cx - R * 0.4, cy + R * 0.75]], 3);
+        // fat and bruise on the upper side, the dark under the lobes
+        x.fillStyle = 'rgba(60,20,30,0.35)'; x.beginPath(); x.ellipse(cx + R * 0.45, cy - R * 0.55, R * 0.4, R * 0.2, 0.3, 0, Math.PI * 2); x.fill();
+        const under = x.createLinearGradient(0, cy + R * 0.2, 0, cy + R * 1.1);
+        under.addColorStop(0, 'rgba(0,0,0,0)'); under.addColorStop(1, 'rgba(10,0,3,0.6)');
+        x.fillStyle = under; x.fillRect(0, 0, HW, HH);
+        // the wet light
+        x.fillStyle = 'rgba(255,220,225,0.35)';
+        x.beginPath(); x.ellipse(cx - R * 0.45, cy - R * 0.45, R * 0.22, R * 0.08, -0.6, 0, Math.PI * 2); x.fill();
+        x.beginPath(); x.ellipse(cx + R * 0.35, cy - R * 0.35, R * 0.12, R * 0.04, -0.3, 0, Math.PI * 2); x.fill();
+        x.fillStyle = 'rgba(255,255,255,0.5)';
+        for (let k = 0; k < 14; k++) x.fillRect(cx - R * 0.8 + hash(k, 3) * R * 1.6, cy - R * 0.7 + hash(3, k) * R * 1.2, 2, 1.5);
+        x.restore();
+        return heartCache;
+    }
+    /** Lub-dub: a strong squeeze and a second, smaller; the beat comes every 1.1 s. */
+    const lubdub = (t) => { const ph = (t % 1.1) / 1.1; return 0.09 * Math.exp(-((ph - 0.05) ** 2) / 0.002) + 0.05 * Math.exp(-((ph - 0.25) ** 2) / 0.002); };
+    function drawHeart(hx, hy, t, dt) {
+        r.swell = Math.max(0, (r.swell || 0) - dt * 0.05);
+        const sq = lubdub(t), sc = 1 + (r.swell || 0) - sq * 0.6;
+        // a red light spreading through the flesh round it on each beat
+        const ph = (t % 1.1) / 1.1;
+        if (ph < 0.6) {
+            const rr = HEART.rx * TS * (1.2 + ph * 3);
+            const lg = ctx.createRadialGradient(hx, hy, rr * 0.7, hx, hy, rr);
+            lg.addColorStop(0, 'rgba(168,19,44,0)'); lg.addColorStop(0.8, `rgba(200,30,50,${(0.28 * (1 - ph / 0.6)).toFixed(3)})`); lg.addColorStop(1, 'rgba(168,19,44,0)');
+            ctx.fillStyle = lg; ctx.fillRect(hx - rr, hy - rr, rr * 2, rr * 2);
+        }
+        // the great vessels, arching out of the top into the rock (they pull with the beat)
+        const pull = sq * 30;
+        ctx.lineCap = 'round';
+        const arch = (x0, y0, c1x, c1y, c2x, c2y, x1, y1, w) => {
+            ctx.strokeStyle = '#2c1219'; ctx.lineWidth = w + 6; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x1, y1); ctx.stroke();
+            ctx.strokeStyle = '#6e1424'; ctx.lineWidth = w; ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,170,180,0.25)'; ctx.lineWidth = w / 4; ctx.stroke();
+        };
+        const R = HEART.rx * TS;
+        arch(hx + R * 0.05, hy - R * 0.5, hx + R * 0.1, hy - R * 1.6 + pull, hx + R * 1.2, hy - R * 1.9, hx + R * 1.6, hy - R * 1.2, 26);
+        arch(hx - R * 0.25, hy - R * 0.45, hx - R * 0.4, hy - R * 1.3 + pull, hx - R * 1.3, hy - R * 1.5, hx - R * 1.7, hy - R * 2.2, 20);
+        arch(hx + R * 0.45, hy - R * 0.5, hx + R * 0.6, hy - R * 1.2, hx + R * 0.5, hy - R * 2, hx + R * 0.3, hy - R * 2.6, 14);
+        const img = heartImage();
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.rotate(-0.38);                                   // it lies tilted, the apex down and to the left
+        ctx.scale(sc * (1 + sq * 0.15), sc);
+        ctx.drawImage(img.c, -HW / 2, -HH * 0.45, HW, HH);
+        ctx.restore();
+    }
+    /** A point along the flow's path, k from 0 (the base) to 1 (the heart): [x, y] in tiles. */
+    function flowAt(path, k) {
+        const f = Math.max(0, Math.min(1, k)) * (path.length - 1), i = Math.floor(f), u = f - i;
+        const a = path[i], b = path[Math.min(path.length - 1, i + 1)];
+        return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    }
+    /** The sleepers: small lights running down the shaft the drone dug, in waves; each arrival swells the heart. */
+    const FLOW_N = 216;
+    function drawFlow(s, path, camY) {
+        const T0 = s.flowT;
+        for (let k = 0; k < FLOW_N; k++) {
+            const start = (k / FLOW_N) * FLOW_S * 0.5 + Math.floor(k / 36) * 0.15 + hash(k, 11) * 0.35;
+            const prog = (T0 - start) / (FLOW_S * 0.42);
+            if (prog <= 0) continue;
+            if (prog >= 1) { if (!r.arrived) r.arrived = new Set(); if (!r.arrived.has(k)) { r.arrived.add(k); r.swell = Math.min(0.12, (r.swell || 0) + 0.004); } continue; }
+            const [px, py] = flowAt(path, prog);
+            const sx = r.originX + px * TS + TS / 2 + Math.sin(k * 7 + T0 * 3) * 8 * hash(k, 5), sy = py * TS + TS / 2 - camY + Math.cos(k * 3 + T0 * 2) * 4;
+            ctx.fillStyle = 'rgba(242,226,184,0.22)'; ctx.beginPath(); ctx.arc(sx, sy, 9, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff3d6'; ctx.beginPath(); ctx.arc(sx, sy, 2.6, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+
     /** The WORKSHOP's arms: they swing down from the ceiling to the drone, sparks and a weld flash; building, four seconds. */
     function drawArms(x0, floorY, dt) {
         const a = r.armsAnim;
@@ -1105,5 +1198,7 @@ export function createRenderer(canvas) {
     function arms(kind) { r.armsAnim = { kind, t: 0, dur: kind === 'build' ? BUILD_S : 1.3 }; }
     function hitFlash() { r.hitUntil = performance.now() / 1000 + 0.3; }
     function fullFlash() { r.fullUntil = performance.now() / 1000 + 0.35; }
-    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, arms, hitFlash, fullFlash, worldWidth: W * TS };
+    /** The DUPLICATOR: the doubled piece's cell flashes on the gauge. */
+    function dupFlash(at) { r.dup = { at, until: performance.now() / 1000 + 0.6 }; }
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, arms, hitFlash, fullFlash, dupFlash, worldWidth: W * TS };
 }

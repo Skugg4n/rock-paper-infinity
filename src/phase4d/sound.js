@@ -62,6 +62,14 @@ export function createDigSound() {
             else if (e.type === 'fit') audio.thunk();
             else if (e.type === 'heart') thump(1, 40);
         },
+        /** A chamber's window going dark at the end: soft. */
+        window() {
+            const gr = node(); if (!gr || !audio.getPrefs().sfx) return;
+            const { ctx, sfxBus } = gr, t = ctx.currentTime;
+            const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 330 + Math.random() * 60;
+            const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.03, t + 0.02); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+            o.connect(e); e.connect(sfxBus); o.start(t); o.stop(t + 0.45);
+        },
         /** EARLY WARNING: a soft beep. */
         beep() {
             const gr = node(); if (!gr || !audio.getPrefs().sfx) return;

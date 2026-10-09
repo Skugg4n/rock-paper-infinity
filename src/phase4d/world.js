@@ -23,8 +23,8 @@ export const GAS_FROM = 70, GAS_TO = 290;
 /** Ore: what it is worth and in what. */
 export const ORE = {
     [T.ROCK]: { kind: 'rock', parts: 2, bio: 0 },
-    [T.PAPER]: { kind: 'paper', parts: 4, bio: 0 },
-    [T.SCISSORS]: { kind: 'scissors', parts: 8, bio: 0 },
+    [T.PAPER]: { kind: 'paper', parts: 5, bio: 0 },
+    [T.SCISSORS]: { kind: 'scissors', parts: 10, bio: 0 },
     [T.BIO]: { kind: 'bio', parts: 0, bio: 1 },
 };
 
@@ -157,7 +157,8 @@ export function makeWorld(seed = 1) {
     // two in the war, the first near 120 m, so the lab opens after a few dives; then one a layer.
     const q = rng(seed * 131 + 7);
     const quantum = [];
-    const spans = [[105, 140], [200, 280], ...LAYERS.slice(2).map((L) => [L.from + 30, L.to - 30])];
+    // (v1.92.6: a seventh, low in the old rock, for the DUPLICATOR's place in the lab's pool)
+    const spans = [[105, 140], [200, 280], ...LAYERS.slice(2).map((L) => [L.from + 30, L.to - 30]), [560, 680]];
     spans.forEach(([from, to]) => {
         const lo = rowOf(from), hi = Math.min(rowOf(to), SINEW_BAND[0] - 2);
         for (let tries = 0; tries < 40; tries++) {

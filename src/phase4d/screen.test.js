@@ -2,7 +2,7 @@
 // The dig's screen, run in jsdom with a do-nothing canvas: every frame of the act draws without an
 // error (the start, a dive with the way home shown, the heart's beats, the ending and the rise).
 import { JSDOM } from 'jsdom';
-import { preparedState, newState, serialize, SAVE_KEY, HOME_X } from './dig.js';
+import { preparedState, newState, serialize, SAVE_KEY, HOME_X, closeStop } from './dig.js';
 
 function noopCtx() {
     const grad = { addColorStop() {} };
@@ -116,11 +116,12 @@ test('the act draws from the start to the rise without an error', async () => {
     // to the heart
     st.y = 397; st.x = HOME_X; st.levels.hull = 3; st.levels.drill = 3; st.grafts = 3; st.battery = 300; st.tut.done.warm = true;
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    t = await run(120, t);
+    for (let k = 0; k < 40 && !st.ended; k++) { t = await run(5, t); while (st.tut.stop) closeStop(st); }
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown' }));
     expect(st.ended).toBe(true);
     expect(document.getElementById('dig-root').classList.contains('dig-ending')).toBe(true);
-    t = await run(220, t);
+    for (let k = 0; k < 80 && !st.flowDone; k++) { t = await run(5, t); while (st.tut.stop) closeStop(st); }
+    t = await run(20, t);
     expect(document.getElementById('dig-rise').hidden).toBe(false);
     window.rpiDig.renderer.rise();
     await run(120, t);

@@ -16,9 +16,9 @@ import {
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
     shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady, boost, teleport, shock,
     fittable, fit, LINE_TTL, buildDrone, buildPrice, buyGen, genOpen, GEN_PRICE, GEN_NAME, LINES,
-    tellLoss, maxHp, mendPrice, mendPlates,
+    tellLoss, maxHp, mendPrice, mendPlates, FLOW_S, HOME_X, buyRefinery, refOpen, REF_PRICE, REF_NAME,
 } from './dig.js';
-import { has, coolLeft, COOL, LAB_S, Q_NAME, Q_LINES } from './quantum.js';
+import { has, coolLeft, coolOf, LAB_S, Q_NAME, Q_LINES } from './quantum.js';
 import { worstAlarm, ALARM_LINES } from './alarms.js';
 import { depthOf, FINDS } from './world.js';
 import { createRenderer, RISE_S } from './render.js';
@@ -136,7 +136,7 @@ const CSS = `
 `;
 
 /** Rows whose level 0 is a real thing the drone has (a battery, a steel bit): it is a filled box. */
-const HAS_BASE = ['battery', 'steering', 'drill', 'cargo', 'lamp', 'hull', 'armour'];
+const HAS_BASE = ['battery', 'steering', 'drill', 'cargo', 'lamp', 'hull', 'armour', 'booster'];
 const ORE_COLOUR = { 8: '#9fd8e8', 9: '#efe6c8', 10: '#9fe3ff', 11: '#ff4d6d' };
 const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
@@ -230,7 +230,7 @@ export function init() {
     if (s.risen) riseTimer = setTimeout(() => toUnity(false), 0);
 
     // ---- the hands
-    let beat = null;
+    let beat = null, flowPath = null, flowRows = 0;
     const held = [];
     let mouse = null;              // {x, y} while the button is held on the world
     const pressedAt = { left: -1e9, right: -1e9 };
@@ -286,7 +286,8 @@ export function init() {
         if (!short) path = null;
         else if (s.time - pathAt > 0.4) { pathAt = s.time; path = pathHome(s); }
         const st = s.tut && s.tut.stop;
-        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path, focus: st && !st.crt ? st.focus : null, beat };
+        if (s.flowT != null && !flowPath) { const p = pathHome(s); flowPath = p && p.length > 1 ? p.slice().reverse() : [[HOME_X, -1], [s.x, s.y]]; }
+        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path, focus: st && !st.crt ? st.focus : null, beat, flowPath };
     };
     /** The hand: a direction, and with up a side (held, or pressed in the last 250 ms) to turn into. */
     function hand() {
@@ -369,6 +370,11 @@ export function init() {
     mendBtn.addEventListener('click', () => { if (mendPlates(s)) refreshShop(true); mendBtn.blur(); }, { signal });
     mendBtn.dataset.row = 'mend';
     ui.shopRows.prepend(mendBtn);
+    const refBtn = el('button', 'dig-buy'); refBtn.type = 'button';
+    refBtn.innerHTML = '<span class="dymo is-small"></span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc">+25 % PARTS per ore.</span>';
+    refBtn.addEventListener('click', () => { if (buyRefinery(s)) refreshShop(true); refBtn.blur(); }, { signal });
+    refBtn.dataset.row = 'refinery';
+    ui.shopRows.appendChild(refBtn);
     const genBtn = el('button', 'dig-buy'); genBtn.type = 'button';
     genBtn.innerHTML = '<span class="dymo is-small"></span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc">Burns ore slower.</span>';
     genBtn.addEventListener('click', () => { if (buyGen(s)) refreshShop(true); genBtn.blur(); }, { signal });
@@ -378,15 +384,28 @@ export function init() {
     function refreshShop(force = false) {
         const lost = !!s.lost && !s.ended;
         const atGen = !lost && roomOf(s) === 'generator' && genOpen(s) && !s.ended;
+        // the REFINERY is sold at the WAREHOUSE, from the third delivery on
+        const atRef = !lost && roomOf(s) === 'warehouse' && refOpen(s) && !s.ended;
         const here = !lost && inWorkshop(s) && !s.ended;
         const fresh = s.tut && s.tut.on ? s.tut.fresh : null;
-        const key = `${here}|${lost}|${atGen}|${s.hp}|${s.hoverOffer}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}|${s.lostCount}`;
+        const key = `${here}|${lost}|${atGen}|${roomOf(s)}|${s.deliveries}|${s.refFresh}|${s.hp}|${s.hoverOffer}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}|${s.lostCount}`;
         if (!force && key === shopKey) return;
         shopKey = key;
         // the workshop is a place: its card is up while the drone stands in it (or while there is none);
         // at the GENERATOR the same card sells the generator's levels
-        ui.shop.hidden = !(here || lost || atGen);
-        ui.shopTitle.textContent = atGen ? 'GENERATOR' : 'WORKSHOP';
+        ui.shop.hidden = !(here || lost || atGen || atRef);
+        ui.shopTitle.textContent = atGen ? 'GENERATOR' : atRef ? 'WAREHOUSE' : 'WORKSHOP';
+        const rl = s.levels.refinery || 0, refP = REF_PRICE[rl];
+        refBtn.hidden = !atRef;
+        refBtn.querySelector('.dymo').textContent = refP === undefined ? REF_NAME[rl - 1] : REF_NAME[rl];
+        refBtn.querySelector('.dig-dash').textContent = '■'.repeat(rl) + '□'.repeat(4 - rl);
+        const rpe = refBtn.querySelector('.dig-price');
+        if (refP === undefined) { rpe.textContent = 'DONE'; rpe.className = 'dig-price is-short'; }
+        else if (s.parts >= refP) { rpe.textContent = `${refP} PARTS`; rpe.className = 'dig-price'; }
+        else { rpe.textContent = `Need ${refP - s.parts} more.`; rpe.className = 'dig-price is-short'; }
+        refBtn.disabled = refP === undefined || s.parts < refP;
+        refBtn.classList.toggle('is-ready', !refBtn.disabled);
+        refBtn.classList.toggle('is-fresh', !!s.refFresh);
         ui.shopNote.textContent = `${s.parts} PARTS`;
         const bp = buildPrice(s);
         buildBtn.hidden = !lost;
@@ -623,7 +642,7 @@ export function init() {
             b.hidden = !has(s, id);
             if (b.hidden) continue;
             const left = coolLeft(s, id);
-            b.querySelector('i').style.width = `${Math.round(100 * (1 - left / COOL[id]))}%`;
+            b.querySelector('i').style.width = `${Math.round(100 * (1 - left / coolOf(s, id)))}%`;
             b.classList.toggle('is-ready', left === 0 && !isHome(s));
         }
         // the GPS: a button with its charge
@@ -655,7 +674,6 @@ export function init() {
     }
 
     // ---- the end
-    let riseShownAt = 0;
     ui.rise.addEventListener('click', () => {
         s.risen = true;
         save();
@@ -703,18 +721,29 @@ export function init() {
                 if (e.type === 'hit') rnd.hitFlash();
                 if (e.type === 'shock' || e.type === 'teleport') rnd.ring(e.type);
                 if (e.type === 'full') { rnd.pop('Cargo full.', '#f1efe8', false); rnd.fullFlash(); }
-                if (e.type === 'unloaded') rnd.pop(LINES.unloaded(e.ore, e.gen || 0, e.parts), '#f2d98a', false);
+                if (e.type === 'unloaded') rnd.pop(LINES.unloaded(e.ore, e.gen || 0, e.parts, e.refined || 0), '#f2d98a', false);
+                if (e.type === 'dup') rnd.dupFlash(e.at);
                 if (e.type === 'bump') rnd.bump(s);
                 if (e.type === 'q-named') rnd.label(e.i, 'QUANTUM OBJECT');
                 if (e.type === 'heart') ui.root.classList.add('dig-ending');
+                if (e.type === 'flow') {
+                    // the way the drone came, from the base down to the heart
+                    const p = pathHome(s);
+                    flowPath = p && p.length > 1 ? p.slice().reverse() : [[HOME_X, -1], [s.x, s.y]];
+                }
                 if (e.type === 'buy' || e.type === 'graft' || e.type === 'deliver') shopKey = '';
             }
             s.events.length = 0;
             sound?.update(depthM(s), dt, s.ended);
             // EARLY WARNING: a soft beep, repeating while it holds
             if (s.warnOn && !s.lost) { warnT -= dt; if (warnT <= 0) { warnT = 1.1; sound?.beep(); } } else warnT = 0;
-            if (s.ended && !s.risen && !riseShownAt) riseShownAt = s.time;
-            if (riseShownAt && !s.risen && s.time - riseShownAt > 9.5) ui.rise.hidden = false;
+            // RISE once the sleepers have reached the heart
+            if (s.flowDone && !s.risen) ui.rise.hidden = false;
+            // the windows going dark: a soft sound for each row of them
+            if (s.flowT != null) {
+                const rows = Math.floor(Math.min(1, s.flowT / (FLOW_S * 0.7)) * 36);
+                if (rows > flowRows) { flowRows = rows; sound?.window(); }
+            }
             if (!ui.rise.hidden) ui.rise.style.left = `${rnd.r.originX + rnd.worldWidth / 2}px`;
         }
         // the new row is seen once the drone has been in the workshop and left
