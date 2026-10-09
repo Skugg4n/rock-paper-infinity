@@ -1,7 +1,8 @@
 /* eslint-env jest */
 import {
     openingScript, scriptLines, pointAt, pointFlicks, POINT_MS, matchResult, destinyHand, actAfter,
-    writeChoice, VERSION_OF, OTHER, HANDS, letterDelay, SAY, retypeAct, afterRetype, ERASE_MS,
+    writeChoice, VERSION_OF, OTHER, HANDS, letterDelay, SAY, roundSteps, COUNT, COUNT_MS, RESULT_MS, REST_MS,
+    CHOOSE_LINE, DEPART, DEEP_CARD, moveFocus, ACTS, DEPART_MS,
 } from './interim.js';
 import { DEEP_VERSION_KEY } from './deepVersion.js';
 
@@ -75,13 +76,55 @@ describe('the interim', () => {
         expect([destinyHand(r), destinyHand(r), destinyHand(r)]).toEqual(HANDS);
     });
 
-    test('a win turns the path, a loss holds it, a draw plays again', () => {
-        expect(actAfter('drone', 'win')).toBe('vault');
-        expect(actAfter('vault', 'win')).toBe('drone');
+    test('a win lets the player choose, a loss holds the path, a draw plays again', () => {
+        expect(actAfter('drone', 'win')).toBe('choose');
+        expect(actAfter('vault', 'win')).toBe('choose');
         expect(actAfter('drone', 'lose')).toBe('drone');
         expect(actAfter('vault', 'lose')).toBe('vault');
         expect(actAfter('vault', 'draw')).toBe(null);
-        expect(SAY).toEqual({ draw: 'Again.', win: 'You win. The path turns.', lose: 'Destiny holds.', accept: 'So be it.' });
+        expect(SAY).toEqual({ draw: 'Again.', win: 'You win.', lose: 'Destiny holds.', accept: 'So be it.' });
+        expect(CHOOSE_LINE).toBe('You have beaten Destiny and may choose your path.');
+    });
+
+    test('the match counts to three, then both hands, the result, and a long rest', () => {
+        expect(COUNT).toEqual(['1', '2', '3']);
+        expect(COUNT_MS).toBe(600);
+        for (const result of ['win', 'lose', 'draw']) {
+            const s = roundSteps(result);
+            expect(s).toEqual([
+                { count: '1' }, { pause: 600 }, { count: '2' }, { pause: 600 }, { count: '3' }, { pause: 600 },
+                { reveal: true }, { pause: RESULT_MS }, { say: SAY[result] }, { pause: REST_MS },
+            ]);
+        }
+        expect(RESULT_MS).toBe(500);
+        expect(REST_MS).toBeGreaterThanOrEqual(2500);
+        // nothing is shown before the count is done: 1.8 s from the pick to the reveal
+        const s = roundSteps('win');
+        const before = s.slice(0, s.findIndex(x => x.reveal)).reduce((t, x) => t + (x.pause || 0), 0);
+        expect(before).toBe(1800);
+    });
+
+    test('the winner picks with the arrows: left the drone, right the vault, no wrap', () => {
+        expect(ACTS).toEqual(['drone', 'vault']);
+        expect(moveFocus('drone', 'ArrowRight')).toBe('vault');
+        expect(moveFocus('vault', 'ArrowRight')).toBe('vault');
+        expect(moveFocus('vault', 'ArrowLeft')).toBe('drone');
+        expect(moveFocus('drone', 'ArrowLeft')).toBe('drone');
+        expect(moveFocus('vault', 'Enter')).toBe('vault');
+    });
+
+    test('both choices resolve to their chapter IV, with their departure line', () => {
+        const store = {};
+        const storage = { setItem: (k, v) => { store[k] = v; } };
+        expect(writeChoice('vault', storage)).toBe('vault');
+        expect(store[DEEP_VERSION_KEY]).toBe('vault');
+        expect(DEPART.vault).toBe('You go deep into the vault.');
+        expect(writeChoice('drone', storage)).toBe('dig');
+        expect(store[DEEP_VERSION_KEY]).toBe('dig');
+        expect(DEPART.drone).toBe('You go deep, as the drone.');
+        expect(DEPART_MS).toBe(2000);
+        expect(DEEP_CARD).toEqual({ roman: 'IV', title: 'DEEP', dark: true, slow: true, silent: true, hold: 5000 });
+        expect(Object.values(DEPART).join(' ') + CHOOSE_LINE).not.toMatch(/\u2014/);
     });
 
     test('the version written is the vault or the dig, never the colony', () => {
@@ -95,15 +138,5 @@ describe('the interim', () => {
         expect(() => writeChoice('colony', storage)).toThrow();
         // a storage that throws still gives the version
         expect(writeChoice('drone', { setItem: () => { throw new Error('full'); } })).toBe('dig');
-    });
-
-    test('after a win the pointed line is retyped to name the other act (B453)', () => {
-        for (const pointed of ['drone', 'vault']) {
-            const line = scriptLines(openingScript(pointed))[3];
-            const r = retypeAct(pointed, OTHER[pointed]);
-            expect(r.type).toBe(`${OTHER[pointed]}.`);
-            expect(afterRetype(line, r)).toBe(`Destiny points to the ${OTHER[pointed]}.`);
-        }
-        expect(ERASE_MS).toBeLessThan(letterDelay('a') + 1);
     });
 });

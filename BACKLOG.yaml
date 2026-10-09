@@ -3521,3 +3521,13 @@ items:
       skips what the match decided.
     status: open
     notes: "By design for testing; written down so nobody is surprised."
+
+  - id: B455
+    added: 2026-10-09
+    source: "war-interim2 (v1.91.0), seen in the headless run"
+    request: |
+      With the count, the choose line, the two big icons and the departure line the interim's screen is about 650 px
+      tall; centred in a window shorter than that it cut off its own top.
+    status: done
+    resolved_in: v1.91.0
+    notes: "v1.91.0: #interim scrolls (scrollbar hidden), the text centres with margin auto and the screen follows the newest line (style-interim.css, src/interim.js). Checked headless at 1280 x 600."
