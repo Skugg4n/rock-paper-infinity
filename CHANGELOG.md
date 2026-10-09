@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.92.2 - 2026-10-09 (chapter IV, the dig: hazards and lost drones)
+
+Ola's second play, section H of docs/superpowers/specs/2026-10-09-deep-dig-pass3.md.
+- **Hazards** (H1, src/phase4d/hazards.js). MAGMA below 600 m: glowing pockets that light the dark round them; dig into one, or beside one, and it runs into the tunnel (a tile every 1.5 s, down and to the sides) and hardens to hard rock after 20 s; in it the drone heats and the HULL holds a while (1 s, 1.2 s more a level), then the drone is lost. "Magma. Do not open it." the first time the lamp shows it. GAS in the war's old bunkers: green pockets that burst when the drill touches them, take the tiles round them and half the battery. "Gas from the war. It burns." CAVE-INS in the old rock: an opening four tiles wide under a roof falls in after 2 s of sifting dust. "The roof is moving." The GPS ping shows magma and gas. No hazard lies within two columns of the middle, so a way straight down stays clear. Steering I's second step never digs into a hazard.
+- **A lost drone is lost** (H2). An empty battery, a cave-in, the magma: the drone stays where it is, dark, and the camera goes to the WORKSHOP: "The drone is lost. Build another." BUILD A DRONE (free the first three times, then 10, 15, 20 parts, never more than there are) builds a new one on the plate in 4 s, with the same upgrades and a full battery. Its cargo is lost; the colony loses nothing more. The wreck stays down there: reach it and "Half of its cargo was still there." DRONE 2, DRONE 3 in the panel (LOST, BUILDING).
+- **ORE and PARTS** (H3). CARGO shows the ore it holds, a mark a kind; PARTS has a cog. Unloading says it at the drone: "8 ORE → 26 PARTS". A find says what it gives: "A street sign. MARKET ST. +12 PARTS."
+- **Battery** (H4): from 30, five levels: 30, 60, 100, 160, 240, 360 (15, 35, 70, 150, 300 parts). The POWER bar is act I's reserve battery: a round slate pill with a battery mark.
+- **The generator is built up** (H5). From the war on, at the GENERATOR (an arrow, "The generator can be built up. Drive to it."), the card there sells GENERATOR II to IV ("Burns ore slower.", each 30 % less; 40, 90, 180 parts). Under 30 % GENERATORS blinks red and says once "The generators are running low. When they stop, the chambers go cold."; at 0 the stop says "The generators stopped. The sleepers are freezing."
+- **The workshop** (H6): a one-level upgrade leaves the list when it is bought. UPWARD DRILL (from I: ore, finds, quantum objects; II, 40 parts: soft rock; III, 120: anything, as fast as down); its row comes after three bumps. GPS I to IV: a cone down; wider and farther; the whole circle; ready in half the time (40, 80, 120, 180).
+- Heat drain in the warm rock 0.2 a second (was 0.3); with the TELEPORT ready the autopilot plays as a player who knows the way home is a key press.
+- Sim: the heart at 27.0 / 25.0 / 22.7 / 25.5 min (seeds 7 / 11 / 3 / 5), no drones lost by the careful player (with STEERING I for 6 min: none, four seeds); `--careless` (never mends) loses 50 sleepers. Headless: `node scripts/play-dig.mjs --hazards`.
+
 ## v1.92.1 - 2026-10-09 (chapter IV, the dig after its test)
 
 After the third independent test (docs/playtests/2026-10-09-dig-human-test-3.md, NÄSTAN) and Ola's own play ("GRYM uppdatering! Älskar lugnet.").

@@ -55,7 +55,7 @@ test('a new game shows only the CRT; the gauges wait their turn', async () => {
 
 test('Space and Enter stay in the dig: they never reach the shell (whose Space pauses the game)', async () => {
     const s0 = preparedState({ row: 20, parts: 200 });
-    s0.y = -1; s0.x = 13;
+    s0.y = -1; s0.x = 13; s0.levels.steering = 0;
     localStorage.setItem(SAVE_KEY, serialize(s0));
     const m = await import('./index.js');
     m.init();

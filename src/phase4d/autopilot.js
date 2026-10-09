@@ -13,6 +13,12 @@ import {
     stopOpen, closeStop, STOPS, litAt, boost, teleport, shock, fittable, fit,
 } from './dig.js';
 import { coolLeft } from './quantum.js';
+import { caveOver, risky } from './hazards.js';
+
+export { risky };
+import { buildDrone, genOpen, buyGen, GEN_PRICE } from './dig.js';
+
+
 import { HOME_X, roomSpot } from './base.js';
 import { spotOf, repairCost, worstAlarm } from './alarms.js';
 import { depthOf } from './world.js';
@@ -133,6 +139,7 @@ function nearestWanted(s, reach = 30, fixed = null) {
             const nt = tileAt(s, nx, ny);
             if (nt === -1 || nt === T.HEART) continue;
             if (nt !== T.AIR && (dy === -1 || gateOf(s, nt, ny))) continue;
+            if (risky(s, nx, ny)) continue;
             const c = nt === T.AIR ? (dy === -1 ? UP_TIME : MOVE_TIME * (dy ? 0.3 : 1)) : digTime(s, nt, ny) + 0.05;
             const nd = d + c;
             const k = idx(nx, ny);
@@ -159,7 +166,7 @@ function blocker(s) {
     return null;
 }
 
-const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'mapping', 'homing', 'lamp', 'hull'];
+const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'mapping', 'updrill', 'homing', 'lamp', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
@@ -234,6 +241,21 @@ export function shop(s, mem) {
  */
 export function decide(s, mem) {
     if (s.ended) return { dir: null };
+    if (s.lost) { buildDrone(s); return { dir: null }; }
+    // a roof that is moving overhead: out from under it, now
+    const cave = !isHome(s) && caveOver(s);
+    if (cave) {
+        if (tileAt(s, s.x, s.y - 1) === T.AIR) return { dir: 'up' };
+        return { dir: s.x - cave.x0 < cave.x1 - s.x ? 'left' : 'right' };
+    }
+    // magma in the drone's own tile or right beside it: up and away
+    if (!isHome(s) && s.lava) {
+        const hot = (x, y) => s.lava[y * W + x] !== undefined;
+        if (hot(s.x, s.y) || hot(s.x - 1, s.y) || hot(s.x + 1, s.y)) {
+            if (tileAt(s, s.x, s.y - 1) === T.AIR && !hot(s.x, s.y - 1)) return { dir: 'up' };
+            for (const d of [-1, 1]) if (tileAt(s, s.x + d, s.y) === T.AIR && !hot(s.x + d, s.y)) return { dir: d < 0 ? 'left' : 'right' };
+        }
+    }
     if (isHome(s)) {
         mem.going = null; mem.target = null; s.pingSeen = null; mem.hist = [];
         const toward = (x) => (s.x < x ? 'right' : s.x > x ? 'left' : null);
@@ -253,12 +275,19 @@ export function decide(s, mem) {
             if (roomOf(s) !== 'workshop') return { dir: toward(roomSpot('workshop')) };
             shop(s, mem);
         }
+        // the generator's next level, when the parts are plenty
+        const gp = GEN_PRICE[s.levels.gen || 0];
+        if (genOpen(s) && gp !== undefined && s.parts >= gp * 1.6 && s.reserve < 70) {
+            if (roomOf(s) !== 'generator') return { dir: toward(roomSpot('generator')) };
+            buyGen(s);
+        }
         if (s.battery < batteryCap(s) * 0.97) return { dir: null };
         // down: the drone drives to the hatch
         return { dir: 'down' };
     }
     const home = wayHome(s);
-    const homeNeed = (home ? home.cost : homeCost(s) * 1.5) * 1.12 + 2.5;
+    // with the TELEPORT ready, the way home is a key press
+    const homeNeed = coolLeft(s, 'teleport') === 0 && s.y > 25 ? 4 : (home ? home.cost : homeCost(s) * 1.5) * 1.12 + 2.5;
     // the radio: an alarm, and not much time to spare
     const worst = s.levels.radio > 0 ? worstAlarm(s) : null;
     const tripS = (s.y + 1) * 0.05 + 4;
@@ -309,7 +338,16 @@ export function decide(s, mem) {
     }
     if (below === T.HEART) return { dir: 'down' };
     const g = below > 0 ? gateOf(s, below, s.y + 1) : null;
-    if (!g) return { dir: 'down' };
+    if (!g && !risky(s, s.x, s.y + 1)) return { dir: 'down' };
+    if (!g) {
+        // a hazard below: around it
+        for (const d of ['left', 'right']) {
+            const nx = s.x + (d === 'left' ? -1 : 1), t = tileAt(s, nx, s.y);
+            if ((t === T.AIR || (t > 0 && !gateOf(s, t, s.y))) && !risky(s, nx, s.y)) return { dir: d };
+        }
+        mem.going = 'home';
+        return { dir: home ? home.dir : 'up' };
+    }
     const need = blocker(s);
     if (need) {
         mem.need = need;
@@ -323,8 +361,8 @@ export function decide(s, mem) {
                 // nothing seen: dig sideways into the dark
                 const first = (Math.floor(s.time / 20) % 2) ? 'left' : 'right';
                 for (const d of [first, first === 'left' ? 'right' : 'left']) {
-                    const t = tileAt(s, s.x + (d === 'left' ? -1 : 1), s.y);
-                    if (t >= 0 && !(t > 0 && gateOf(s, t, s.y))) return { dir: d };
+                    const nx = s.x + (d === 'left' ? -1 : 1), t = tileAt(s, nx, s.y);
+                    if (t >= 0 && !(t > 0 && gateOf(s, t, s.y)) && !risky(s, nx, s.y)) return { dir: d };
                 }
             }
             mem.going = 'home';
@@ -333,8 +371,8 @@ export function decide(s, mem) {
     }
     // a hard tile under us: around it
     for (const d of ['left', 'right']) {
-        const t = tileAt(s, s.x + (d === 'left' ? -1 : 1), s.y);
-        if (t === T.AIR || (t > 0 && !gateOf(s, t, s.y))) return { dir: d };
+        const nx = s.x + (d === 'left' ? -1 : 1), t = tileAt(s, nx, s.y);
+        if ((t === T.AIR || (t > 0 && !gateOf(s, t, s.y))) && !risky(s, nx, s.y)) return { dir: d };
     }
     if (tgt) return { dir: tgt.dir };
     mem.going = 'home';

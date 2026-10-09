@@ -3,8 +3,9 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
-    boost, teleport, shock, litAt, lampRadius, fit, cargoCap,
+    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
 } from './dig.js';
+import { CAVE_WARN, LAVA_STEP, heatHold } from './hazards.js';
 import { qOrder, has, LAB_S, Q_LINES } from './quantum.js';
 import { FIRST_FAIL, REPAIR_S, spotOf, ALARM_LINES } from './alarms.js';
 import { decide, readStop } from './autopilot.js';
@@ -92,16 +93,37 @@ describe('the rules', () => {
         run(s, 200);
         expect(s.reserve).toBeLessThan(100);
     });
-    test('an empty battery, later on: recovered home, cargo gone, a tenth of the reserve lost', () => {
+    test('an empty battery: the drone is lost where it is, a wreck with its cargo; a new one is built in the workshop', () => {
         const s = preparedState({ row: 10 });
-        s.deaths = 3;
-        s.y = 10; s.cargo = [T.ROCK, T.ROCK]; s.battery = 0.01; s.reserve = 50;
-        step(s, 0.05, { dir: 'left' });
-        step(s, 0.5, { dir: 'left' });
-        expect(s.y).toBe(-1);
-        expect(s.cargo).toEqual([]);
-        expect(s.reserve).toBeLessThanOrEqual(40);
-        expect(s.line.text).toBe('Recovered. The cargo is gone.');
+        s.y = 10; s.cargo = [T.ROCK, T.ROCK, T.PAPER, T.PAPER]; s.battery = 0.01; s.reserve = 50;
+        step(s, 0.05, { dir: 'left' }); step(s, 0.5, { dir: 'left' });
+        expect(s.lost).toBe(true);
+        expect(s.wrecks).toHaveLength(1);
+        expect(s.wrecks[0].cargo).toHaveLength(4);
+        expect(s.reserve).toBe(50);
+        expect(s.tut.stop.text).toEqual(['The drone is lost. Build another.']);
+        closeStop(s);
+        const y0 = s.y;
+        run(s, 10, { dir: 'down' });
+        expect(s.y).toBe(y0);                              // no drone, nothing moves
+        expect(buildDrone(s)).toBe(true);
+        expect(s.droneN).toBe(2);
+        run(s, Math.ceil(BUILD_S / 0.05) + 2);
+        expect(s.battery).toBe(batteryCap(s));
+        // back at the wreck: half its cargo
+        const w = s.wrecks[0];
+        s.y = w.y - 1; s.x = w.x; s.cargo = [];
+        for (let y = 0; y <= w.y; y++) s.tiles[y * W + w.x] = T.AIR;
+        run(s, 10, { dir: 'down' });
+        expect(s.cargo).toHaveLength(2);
+        expect(s.line.text).toBe('Half of its cargo was still there.');
+    });
+    test('a new drone: free three times, then 10, 15, 20 parts (never more than there are)', () => {
+        const s = started();
+        s.parts = 100;
+        for (const [n, want] of [[1, 0], [3, 0], [4, 10], [5, 15], [6, 20]]) { s.lostCount = n; expect(buildPrice(s)).toBe(want); }
+        s.parts = 7; s.lostCount = 6;
+        expect(buildPrice(s)).toBe(7);
     });
     test('once a dive, when the battery is just enough to fly home: Turn back.', () => {
         const s = preparedState({ row: 30 });
@@ -159,7 +181,7 @@ describe('the rules', () => {
         const s = started();
         s.reserve = 0;
         step(s, 0.05, {});
-        expect(s.tut.stop.text).toEqual(['The generators are empty. The sleepers go dark one by one.']);
+        expect(s.tut.stop.text).toEqual(['The generators stopped. The sleepers are freezing.']);
         run(s, Math.round(POD_EVERY * 2 / 0.05) + 1);
         expect(sleepers(s)).toBe(214);
         expect(s.line.text).toMatch(/^Pod \d+ went dark\.$/);
@@ -419,7 +441,9 @@ describe('pass 3, step 2: the base breaks, the tools are upgrades', () => {
         expect(ping(s)).toBe(false);                     // recharging
         s.time += GPS[1].recharge; expect(gpsReady(s)).toBe(true);
         expect(GPS[2].range).toBeGreaterThan(GPS[1].range);
-        expect(GPS[2].recharge).toBeLessThan(GPS[1].recharge);
+        s.levels.gps = 3; s.time += 100; ping(s);
+        expect(pingShows(s, HOME_X, 35)).toBe(true);          // GPS III: the whole circle
+        expect(GPS[4].recharge).toBe(GPS[1].recharge / 2);
     });
     test('the first turn back asks for the HOMING LINE; ore that was not there for the GPS', () => {
         const s = preparedState({ row: 30 });
@@ -565,7 +589,7 @@ describe('v1.92.1: after the third test and Ola', () => {
         b.delivered = 1;
         for (const s of [a, b]) { s.tut.dug = true; s.tut.show.power = true; s.tut.done.power = true; }
         run(a, 40, { dir: 'down' }); run(b, 40, { dir: 'down' });
-        expect(40 - a.battery).toBeLessThan((40 - b.battery) * 0.7);
+        expect(batteryCap(a) - a.battery).toBeLessThan((batteryCap(b) - b.battery) * 0.7);
     });
     test('the first deaths are a stop; a missed generator is said', () => {
         const s = started();
@@ -581,4 +605,74 @@ test('taps of up climb: the drone holds a moment after each step up instead of f
     s.y = 30; s.x = HOME_X;
     for (let k = 0; k < 10; k++) { step(s, 0.05, { dir: 'up' }); for (let i = 0; i < 5; i++) step(s, 0.05, {}); }
     expect(s.y).toBeLessThanOrEqual(21);
+});
+
+describe('v1.92.2: hazards, lost drones, ore and parts', () => {
+    test('magma: a pocket opened runs into the tunnel, harms the drone, and hardens', () => {
+        const s = preparedState({ row: 130, levels: { drill: 3, hull: 1 } });
+        s.y = 130; s.x = HOME_X;
+        for (let x = 0; x < W; x++) { s.tiles[130 * W + x] = T.AIR; s.tiles[131 * W + x] = T.STONE; s.tiles[129 * W + x] = x === HOME_X ? T.AIR : T.STONE; }
+        s.tiles[130 * W + 20] = T.STONE; s.tiles[130 * W + 21] = T.MAGMA;
+        s.x = 19;
+        run(s, 30, { dir: 'right' });                     // digs beside the pocket: it opens
+        expect(Object.keys(s.lava).length).toBeGreaterThan(0);
+        run(s, 120);
+        expect(s.lost).toBe(true);                         // stood in it too long
+        // it hardens after a while
+        run(s, Math.ceil(30 / 0.05));
+        expect(Object.keys(s.lava).length).toBe(0);
+        expect(heatHold(3)).toBeGreaterThan(heatHold(0));
+        expect(LAVA_STEP).toBe(1.5);
+    });
+    test('gas: the drill touches it and it bursts, taking the tiles round it and power', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.x = HOME_X; s.levels.battery = 3; s.battery = batteryCap(s);
+        s.tiles[31 * W + HOME_X] = T.GAS; s.tiles[31 * W + HOME_X + 1] = T.STONE;
+        run(s, 20, { dir: 'down' });
+        expect(s.tiles[31 * W + HOME_X + 1]).toBe(T.AIR);
+        expect(s.battery).toBeLessThan(batteryCap(s) * 0.5);
+    });
+    test('a cave-in: an opening four wide under a roof in old rock falls after two seconds of warning', () => {
+        const s = preparedState({ row: 80, levels: { drill: 2, hull: 1 } });
+        s.y = 80; s.x = 3;
+        for (let x = 0; x < W; x++) { s.tiles[79 * W + x] = T.STONE; s.tiles[81 * W + x] = T.STONE; s.tiles[80 * W + x] = T.STONE; }
+        s.tiles[80 * W + 3] = T.AIR; s.tiles[80 * W + 4] = T.AIR; s.tiles[80 * W + 5] = T.AIR;
+        s.levels.battery = 3; s.battery = batteryCap(s);
+        for (let i = 0; i < 40 && !s.caves.length; i++) run(s, 1, { dir: 'right' });
+        expect(s.caves).toHaveLength(1);
+        s.x = 4; s.act = null;
+        expect(s.line.text).toBe('The roof is moving.');
+        run(s, Math.ceil(CAVE_WARN / 0.05) + 4);
+        expect(s.lost).toBe(true);                         // stayed under it
+        expect(s.tiles[80 * W + 4]).toBe(T.STONE);
+    });
+    test('UPWARD DRILL: I ore only, II soft rock, III anything as fast as down', () => {
+        const s = started();
+        expect(canDigUp(s, T.ROCK)).toBe(true);
+        expect(canDigUp(s, T.STONE)).toBe(false);
+        s.levels.updrill = 1; expect(canDigUp(s, T.STONE)).toBe(true); expect(canDigUp(s, T.HARD)).toBe(false);
+        s.levels.updrill = 2; expect(canDigUp(s, T.HARD)).toBe(true);
+    });
+    test('the generator is built up at the GENERATOR from the war on; each level burns 30 % less', () => {
+        const s = started();
+        s.parts = 500; s.y = -1; s.x = 1; s.drainFrom = 0; s.time = 10;
+        expect(buyGen(s)).toBe(false);                     // not before the war
+        s.layerSeen = 1;
+        const before = drainRate(s);
+        expect(buyGen(s)).toBe(true);
+        expect(drainRate(s) / before).toBeCloseTo(GEN_DRAIN[1]);
+    });
+    test('a find says what it gives; unloading says ore into parts', () => {
+        const s = started();
+        s.tut.dug = true; s.tut.done.power = true; s.tut.show.power = true;
+        const i = Object.keys(s.finds).map(Number).find((k) => s.finds[k] === 0);
+        s.y = Math.floor(i / W) - 1; s.x = i % W;
+        run(s, 20, { dir: 'down' });
+        expect(s.line.text).toBe('A street sign. MARKET ST. +12 PARTS.');
+        const t = started();
+        t.cargo = [T.ROCK, T.PAPER]; t.y = -1; t.x = roomSpot('warehouse');
+        const ev = [];
+        for (let k = 0; k < 10; k++) { step(t, 0.05, {}); ev.push(...t.events); t.events.length = 0; }
+        expect(ev.find((e) => e.type === 'unloaded')).toMatchObject({ ore: 2, parts: 6 });
+    });
 });

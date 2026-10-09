@@ -4,7 +4,7 @@
 // --reckless: the old careless one, who ignores the way home half the time
 // One line a minute: minute, depth record, parts, upgrades, sleepers, colony %; then the moments.
 // Time is the player's: the game's clock plus the seconds spent reading stops (the game is paused then).
-import { newState, step, sleepers, ROWS, stopOpen } from '../src/phase4d/dig.js';
+import { newState, step, sleepers, ROWS, stopOpen, buildDrone } from '../src/phase4d/dig.js';
 import { decide, readStop } from '../src/phase4d/autopilot.js';
 import { depthOf } from '../src/phase4d/world.js';
 
@@ -30,9 +30,12 @@ let firstUp = false, lastRecord = -1, lastRecordAt = 0;
 const gaps = [];
 const ups = () => ROWS.reduce((a, r) => a + s.levels[r], 0) + s.grafts;
 const uses = { boost: 0, teleport: 0, shock: 0 };
+const lostWhy = {};
 console.log(' min  record   parts  bio  upgr  sleepers  colony  deaths');
 for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     if (stopOpen(s)) { const id = s.tut.stop.id; read += readStop(s); news.push([wall(), `stop ${id}`]); continue; }
+    // a lost drone: the player reads, then builds another (two seconds)
+    if (s.lost) { read += 2; buildDrone(s); continue; }
     const before = ups();
     if (noradio && s.tut) s.tut.rows = s.tut.rows.filter((r) => r !== 'radio');
     if (nosteer && s.tut) s.tut.rows = s.tut.rows.filter((r) => r !== 'steering');
@@ -47,7 +50,7 @@ for (let next = 60; wall() < MIN * 60 && !s.ended;) {
         if (e.type in uses) uses[e.type]++;
         if (e.type === 'layer') mark(`layer ${e.layer} (${depthOf(s.y)} m)`);
         if (e.type === 'find') mark(`find ${e.n}`);
-        if (e.type === 'dead') mark('battery empty, recovered');
+        if (e.type === 'dead') { mark(`drone lost (${e.why}) at ${depthOf(e.y)} m`); lostWhy[e.why] = (lostWhy[e.why] || 0) + 1; }
         if (e.type === 'graft') mark(`graft ${e.id}`);
         if (e.type === 'heart') mark('THE HEART');
         if (e.type === 'quantum') mark('quantum object picked up');
@@ -72,5 +75,6 @@ for (let i = 1; i < early.length; i++) closest = Math.min(closest, early[i][0] -
 console.log(`\nnew on screen in the first 5 min: ${early.map(([t, w]) => `${Math.round(t)}s ${w}`).join(' · ')}`);
 console.log(`first dig decision ${Math.round(firsts.dig)} s, first ore home ${Math.round(firsts.ore)} s, stops read ${Math.round(read)} s`);
 console.log(`used: ${JSON.stringify(uses)}`);
+console.log(`drones lost: ${s.deaths} ${JSON.stringify(lostWhy)}`);
 console.log(`chambers: ${s.alarms.n} failures, ${s.alarms.lost} sleepers lost to them`);
 console.log(`end at ${(wall() / 60).toFixed(1)} min, levels ${JSON.stringify(s.levels)} grafts ${s.grafts}, finds ${s.found.length}/12, sleepers ${sleepers(s)}, longest wait for a new 25 m: ${Math.round(Math.max(...gaps))} s`);

@@ -9,7 +9,7 @@
  */
 
 import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
-import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE } from './dig.js';
+import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE, BUILD_S } from './dig.js';
 import { spotOf, REPAIR_S } from './alarms.js';
 import { has, boosting, LAB_S } from './quantum.js';
 import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
@@ -165,10 +165,33 @@ export function createRenderer(canvas) {
                     ctx.fillRect(sx, sy, TS, TS);
                 }
                 if (isOre(tt)) glint(sx, sy, hash(x, y), t);
+                if (tt === T.MAGMA) { ctx.fillStyle = `rgba(255,120,30,${(0.15 + 0.15 * Math.sin(t * 3 + x + y)).toFixed(3)})`; ctx.fillRect(sx, sy, TS, TS); }
                 else if (tt === T.GHOST) {
                     const h = hash(x, y);
                     if (Math.sin(t * 1.3 + h * 40) >= 0.2 - mad * 0.6) { drawOre(h < 0.5 ? T.SCISSORS : T.PAPER, sx, sy, h); glint(sx, sy, h, t); }
                 }
+            }
+        }
+
+        // ---- running magma over the open ground; the dust of a roof that is moving
+        if (s.lava) {
+            for (const k of Object.keys(s.lava)) {
+                const i = Number(k), yy = Math.floor(i / W);
+                if (yy < y0 || yy > y1) continue;
+                const age = s.lava[k], cool = Math.min(1, age / 20);
+                const lx = r.originX + (i % W) * TS, ly = yy * TS - camY;
+                ctx.fillStyle = `rgb(${Math.round(255 - 120 * cool)},${Math.round(110 - 70 * cool)},${Math.round(20 + 10 * cool)})`;
+                ctx.fillRect(lx, ly + 6, TS, TS - 6);
+                ctx.fillStyle = 'rgba(255,220,120,0.5)';
+                ctx.fillRect(lx + ((t * 20 + i) % TS), ly + 8, 6, 2);
+            }
+        }
+        for (const c of s.caves || []) {
+            const cy = c.y * TS - camY;
+            for (let k = 0; k < 6; k++) {
+                const dx2 = r.originX + (c.x0 + hash(k, Math.floor(performance.now() / 120)) * (c.x1 - c.x0 + 1)) * TS;
+                ctx.fillStyle = 'rgba(190,180,160,0.7)';
+                ctx.fillRect(dx2, cy + ((performance.now() / 4 + k * 37) % TS), 2, 3);
             }
         }
 
@@ -216,7 +239,8 @@ export function createRenderer(canvas) {
         // dark from the start (pass 3): only the base's lamps and the drone's
         const under = 1;
         if (!s.ended) {
-            let rad = lampRadius(s) * TS;
+            // no drone (lost, or not yet built): no lamp
+            let rad = s.lost || s.build > 0 ? 4 : lampRadius(s) * TS;
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);
             const top = Math.max(0, groundY + CITY_ROW * TS);
             ctx.save();
@@ -241,6 +265,17 @@ export function createRenderer(canvas) {
                     ctx.fillStyle = tt === T.FIND ? 'rgba(255,214,120,0.35)' : tt === T.BIO ? 'rgba(255,90,110,0.35)' : 'rgba(160,225,255,0.3)';
                     const mx = r.originX + (i % W) * TS + TS / 2, my = yy * TS + TS / 2 - camY;
                     ctx.beginPath(); ctx.moveTo(mx, my - 5); ctx.lineTo(mx + 5, my); ctx.lineTo(mx, my + 5); ctx.lineTo(mx - 5, my); ctx.fill();
+                }
+            }
+            // magma glows: it lights the dark round it (a warning, not a trap)
+            for (let y = Math.max(0, y0); y <= y1 && y1 >= y0; y++) {
+                for (let x = 0; x < W; x++) {
+                    const i = y * W + x;
+                    if (s.tiles[i] !== T.MAGMA && !(s.lava && s.lava[i] !== undefined)) continue;
+                    const gx = r.originX + x * TS + TS / 2, gy = y * TS + TS / 2 - camY;
+                    const gl = ctx.createRadialGradient(gx, gy, 2, gx, gy, TS * 1.4);
+                    gl.addColorStop(0, `rgba(255,120,40,${(0.35 + 0.1 * Math.sin(t * 3 + x)).toFixed(3)})`); gl.addColorStop(1, 'rgba(255,120,40,0)');
+                    ctx.fillStyle = gl; ctx.fillRect(gx - TS * 1.4, gy - TS * 1.4, TS * 2.8, TS * 2.8);
                 }
             }
             // what is not from here flickers faintly even in the dark
@@ -279,9 +314,9 @@ export function createRenderer(canvas) {
                 for (let y = pg.y; y <= Math.min(H - 1, pg.y + g.range); y++) {
                     for (let x = 0; x < W; x++) {
                         const tt = s.tiles[y * W + x];
-                        if (!(isOre(tt) || tt === T.FIND) || !pingShows(s, x, y)) continue;
+                        if (!(isOre(tt) || tt === T.FIND || tt === T.MAGMA || tt === T.GAS) || !pingShows(s, x, y)) continue;
                         if (Math.hypot(x - pg.x, y - pg.y) * TS > reach) continue;
-                        ctx.fillStyle = tt === T.FIND ? `rgba(255,214,120,${(0.9 * fade).toFixed(3)})` : tt === T.BIO ? `rgba(255,90,110,${(0.9 * fade).toFixed(3)})` : `rgba(160,225,255,${(0.9 * fade).toFixed(3)})`;
+                        ctx.fillStyle = tt === T.MAGMA ? `rgba(255,120,40,${(0.9 * fade).toFixed(3)})` : tt === T.GAS ? `rgba(140,230,110,${(0.9 * fade).toFixed(3)})` : tt === T.FIND ? `rgba(255,214,120,${(0.9 * fade).toFixed(3)})` : tt === T.BIO ? `rgba(255,90,110,${(0.9 * fade).toFixed(3)})` : `rgba(160,225,255,${(0.9 * fade).toFixed(3)})`;
                         ctx.fillRect(r.originX + x * TS + TS / 2 - 4, y * TS + TS / 2 - camY - 4, 8, 8);
                     }
                 }
@@ -298,7 +333,29 @@ export function createRenderer(canvas) {
         }
 
         // ---- the drone
-        if (r.rising === null) {
+        // ---- the wrecks: dark drones with dead lamps, where they were lost
+        for (const w of s.wrecks || []) {
+            const wy = w.y * TS + TS / 2 - camY;
+            if (wy < -40 || wy > vh + 40) continue;
+            const wx = r.originX + w.x * TS + TS / 2;
+            ctx.save(); ctx.translate(wx, wy);
+            ctx.fillStyle = w.looted ? '#15181d' : '#1f242b'; roundRect(-19, -13, 38, 26, 8); ctx.fill();
+            ctx.fillStyle = '#2c323a'; roundRect(-13, -9, 26, 16, 3); ctx.fill();
+            ctx.fillStyle = '#3a3226'; ctx.fillRect(12, -6, 4, 4);
+            if (!w.looted && w.cargo.length) { ctx.fillStyle = 'rgba(160,225,255,0.5)'; ctx.fillRect(-6, -12, 3, 3); ctx.fillRect(-1, -12, 3, 3); }
+            ctx.restore();
+        }
+        // a new drone being built on the workshop's plate: a frame, then the parts, four seconds
+        if (s.build > 0 && r.rising === null) {
+            const k = 1 - s.build / BUILD_S;
+            ctx.strokeStyle = C.amber; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+            ctx.strokeRect(dx - 22, dy - 16, 44, 32); ctx.setLineDash([]);
+            ctx.save(); ctx.globalAlpha = Math.min(1, k * 1.2);
+            ctx.beginPath(); ctx.rect(dx - 30, dy + 18 - 40 * k, 60, 40 * k + 10); ctx.clip();
+            drawDrone(s, dx, dy); ctx.restore();
+            if (Math.random() < 0.5) burst(dx + (Math.random() - 0.5) * 40, dy + 18 - 40 * k, '#ffd678', 1);
+        }
+        if (r.rising === null && !s.lost && !(s.build > 0)) {
             // the BOOSTER is felt: a trail of the drone where it was, and speed lines
             if (boosting(s)) {
                 trail.push({ x: dx, y: dy + camY, life: 0.35 });
@@ -442,6 +499,8 @@ export function createRenderer(canvas) {
         if (tt === T.HARD) base = '#1f2226';
         if (tt === T.BASALT) base = '#131416';
         if (tt === T.SINEW) base = '#6e2a33';
+        if (tt === T.MAGMA) base = '#7a2a10';
+        if (tt === T.GAS) base = '#24331f';
         if (tt === T.HEART) base = '#5a0d1a';
         if (tt === T.FLESH || tt === T.BIO || li === 5) {
             const pulse = 0.5 + 0.5 * Math.sin(-y * 0.35 + x * 0.2);
@@ -470,6 +529,14 @@ export function createRenderer(canvas) {
         }
         // ore (the ore that is not there is drawn per frame: it flickers)
         if (ORE_COL[tt]) drawOre(tt, sx, sy, h);
+        if (tt === T.MAGMA) {         // glowing rock: cracks of orange
+            ctx.strokeStyle = '#ff8a2a'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(sx + 4, sy + 10 + h * 8); ctx.lineTo(sx + 14, sy + 16); ctx.lineTo(sx + 12, sy + 26); ctx.moveTo(sx + 14, sy + 16); ctx.lineTo(sx + 27, sy + 12 + h * 6); ctx.stroke();
+        }
+        if (tt === T.GAS) {           // a pocket of green, an old bunker's breath
+            ctx.fillStyle = 'rgba(140,220,110,0.55)';
+            for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(sx + 8 + hash(x + k, y) * 16, sy + 8 + hash(y + k, x) * 16, 2.5 + 2 * hash(k, x + y), 0, Math.PI * 2); ctx.fill(); }
+        }
         if (tt === T.FIND) {
             ctx.fillStyle = '#e9c46a';
             ctx.fillRect(sx + 8, sy + 10, 16, 12);
@@ -787,6 +854,8 @@ export function createRenderer(canvas) {
             ctx.fillStyle = '#0b0c0e'; ctx.fillRect(lx + 10, top + 34, lw - 70, 6);
             ctx.fillStyle = C.cold; ctx.fillRect(lx + 11, top + 35, (lw - 72) * k, 4);
         }
+        // the generator can be built up: an arrow there until the drone has been
+        if (s.genFresh && !(s.y === -1 && s.x >= ROOMS.generator[0] && s.x <= ROOMS.generator[1])) arrow(r.originX + 2 * TS, top + 46 + 4 * Math.sin(t * 5), 1);
         // the carried object goes to the lab: an arrow there
         if (q && q.carry.length && s.y === -1 && !s.cargo.length && !(s.x >= ROOMS.lab[0] && s.x <= ROOMS.lab[1])) arrow(r.originX + roomSpot('lab') * TS + TS * 1.5, top + 46 + 4 * Math.sin(t * 5), 1);
         // look here: the warehouse with cargo aboard, the workshop with something new

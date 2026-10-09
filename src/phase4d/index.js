@@ -13,7 +13,7 @@ import {
     SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, ROW_NAME, rowText, GRAFTS, graftShown,
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
     shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady, boost, teleport, shock,
-    fittable, fit, LINE_TTL,
+    fittable, fit, LINE_TTL, buildDrone, buildPrice, buyGen, genOpen, GEN_PRICE, GEN_NAME, LINES,
 } from './dig.js';
 import { has, coolLeft, COOL, LAB_S, Q_NAME, Q_LINES } from './quantum.js';
 import { worstAlarm, ALARM_LINES } from './alarms.js';
@@ -96,6 +96,18 @@ const CSS = `
 .dig-panel.is-bare { background: transparent; box-shadow: none; }
 .dig-shop h3 .dig-val { font-size: 16px; }
 .dig-buy.is-fresh { box-shadow: inset 0 0 0 2px #ffd678; }
+#dig-power-box .dig-row .dig-val, [data-show="parts"] .dig-val, [data-show="cargo"] .dig-val { display: inline-flex; align-items: center; white-space: nowrap; }
+.dig-shop { overflow-x: hidden; scrollbar-color: #3a4350 transparent; }
+.dig-buy .dig-price.is-short { max-width: 72px; white-space: normal; text-align: right; font-size: 12px; }
+.dig-ico { flex: none; width: 15px; height: 15px; margin-right: 5px; vertical-align: -2px; fill: none; stroke: #8fa1b6; stroke-width: 2; stroke-linecap: round; }
+.dig-ore { font: 12px/1 system-ui; letter-spacing: 0; margin-right: 8px; }
+.dig-ore b { font-weight: 600; margin-left: 5px; }
+.dig-ore i { display: inline-block; width: 8px; height: 8px; transform: rotate(45deg); margin-right: 2px; }
+#dig-power-box .dig-bar { height: 10px; border-radius: 9999px; background: #cbd5e1; padding: 2px; box-sizing: border-box; }
+#dig-power-box .dig-bar > i { border-radius: 9999px; top: 2px; bottom: 2px; left: 2px; background: #64748b; }
+#dig-power-box .dig-bar > i.is-red { background: #ff5a5a; }
+#dig-gen-box.is-low .dig-val { color: #ff5a5a; animation: dig-blink .8s steps(2) infinite; }
+.dig-buy.is-build .dymo { background: #3a2a10; }
 .dig-buy.is-sel { background: rgba(255,255,255,.12); outline: 2px solid #f1efe8; outline-offset: -2px; }
 .dig-buy.is-fit .dymo { background: #2a1838; }
 .dig-buy.is-fit .dig-price { color: #c9b8ff; }
@@ -119,6 +131,7 @@ const CSS = `
 #dig-help { position: absolute; right: 16px; bottom: 16px; font: 12px/1.4 system-ui; color: #5d6a78; text-align: right; pointer-events: none; }
 `;
 
+const ORE_COLOUR = { 8: '#9fd8e8', 9: '#efe6c8', 10: '#9fe3ff', 11: '#ff4d6d' };
 const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 
@@ -133,11 +146,12 @@ function buildDom(host) {
       <div class="dig-alarm" id="dig-alarm" hidden></div>
       <div data-show="sleepers"><div class="dig-row"><span class="dymo is-small">SLEEPERS</span><span class="dig-val" id="dig-sleepers">216</span></div>
       <canvas class="dig-pods" id="dig-pods" width="240" height="26"></canvas></div>
-      <div data-show="power" id="dig-power-box"><div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val" id="dig-power">100 %</span></div>
+      <div class="dig-row" id="dig-drone-row" hidden><span class="dymo is-small" id="dig-drone">DRONE 2</span><span class="dig-val" id="dig-drone-state"></span></div>
+      <div data-show="power" id="dig-power-box"><div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val"><svg class="dig-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/></svg><span id="dig-power">100 %</span></span></div>
       <div class="dig-bar" id="dig-power-track"><i id="dig-power-fill"></i><s id="dig-power-zone"></s><b id="dig-power-home"></b><em id="dig-power-home-label">HOME</em></div></div>
-      <div data-show="cargo" class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val" id="dig-cargo">0 / 8</span></div>
+      <div data-show="cargo" class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val"><span id="dig-ore" class="dig-ore"></span><span id="dig-cargo">0 / 8</span></span></div>
       <div data-show="depth" class="dig-row"><span class="dymo is-small">DEPTH</span><span class="dig-val" id="dig-depth">0 m</span></div>
-      <div data-show="parts" class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val" id="dig-parts">0</span></div>
+      <div data-show="parts" class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val"><svg class="dig-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span id="dig-parts">0</span></span></div>
       <div data-show="gen" id="dig-gen-box"><div class="dig-row"><span class="dymo is-small">GENERATORS</span><span class="dig-val" id="dig-colony">100 %</span></div>
       <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div></div>
       <div class="dig-row" id="dig-bio-row" hidden><span class="dymo is-small">BIOMASS</span><span class="dig-val" id="dig-bio">0</span></div>
@@ -148,7 +162,7 @@ function buildDom(host) {
       <button type="button" class="dig-ping" data-q="teleport" hidden><span>TELEPORT</span><small>T</small><i></i></button>
       <button type="button" class="dig-ping" data-q="shock" hidden><span>SHOCK WAVE</span><small>Q</small><i></i></button>`;
     const shop = el('div', 'dig-card dig-shop');
-    shop.innerHTML = `<h3><span class="dymo is-small">WORKSHOP</span><span class="dig-val" id="dig-shop-note"></span></h3><div id="dig-shop-rows"></div>`;
+    shop.innerHTML = `<h3><span class="dymo is-small" id="dig-shop-title">WORKSHOP</span><span class="dig-val" id="dig-shop-note"></span></h3><div id="dig-shop-rows"></div>`;
     col.append(panel, shop);
     const stop = el('div', 'dig-stop'); stop.id = 'dig-stop'; stop.hidden = true;
     stop.innerHTML = '<div class="txt" id="dig-stop-text"></div><button type="button" class="ok" id="dig-stop-ok">OK</button>';
@@ -163,9 +177,10 @@ function buildDom(host) {
         power: $('dig-power'), powerFill: $('dig-power-fill'), powerHome: $('dig-power-home'), powerHomeLabel: $('dig-power-home-label'),
         cargo: $('dig-cargo'), depth: $('dig-depth'), colony: $('dig-colony'), colonyFill: $('dig-colony-fill'),
         sleepers: $('dig-sleepers'), parts: $('dig-parts'), bio: $('dig-bio'), bioRow: $('dig-bio-row'), finds: $('dig-finds'),
-        crt: $('dig-crt'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
+        crt: $('dig-crt'), shopTitle: $('dig-shop-title'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
         stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'), genBox: $('dig-gen-box'),
         showEls: [...panel.querySelectorAll('[data-show]')],
+        ore: $('dig-ore'), droneRow: $('dig-drone-row'), drone: $('dig-drone'), droneState: $('dig-drone-state'),
         alarm: $('dig-alarm'), ping: $('dig-ping'), pingBar: $('dig-ping-bar'), qRow: $('dig-q-row'), q: $('dig-q'),
         qBtns: [...panel.querySelectorAll('[data-q]')],
     };
@@ -224,7 +239,7 @@ export function init() {
             if (!d) return;
         }
         // the workshop with keys: up and down choose a row, Enter or Space buys it (left and right still drive)
-        if (!stopOpen(s) && inWorkshop(s) && !ui.shop.hidden) {
+        if (!stopOpen(s) && !ui.shop.hidden) {
             if (d === 'up' || d === 'down') { e.preventDefault(); moveSel(d === 'up' ? -1 : 1); return; }
             if (confirmKey && !e.repeat) { buySel(); return; }
         }
@@ -323,21 +338,54 @@ export function init() {
     graftBtn.addEventListener('click', () => { if (buyGraft(s)) refreshShop(true); graftBtn.blur(); }, { signal });
     graftBtn.dataset.row = 'graft';
     ui.shopRows.appendChild(graftBtn);
+    // a lost drone: BUILD A DRONE (spec H2); the generator's levels at the GENERATOR (H5)
+    const buildBtn = el('button', 'dig-buy is-build'); buildBtn.type = 'button';
+    buildBtn.innerHTML = '<span class="dymo is-small"></span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc"></span>';
+    buildBtn.addEventListener('click', () => { if (buildDrone(s)) refreshShop(true); buildBtn.blur(); }, { signal });
+    buildBtn.dataset.row = 'build';
+    ui.shopRows.prepend(buildBtn);
+    const genBtn = el('button', 'dig-buy'); genBtn.type = 'button';
+    genBtn.innerHTML = '<span class="dymo is-small"></span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc">Burns ore slower.</span>';
+    genBtn.addEventListener('click', () => { if (buyGen(s)) refreshShop(true); genBtn.blur(); }, { signal });
+    genBtn.dataset.row = 'gen';
+    ui.shopRows.appendChild(genBtn);
     let shopKey = '';
     function refreshShop(force = false) {
-        const here = inWorkshop(s) && !s.ended;
+        const lost = !!s.lost && !s.ended;
+        const atGen = !lost && roomOf(s) === 'generator' && genOpen(s) && !s.ended;
+        const here = !lost && inWorkshop(s) && !s.ended;
         const fresh = s.tut && s.tut.on ? s.tut.fresh : null;
-        const key = `${here}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}`;
+        const key = `${here}|${lost}|${atGen}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}|${s.lostCount}`;
         if (!force && key === shopKey) return;
         shopKey = key;
-        // the workshop is a place: its card is up while the drone stands in it
-        ui.shop.hidden = !here;
+        // the workshop is a place: its card is up while the drone stands in it (or while there is none);
+        // at the GENERATOR the same card sells the generator's levels
+        ui.shop.hidden = !(here || lost || atGen);
+        ui.shopTitle.textContent = atGen ? 'GENERATOR' : 'WORKSHOP';
         ui.shopNote.textContent = `${s.parts} PARTS`;
+        const bp = buildPrice(s);
+        buildBtn.hidden = !lost;
+        buildBtn.querySelector('.dymo').textContent = LINES.build(bp);
+        buildBtn.querySelector('.dig-desc').textContent = 'The same upgrades. A full battery.';
+        buildBtn.querySelector('.dig-price').textContent = bp ? `${bp} PARTS` : 'FREE';
+        buildBtn.classList.toggle('is-ready', lost);
+        const gl = s.levels.gen || 0, genP = GEN_PRICE[gl];
+        genBtn.hidden = !atGen;
+        genBtn.querySelector('.dymo').textContent = genP === undefined ? GEN_NAME[gl] : GEN_NAME[gl + 1];
+        genBtn.querySelector('.dig-dash').textContent = '■'.repeat(gl) + '□'.repeat(3 - gl);
+        const gpe = genBtn.querySelector('.dig-price');
+        if (genP === undefined) { gpe.textContent = 'DONE'; gpe.className = 'dig-price is-short'; }
+        else if (s.parts >= genP) { gpe.textContent = `${genP} PARTS`; gpe.className = 'dig-price'; }
+        else { gpe.textContent = `Need ${genP - s.parts} more.`; gpe.className = 'dig-price is-short'; }
+        genBtn.disabled = genP === undefined || s.parts < genP;
+        genBtn.classList.toggle('is-ready', !genBtn.disabled);
         for (const r of ROWS) {
             const b = rows[r], lv = s.levels[r], price = priceOf(s, r), top = maxLevel(r);
-            b.hidden = !rowShown(s, r);
+            // a one-level upgrade leaves the list once it is bought
+            b.hidden = !here || !rowShown(s, r) || (top === 1 && lv >= 1);
             b.classList.toggle('is-fresh', fresh === r);
-            b.querySelector('.dig-dash').textContent = '■'.repeat(lv) + '□'.repeat(top - lv);
+            // UPWARD DRILL starts at I: the dashes show I to III
+            b.querySelector('.dig-dash').textContent = r === 'updrill' ? '■'.repeat(lv + 1) + '□'.repeat(top - lv) : '■'.repeat(lv) + '□'.repeat(top - lv);
             b.querySelector('.dig-desc').textContent = rowText(r, lv);
             const pe = b.querySelector('.dig-price');
             if (price === null) { pe.textContent = 'DONE'; pe.className = 'dig-price is-short'; }
@@ -346,7 +394,7 @@ export function init() {
             b.disabled = !here || price === null || s.parts < price;
             b.classList.toggle('is-ready', !b.disabled);
         }
-        graftBtn.hidden = !graftShown(s);
+        graftBtn.hidden = !here || !graftShown(s);
         graftBtn.classList.toggle('is-fresh', fresh === 'graft');
         const g = GRAFTS[s.grafts];
         graftBtn.querySelector('.dig-dash').textContent = '■'.repeat(s.grafts) + '□'.repeat(3 - s.grafts);
@@ -359,7 +407,7 @@ export function init() {
         graftBtn.classList.toggle('is-ready', !graftBtn.disabled);
         const canFit = fittable(s);
         for (const [id, b] of Object.entries(fits)) {
-            b.hidden = !canFit.includes(id);
+            b.hidden = !here || !canFit.includes(id);
             b.disabled = !here;
             b.classList.toggle('is-ready', !b.hidden && here);
             b.classList.toggle('is-fresh', fresh === `fit-${id}`);
@@ -488,6 +536,16 @@ export function init() {
         ui.powerHome.style.left = `${homePct}%`;
         ui.powerHomeLabel.style.left = `${homePct}%`;
         put('cargo', ui.cargo, `${s.cargo.length} / ${cargoCap(s)}`);
+        // ORE in the cargo, one mark a kind (ROCK, PAPER, SCISSORS; biomass red)
+        const counts = {};
+        for (const t of s.cargo) counts[t] = (counts[t] || 0) + 1;
+        const oreHtml = Object.entries(counts).map(([t, n]) => `<i style="background:${ORE_COLOUR[t] || '#ccc'}"></i><b>${n}</b>`).join(' ');
+        if (ui.ore.__h !== oreHtml) { ui.ore.__h = oreHtml; ui.ore.innerHTML = oreHtml; }
+        // the drone's number, from the second
+        ui.droneRow.hidden = (s.droneN || 1) < 2 && !s.lost;
+        put('drone', ui.drone, s.lost ? `DRONE ${s.droneN}` : `DRONE ${s.droneN || 1}`);
+        put('dronestate', ui.droneState, s.lost ? 'LOST' : s.build > 0 ? 'BUILDING' : '');
+        ui.genBox.classList.toggle('is-low', s.reserve < 30);
         ui.cargo.classList.toggle('is-red', s.cargo.length >= cargoCap(s));
         const best = depthOf(s.record);
         const now = depthM(s);
@@ -595,6 +653,7 @@ export function init() {
                 if (e.type === 'pod') blinkPod = { pod: e.pod, at: performance.now() };
                 if (e.type === 'shock' || e.type === 'teleport') rnd.ring(e.type);
                 if (e.type === 'full') rnd.pop('Cargo full.', '#f1efe8', false);
+                if (e.type === 'unloaded') rnd.pop(LINES.unloaded(e.ore, e.parts), '#f2d98a', false);
                 if (e.type === 'bump') rnd.bump(s);
                 if (e.type === 'q-named') rnd.label(e.i, 'QUANTUM OBJECT');
                 if (e.type === 'heart') ui.root.classList.add('dig-ending');

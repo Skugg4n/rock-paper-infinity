@@ -14,7 +14,11 @@ export const METERS_PER_TILE = 5;
 export const T = {
     AIR: 0, SOIL: 1, STONE: 2, HARD: 3, BASALT: 4, FLESH: 5, SINEW: 6, HEART: 7,
     ROCK: 8, PAPER: 9, SCISSORS: 10, BIO: 11, GHOST: 12, FIND: 13, QUANTUM: 14,
+    MAGMA: 15, GAS: 16,
 };
+/** The hazards (spec H1): magma below 600 m, gas in the war. */
+export const MAGMA_FROM = 600, MAGMA_TO = 1580;
+export const GAS_FROM = 70, GAS_TO = 290;
 
 /** Ore: what it is worth and in what. */
 export const ORE = {
@@ -165,5 +169,25 @@ export function makeWorld(seed = 1) {
             break;
         }
     });
+    // pass 3, H1: the hazards, with their own numbers (the rest of the mountain stays as it was).
+    // Magma in pockets below 600 m, gas pockets in the war (old bunkers); never within two columns of the middle (a way down stays clear),
+    // never over a find, a quantum object or a gate band.
+    const hz = rng(seed * 733 + 3);
+    const free = (x, y) => {
+        const i = y * W + x, t = tiles[i];
+        return Math.abs(x - 11) >= 3 && x >= 0 && x < W && finds[i] === undefined && t !== T.QUANTUM && t !== T.FIND && t !== T.HEART && t !== T.SINEW
+            && !(y >= HARD_BAND[0] && y <= HARD_BAND[1]) && !(y >= BASALT_BAND[0] && y <= BASALT_BAND[1]);
+    };
+    const pocket = (t, y0, size) => {
+        let x = 1 + Math.floor(hz() * (W - 2)), y = y0;
+        for (let k = 0; k < size; k++) {
+            if (free(x, y)) tiles[y * W + x] = t;
+            const d = Math.floor(hz() * 4);
+            x = Math.max(0, Math.min(W - 1, x + (d === 0 ? -1 : d === 1 ? 1 : 0)));
+            y += d === 2 ? 1 : 0;
+        }
+    };
+    for (let y = rowOf(GAS_FROM); y < rowOf(GAS_TO); y += 9 + Math.floor(hz() * 8)) pocket(T.GAS, y, 1 + Math.floor(hz() * 3));
+    for (let y = rowOf(MAGMA_FROM); y < rowOf(MAGMA_TO); y += 6 + Math.floor(hz() * 7)) pocket(T.MAGMA, y, 2 + Math.floor(hz() * 4));
     return { seed, tiles, finds, quantum };
 }

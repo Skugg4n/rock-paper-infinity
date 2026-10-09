@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = process.argv.includes('--pass3') || process.argv.includes('--step2') || process.argv.includes('--step3') || process.argv.includes('--nosteer');
+const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards'].some((a) => process.argv.includes(a));
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +103,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !process.argv.includes('--step2') && !process.argv.includes('--step3') && !process.argv.includes('--long')) {
+    if (PASS3 && !['--step2', '--step3', '--long', '--hazards'].some((a) => process.argv.includes(a))) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -143,6 +143,7 @@ try {
         const b = await ev(`(() => { const e = [...document.querySelectorAll('.dig-buy')].find((x) => !x.disabled && !x.hidden); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 10 }; })()`);
         if (b) { await click(b.x, b.y); await sleep(400); }
         await shot('p3-10-bought');
+        await hold('ArrowLeft', 400);
         await hold('ArrowDown', 1500);
         await shot('p3-11-down-again');
         for (const [cp, name] of [['iv-dig-war', 'p3-12-war'], ['iv-dig-machine', 'p3-13-machine']]) {
@@ -235,6 +236,55 @@ try {
         const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
         const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
         fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
+    }
+    if (process.argv.includes('--hazards')) {
+        // v1.92.2: ore and parts, magma, gas, a cave-in, a lost drone and its wreck, the generator's levels
+        await jump('iv-dig-war');
+        await ev(`(() => { const s = window.rpiDig.state; s.cargo = [8, 8, 9, 10]; return true; })()`);
+        await sleep(500);
+        await shot('p3-50-cargo-ore');
+        // gas beside the drone
+        await ev(`(() => { const s = window.rpiDig.state; s.tiles[(s.y + 1) * 24 + 11] = 16; s.tiles[(s.y + 1) * 24 + 12] = 16; return true; })()`);
+        await sleep(700);
+        await shot('p3-51-gas-seen');
+        await hold('ArrowDown', 700);
+        await sleep(300);
+        await shot('p3-52-gas-burst');
+        // the old rock: a wide opening under a roof
+        await jump('iv-dig-war');
+        await ev(`(() => { const s = window.rpiDig.state; s.y = 70; s.x = 11; s.levels.battery = 4; s.battery = 240; for (let y = 59; y <= 70; y++) s.tiles[y * 24 + 11] = 0; for (let x = 12; x <= 14; x++) s.tiles[70 * 24 + x] = 0; for (let x = 11; x <= 16; x++) s.tiles[69 * 24 + x] = x === 11 ? 0 : 2; s.tiles[70 * 24 + 15] = 2; return true; })()`);
+        await hold('ArrowRight', 300);
+        await ev(`(() => { const s = window.rpiDig.state; s.cargo = [8, 8, 9, 9]; s.caves.push({ x0: 11, x1: 15, y: 70, at: s.time + 2 }); s.act = null; s.x = 13; return true; })()`);
+        await sleep(400);
+        await shot('p3-53-roof-moving');
+        await sleep(2500);
+        await shot('p3-54-lost-workshop');
+        const bb = await ev(`(() => { const e = document.querySelector('.dig-buy.is-build'); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 12 }; })()`);
+        if (bb) { await key('Enter'); await sleep(500); await key('Enter'); }
+        await sleep(1500);
+        await shot('p3-55-building');
+        await sleep(3500);
+        await shot('p3-56-built');
+        await ev(`(() => { const s = window.rpiDig.state; const w = s.wrecks[s.wrecks.length - 1]; if (w) { s.y = w.y - 2; s.x = w.x; for (let y = w.y - 3; y <= w.y; y++) s.tiles[y * 24 + w.x] = 0; } return !!w; })()`);
+        await sleep(400);
+        await shot('p3-56b-wreck');
+        await hold('ArrowDown', 500);
+        await sleep(400);
+        await shot('p3-56c-wreck-looted');
+        // magma below 600 m
+        await jump('iv-dig-machine');
+        await ev(`(() => { const s = window.rpiDig.state; s.tiles[(s.y) * 24 + 13] = 15; s.tiles[(s.y + 1) * 24 + 13] = 15; s.tiles[s.y * 24 + 12] = 2; return true; })()`);
+        await sleep(700);
+        await shot('p3-57-magma-seen');
+        await hold('ArrowRight', 600);
+        await sleep(2500);
+        await shot('p3-58-magma-runs');
+        // the generator's levels at the GENERATOR
+        await jump('iv-dig-war');
+        await ev(`(() => { const s = window.rpiDig.state; s.y = -1; s.x = 2; s.parts = 300; return true; })()`);
+        await sleep(800);
+        await shot('p3-59-generator');
+        console.log('build button seen:', !!bb);
     }
     if (!process.argv.includes('--long') && !PASS3 && !process.argv.includes('--step2')) {
     // 1. the start: dig down, mine sideways, come home, buy
