@@ -10,7 +10,7 @@ import { W, H, T } from './world.js';
 import {
     tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, pingShows, ping, gpsReady,
     priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST, rowShown, maxLevel, ROWS, roomOf,
-    stopOpen, closeStop, STOPS, litAt, boost, teleport, shock, fittable, fit,
+    stopOpen, closeStop, STOPS, litAt, boost, teleport, shock, fittable, fit, mendPrice, mendPlates, priceOf,
 } from './dig.js';
 import { coolLeft } from './quantum.js';
 import { caveOver, risky } from './hazards.js';
@@ -89,7 +89,7 @@ export function pathHome(s) {
 
 /** Is this tile one the player would go for: ore or a find, seen in the lamp or in the last ping. */
 function wanted(s, x, y, t) {
-    if (s.__explore && (isOre(t) || t === T.FIND) && Math.abs(x - s.x) + Math.abs(y - s.y) <= 70) return true;
+    if (s.__explore && (isOre(t) || t === T.FIND) && Math.abs(x - s.x) + Math.abs(y - s.y) <= 140) return true;
     const d = Math.hypot(x - s.x, y - s.y);
     const lit = litAt(s, x, y) || d <= lampRadius(s);
     const onRadar = pingShows(s, x, y) || (s.pingSeen && s.pingSeen.has(y * W + x)) || (s.levels.mapping > 0 && d <= 12 && s.seen.includes(y * W + x));
@@ -166,7 +166,7 @@ function blocker(s) {
     return null;
 }
 
-const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'mapping', 'updrill', 'homing', 'lamp', 'hull'];
+const USEFUL = ['steering', 'warning', 'radio', 'drill', 'cargo', 'battery', 'armour', 'gps', 'mapping', 'updrill', 'homing', 'lamp', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
@@ -196,7 +196,7 @@ function unswing(s, mem, dir) {
 
 /** Would the player walk to the workshop now: something there they can pay. */
 function wantsToShop(s, mem) {
-    if (fittable(s).length) return true;
+    if (fittable(s).length || (mendPrice(s) > 0 && s.parts >= mendPrice(s))) return true;
     // what shop() would buy, tried on a copy
     const c = { ...s, x: roomSpot('workshop'), y: -1, levels: { ...s.levels }, tut: s.tut && { ...s.tut, rows: [...s.tut.rows] }, events: [], sayAt: { ...s.sayAt } };
     return shop(c, { ...mem }).length > 0;
@@ -214,20 +214,23 @@ export function readStop(s) {
 export function shop(s, mem) {
     const bought = [];
     for (const id of fittable(s)) if (fit(s, id)) bought.push(`fit ${id}`);
+    if (mendPrice(s) > 0 && mendPlates(s)) bought.push('mend');
     if (!mem.need) mem.need = nextGate(s);
     for (let guard = 0; guard < 12; guard++) {
         if (graftShown(s) && GRAFTS[s.grafts] && s.bio >= GRAFTS[s.grafts].price && buyGraft(s)) { bought.push('graft'); continue; }
         const want = mem.need && mem.need !== 'graft' && rowShown(s, mem.need) ? mem.need : null;
         if (want && s.levels[want] < maxLevel(want)) {
-            if (s.parts >= priceFor(want, s.levels[want])) { buy(s, want); bought.push(want); mem.need = null; continue; }
+            if (s.parts >= priceFor(want, s.levels[want]) && buy(s, want)) { bought.push(want); mem.need = null; continue; }
             // save for it, but buy cheap things that do not delay it much
         }
-        const cands = USEFUL.filter((r) => rowShown(s, r) && s.levels[r] < maxLevel(r) && (r !== 'hull' || mem.need === 'hull'))
-            .map((r) => ({ r, p: priceFor(r, s.levels[r]) }))
-            .filter((c) => c.p <= s.parts && (!want || s.parts - c.p >= priceFor(want, s.levels[want]) * 0.5 || c.p <= 30))
-            .sort((a, b) => a.p - b.p || USEFUL.indexOf(a.r) - USEFUL.indexOf(b.r));
+        // the unlucky player buys the wrong things first, and saves for nothing
+        const order = mem.wrongFirst ? ['mapping', 'gps', 'lamp', 'cargo', 'armour', 'radio', 'homing', 'battery', 'updrill', 'steering', 'warning', 'drill', 'hull'] : USEFUL;
+        const cands = order.filter((r) => rowShown(s, r) && !(r === 'steering' && s.levels.steering >= 1) && s.levels[r] < maxLevel(r) && (r !== 'hull' || mem.need === 'hull'))
+            .map((r) => ({ r, p: priceOf(s, r) }))
+            .filter((c) => c.p !== null && c.p <= s.parts && (!want || s.parts - c.p >= priceFor(want, s.levels[want]) * 0.5 || c.p <= 30))
+            .sort((a, b) => (mem.wrongFirst ? order.indexOf(a.r) - order.indexOf(b.r) : a.p - b.p || USEFUL.indexOf(a.r) - USEFUL.indexOf(b.r)));
         if (!cands.length) break;
-        buy(s, cands[0].r);
+        if (!buy(s, cands[0].r)) break;
         bought.push(cands[0].r);
     }
     return bought;
@@ -291,7 +294,9 @@ export function decide(s, mem) {
     // the radio: an alarm, and not much time to spare
     const worst = s.levels.radio > 0 ? worstAlarm(s) : null;
     const tripS = (s.y + 1) * 0.05 + 4;
-    if (worst && worst.until - s.time < tripS + 25) mem.going = 'home';
+    // (only when it can pay for the mending, with what it carries: otherwise it digs on for the parts)
+    const canPay = worst && s.parts + s.cargo.length * 2 >= (worst.cost || 0);
+    if (worst && canPay && s.cargo.length + s.parts > 0 && worst.until - s.time < tripS + 25) mem.going = 'home';
     // the generators low: home with what there is
     if (s.reserve < 25 && s.cargo.length) mem.going = 'home';
     if (mem.going === 'home' || s.cargo.length >= cargoCap(s) || s.battery < homeNeed + 3) {
@@ -313,9 +318,9 @@ export function decide(s, mem) {
     s.__explore = saving;
     // with parts enough for what the workshop shows, a player wants depth: only ore on the way
     let cheapest = Infinity;
-    for (const r of ROWS) if (rowShown(s, r) && s.levels[r] < maxLevel(r)) cheapest = Math.min(cheapest, priceFor(r, s.levels[r]));
-    const near = saving ? 90 : s.parts >= cheapest * 1.5 && s.reserve > 60 && depthOf(s.y) < 1600 ? 1.2 : 6;
-    if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < near ? { x: tgt.x, y: tgt.y } : null; }
+    for (const r of ROWS) if (rowShown(s, r) && priceOf(s, r) !== null) cheapest = Math.min(cheapest, priceOf(s, r));
+    const near = saving ? 160 : s.parts >= cheapest * 1.5 && s.reserve > 60 && depthOf(s.y) < 1600 ? 1.2 : 6;
+    if (!tgt) { tgt = nearestWanted(s, saving ? 130 : 30); s.__explore = false; mem.target = tgt && tgt.cost < near ? { x: tgt.x, y: tgt.y } : null; }
     // a player who finds themself going up and down over the same spot gives up on that target for a while
     if (tgt && tgt.cost < near && (tgt.dir === 'up' || tgt.dir === 'down')) {
         mem.vh = (mem.vh || []).filter((h) => s.time - h[1] < 2);

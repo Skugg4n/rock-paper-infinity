@@ -61,6 +61,8 @@ export const FINDS = [
     { layer: 4, line: 'A vein. It runs down, toward something.' },
     { layer: 5, line: 'It moved when I touched it.' },
     { layer: 5, line: 'A tooth. Human.' },
+    // v1.92.4: rare, from the other reality: a free armour plate
+    { layer: 2, line: 'A plate from the other drone.', plate: true },
 ];
 /** What a find is worth, by layer: parts, and biomass in the flesh. */
 export const FIND_PARTS = [12, 30, 60, 100, 160, 0];

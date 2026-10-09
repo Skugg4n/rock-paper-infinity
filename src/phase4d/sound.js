@@ -57,9 +57,18 @@ export function createDigSound() {
             else if (e.type === 'bump') thump(0.25, 70);
             else if (e.type === 'gas' || e.type === 'cave') thump(1, 34);
             else if (e.type === 'magma-open' || e.type === 'roof') audio.knock();
-            else if (e.type === 'build' || e.type === 'wreck' || e.type === 'unloaded') audio.thunk();
+            else if (e.type === 'build' || e.type === 'wreck' || e.type === 'unloaded' || e.type === 'mend') audio.thunk();
+            else if (e.type === 'hit') thump(0.9, 44);
             else if (e.type === 'fit') audio.thunk();
             else if (e.type === 'heart') thump(1, 40);
+        },
+        /** EARLY WARNING: a soft beep. */
+        beep() {
+            const gr = node(); if (!gr || !audio.getPrefs().sfx) return;
+            const { ctx, sfxBus } = gr, t = ctx.currentTime;
+            const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880;
+            const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(0.08, t + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+            o.connect(e); e.connect(sfxBus); o.start(t); o.stop(t + 0.2);
         },
         /** Each frame: the depth in metres and the seconds since the last. */
         update(m, dt, ended) {

@@ -9,13 +9,14 @@
  */
 
 import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
-import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE, BUILD_S } from './dig.js';
+import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE, BUILD_S, PAINTS, maxHp, cargoCap } from './dig.js';
 import { spotOf, REPAIR_S } from './alarms.js';
 import { has, boosting, LAB_S } from './quantum.js';
 import { heatHold } from './hazards.js';
 import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
 
 export const TS = 32;
+const BEAT_HOLD = 2.6, BEAT_GLIDE = 2;
 export const RISE_S = 5;
 const CHUNK = 16;                          // rows of ground per cached canvas
 const KEEP_CHUNKS = 6;
@@ -114,6 +115,14 @@ export function createRenderer(canvas) {
         let mid = 0.42;
         // at the base: the whole base in view, the city faint at the top
         if (p.y < 0) { focusY = (CHAMBER_TOP + 1) / 2 + 0.3; mid = 0.45; }
+        // the death beat: on the dead drone, then a glide up the shaft to the workshop
+        const bt = view.beat;
+        if (bt) {
+            const home = (CHAMBER_TOP + 1) / 2 + 0.3;
+            const g = Math.max(0, Math.min(1, (bt.t - BEAT_HOLD) / (BEAT_GLIDE)));
+            const e = g * g * (3 - 2 * g);
+            focusY = bt.y + (home - bt.y) * e; mid = 0.5 + (0.45 - 0.5) * e;
+        }
         if (p.y >= 380) { focusY = HEART.cy - 0.5; mid = 0.5; }
         if (r.rising !== null) { focusY = riseY(); mid = 0.5; }
         else if (s.ended) {
@@ -128,7 +137,7 @@ export function createRenderer(canvas) {
         const want = Math.max(TOP_ROW * TS, Math.min((H + 6) * TS - vh * 0.5, focusY * TS - vh * mid));
         r.cam.y += (want - r.cam.y) * Math.min(1, dt * 6);
         if (Math.abs(want - r.cam.y) > vh && !(s.ended && r.ending > 2.6)) r.cam.y = want;
-        if ((s.ended && r.ending > 2.6) || r.rising !== null) r.cam.y = want;
+        if ((s.ended && r.ending > 2.6) || r.rising !== null || view.beat) r.cam.y = want;
         const camY = r.cam.y;
         const t = s.time;
         const deep = p.y * 5;                            // metres, roughly
@@ -254,7 +263,7 @@ export function createRenderer(canvas) {
             g.addColorStop(0, 'rgba(0,0,0,0)');
             g.addColorStop(1, `rgba(0,0,0,${(0.995 * under).toFixed(3)})`);
             ctx.fillStyle = g;
-            ctx.fillRect(-vw * 2, -vh * 2, vw * 4, vh * 4);
+            ctx.fillRect(-1e5, -1e5, 2e5, 2e5);
             ctx.restore();
             // MAPPING: what the lamp has lit stays as a dim mark in the dark
             if (s.levels.mapping > 0) {
@@ -341,21 +350,21 @@ export function createRenderer(canvas) {
             const wx = r.originX + w.x * TS + TS / 2;
             ctx.save(); ctx.translate(wx, wy);
             ctx.fillStyle = w.looted ? '#15181d' : '#1f242b'; roundRect(-19, -13, 38, 26, 8); ctx.fill();
-            ctx.fillStyle = '#2c323a'; roundRect(-13, -9, 26, 16, 3); ctx.fill();
+            // its paint, gone dull: the map remembers which drone died where
+            ctx.fillStyle = PAINTS[w.paint || 0] || '#2c323a'; ctx.globalAlpha = 0.45; roundRect(-13, -9, 26, 16, 3); ctx.fill(); ctx.globalAlpha = 1;
+            ctx.fillStyle = 'rgba(11,12,14,0.6)'; ctx.font = '600 9px "Bebas Neue", "Arial Narrow", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(String(w.n || ''), 0, 5); ctx.textAlign = 'left';
             ctx.fillStyle = '#3a3226'; ctx.fillRect(12, -6, 4, 4);
             if (!w.looted && w.cargo.length) { ctx.fillStyle = 'rgba(160,225,255,0.5)'; ctx.fillRect(-6, -12, 3, 3); ctx.fillRect(-1, -12, 3, 3); }
             ctx.restore();
         }
         // a new drone being built on the workshop's plate: a frame, then the parts, four seconds
         if (s.build > 0 && r.rising === null) {
+            // piece by piece: the frame, the tracks, the body and the drill, the lamp
             const k = 1 - s.build / BUILD_S;
-            ctx.strokeStyle = C.amber; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
-            ctx.strokeRect(dx - 22, dy - 16, 44, 32); ctx.setLineDash([]);
-            ctx.save(); ctx.globalAlpha = Math.min(1, k * 1.2);
-            ctx.beginPath(); ctx.rect(dx - 30, dy + 18 - 40 * k, 60, 40 * k + 10); ctx.clip();
-            drawDrone(s, dx, dy); ctx.restore();
-            if (Math.random() < 0.5) burst(dx + (Math.random() - 0.5) * 40, dy + 18 - 40 * k, '#ffd678', 1);
+            drawDrone(s, dx, dy, 1 + Math.floor(k * 4));
         }
+        // the arms swing down from the WORKSHOP's ceiling (a build, an upgrade)
+        if (r.armsAnim && groundY > -TS * 4) drawArms(dx, groundY, dt);
         if (r.rising === null && !s.lost && !(s.build > 0)) {
             // the BOOSTER is felt: a trail of the drone where it was, and speed lines
             if (boosting(s)) {
@@ -381,6 +390,20 @@ export function createRenderer(canvas) {
                 const k = Math.min(1, s.heat / heatHold(s.levels.hull));
                 ctx.fillStyle = '#0b0c0e'; ctx.fillRect(dx - 22, dy - 36, 44, 7);
                 ctx.fillStyle = k > 0.7 ? C.danger : '#ff9a3a'; ctx.fillRect(dx - 21, dy - 35, 42 * k, 5);
+            }
+        }
+        // the death beat: a flash, the lamp flickering out, the cause by the dead drone
+        if (view.beat) {
+            const b = view.beat, bx = r.originX + b.x * TS + TS / 2, by = b.y * TS + TS / 2 - camY;
+            if (b.t < 0.35) { ctx.fillStyle = `rgba(255,255,255,${(0.8 * (1 - b.t / 0.35)).toFixed(3)})`; ctx.beginPath(); ctx.arc(bx, by, 28, 0, Math.PI * 2); ctx.fill(); }
+            if (b.t < 1.4 && Math.random() < 0.5 - b.t / 3) { ctx.fillStyle = 'rgba(255,233,168,0.6)'; ctx.fillRect(bx + 14, by - 6, 5, 4); }
+            if (b.t > 0.5 && b.t < BEAT_HOLD + 0.8 && b.why) {
+                ctx.globalAlpha = Math.min(1, (b.t - 0.5) * 3, (BEAT_HOLD + 0.8 - b.t) * 3);
+                ctx.font = '600 26px "Bebas Neue", "Arial Narrow", sans-serif'; ctx.textAlign = 'center';
+                const tw = ctx.measureText(b.why).width + 24;
+                ctx.fillStyle = 'rgba(7,8,10,0.85)'; ctx.fillRect(bx - tw / 2, by - 74, tw, 34);
+                ctx.fillStyle = C.danger; ctx.fillText(b.why, bx, by - 48);
+                ctx.textAlign = 'left'; ctx.globalAlpha = 1;
             }
         }
         // a name over a tile (the first quantum object the lamp touches)
@@ -895,47 +918,68 @@ export function createRenderer(canvas) {
      * plates (HULL), a dish (GPS), a mast (RADIO), nozzles (BOOSTER), a second lamp below. GRAFT turns
      * it to flesh: a drill of bone, a body that heals in red patches, then skin with veins and tracks of sinew.
      */
-    function drawDrone(s, dx, dy) {
+    function drawDrone(s, dx, dy, stage = 9) {
         const g = s.grafts, L = s.levels, face = s.face || 1;
         const now = performance.now() / 1000;
         const digging = s.act && s.act.kind === 'dig';
         const moving = !!s.act;
-        const body = g >= 3 ? '#9a4452' : g === 2 ? '#b98a86' : '#b8c0c8';
+        // its paint (v1.92.4: each new drone a colour of the house), flesh after the grafts
+        const body = g >= 3 ? '#9a4452' : g === 2 ? '#b98a86' : PAINTS[s.paint || 0] || '#b8c0c8';
         const trackCol = g >= 3 ? '#5a1c26' : '#1b1f25';
         const tread = g >= 3 ? '#8a2c3a' : '#3a4350';
+        // EARLY WARNING: the lamp blinks amber
+        const warn = s.warnOn && Math.floor(now * 3) % 2 === 0;
+        const lampCol = warn ? '#ffb02e' : '#ffe9a8';
         ctx.save();
         ctx.translate(dx, dy);
         ctx.scale(1.12, 1.12);
-        // the lamp's beam forward, and with the SECOND LAMP one down
-        const beam = 46 + 16 * L.lamp;
-        const bg = ctx.createLinearGradient(face * 14, 0, face * (14 + beam), 0);
-        bg.addColorStop(0, 'rgba(255,240,200,0.20)'); bg.addColorStop(1, 'rgba(255,240,200,0)');
-        ctx.fillStyle = bg;
-        ctx.beginPath(); ctx.moveTo(face * 16, -5); ctx.lineTo(face * (16 + beam), -5 - beam * 0.35); ctx.lineTo(face * (16 + beam), -5 + beam * 0.35); ctx.fill();
-        if (has(s, 'lamp2')) {
-            const dg = ctx.createLinearGradient(0, 14, 0, 14 + beam);
-            dg.addColorStop(0, 'rgba(255,240,200,0.16)'); dg.addColorStop(1, 'rgba(255,240,200,0)');
-            ctx.fillStyle = dg;
-            ctx.beginPath(); ctx.moveTo(-4, 14); ctx.lineTo(-beam * 0.32, 14 + beam); ctx.lineTo(beam * 0.32, 14 + beam); ctx.fill();
+        if (stage >= 4) {
+            // the lamp's beam forward, and with the SECOND LAMP one down
+            const beam = 46 + 16 * L.lamp;
+            const bg = ctx.createLinearGradient(face * 14, 0, face * (14 + beam), 0);
+            bg.addColorStop(0, warn ? 'rgba(255,176,46,0.35)' : 'rgba(255,240,200,0.20)'); bg.addColorStop(1, 'rgba(255,240,200,0)');
+            ctx.fillStyle = bg;
+            ctx.beginPath(); ctx.moveTo(face * 16, -5); ctx.lineTo(face * (16 + beam), -5 - beam * 0.35); ctx.lineTo(face * (16 + beam), -5 + beam * 0.35); ctx.fill();
+            if (has(s, 'lamp2')) {
+                const dg = ctx.createLinearGradient(0, 14, 0, 14 + beam);
+                dg.addColorStop(0, 'rgba(255,240,200,0.16)'); dg.addColorStop(1, 'rgba(255,240,200,0)');
+                ctx.fillStyle = dg;
+                ctx.beginPath(); ctx.moveTo(-4, 14); ctx.lineTo(-beam * 0.32, 14 + beam); ctx.lineTo(beam * 0.32, 14 + beam); ctx.fill();
+            }
+            // the booster's flame
+            if (has(s, 'booster') && boosting(s)) {
+                ctx.fillStyle = `rgba(143,208,255,${(0.5 + 0.4 * Math.sin(now * 40)).toFixed(3)})`;
+                ctx.beginPath(); ctx.moveTo(-face * 20, -6); ctx.lineTo(-face * (34 + 6 * Math.sin(now * 33)), -2); ctx.lineTo(-face * 20, 2); ctx.fill();
+            }
         }
-        // the booster's flame
-        if (has(s, 'booster') && boosting(s)) {
-            ctx.fillStyle = `rgba(143,208,255,${(0.5 + 0.4 * Math.sin(now * 40)).toFixed(3)})`;
-            ctx.beginPath(); ctx.moveTo(-face * 20, -6); ctx.lineTo(-face * (34 + 6 * Math.sin(now * 33)), -2); ctx.lineTo(-face * 20, 2); ctx.fill();
+        // the frame (the first thing the arms set down), then the tracks all round
+        if (stage <= 1) {
+            ctx.strokeStyle = '#8fa1b6'; ctx.lineWidth = 1.5;
+            roundRect(-21, -15, 42, 30, 9); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
+            ctx.restore();
+            return;
         }
-        // the tracks all round: a loop with treads that run when it moves
         ctx.fillStyle = trackCol;
         roundRect(-21, -15, 42, 30, 9); ctx.fill();
         const off = moving ? (now * 30) % 6 : 0;
         ctx.fillStyle = tread;
         for (let k = -18 + off; k < 18; k += 6) { ctx.fillRect(k, -15, 3, 2); ctx.fillRect(k, 13, 3, 2); }
         for (let k = -11 + off; k < 11; k += 6) { ctx.fillRect(-21, k, 2, 3); ctx.fillRect(19, k, 2, 3); }
-        // armour plates, one a HULL level
-        ctx.fillStyle = g >= 3 ? '#6e2a33' : '#5c6673';
-        for (let k = 0; k < L.hull; k++) { ctx.fillRect(-19 + k * 7, 9, 5, 4); ctx.fillRect(14 - k * 7, 9, 5, 4); }
-        // the body
+        if (stage <= 2) { ctx.strokeStyle = '#8fa1b6'; ctx.lineWidth = 1; roundRect(-15, -10, 30, 19, 4); ctx.stroke(); ctx.restore(); return; }
+        // the body, in its paint, its number stencilled
         ctx.fillStyle = body;
         roundRect(-15, -10, 30, 19, 4); ctx.fill();
+        if (g < 2) {
+            ctx.fillStyle = 'rgba(11,12,14,0.55)'; ctx.font = '600 9px "Bebas Neue", "Arial Narrow", sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(String(s.droneN || 1), face > 0 ? -7 : 7, 6); ctx.textAlign = 'left';
+        }
+        // armour: a plate a hit point, a dent for each one lost
+        const hp = s.hp ?? 1, mh = maxHp(s);
+        ctx.fillStyle = g >= 3 ? '#6e2a33' : '#5c6673';
+        for (let k = 0; k < hp; k++) { ctx.fillRect(-14 + k * 7, 4, 5, 4); ctx.fillStyle = g >= 3 ? '#6e2a33' : '#5c6673'; }
+        ctx.strokeStyle = 'rgba(11,12,14,0.7)'; ctx.lineWidth = 1.2;
+        for (let k = hp; k < mh; k++) { ctx.beginPath(); ctx.arc(-11 + k * 7, 6, 2.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
         if (g >= 2) {
             // patches that heal, red, breathing
             ctx.fillStyle = `rgba(168,19,44,${(0.45 + 0.2 * Math.sin(now * 3.3)).toFixed(3)})`;
@@ -947,7 +991,6 @@ export function createRenderer(canvas) {
             ctx.beginPath(); ctx.moveTo(-14, -4); ctx.bezierCurveTo(-6, -11, 4, 6, 14, -6); ctx.moveTo(-10, 7); ctx.bezierCurveTo(-2, 1, 6, 9, 12, 4); ctx.stroke();
         }
         // the cargo hold on top, wider with each CARGO level; its hatch opens at the warehouse
-        // the hatch stays open a moment after the last piece is out
         const inStore = s.y === -1 && s.x >= ROOMS.warehouse[0] && s.x <= ROOMS.warehouse[1];
         if (inStore && s.cargo.length) r.hatchUntil = now + 1.2;
         const hw = 12 + 3 * L.cargo, open = inStore && now < (r.hatchUntil || 0);
@@ -958,20 +1001,21 @@ export function createRenderer(canvas) {
         ctx.rotate(open ? -1.1 - 0.1 * Math.sin(now * 8) : 0);
         ctx.fillStyle = g >= 3 ? '#9a4452' : '#9aa4b0'; ctx.fillRect(0, -2, hw, 3);
         ctx.restore();
-        if (open && s.cargo.length) { ctx.fillStyle = '#9fd8e8'; ctx.fillRect(-hw / 2, -14 - 3 - (now * 20) % 6, 3, 3); }
         // the window
         ctx.fillStyle = g >= 2 ? '#7a2030' : '#2a3442';
         ctx.fillRect(face > 0 ? 2 : -10, -7, 8, 6);
         ctx.fillStyle = 'rgba(143,208,255,0.6)'; ctx.fillRect(face > 0 ? 3 : -9, -6, 3, 2);
-        // the lamp, bigger with each LAMP level
-        ctx.fillStyle = '#ffe9a8';
-        const lw = 3 + L.lamp;
-        ctx.fillRect(face > 0 ? 14 : -14 - lw, -7, lw, 5);
-        if (has(s, 'lamp2')) ctx.fillRect(-3, 9, 6, 3);
-        // the GPS dish, the radio's mast, the booster's nozzles
-        if (L.gps > 0) { ctx.strokeStyle = '#d5dbe3'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(9, -17, 4 + L.gps, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.fillRect(8.5, -17, 1, 3); }
-        if (L.radio > 0) { ctx.strokeStyle = '#8fa1b6'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-12, -14); ctx.lineTo(-14, -26); ctx.stroke(); ctx.fillStyle = Math.floor(now * 2) % 2 ? '#ff6b5a' : '#4a1a16'; ctx.fillRect(-15, -28, 3, 3); }
-        if (has(s, 'booster')) { ctx.fillStyle = '#3a4350'; ctx.fillRect(face > 0 ? -21 : 17, -8, 4, 4); ctx.fillRect(face > 0 ? -21 : 17, -2, 4, 4); }
+        if (stage >= 4) {
+            // the lamp, bigger with each LAMP level
+            ctx.fillStyle = lampCol;
+            const lw = 3 + L.lamp;
+            ctx.fillRect(face > 0 ? 14 : -14 - lw, -7, lw, 5);
+            if (has(s, 'lamp2')) ctx.fillRect(-3, 9, 6, 3);
+            // the GPS dish, the radio's mast, the booster's nozzles
+            if (L.gps > 0) { ctx.strokeStyle = '#d5dbe3'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(9, -17, 4 + L.gps, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.fillRect(8.5, -17, 1, 3); }
+            if (L.radio > 0) { ctx.strokeStyle = '#8fa1b6'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-12, -14); ctx.lineTo(-14, -26); ctx.stroke(); ctx.fillStyle = Math.floor(now * 2) % 2 ? '#ff6b5a' : '#4a1a16'; ctx.fillRect(-15, -28, 3, 3); }
+            if (has(s, 'booster')) { ctx.fillStyle = '#3a4350'; ctx.fillRect(face > 0 ? -21 : 17, -8, 4, 4); ctx.fillRect(face > 0 ? -21 : 17, -2, 4, 4); }
+        }
         // the drill, on its arm toward the dig; it spins while it bites; bone after the first graft
         const dir = digging ? { x: s.act.tx - s.x, y: s.act.ty - s.y } : (s.act && s.act.kind === 'fall') ? { x: 0, y: 1 } : { x: face, y: 0 };
         const ang = Math.atan2(dir.y, dir.x);
@@ -982,7 +1026,6 @@ export function createRenderer(canvas) {
         if (digging) ctx.translate(Math.sin(now * 70) * 0.8, 0);
         ctx.fillStyle = g >= 1 ? '#e8dcc8' : '#7d8794';
         ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(len, 0); ctx.lineTo(0, 6); ctx.closePath(); ctx.fill();
-        // the spiral grooves run when it bites
         ctx.strokeStyle = g >= 1 ? 'rgba(120,90,70,0.8)' : 'rgba(30,36,44,0.8)'; ctx.lineWidth = 1.2;
         const ph = digging ? (now * 24) % 1 : 0;
         for (let k = 0; k < 3; k++) {
@@ -990,7 +1033,46 @@ export function createRenderer(canvas) {
             ctx.beginPath(); ctx.moveTo(u, -hh); ctx.lineTo(u + 2, hh); ctx.stroke();
         }
         ctx.restore();
+        // the cargo gauge on its side: a cell a piece, in the ore's colour; full, it blinks once
+        if (stage >= 4) {
+            const cap = cargoCap(s), cols = Math.ceil(cap / 6), rows = Math.ceil(cap / cols), pitch = 4.2;
+            const gx = face > 0 ? -22 - cols * pitch - 1 : 23, gy = -rows * pitch / 2;
+            const flash = now < (r.fullUntil || 0);
+            ctx.fillStyle = 'rgba(11,12,14,0.8)'; ctx.fillRect(gx - 1, gy - 1, cols * pitch + 1, rows * pitch + 1);
+            for (let i = 0; i < cap; i++) {
+                const t = s.cargo[i];
+                ctx.fillStyle = flash ? '#ffffff' : t ? (ORE_COL[t] || '#ccc') : '#2a313b';
+                ctx.fillRect(gx + (i % cols) * pitch, gy + Math.floor(i / cols) * pitch, pitch - 1, pitch - 1);
+            }
+        }
+        // a hit: a white flash over it
+        if (now < (r.hitUntil || 0)) { ctx.fillStyle = `rgba(255,255,255,${((r.hitUntil - now) / 0.3).toFixed(3)})`; roundRect(-22, -16, 44, 32, 9); ctx.fill(); }
         ctx.restore();
+    }
+    /** The WORKSHOP's arms: they swing down from the ceiling to the drone, sparks and a weld flash; building, four seconds. */
+    function drawArms(x0, floorY, dt) {
+        const a = r.armsAnim;
+        if (!a) return;
+        a.t += dt;
+        if (a.t >= a.dur) { r.armsAnim = null; return; }
+        const ceil = floorY - 3 * TS + 8;
+        const k = a.t / a.dur, swing = Math.sin(Math.min(1, a.t / 0.4) * Math.PI / 2) * (1 - Math.max(0, (a.t - a.dur + 0.4) / 0.4));
+        for (const side of [-1, 1]) {
+            const bx = x0 + side * 34, by = ceil;
+            const ex = x0 + side * (14 + 4 * Math.sin(a.t * 9 + side)), ey = floorY - 18 - 8 * Math.sin(a.t * 6 + side * 2);
+            const mx = bx + (ex - bx) * 0.5 + side * 12, my = by + (ey - by) * 0.45 * swing;
+            const tx = bx + (ex - bx) * swing, ty = by + (ey - by) * swing;
+            ctx.strokeStyle = '#5c6673'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+            ctx.fillStyle = '#8fa1b6'; ctx.beginPath(); ctx.arc(mx, my, 3, 0, Math.PI * 2); ctx.fill();
+            // the tool: a bolt spun in, then a weld
+            ctx.save(); ctx.translate(tx, ty); ctx.rotate(a.t * 20 * side); ctx.fillStyle = '#d5dbe3'; ctx.fillRect(-3, -1, 6, 2); ctx.restore();
+            if (swing > 0.8 && Math.random() < 0.5) burst(tx, ty, '#ffd678', 1);
+            if (swing > 0.8 && Math.floor((a.t + side) * 3) % 2 === 0 && (a.t * 7) % 1 < 0.25) {
+                ctx.fillStyle = 'rgba(220,240,255,0.85)'; ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        void k;
     }
     function roundRect(x, y, w, h, r0) {
         ctx.beginPath();
@@ -1019,5 +1101,9 @@ export function createRenderer(canvas) {
         }
     }
 
-    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, worldWidth: W * TS };
+    /** The arms in the WORKSHOP: a new drone (four seconds) or an upgrade fitted (1.3 s). */
+    function arms(kind) { r.armsAnim = { kind, t: 0, dur: kind === 'build' ? BUILD_S : 1.3 }; }
+    function hitFlash() { r.hitUntil = performance.now() / 1000 + 0.3; }
+    function fullFlash() { r.fullUntil = performance.now() / 1000 + 0.35; }
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, arms, hitFlash, fullFlash, worldWidth: W * TS };
 }

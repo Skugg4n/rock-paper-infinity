@@ -2,9 +2,11 @@
 //   node scripts/sim-dig.mjs [--minutes 40] [--seed 7] [--careless] [--noradio] [--reckless]
 // --careless: a player who does not mend what fails at the base (and has no radio)
 // --reckless: the old careless one, who ignores the way home half the time
+// --unlucky: buys the wrong things first (MAPPING, GPS, LAMP...), and loses three drones just before
+//            delivering a full cargo; must still pass every wall (the run fails if it is stuck for good)
 // One line a minute: minute, depth record, parts, upgrades, sleepers, colony %; then the moments.
 // Time is the player's: the game's clock plus the seconds spent reading stops (the game is paused then).
-import { newState, step, sleepers, ROWS, stopOpen, buildDrone } from '../src/phase4d/dig.js';
+import { newState, step, sleepers, ROWS, stopOpen, buildDrone, nextWall, cargoCap } from '../src/phase4d/dig.js';
 import { decide, readStop } from '../src/phase4d/autopilot.js';
 import { depthOf } from '../src/phase4d/world.js';
 
@@ -12,6 +14,9 @@ const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? Number
 const MIN = arg('--minutes', 40);
 const careless = process.argv.includes('--reckless');
 const mem = {};
+const unlucky = process.argv.includes('--unlucky');
+if (unlucky) mem.wrongFirst = true;
+let forced = 0;
 if (process.argv.includes('--careless')) { mem.noRepair = true; process.argv.push('--noradio'); }
 // --noradio: a player who never buys the SHORT WAVE RADIO (hears of failures only at home)
 const noradio = process.argv.includes('--noradio');
@@ -31,6 +36,7 @@ const gaps = [];
 const ups = () => ROWS.reduce((a, r) => a + s.levels[r], 0) + s.grafts;
 const uses = { boost: 0, teleport: 0, shock: 0 };
 const lostWhy = {};
+let wallAt = null, wallRow = null, longestWall = 0;
 let lowGen = 100, under50 = 0, wasUnder = false;
 console.log(' min  record   parts  bio  upgr  sleepers  colony  deaths');
 for (let next = 60; wall() < MIN * 60 && !s.ended;) {
@@ -39,6 +45,8 @@ for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     if (s.lost) { read += 2; buildDrone(s); continue; }
     const before = ups();
     if (noradio && s.tut) s.tut.rows = s.tut.rows.filter((r) => r !== 'radio');
+    // the unlucky player: a full cargo, almost home, and the drone is lost (three times)
+    if (unlucky && forced < 3 && s.cargo.length >= cargoCap(s) && s.y >= 0 && s.y <= 3 && s.dives > 2) { forced++; s.battery = 0.0001; }
     if (nosteer && s.tut) s.tut.rows = s.tut.rows.filter((r) => r !== 'steering');
     step(s, DT, { decide: (st) => {
         let { dir } = decide(st, mem);
@@ -62,6 +70,10 @@ for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     }
     s.events.length = 0;
     if (s.drainFrom != null && s.time > s.drainFrom) { lowGen = Math.min(lowGen, s.reserve); if (s.reserve < 50 && !wasUnder) under50++; wasUnder = s.reserve < 50; }
+    // in front of a wall: how long until it is passed
+    const wl = nextWall(s);
+    if (wl && s.record >= wl.row - 3) { if (wallRow !== wl.row) { wallRow = wl.row; wallAt = wall(); } }
+    else if (wallRow !== null) { longestWall = Math.max(longestWall, wall() - wallAt); mark(`wall at ${depthOf(wallRow)} m passed after ${Math.round(wall() - wallAt)} s`); wallRow = null; }
     if (ups() > before) { if (!firstUp) { firstUp = true; mark('first upgrade'); } }
     if (s.record > lastRecord) { if (Math.floor(depthOf(s.record) / 25) > Math.floor(depthOf(lastRecord) / 25)) { gaps.push(s.time - lastRecordAt); lastRecordAt = s.time; } lastRecord = s.record; }
     if (wall() >= next) {
@@ -80,4 +92,7 @@ console.log(`used: ${JSON.stringify(uses)}`);
 console.log(`generators: lowest ${Math.round(lowGen)} %, under 50 % ${under50} times`);
 console.log(`drones lost: ${s.deaths} ${JSON.stringify(lostWhy)}`);
 console.log(`chambers: ${s.alarms.n} failures, ${s.alarms.lost} sleepers lost to them`);
+const stuckNow = wallRow !== null ? wall() - wallAt : 0;
+console.log(`walls: longest wait in front of one ${Math.round(Math.max(longestWall, stuckNow))} s${stuckNow ? ` (still stuck at ${depthOf(wallRow)} m for ${Math.round(stuckNow)} s)` : ''}`);
 console.log(`end at ${(wall() / 60).toFixed(1)} min, levels ${JSON.stringify(s.levels)} grafts ${s.grafts}, finds ${s.found.length}/12, sleepers ${sleepers(s)}, longest wait for a new 25 m: ${Math.round(Math.max(...gaps))} s`);
+if (stuckNow > 600 || (!s.ended && wallRow !== null && stuckNow > 300)) { console.log('STUCK FOR GOOD'); process.exitCode = 1; }

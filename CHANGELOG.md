@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.92.4 - 2026-10-09 (chapter IV, the dig: armour, a fill gauge, a crane that builds)
+
+Ola's notes after v1.92.3.
+- **UPWARD DRILL comes later.** At first the drone cannot dig up at all; the row comes after it has bumped three times into ore, a find or a quantum object it could see right above. I: ore, finds, quantum objects; II: soft rock; III: anything, as fast as down (40, 80, 160). A drone sealed in (hardened magma, a fallen roof) always claws its way up, slowly, whatever its drill.
+- **Stops stay until they are answered.** Only OK, Enter or Space close one (the "Dig." stop also down, which is what it asks), never a click elsewhere, and never in its first 0.8 s.
+- **The cargo gauge on the drone:** a grid of cells on its side, a cell a piece in the ore's colour (8 cells, more with CARGO); full, it blinks once. The panel's CARGO stays.
+- **The WORKSHOP's arms.** A new drone is assembled on the plate piece by piece over 4 s (the frame, the tracks, the body and drill, the lamp) while two arms swing down from the ceiling with sparks, a spun bolt and weld flashes; every upgrade, fitting or mending is a short arm visit (1.3 s).
+- **Each new drone its own paint** (rust orange, oxide green, signal yellow, steel blue, chalk white; never the last one's) and its number stencilled on it. Wrecks keep their colour and number.
+- **ARMOUR.** The drone has one plate; ARMOUR I and II (40, 120 parts) add one each, and a rare find in the old rock, "A plate from the other drone. It fits.", one more (three at most). A gas burst, a falling roof, or the magma past the heat bar takes a plate: a white flash and a dent on the drone; with none left the drone is lost. MEND PLATES in the workshop (6 parts a plate). Plates on the drone and ARMOUR in the panel. The row comes when a hazard is first seen or first hits.
+- **EARLY WARNING** (30 parts, the row after the first delivery): at the turn-back point plus a margin the drone's lamp blinks amber, a soft beep repeats, and "Turn back now." once a dive. Without it, only the home mark on the POWER bar.
+- **STEERING III: HOVER** (70 parts): "Hover. One tap, one tile. The drone holds still between taps." Every press is one tile (up too), the drone hovers in open space when no key is held (a little power), a held key repeats about four times a second (a long vertical hold speeds up after 1.5 s so the way home is no crawl). Offered once the drone has died to a hazard, been hit by one, or touched the magma. With STEERING II a tap up is exactly one tile.
+- **The death is a beat.** The world runs at a fifth for 1.5 s, the drone flashes and its lamp flickers out; a hold on the grey wreck with the cause big beside it ("Magma. The hull melted."); then the camera glides up the shaft to the WORKSHOP (2 s); nothing takes input meanwhile, and only then the stop. A lost drone has no battery and the base's news waits for the new one.
+- **Never stuck.** Ore grows back above the next wall each time the drone is home (three tiles beside open ground near the shaft, worth more deeper), the city's rubble gives a part now and then (five a dive), a new drone never takes the parts the next wall's upgrade still needs, a stopped generator is mended for what there is, and after 150 s in front of a wall its upgrade costs what the player has. Repairs cost 8 + 1 a 40 m (was 10 + 1 a 20 m). Top prices lower: DRILL III 320, CARGO III 260, LAMP III 220, HULL III 320.
+- **Sim** (`node scripts/sim-dig.mjs`): the heart at 28.5 / 29.0 / 25.0 / 25.6 min (seeds 7 / 11 / 3 / 5), no drones and no sleepers lost by the careful player, longest wait in front of a wall 160 s. New `--unlucky` player (buys MAPPING, GPS, LAMP first, loses three drones just before delivering a full cargo): passes every wall, longest wait 147 s, heart at 20 to 30 min; the run fails (exit 1) if it is stuck for good. Headless: `node scripts/play-dig.mjs --v1924`.
+
 ## v1.92.3 - 2026-10-09 (chapter IV, the dig: why the drone died, a base with teeth, into chapter V)
 
 After the second independent test of pass 3 (docs/playtests/2026-10-09-dig-human-test-4.md, NÄSTAN).

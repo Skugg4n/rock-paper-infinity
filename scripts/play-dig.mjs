@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923'].some((a) => process.argv.includes(a));
+const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924'].some((a) => process.argv.includes(a));
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +103,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923'].some((a) => process.argv.includes(a))) {
+    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924'].some((a) => process.argv.includes(a))) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -236,6 +236,43 @@ try {
         const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
         const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
         fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
+    }
+    if (process.argv.includes('--v1924')) {
+        // v1.92.4: stops that stay, the cargo gauge, armour, the warning, the death beat, the arms
+        await jump('iv-dig-start');
+        for (let i = 0; i < 30 && (await st('s.tut.stop && s.tut.stop.id')) === 'arrive'; i++) await sleep(500);
+        await sleep(200);
+        await click(700, 600);                              // a click elsewhere: the stop stays
+        await key('Enter');                                 // too soon (under 0.8 s): it stays
+        const still = await st('s.tut.stop && s.tut.stop.id');
+        await sleep(900);
+        await key('Enter');
+        console.log('stop after a click and an early Enter:', still, '| after a late Enter:', await st('s.tut.stop && s.tut.stop.id'));
+        await jump('iv-dig-war');
+        await ev(`(() => { const s = window.rpiDig.state; s.cargo = [8, 8, 9, 10, 9, 8, 8]; s.levels.armour = 1; s.hp = 1; s.levels.warning = 1; s.battery = 12; return true; })()`);
+        await sleep(900);
+        const d = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
+        const z = await send('Page.captureScreenshot', { format: 'png', clip: { x: d.x - 120, y: d.y - 90, width: 240, height: 150, scale: 3 } });
+        fs.writeFileSync(path.join(SHOTS, 'p3-70-drone-gauge-warning-dent.png'), Buffer.from(z.result.data, 'base64'));
+        await shot('p3-71-warning');
+        // the death beat
+        await ev(`(() => { const s = window.rpiDig.state; s.levels.warning = 0; s.hp = 1; s.lava[s.y * 24 + s.x] = 0; s.heat = 99; return true; })()`);
+        await sleep(400);
+        await shot('p3-72-beat-slow');
+        await sleep(1500);
+        await shot('p3-73-beat-cause');
+        await sleep(1500);
+        await shot('p3-74-beat-glide');
+        await sleep(2000);
+        await shot('p3-75-beat-workshop-stop');
+        await key('Enter');
+        await sleep(300);
+        await key('Enter');                                  // BUILD A DRONE (the chosen row)
+        await sleep(1600);
+        await shot('p3-76-arms-build');
+        await sleep(3000);
+        await shot('p3-77-new-paint');
+        console.log('drone', await st('s.droneN'), 'paint', await st('s.paint'), 'wrecks', await st('s.wrecks.length'));
     }
     if (process.argv.includes('--v1923')) {
         // v1.92.3: why the drone died, a base with teeth, into chapter V

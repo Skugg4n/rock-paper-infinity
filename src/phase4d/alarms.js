@@ -19,7 +19,7 @@ export const KILL = 10;
 /** Seconds to answer a failure, by the deepest the drone has been (metres). */
 export const failWindow = (m) => Math.round(75 + 0.03 * m);
 /** Parts a repair costs, by the deepest the drone has been. */
-export const repairCost = (m) => 10 + Math.round(m / 20);
+export const repairCost = (m) => 8 + Math.round(m / 40);
 /** The next failure after this one, seconds: two to five minutes, closer together deep down. */
 export const failGap = (u, m) => (FAIL_MIN + (FAIL_MAX - FAIL_MIN) * u) * (1 - 0.35 * Math.min(1, m / 1500));
 
@@ -112,7 +112,8 @@ export function stepAlarms(s, dt, io) {
     const here = io.home && !s.act ? failureAt(al, s.x) : null;
     if (!here) { al.repair = null; return; }
     const f = al.list.find((q) => q.id === here);
-    const cost = f ? (f.cost ?? repairCost(io.recordM)) : (al.genCost ?? repairCost(io.recordM));
+    // a stopped generator never locks the game: it is mended for what there is (never more)
+    const cost = f ? (f.cost ?? repairCost(io.recordM)) : Math.min(al.genCost ?? repairCost(io.recordM), s.parts);
     if (s.parts < cost) { al.repair = null; io.say(ALARM_LINES.short(cost), 'gate'); return; }
     if (!al.repair || al.repair.id !== here) al.repair = { id: here, t: 0 };
     al.repair.t += dt;

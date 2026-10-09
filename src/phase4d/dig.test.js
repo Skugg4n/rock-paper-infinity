@@ -3,7 +3,7 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
-    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, LOST_WHY, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
+    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, LOST_WHY, maxHp, mendPlates, PAINTS, priceOf, STUCK_S, isOre, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
 } from './dig.js';
 import { CAVE_WARN, LAVA_STEP, heatHold } from './hazards.js';
 import { qOrder, has, LAB_S, Q_LINES } from './quantum.js';
@@ -37,7 +37,7 @@ describe('the world', () => {
             expect(w.tiles[BASALT_BAND[0] * W + x]).toBe(T.BASALT);
             expect(w.tiles[SINEW_BAND[0] * W + x]).toBe(T.SINEW);
         }
-        expect(Object.keys(w.finds)).toHaveLength(12);
+        expect(Object.keys(w.finds)).toHaveLength(13);
         expect(Array.from(w.tiles).filter((t) => t === T.HEART).length).toBeGreaterThan(4);
     });
 });
@@ -101,6 +101,8 @@ describe('the rules', () => {
         expect(s.wrecks).toHaveLength(1);
         expect(s.wrecks[0].cargo).toHaveLength(4);
         expect(s.reserve).toBe(50);
+        expect(stopOpen(s)).toBe(false);                   // first the beat on the screen
+        for (let i = 0; i < 120 && !stopOpen(s); i++) step(s, 0.05, {});
         expect(s.tut.stop.text).toEqual(['The battery ran out.', 'The drone is lost. Build another.']);
         closeStop(s);
         const y0 = s.y;
@@ -123,13 +125,19 @@ describe('the rules', () => {
         s.parts = 100;
         for (const [n, want] of [[1, 0], [3, 0], [4, 10], [5, 15], [6, 20]]) { s.lostCount = n; expect(buildPrice(s)).toBe(want); }
         s.parts = 7; s.lostCount = 6;
+        expect(buildPrice(s)).toBe(0);                        // the wall's DRILL still needs them
+        s.levels.drill = 1; s.levels.hull = 1; s.levels.drill = 2; s.levels.hull = 3;
         expect(buildPrice(s)).toBe(7);
     });
-    test('once a dive, when the battery is just enough to fly home: Turn back.', () => {
+    test('EARLY WARNING: at the turn-back point (plus a margin) "Turn back now." once a dive; without it no line', () => {
         const s = preparedState({ row: 30 });
         s.y = 30; s.battery = 8;
         step(s, 0.05, {});
-        expect(s.line.text).toBe('Turn back. Just enough power to fly home.');
+        expect(s.line.kind).not.toBe('turnback');
+        s.levels.warning = 1;
+        step(s, 0.05, {});
+        expect(s.line.text).toBe('Turn back now.');
+        expect(s.warnOn).toBe(true);
     });
     test('up into rock: a bump, no words (the CRT is not spammed)', () => {
         const s = preparedState({ row: 10 });
@@ -149,7 +157,7 @@ describe('the rules', () => {
         const s = preparedState({ row: 10 });
         s.y = 10;
         s.tiles[11 * W + HOME_X] = T.AIR; s.tiles[12 * W + HOME_X] = T.AIR;   // open below
-        s.tiles[9 * W + HOME_X] = T.STONE;                                    // a ledge above
+        s.tiles[9 * W + HOME_X] = T.HARD;                                     // a ledge above (too hard to dig)
         const b0 = s.battery;
         const ys = new Set();
         for (let i = 0; i < 40; i++) { step(s, 0.05, { dir: 'up' }); ys.add(s.y); }
@@ -158,7 +166,7 @@ describe('the rules', () => {
     });
     test('ore right above a tunnel can be dug from below', () => {
         const s = preparedState({ row: 10 });
-        s.y = 10; s.tiles[9 * W + HOME_X] = T.ROCK;
+        s.y = 10; s.tiles[9 * W + HOME_X] = T.ROCK; s.levels.updrill = 1;
         for (let i = 0; i < 12; i++) step(s, 0.05, { dir: 'up' });
         expect(s.cargo).toContain(T.ROCK);
     });
@@ -173,7 +181,7 @@ describe('the rules', () => {
     });
     test('the turn-back line is on only while it is true', () => {
         const s = preparedState({ row: 30 });
-        s.y = 30; s.battery = 8;
+        s.y = 30; s.battery = 8; s.levels.warning = 1;
         step(s, 0.05, {});
         expect(s.line.kind).toBe('turnback');
         s.battery = 200; s.levels.battery = 3;
@@ -657,12 +665,44 @@ describe('v1.92.2: hazards, lost drones, ore and parts', () => {
         expect(s.lost).toBe(true);                         // stayed under it
         expect(s.tiles[80 * W + 4]).toBe(T.STONE);
     });
-    test('UPWARD DRILL: I ore only, II soft rock, III anything as fast as down', () => {
+    test('UPWARD DRILL comes later: none at first; I ore only, II soft rock, III anything as fast as down', () => {
         const s = started();
-        expect(canDigUp(s, T.ROCK)).toBe(true);
-        expect(canDigUp(s, T.STONE)).toBe(false);
-        s.levels.updrill = 1; expect(canDigUp(s, T.STONE)).toBe(true); expect(canDigUp(s, T.HARD)).toBe(false);
-        s.levels.updrill = 2; expect(canDigUp(s, T.HARD)).toBe(true);
+        expect(canDigUp(s, T.ROCK)).toBe(false);
+        s.levels.updrill = 1; expect(canDigUp(s, T.ROCK)).toBe(true); expect(canDigUp(s, T.STONE)).toBe(false);
+        s.levels.updrill = 2; expect(canDigUp(s, T.STONE)).toBe(true); expect(canDigUp(s, T.HARD)).toBe(false);
+        s.levels.updrill = 3; expect(canDigUp(s, T.HARD)).toBe(true);
+    });
+    test('UPWARD DRILL is offered after bumping into ore above three times', () => {
+        const s = preparedState({ row: 10 });
+        s.tut.rows = ['battery']; s.tut.needs = [];
+        s.y = 10; s.x = HOME_X + 1; s.tiles[10 * W + HOME_X + 1] = T.AIR; s.tiles[11 * W + HOME_X + 1] = T.STONE; s.tiles[9 * W + HOME_X + 1] = T.ROCK;
+        for (let k = 0; k < 3; k++) { s.bumpAt = -9; s.pressSteps = 0; step(s, 0.05, { dir: 'up' }); }
+        expect(s.tut.needs).toContain('updrill');
+    });
+    test('ARMOUR: one plate; a hit costs one (a flash, a dent); at none the drone is lost; mended at the workshop', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.x = HOME_X; s.levels.armour = 1; s.hp = maxHp(s); s.levels.battery = 3; s.battery = batteryCap(s);
+        expect(s.hp).toBe(2);
+        s.tiles[31 * W + HOME_X] = T.GAS;
+        run(s, 20, { dir: 'down' });
+        expect(s.hp).toBe(1);
+        expect(s.lost).toBe(false);
+        s.y = -1; s.x = roomSpot('workshop'); s.parts = 50;
+        expect(mendPlates(s)).toBe(true);
+        expect(s.hp).toBe(2);
+        const t = preparedState({ row: 30 });
+        t.y = 30; t.x = HOME_X; t.tiles[31 * W + HOME_X] = T.GAS;
+        run(t, 20, { dir: 'down' });
+        expect(t.lost).toBe(true);
+    });
+    test('a new drone gets new paint (never the last one\'s) and its number; the wreck keeps its colour', () => {
+        const s = preparedState({ row: 10 });
+        s.y = 10; s.battery = 0.01;
+        run(s, 3, { dir: 'left' });
+        expect(s.wrecks[0].paint).toBe(0);
+        buildDrone(s);
+        expect(s.paint).not.toBe(0);
+        expect(PAINTS[s.paint]).toBeDefined();
     });
     test('the generator is built up at the GENERATOR from the war on; each level burns 30 % less', () => {
         const s = started();
@@ -725,5 +765,59 @@ describe('v1.92.3: why the drone died, a base with teeth', () => {
     });
     test('the alarm shows the price', () => {
         expect(ALARM_LINES.tag('c2', 40, 12)).toBe('CHAMBER 3 · 40 s · 12 PARTS');
+    });
+});
+
+describe('v1.92.4: STEERING III, pacing, trapped', () => {
+    test('STEERING III (HOVER): offered after a hazard; one tap one tile; the drone holds still in open space; held, about four a second', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.x = HOME_X;
+        expect(priceOf(s, 'steering')).toBeNull();          // not before a hazard
+        s.hoverOffer = true;
+        expect(priceOf(s, 'steering')).toBe(70);
+        s.levels.steering = 2;
+        for (let y = 20; y <= 40; y++) s.tiles[y * W + HOME_X] = T.AIR;
+        run(s, 20);
+        expect(s.y).toBe(30);                                // hovers, no fall
+        run(s, 1, { dir: 'up' }); run(s, 10);
+        expect(s.y).toBe(29);                                // one tap, one tile
+        const y0 = s.y;
+        run(s, 20, { dir: 'down' });                         // held 1 s: about four
+        expect(s.y - y0).toBeGreaterThanOrEqual(3);
+        expect(s.y - y0).toBeLessThanOrEqual(5);
+    });
+    test('STEERING II: a tap up is exactly one tile', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.x = HOME_X;
+        run(s, 3, { dir: 'up' });                            // a 0.15 s press
+        run(s, 4);
+        expect(s.y).toBe(29);
+    });
+    test('sealed in: the drone claws its way up through anything (slowly), whatever its drill', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.x = HOME_X;
+        s.tiles[29 * W + HOME_X] = T.STONE; s.tiles[31 * W + HOME_X] = T.STONE;
+        for (const dx of [-1, 1]) s.tiles[30 * W + HOME_X + dx] = T.STONE;
+        run(s, 40, { dir: 'up' });
+        expect(s.y).toBeLessThan(30);
+    });
+});
+
+describe('v1.92.4: never stuck', () => {
+    test('ore grows back above the next wall each time the drone is home', () => {
+        const s = started();
+        for (let y = 3; y < 58; y++) for (let x = 5; x <= 17; x++) if (isOre(s.tiles[y * W + x])) s.tiles[y * W + x] = T.STONE;
+        for (let y = 3; y < 58; y++) s.tiles[y * W + 8] = T.AIR;        // a tunnel to grow beside
+        const count = () => { let n = 0; for (let y = 3; y < 58; y++) for (let x = 5; x <= 17; x++) if (isOre(s.tiles[y * W + x])) n++; return n; };
+        for (let k = 0; k < 5; k++) { s.y = 3; s.x = 8; step(s, 0.05, {}); s.y = -1; s.x = HOME_X; step(s, 0.05, {}); }
+        expect(count()).toBeGreaterThan(5);
+    });
+    test('long in front of a wall, its upgrade costs what the player has', () => {
+        const s = preparedState({ row: 57 });
+        s.parts = 9; s.levels.drill = 0;
+        step(s, 0.05, {});
+        expect(priceOf(s, 'drill')).toBe(PRICES[0]);
+        s.time += STUCK_S + 1;
+        expect(priceOf(s, 'drill')).toBe(9);
     });
 });

@@ -103,7 +103,7 @@ test('the CRT never says the same line twice in a row', async () => {
 });
 
 test('the act draws from the start to the rise without an error', async () => {
-    const s = preparedState({ row: 30, levels: { drill: 1 } });
+    const s = preparedState({ row: 30, levels: { drill: 1, warning: 1 } });
     s.y = 30; s.battery = 8;
     localStorage.setItem(SAVE_KEY, serialize(s));
     const m = await import('./index.js');

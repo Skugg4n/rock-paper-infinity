@@ -16,6 +16,7 @@ import {
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
     shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady, boost, teleport, shock,
     fittable, fit, LINE_TTL, buildDrone, buildPrice, buyGen, genOpen, GEN_PRICE, GEN_NAME, LINES,
+    tellLoss, maxHp, mendPrice, mendPlates,
 } from './dig.js';
 import { has, coolLeft, COOL, LAB_S, Q_NAME, Q_LINES } from './quantum.js';
 import { worstAlarm, ALARM_LINES } from './alarms.js';
@@ -32,6 +33,7 @@ const TYPE_MS = 40;
 const ARRIVE_HOLD_MS = 1400;
 const FRAME_MS = 1000 / 30;           // the picture at 30 fps at most: the owner's machine is slow
 
+const BEAT_SLOW = 1.5, BEAT_END = 4.6;
 let ac = null, raf = 0, saveTimer = 0, riseTimer = 0, root = null, style = null, sound = null, state = null;
 
 const CSS = `
@@ -134,7 +136,7 @@ const CSS = `
 `;
 
 /** Rows whose level 0 is a real thing the drone has (a battery, a steel bit): it is a filled box. */
-const HAS_BASE = ['battery', 'steering', 'drill', 'updrill', 'cargo', 'lamp', 'hull'];
+const HAS_BASE = ['battery', 'steering', 'drill', 'cargo', 'lamp', 'hull', 'armour'];
 const ORE_COLOUR = { 8: '#9fd8e8', 9: '#efe6c8', 10: '#9fe3ff', 11: '#ff4d6d' };
 const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
@@ -153,6 +155,7 @@ function buildDom(host) {
       <div class="dig-row" id="dig-drone-row" hidden><span class="dymo is-small" id="dig-drone">DRONE 2</span><span class="dig-val" id="dig-drone-state"></span></div>
       <div data-show="power" id="dig-power-box"><div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val"><svg class="dig-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/></svg><span id="dig-power">100 %</span></span></div>
       <div class="dig-bar" id="dig-power-track"><i id="dig-power-fill"></i><s id="dig-power-zone"></s><b id="dig-power-home"></b><em id="dig-power-home-label">HOME</em></div></div>
+      <div class="dig-row" id="dig-hp-row" hidden><span class="dymo is-small">ARMOUR</span><span class="dig-val" id="dig-hp"></span></div>
       <div data-show="cargo" class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val"><span id="dig-ore" class="dig-ore"></span><span id="dig-cargo">0 / 8</span></span></div>
       <div data-show="depth" class="dig-row"><span class="dymo is-small">DEPTH</span><span class="dig-val" id="dig-depth">0 m</span></div>
       <div data-show="parts" class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val"><svg class="dig-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span id="dig-parts">0</span></span></div>
@@ -184,6 +187,7 @@ function buildDom(host) {
         crt: $('dig-crt'), shopTitle: $('dig-shop-title'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
         stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'), genBox: $('dig-gen-box'),
         showEls: [...panel.querySelectorAll('[data-show]')],
+        hpRow: $('dig-hp-row'), hp: $('dig-hp'),
         ore: $('dig-ore'), droneRow: $('dig-drone-row'), drone: $('dig-drone'), droneState: $('dig-drone-state'),
         alarm: $('dig-alarm'), ping: $('dig-ping'), pingBar: $('dig-ping-bar'), qRow: $('dig-q-row'), q: $('dig-q'),
         qBtns: [...panel.querySelectorAll('[data-q]')],
@@ -226,6 +230,7 @@ export function init() {
     if (s.risen) riseTimer = setTimeout(() => toUnity(false), 0);
 
     // ---- the hands
+    let beat = null;
     const held = [];
     let mouse = null;              // {x, y} while the button is held on the world
     const pressedAt = { left: -1e9, right: -1e9 };
@@ -238,12 +243,17 @@ export function init() {
         const d = KEYS[e.key];
         const confirmKey = e.key === 'Enter' || e.key === ' ' || e.code === 'Space';
         if (confirmKey) { e.preventDefault(); e.stopPropagation(); }
-        // a stop: OK, Enter or Space, or a fresh press of a direction (doing what it asks); the arrival is typed: a key finishes it
-        if (stopOpen(s) && !e.repeat && (d || confirmKey)) {
+        // the death beat: nothing is taken (no input is lost) until the camera has arrived
+        if (beat) { e.preventDefault(); return; }
+        // a stop closes only on OK, Enter or Space (the Dig stop also on down, which is what it asks), and not
+        // in its first 0.8 s (a click or key in flight does not eat it); the arrival is typed: a key finishes it
+        if (stopOpen(s)) {
             e.preventDefault();
-            if (s.tut.stop.crt) { crtSkip(); return; }
-            closeStop(s);
-            if (!d) return;
+            if (s.tut.stop.crt) { if (d || confirmKey) crtSkip(); return; }
+            const doing = d === 'down' && s.tut.stop.id === 'dig';
+            if (!e.repeat && (confirmKey || doing) && stopReady()) closeStop(s);
+            if (!doing) return;
+            if (stopOpen(s)) return;
         }
         // the workshop with keys: up and down choose a row, Enter or Space buys it (left and right still drive)
         if (!stopOpen(s) && !ui.shop.hidden) {
@@ -264,7 +274,7 @@ export function init() {
     for (const b of ui.qBtns) b.addEventListener('click', () => ({ booster: boost, teleport, shock })[b.dataset.q](s), { signal });
     window.addEventListener('keyup', (e) => { const d = KEYS[e.key]; if (d) release(d); }, { signal });
     window.addEventListener('blur', () => { held.length = 0; mouse = null; }, { signal });
-    ui.canvas.addEventListener('pointerdown', (e) => { mouse = { x: e.clientX, y: e.clientY }; ui.canvas.setPointerCapture?.(e.pointerId); }, { signal });
+    ui.canvas.addEventListener('pointerdown', (e) => { if (beat || stopOpen(s)) return; mouse = { x: e.clientX, y: e.clientY }; ui.canvas.setPointerCapture?.(e.pointerId); }, { signal });
     ui.canvas.addEventListener('pointermove', (e) => { if (mouse) mouse = { x: e.clientX, y: e.clientY }; }, { signal });
     const up = () => { mouse = null; };
     ui.canvas.addEventListener('pointerup', up, { signal });
@@ -276,7 +286,7 @@ export function init() {
         if (!short) path = null;
         else if (s.time - pathAt > 0.4) { pathAt = s.time; path = pathHome(s); }
         const st = s.tut && s.tut.stop;
-        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path, focus: st && !st.crt ? st.focus : null };
+        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path, focus: st && !st.crt ? st.focus : null, beat };
     };
     /** The hand: a direction, and with up a side (held, or pressed in the last 250 ms) to turn into. */
     function hand() {
@@ -354,6 +364,11 @@ export function init() {
     buildBtn.addEventListener('click', () => { if (buildDrone(s)) refreshShop(true); buildBtn.blur(); }, { signal });
     buildBtn.dataset.row = 'build';
     ui.shopRows.prepend(buildBtn);
+    const mendBtn = el('button', 'dig-buy'); mendBtn.type = 'button';
+    mendBtn.innerHTML = '<span class="dymo is-small">MEND PLATES</span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc">A dent hammered out, a plate bolted on.</span>';
+    mendBtn.addEventListener('click', () => { if (mendPlates(s)) refreshShop(true); mendBtn.blur(); }, { signal });
+    mendBtn.dataset.row = 'mend';
+    ui.shopRows.prepend(mendBtn);
     const genBtn = el('button', 'dig-buy'); genBtn.type = 'button';
     genBtn.innerHTML = '<span class="dymo is-small"></span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc">Burns ore slower.</span>';
     genBtn.addEventListener('click', () => { if (buyGen(s)) refreshShop(true); genBtn.blur(); }, { signal });
@@ -365,7 +380,7 @@ export function init() {
         const atGen = !lost && roomOf(s) === 'generator' && genOpen(s) && !s.ended;
         const here = !lost && inWorkshop(s) && !s.ended;
         const fresh = s.tut && s.tut.on ? s.tut.fresh : null;
-        const key = `${here}|${lost}|${atGen}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}|${s.lostCount}`;
+        const key = `${here}|${lost}|${atGen}|${s.hp}|${s.hoverOffer}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}|${s.lostCount}`;
         if (!force && key === shopKey) return;
         shopKey = key;
         // the workshop is a place: its card is up while the drone stands in it (or while there is none);
@@ -375,6 +390,11 @@ export function init() {
         ui.shopNote.textContent = `${s.parts} PARTS`;
         const bp = buildPrice(s);
         buildBtn.hidden = !lost;
+        const mp = mendPrice(s);
+        mendBtn.hidden = !here || mp <= 0;
+        mendBtn.querySelector('.dig-price').textContent = `${mp} PARTS`;
+        mendBtn.disabled = s.parts < mp;
+        mendBtn.classList.toggle('is-ready', !mendBtn.disabled);
         buildBtn.querySelector('.dymo').textContent = LINES.build(bp);
         buildBtn.querySelector('.dig-desc').textContent = 'The same upgrades. A full battery.';
         buildBtn.querySelector('.dig-price').textContent = bp ? `${bp} PARTS` : 'FREE';
@@ -495,11 +515,15 @@ export function init() {
     }
 
     // ---- the stop: the amber box (the arrival is on the CRT instead)
-    ui.stopOk.addEventListener('click', () => { closeStop(s); }, { signal });
+    ui.stopOk.addEventListener('click', () => { if (stopReady()) closeStop(s); }, { signal });
+    // a stop is not dismissed in its first 0.8 s
+    let stopSeen = null, stopSince = 0;
+    const stopReady = () => performance.now() - stopSince >= 800;
     let stopHtml = '';
     function refreshStop() {
         const st = s.tut && s.tut.stop;
-        const box = !!st && !st.crt;
+        if (st !== stopSeen) { stopSeen = st; stopSince = performance.now(); }
+        const box = !!st && !st.crt && !beat;
         ui.stop.hidden = !box;
         ui.root.classList.toggle('has-stop', box);
         const html = box ? st.text.map((l) => `<div>${esc(l)}</div>`).join('') : '';
@@ -559,6 +583,10 @@ export function init() {
         put('drone', ui.drone, s.lost ? `DRONE ${s.droneN}` : `DRONE ${s.droneN || 1}`);
         put('dronestate', ui.droneState, s.lost ? 'LOST' : s.build > 0 ? 'BUILDING' : '');
         ui.genBox.classList.toggle('is-low', s.reserve < 30);
+        // the plates: filled while whole, empty when a hit has taken one
+        const mh = maxHp(s);
+        ui.hpRow.hidden = mh < 2 && (s.hp ?? 1) >= mh;
+        put('hp', ui.hp, '▮'.repeat(Math.max(0, s.hp ?? 1)) + '▯'.repeat(Math.max(0, mh - (s.hp ?? 1))));
         ui.cargo.classList.toggle('is-red', s.cargo.length >= cargoCap(s));
         const best = depthOf(s.record);
         const now = depthM(s);
@@ -641,7 +669,7 @@ export function init() {
     }, { signal });
 
     // ---- the loop
-    let prev = performance.now(), drawnAt = -1e9, wasInShop = false;
+    let prev = performance.now(), drawnAt = -1e9, wasInShop = false, warnT = 0;
     function frame(now) {
         raf = requestAnimationFrame(frame);
         let dt = Math.min(0.1, (now - prev) / 1000);
@@ -649,8 +677,14 @@ export function init() {
         if (window.__rpiPaused || document.hidden) dt = 0;
         // a stop: the world stands still (the rules see it too); the picture keeps breathing
         if (stopOpen(s)) dt = 0;
+        // the death beat (v1.92.4): slow for 1.5 s, a hold on the dead drone, the camera up to the workshop
+        if (beat) {
+            beat.t += Math.min(0.1, (now - (beat.last || now)) / 1000); beat.last = now;
+            if (beat.t < BEAT_SLOW) dt *= 0.2;
+            if (beat.t >= BEAT_END) { beat = null; tellLoss(s); }
+        }
         if (dt > 0) {
-            const input = s.ended ? {} : hand();
+            const input = s.ended || beat ? {} : hand();
             // small steps, so a slow frame does not skip a tile
             let left = dt;
             while (left > 0) { const h = Math.min(0.05, left); step(s, h, input); left -= h; }
@@ -664,8 +698,11 @@ export function init() {
                     rnd.pop(e.bio ? `+${e.bio} BIOMASS` : `+${e.parts} PARTS`, '#f2d98a', true, first ? 'Finds are worth more than ore.' : '');
                 }
                 if (e.type === 'pod') blinkPod = { pod: e.pod, at: performance.now() };
+                if (e.type === 'dead' && e.y >= 0) { beat = { t: 0, x: e.x, y: e.y, why: s.lostWhy, last: now }; held.length = 0; mouse = null; }
+                if (e.type === 'build' || e.type === 'buy' || e.type === 'fit' || e.type === 'mend' || e.type === 'graft') rnd.arms(e.type === 'build' ? 'build' : 'fit');
+                if (e.type === 'hit') rnd.hitFlash();
                 if (e.type === 'shock' || e.type === 'teleport') rnd.ring(e.type);
-                if (e.type === 'full') rnd.pop('Cargo full.', '#f1efe8', false);
+                if (e.type === 'full') { rnd.pop('Cargo full.', '#f1efe8', false); rnd.fullFlash(); }
                 if (e.type === 'unloaded') rnd.pop(LINES.unloaded(e.ore, e.gen || 0, e.parts), '#f2d98a', false);
                 if (e.type === 'bump') rnd.bump(s);
                 if (e.type === 'q-named') rnd.label(e.i, 'QUANTUM OBJECT');
@@ -674,6 +711,8 @@ export function init() {
             }
             s.events.length = 0;
             sound?.update(depthM(s), dt, s.ended);
+            // EARLY WARNING: a soft beep, repeating while it holds
+            if (s.warnOn && !s.lost) { warnT -= dt; if (warnT <= 0) { warnT = 1.1; sound?.beep(); } } else warnT = 0;
             if (s.ended && !s.risen && !riseShownAt) riseShownAt = s.time;
             if (riseShownAt && !s.risen && s.time - riseShownAt > 9.5) ui.rise.hidden = false;
             if (!ui.rise.hidden) ui.rise.style.left = `${rnd.r.originX + rnd.worldWidth / 2}px`;
