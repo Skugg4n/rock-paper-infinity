@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.91.1 - 2026-10-09 (no battle buttons after the enemy leaves, the interim hands over without a flash)
+
+After Ola's playtest of the interim. No rule changed (`sim-phase3.mjs 1` prints the same line).
+- **Nothing left to fight.** Once the enemy has left (`w.enemyLeft`, from the withdrawal on) the battle controls go: the quartermaster, the crosshair, the auto strike, swords and shields, air defence, the raid, intel, radar, the weapon tier and the war HUD with the arms slider. They fade and slide away the way the controls leave at GO DEEP (`.deep-leave`, 60 ms apart), then are hidden. It follows the state, so a reload or the iii-end checkpoint shows the same at once. The shovel, the city's own buttons, the doomsday ring with the salvage and the war room stay. No new control opens after the leave either (the war room no longer announces the crosshair after the launch).
+- **The wording.** The war room's second line on the walk to the hatch: "Status: they go down to wait until the earth heals its surface and is habitable once more. The rest of humanity will have to fend for itself."
+- **The hand-over** (Ola: the war city for a moment, then a click with a white box, then black). Two causes, measured headless at 1280 x 800: the interim screen faded out under the card while the card's veil was still coming in, so the city showed through (side strips at luminance 115 at the card's start); and a dark card's veil rests white and only turns black with `is-dark`, so the slow 1.4 s fade went from light grey to black (`rgb(211, 211, 211)` at 17 % opacity). Now the screen stays whole under the card until the midpoint, when the veil is whole, and the veil is made black before the card starts (`blackVeil`, src/interim.js, unit-tested; src/chapterCard.js untouched). The INTERIM card before the screen gets the same black veil.
+- **Measured** (every ~100 ms from the departure line, Continue to the vault and a win choosing the drone): the IV card at 3.0 s, the veil whole at 4.1 to 4.2 s with the screen still under it, IV · DEEP readable from 5.1 s, the screen removed and chapter IV started at the midpoint (7.3 to 8.0 s), the title out by 13.4 s, then the act. Every frame before the midpoint is black or the screen (side strips at most 7.2), the veil is `rgb(0, 0, 0)` in every frame.
+
 ## v1.91.0 - 2026-10-09 (the interim counts to three, the winner chooses the path, IV · DEEP)
 
 After Ola's first look at the interim. No rule changed (`sim-phase3.mjs 1` prints the same line).
