@@ -3,13 +3,17 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
-    boost, teleport, shock, litAt, lampRadius,
+    boost, teleport, shock, litAt, lampRadius, fit, cargoCap,
 } from './dig.js';
 import { qOrder, has, LAB_S, Q_LINES } from './quantum.js';
-import { FIRST_FAIL, REPAIR_S, spotOf, repairCost, ALARM_LINES } from './alarms.js';
+import { FIRST_FAIL, REPAIR_S, spotOf, ALARM_LINES } from './alarms.js';
 import { decide, readStop } from './autopilot.js';
 import { roomSpot, roomAt, chamberOf, chamberOver } from './base.js';
 
+/** Steps the world, reading every stop that opens (as a player clicking OK). */
+function run(s, n, input = {}) { for (let i = 0; i < n; i++) { while (stopOpen(s)) closeStop(s); step(s, 0.05, input); } }
+/** The lab's gifts, opened and fitted. */
+const give = (s, ...ids) => { for (const id of ids) { s.quantum.got.push(id); s.quantum.fit.push(id); } };
 /** A fresh game past its first stops. */
 function started() {
     const s = newState(7);
@@ -82,8 +86,10 @@ describe('the rules', () => {
         for (let i = 0; i < 200; i++) step(s, 0.05, {});
         expect(s.reserve).toBe(100);
         expect(shows(s, 'gen')).toBe(false);
-        for (let i = 0; i < 1200; i++) step(s, 0.05, {});
+        for (let i = 0; i < 1200 && !stopOpen(s); i++) step(s, 0.05, {});
         expect(shows(s, 'gen')).toBe(true);
+        expect(s.tut.stop.text).toEqual(['The generators keep them alive. Ore keeps the generators running.']);
+        run(s, 200);
         expect(s.reserve).toBeLessThan(100);
     });
     test('an empty battery, later on: recovered home, cargo gone, a tenth of the reserve lost', () => {
@@ -103,14 +109,16 @@ describe('the rules', () => {
         step(s, 0.05, {});
         expect(s.line.text).toBe('Turn back. Just enough power to fly home.');
     });
-    test('pressing up under rock in a side tunnel says where the way up is', () => {
+    test('up into rock: a bump, no words (the CRT is not spammed)', () => {
         const s = preparedState({ row: 10 });
         s.y = 10;
-        s.tiles[10 * W + HOME_X + 1] = T.AIR; s.tiles[10 * W + HOME_X + 2] = T.AIR;
-        s.tiles[9 * W + HOME_X + 2] = T.STONE;
-        s.x = HOME_X + 2;
-        step(s, 0.05, { dir: 'up' });
-        expect(s.line.text).toBe('Up only through open ground. The way up is to the left.');
+        for (let x = 0; x < W; x++) { s.tiles[10 * W + x] = T.AIR; s.tiles[9 * W + x] = x === HOME_X ? T.AIR : T.STONE; }
+        s.x = HOME_X + 4;
+        const ev = [];
+        for (let i = 0; i < 20; i++) { step(s, 0.05, { dir: 'up' }); ev.push(...s.events.map((e) => e.type)); s.events.length = 0; }
+        expect(s.y).toBe(10);
+        expect(ev).toContain('bump');
+        expect(s.line.text).toBe('');
     });
     test('up under a ledge: the drone hovers, it does not bounce, and costs little', () => {
         const s = preparedState({ row: 10 });
@@ -150,7 +158,9 @@ describe('the rules', () => {
     test('the colony at 0 %: a pod goes dark every three seconds', () => {
         const s = started();
         s.reserve = 0;
-        for (let i = 0; i < Math.round(POD_EVERY * 2 / 0.05) + 1; i++) step(s, 0.05, {});
+        step(s, 0.05, {});
+        expect(s.tut.stop.text).toEqual(['The generators are empty. The sleepers go dark one by one.']);
+        run(s, Math.round(POD_EVERY * 2 / 0.05) + 1);
         expect(sleepers(s)).toBe(214);
         expect(s.line.text).toMatch(/^Pod \d+ went dark\.$/);
     });
@@ -221,9 +231,11 @@ describe('pass 3: one thing at a time', () => {
         const s = started();
         for (let i = 0; i < 10; i++) step(s, 0.05, { dir: 'left' });
         expect(s.x).toBe(HOME_X);
-        for (let i = 0; i < 20 && !stopOpen(s); i++) step(s, 0.05, { dir: 'down' });
+        for (let i = 0; i < 20 && s.y < 0; i++) step(s, 0.05, { dir: 'down' });
         expect(s.y).toBe(0);
         expect(shows(s, 'power')).toBe(true);
+        expect(stopOpen(s)).toBe(false);                 // it does not cut the first dig
+        for (let i = 0; i < 40 && !stopOpen(s); i++) step(s, 0.05, {});
         expect(s.tut.stop.text).toEqual(['Power. It takes you down and brings you home.']);
     });
     test('CARGO at the first ore, DEPTH at 20 m, PARTS and the workshop (one row: BATTERY) at the first delivery', () => {
@@ -290,10 +302,36 @@ describe('pass 3: one thing at a time', () => {
         expect(s.x).toBe(HOME_X);
         expect(s.y).toBeGreaterThanOrEqual(0);
         const t = preparedState({ row: 5 });
-        t.y = 0; t.x = HOME_X + 1; t.tiles[HOME_X + 1] = T.AIR;
+        t.y = 0; t.x = HOME_X + 3; t.tiles[HOME_X + 3] = T.AIR; t.tiles[HOME_X + 2] = T.AIR;
         for (let i = 0; i < 10; i++) step(t, 0.05, { dir: 'up' });
         expect(t.y).toBe(0);
-        expect(t.line.text).toMatch(/^Up only through open ground/);
+    });
+    test('steering I: up held beside the shaft steps into it and flies home; an up press cancels the second side step', () => {
+        const s = preparedState({ row: 30 });
+        s.levels.steering = 0;
+        s.y = 30; s.x = HOME_X + 1;
+        s.tiles[30 * W + HOME_X + 1] = T.AIR; s.tiles[31 * W + HOME_X + 1] = T.STONE;
+        for (let i = 0; i < 200 && s.y > -1; i++) step(s, 0.05, { dir: 'up' });
+        expect(s.y).toBe(-1);
+        // from the shaft, a side press goes two steps, unless up comes first
+        const t = preparedState({ row: 30 });
+        t.levels.steering = 0; t.y = 30; t.x = HOME_X;
+        for (let x = 0; x < W; x++) t.tiles[30 * W + x] = T.AIR;
+        for (let x = 0; x < W; x++) if (x !== HOME_X) t.tiles[29 * W + x] = T.STONE;
+        for (let x = 0; x < W; x++) t.tiles[31 * W + x] = T.STONE;
+        step(t, 0.05, { dir: 'right' });
+        for (let i = 0; i < 6; i++) step(t, 0.05, { dir: 'up' });
+        expect(t.x).toBe(HOME_X);                    // back under the shaft, not two steps out
+    });
+    test('steering I: the second step never carries the drone past the shaft', () => {
+        const s = preparedState({ row: 30 });
+        s.levels.steering = 0; s.y = 30; s.x = HOME_X + 1;
+        for (let x = 0; x < W; x++) s.tiles[30 * W + x] = T.AIR;
+        for (let x = 0; x < W; x++) if (x !== HOME_X) s.tiles[29 * W + x] = T.STONE;
+        for (let x = 0; x < W; x++) s.tiles[31 * W + x] = T.STONE;
+        step(s, 0.05, { dir: 'left' });
+        for (let i = 0; i < 10; i++) step(s, 0.05, {});
+        expect(s.x).toBe(HOME_X);
     });
     test('the chambers: 36 sleepers each, six of them', () => {
         expect(chamberOf(1)).toBe(0);
@@ -330,10 +368,10 @@ describe('pass 3, step 2: the base breaks, the tools are upgrades', () => {
         expect(s.alarms.lost).toBe(10);
         expect(sleepers(s)).toBe(206);
         // away without the radio: the news waits for the base
-        expect(s.alarms.unseen[0]).toMatch(/^Chamber \d went dark\. 10 sleepers died\.$/);
+        expect(s.alarms.unseen[0].text).toMatch(/^While you were gone: chamber \d went dark\. 10 died\.$/);
         at(s, HOME_X); s.wasHome = false;
         step(s, 0.05, {});
-        expect(s.line.text).toMatch(/went dark\. 10 sleepers died\./);
+        expect(s.line.text).toMatch(/^While you were gone: chamber \d went dark\. 10 died\.$/);
     });
     test('home with a chamber failing: a stop the first time; mended in two seconds under it, for parts', () => {
         const s = started();
@@ -341,13 +379,16 @@ describe('pass 3, step 2: the base breaks, the tools are upgrades', () => {
         s.alarms.list.push({ id: 'c3', at: 0, until: 500 });
         at(s, HOME_X); s.parts = 50;
         step(s, 0.05, {});
-        expect(s.tut.stop.text).toEqual(['A chamber is failing. Return to base and repair it.']);
+        expect(s.tut.stop.text).toEqual(['A chamber is failing. Drive to it and repair it.']);
         expect(s.tut.needs).toContain('radio');
         closeStop(s);
+        s.alarms.list[0].cost = 17;                   // the price set when the alarm started
+        s.record = 300;                               // deeper since: the price does not move
         at(s, spotOf('c3'));
         for (let i = 0; i < Math.ceil(REPAIR_S / 0.05) + 2; i++) step(s, 0.05, {});
         expect(s.alarms.list).toEqual([]);
-        expect(s.parts).toBe(50 - repairCost(depthOf(s.record)));
+        expect(s.parts).toBe(50 - 17);
+        expect(s.line.text).toBe('Chamber 4 is mended.');
     });
     test('a stopped generator: POWER does not charge at home until it is mended', () => {
         const s = started();
@@ -416,7 +457,12 @@ describe('pass 3, step 3: things from the other side, the flesh', () => {
         s.x = HOME_X;
         for (let i = 0; i < Math.ceil(LAB_S / 0.05) + 100 && !stopOpen(s); i++) step(s, 0.05, {});
         const first = s.quantum.order[0];
-        expect(s.tut.stop.text[0]).toBe(`The lab opened it. It was a ${first === 'booster' ? 'BOOSTER' : 'SHOCK WAVE'}.`);
+        expect(s.tut.stop.text).toEqual([`The lab opened it. It was a ${first === 'booster' ? 'BOOSTER' : 'SHOCK WAVE'}.`, 'Fit it in the WORKSHOP.']);
+        expect(has(s, first)).toBe(false);              // fitted in the workshop first
+        closeStop(s);
+        expect(fit(s, first)).toBe(false);              // not in the workshop
+        s.x = roomSpot('workshop');
+        expect(fit(s, first)).toBe(true);
         expect(has(s, first)).toBe(true);
     });
     test('THE OTHER DRONE: It is us. It is not us.', () => {
@@ -432,7 +478,7 @@ describe('pass 3, step 3: things from the other side, the flesh', () => {
     });
     test('BOOSTER: twice as fast at half the power; TELEPORT: home at once; SHOCK WAVE: eats two tiles round, ore to the cargo', () => {
         const a = preparedState({ row: 20 }), b = preparedState({ row: 20 });
-        for (const s of [a, b]) { s.y = 20; s.quantum.got.push('booster', 'teleport', 'shock'); }
+        for (const s of [a, b]) { s.y = 20; give(s, 'booster', 'teleport', 'shock'); }
         expect(boost(b)).toBe(true);
         const a0 = a.battery, b0 = b.battery;
         for (const s of [a, b]) for (let y = 21; y < 60; y++) s.tiles[y * W + HOME_X] = T.SOIL;
@@ -441,7 +487,7 @@ describe('pass 3, step 3: things from the other side, the flesh', () => {
         expect((b0 - b.battery) / (b.y - 20)).toBeLessThan((a0 - a.battery) / (a.y - 20));
         expect(boost(b)).toBe(false);                    // recharging
         const c = preparedState({ row: 40 });
-        c.y = 40; c.quantum.got.push('shock', 'teleport');
+        c.y = 40; give(c, 'shock', 'teleport');
         c.tiles[41 * W + HOME_X + 1] = T.ROCK; c.tiles[42 * W + HOME_X] = T.STONE;
         expect(shock(c)).toBe(true);
         expect(c.tiles[42 * W + HOME_X]).toBe(T.AIR);
@@ -451,17 +497,17 @@ describe('pass 3, step 3: things from the other side, the flesh', () => {
     });
     test('the SECOND LAMP lights farther down; the DEEP BATTERY charges in the heat', () => {
         const s = preparedState({ row: 260, levels: { hull: 3, drill: 3, battery: 3 } });
-        s.y = 260; s.x = HOME_X; s.quantum.got = [];
+        s.y = 260; s.x = HOME_X; s.quantum.got = []; s.quantum.fit = [];
         const r = lampRadius(s);
         expect(litAt(s, HOME_X, 260 + Math.ceil(r) + 1)).toBe(false);
-        s.quantum.got.push('lamp2');
+        give(s, 'lamp2');
         expect(litAt(s, HOME_X, 260 + Math.ceil(r) + 1)).toBe(true);
         expect(litAt(s, HOME_X, 260 - Math.ceil(r) - 1)).toBe(false);
         s.tiles[261 * W + HOME_X] = T.STONE;
         s.battery = 50; s.grafts = 3;
         step(s, 1, {});
         const without = s.battery;
-        s.quantum.got.push('deepbat'); s.battery = 50;
+        give(s, 'deepbat'); s.battery = 50;
         step(s, 1, {});
         expect(s.battery).toBeGreaterThan(without);
     });
@@ -478,4 +524,61 @@ describe('pass 3, step 3: things from the other side, the flesh', () => {
         expect(t.line.text).toBe('This is not rock. It is growing in the tank.');
         expect(t.tut.fresh).toBe('graft');
     });
+});
+
+describe('v1.92.1: after the third test and Ola', () => {
+    test('the base row: the drone drives from the hatch into every room and back, also after a repair', () => {
+        const s = preparedState({ row: 20, parts: 200 });
+        s.y = -1; s.x = HOME_X;
+        s.alarms.list.push({ id: 'c2', at: 0, until: 999, cost: 10 });
+        const at = () => (s.act ? s.act.tx : s.x);
+        const goTo = (x) => { for (let i = 0; i < 200 && at() !== x; i++) run(s, 1, { dir: at() < x ? 'right' : 'left' }); };
+        for (const x of [0, roomSpot('warehouse'), spotOf('c2'), HOME_X, roomSpot('workshop'), roomSpot('lab'), W - 1, HOME_X]) {
+            goTo(x);
+            run(s, 50);                                   // stand still (mends c2 when under it)
+            expect(s.x).toBe(x);
+            expect(s.y).toBe(-1);
+        }
+        expect(s.alarms.list).toEqual([]);
+    });
+    test('a full cargo: the drone leaves ore in the rock and says so once', () => {
+        const s = preparedState({ row: 20 });
+        s.y = 20; s.x = HOME_X;
+        s.cargo = Array(cargoCap(s)).fill(T.ROCK);
+        s.tiles[21 * W + HOME_X] = T.PAPER;
+        const ev = [];
+        for (let i = 0; i < 30; i++) { step(s, 0.05, { dir: 'down' }); ev.push(...s.events.map((e) => e.type)); s.events.length = 0; }
+        expect(s.tiles[21 * W + HOME_X]).toBe(T.PAPER);
+        expect(s.y).toBe(20);
+        expect(ev.filter((e) => e === 'full')).toHaveLength(1);
+        expect(s.tut.needs).toContain('mapping');
+    });
+    test('MAPPING: ore the lamp has lit is remembered', () => {
+        const s = preparedState({ row: 20 });
+        s.y = 20; s.x = HOME_X; s.levels.mapping = 1;
+        s.tiles[21 * W + HOME_X + 1] = T.ROCK;
+        step(s, 0.05, {});
+        expect(s.seen).toContain(21 * W + HOME_X + 1);
+    });
+    test('the first dive forgives: half the power until the first ore is home', () => {
+        const a = started(), b = started();
+        b.delivered = 1;
+        for (const s of [a, b]) { s.tut.dug = true; s.tut.show.power = true; s.tut.done.power = true; }
+        run(a, 40, { dir: 'down' }); run(b, 40, { dir: 'down' });
+        expect(40 - a.battery).toBeLessThan((40 - b.battery) * 0.7);
+    });
+    test('the first deaths are a stop; a missed generator is said', () => {
+        const s = started();
+        s.y = -1; s.alarms.list.push({ id: 'c4', at: 0, until: 0.01, cost: 10 });
+        s.tut.done.failing = true;
+        step(s, 0.05, {});
+        expect(s.tut.stop.text).toEqual(['Chamber 5 went dark. 10 sleepers died.']);
+    });
+});
+
+test('taps of up climb: the drone holds a moment after each step up instead of falling back', () => {
+    const s = preparedState({ row: 30 });
+    s.y = 30; s.x = HOME_X;
+    for (let k = 0; k < 10; k++) { step(s, 0.05, { dir: 'up' }); for (let i = 0; i < 5; i++) step(s, 0.05, {}); }
+    expect(s.y).toBeLessThanOrEqual(21);
 });

@@ -13,8 +13,9 @@ import {
     SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, ROW_NAME, rowText, GRAFTS, graftShown,
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
     shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady, boost, teleport, shock,
+    fittable, fit, LINE_TTL,
 } from './dig.js';
-import { has, coolLeft, COOL, LAB_S } from './quantum.js';
+import { has, coolLeft, COOL, LAB_S, Q_NAME, Q_LINES } from './quantum.js';
 import { worstAlarm, ALARM_LINES } from './alarms.js';
 import { depthOf, FINDS } from './world.js';
 import { createRenderer, RISE_S } from './render.js';
@@ -95,6 +96,10 @@ const CSS = `
 .dig-panel.is-bare { background: transparent; box-shadow: none; }
 .dig-shop h3 .dig-val { font-size: 16px; }
 .dig-buy.is-fresh { box-shadow: inset 0 0 0 2px #ffd678; }
+.dig-buy.is-sel { background: rgba(255,255,255,.12); outline: 2px solid #f1efe8; outline-offset: -2px; }
+.dig-buy.is-fit .dymo { background: #2a1838; }
+.dig-buy.is-fit .dig-price { color: #c9b8ff; }
+#dig-power-box .dig-bar { margin-bottom: 20px; }
 .dig-stop { position: absolute; left: calc(50% + ${COLUMN / 2}px); top: 18px; transform: translateX(-50%); z-index: 30; max-width: 440px; min-width: 280px; padding: 16px 20px 14px; border-radius: 10px; box-sizing: border-box;
   background: rgba(7,8,10,.94); box-shadow: 0 0 0 1.5px #ffd678, 0 20px 60px rgba(0,0,0,.7), 0 0 30px rgba(255,214,120,.15);
   font: 15px/22px ui-monospace, 'SF Mono', Menlo, monospace; color: #ffd678; text-shadow: 0 0 6px rgba(255,214,120,.35); display: flex; flex-direction: column; gap: 12px; }
@@ -133,7 +138,7 @@ function buildDom(host) {
       <div data-show="cargo" class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val" id="dig-cargo">0 / 8</span></div>
       <div data-show="depth" class="dig-row"><span class="dymo is-small">DEPTH</span><span class="dig-val" id="dig-depth">0 m</span></div>
       <div data-show="parts" class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val" id="dig-parts">0</span></div>
-      <div data-show="gen"><div class="dig-row"><span class="dymo is-small">GENERATORS</span><span class="dig-val" id="dig-colony">100 %</span></div>
+      <div data-show="gen" id="dig-gen-box"><div class="dig-row"><span class="dymo is-small">GENERATORS</span><span class="dig-val" id="dig-colony">100 %</span></div>
       <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div></div>
       <div class="dig-row" id="dig-bio-row" hidden><span class="dymo is-small">BIOMASS</span><span class="dig-val" id="dig-bio">0</span></div>
       <div data-show="finds" class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>
@@ -159,7 +164,7 @@ function buildDom(host) {
         cargo: $('dig-cargo'), depth: $('dig-depth'), colony: $('dig-colony'), colonyFill: $('dig-colony-fill'),
         sleepers: $('dig-sleepers'), parts: $('dig-parts'), bio: $('dig-bio'), bioRow: $('dig-bio-row'), finds: $('dig-finds'),
         crt: $('dig-crt'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
-        stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'),
+        stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'), genBox: $('dig-gen-box'),
         showEls: [...panel.querySelectorAll('[data-show]')],
         alarm: $('dig-alarm'), ping: $('dig-ping'), pingBar: $('dig-ping-bar'), qRow: $('dig-q-row'), q: $('dig-q'),
         qBtns: [...panel.querySelectorAll('[data-q]')],
@@ -204,16 +209,26 @@ export function init() {
     const pressedAt = { left: -1e9, right: -1e9 };
     const press = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); held.push(dir); if (dir in pressedAt) pressedAt[dir] = performance.now(); };
     const release = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); };
+    // Captured on the window, before the shell's own keys: Space and Enter belong to the dig (stops, the
+    // workshop) and must never reach the shell's pause (v1.92.0: Space paused the game, the drone "locked").
     window.addEventListener('keydown', (e) => {
         if (e.metaKey || e.ctrlKey) return;
         const d = KEYS[e.key];
+        const confirmKey = e.key === 'Enter' || e.key === ' ' || e.code === 'Space';
+        if (confirmKey) { e.preventDefault(); e.stopPropagation(); }
         // a stop: OK, Enter or Space, or a fresh press of a direction (doing what it asks); the arrival is typed: a key finishes it
-        if (stopOpen(s) && !e.repeat && (d || e.key === 'Enter' || e.key === ' ')) {
+        if (stopOpen(s) && !e.repeat && (d || confirmKey)) {
             e.preventDefault();
             if (s.tut.stop.crt) { crtSkip(); return; }
             closeStop(s);
             if (!d) return;
         }
+        // the workshop with keys: up and down choose a row, Enter or Space buys it (left and right still drive)
+        if (!stopOpen(s) && inWorkshop(s) && !ui.shop.hidden) {
+            if (d === 'up' || d === 'down') { e.preventDefault(); moveSel(d === 'up' ? -1 : 1); return; }
+            if (confirmKey && !e.repeat) { buySel(); return; }
+        }
+        if (confirmKey) return;
         if ((e.key === 'g' || e.key === 'G') && !stopOpen(s)) { e.preventDefault(); ping(s); return; }
         // the lab's gifts: B, T, Q
         const qk = { b: boost, t: teleport, q: shock }[e.key.toLowerCase()];
@@ -221,7 +236,7 @@ export function init() {
         if (!d) return;
         e.preventDefault();
         press(d);
-    }, { signal });
+    }, { signal, capture: true });
     ui.ping.addEventListener('click', () => ping(s), { signal });
     for (const b of ui.qBtns) b.addEventListener('click', () => ({ booster: boost, teleport, shock })[b.dataset.q](s), { signal });
     window.addEventListener('keyup', (e) => { const d = KEYS[e.key]; if (d) release(d); }, { signal });
@@ -261,20 +276,58 @@ export function init() {
     for (const r of ROWS) {
         const b = el('button', 'dig-buy'); b.type = 'button';
         b.innerHTML = '<span class="dymo is-small"></span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc"></span>';
-        b.addEventListener('click', () => { if (buy(s, r)) refreshShop(true); }, { signal });
+        b.addEventListener('click', () => { if (buy(s, r)) refreshShop(true); b.blur(); }, { signal });
+        b.dataset.row = r;
         ui.shopRows.appendChild(b);
         rows[r] = b;
         b.querySelector('.dymo').textContent = ROW_NAME[r];
     }
+    // the lab's things are fitted here: FIT BOOSTER and what it does
+    const fits = {};
+    for (const id of Object.keys(Q_NAME)) {
+        if (id === 'other') continue;
+        const b = el('button', 'dig-buy is-fit'); b.type = 'button';
+        b.innerHTML = `<span class="dymo is-small">FIT ${Q_NAME[id]}</span><span class="dig-dash"></span><span class="dig-price">FIT</span><span class="dig-desc"></span>`;
+        b.querySelector('.dig-desc').textContent = Q_LINES.use[id];
+        b.addEventListener('click', () => { if (fit(s, id)) refreshShop(true); b.blur(); }, { signal });
+        b.dataset.row = `fit-${id}`;
+        ui.shopRows.prepend(b);
+        fits[id] = b;
+    }
+    // the selected row (keys): the first one that can be bought, kept by name
+    let sel = null;
+    const shopButtons = () => [...ui.shopRows.querySelectorAll('.dig-buy')].filter((b) => !b.hidden);
+    let selFresh = null;
+    function paintSel() {
+        const list = shopButtons();
+        // something new in the workshop is the row chosen when it comes
+        const fresh = s.tut && s.tut.on ? s.tut.fresh : null;
+        if (fresh !== selFresh) { selFresh = fresh; if (fresh && list.some((b) => b.dataset.row === fresh)) sel = fresh; }
+        if (!list.some((b) => b.dataset.row === sel)) sel = (list.find((b) => !b.disabled) || list[0])?.dataset.row ?? null;
+        for (const b of ui.shopRows.querySelectorAll('.dig-buy')) b.classList.toggle('is-sel', b.dataset.row === sel);
+    }
+    function moveSel(k) {
+        const list = shopButtons();
+        if (!list.length) return;
+        const i = Math.max(0, list.findIndex((b) => b.dataset.row === sel));
+        sel = list[(i + k + list.length) % list.length].dataset.row;
+        paintSel();
+        list.find((b) => b.dataset.row === sel)?.scrollIntoView?.({ block: 'nearest' });
+    }
+    function buySel() {
+        const b = shopButtons().find((x) => x.dataset.row === sel);
+        if (b && !b.disabled) b.click();
+    }
     const graftBtn = el('button', 'dig-buy is-graft'); graftBtn.type = 'button';
     graftBtn.innerHTML = '<span class="dymo is-small">GRAFT</span><span class="dig-dash"></span><span class="dig-price"></span><span class="dig-desc"></span>';
-    graftBtn.addEventListener('click', () => { if (buyGraft(s)) refreshShop(true); }, { signal });
+    graftBtn.addEventListener('click', () => { if (buyGraft(s)) refreshShop(true); graftBtn.blur(); }, { signal });
+    graftBtn.dataset.row = 'graft';
     ui.shopRows.appendChild(graftBtn);
     let shopKey = '';
     function refreshShop(force = false) {
         const here = inWorkshop(s) && !s.ended;
         const fresh = s.tut && s.tut.on ? s.tut.fresh : null;
-        const key = `${here}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}`;
+        const key = `${here}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}|${fittable(s).join()}`;
         if (!force && key === shopKey) return;
         shopKey = key;
         // the workshop is a place: its card is up while the drone stands in it
@@ -304,6 +357,14 @@ export function init() {
         else { gp.textContent = `Need ${g.price - s.bio} more.`; gp.className = 'dig-price is-short'; }
         graftBtn.disabled = !here || !g || s.bio < g.price;
         graftBtn.classList.toggle('is-ready', !graftBtn.disabled);
+        const canFit = fittable(s);
+        for (const [id, b] of Object.entries(fits)) {
+            b.hidden = !canFit.includes(id);
+            b.disabled = !here;
+            b.classList.toggle('is-ready', !b.hidden && here);
+            b.classList.toggle('is-fresh', fresh === `fit-${id}`);
+        }
+        paintSel();
     }
 
     // ---- the CRT: the arrival typed (40 ms a letter), then the lines the rules say
@@ -346,15 +407,22 @@ export function init() {
             const line = s.line;
             if (line && line.n !== crt.n) {
                 crt.n = line.n;
-                if (line.text) {
-                    crt.lines.push({ text: line.text, kind: line.kind, shown: 0, n: line.n, at: nowMs });
+                const last = crt.lines[crt.lines.length - 1];
+                if (line.text && last && last.text === line.text) {
+                    // never the same line twice in a row: the one there is renewed
+                    last.at = nowMs; last.n = line.n; last.ttl = LINE_TTL[line.kind] ?? 6;
+                } else if (line.text) {
+                    // the arrival's words go when the first real line comes
+                    crt.lines = crt.lines.filter((l) => l.kind !== 'sys');
+                    crt.lines.push({ text: line.text, kind: line.kind, shown: 0, n: line.n, at: nowMs, ttl: LINE_TTL[line.kind] ?? 6 });
                     if (crt.lines.length > 4) crt.lines.splice(0, crt.lines.length - 4);
-                } else {
-                    // a line that stopped being true (turn back) goes
-                    const last = crt.lines[crt.lines.length - 1];
-                    if (last && last.kind === 'turnback') crt.lines.pop();
+                } else if (last && last.n === line.n - 1) {
+                    // the line stopped being true (turn back, a hint): it goes
+                    crt.lines.pop();
                 }
             }
+            // a line whose time is up goes (it is no longer true)
+            crt.lines = crt.lines.filter((l) => l.kind === 'sys' || l.ttl === Infinity || nowMs - l.at < (l.ttl ?? 6) * 1000 + 1500);
             const on = lineNow(s);
             html = crt.lines.map((l, k) => {
                 if (l.n >= 0 && l.shown < l.text.length) l.shown = Math.min(l.text.length, Math.floor((nowMs - l.at) / (TYPE_MS * 0.6)));
@@ -376,6 +444,7 @@ export function init() {
         const html = box ? st.text.map((l) => `<div>${esc(l)}</div>`).join('') : '';
         if (html !== stopHtml) { stopHtml = html; ui.stopText.innerHTML = html; }
         ui.powerBox.classList.toggle('dig-focus', box && st.focus === 'power');
+        ui.genBox.classList.toggle('dig-focus', box && st.focus === 'gen');
     }
 
     // ---- the panel
@@ -525,6 +594,9 @@ export function init() {
                 }
                 if (e.type === 'pod') blinkPod = { pod: e.pod, at: performance.now() };
                 if (e.type === 'shock' || e.type === 'teleport') rnd.ring(e.type);
+                if (e.type === 'full') rnd.pop('Cargo full.', '#f1efe8', false);
+                if (e.type === 'bump') rnd.bump(s);
+                if (e.type === 'q-named') rnd.label(e.i, 'QUANTUM OBJECT');
                 if (e.type === 'heart') ui.root.classList.add('dig-ending');
                 if (e.type === 'buy' || e.type === 'graft' || e.type === 'deliver') shopKey = '';
             }

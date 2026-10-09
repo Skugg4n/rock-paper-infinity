@@ -210,7 +210,10 @@ async function bootstrap() {
     !localStorage.getItem(PHASE2_CONSTANTS.SAVE_KEY) &&
     !localStorage.getItem(PHASE4_CONSTANTS.SAVE_KEY) &&
     !localStorage.getItem('rpi-deep-vault') &&
-    !localStorage.getItem('rpi-unity');
+    !localStorage.getItem('rpi-deep-dig') &&
+    !localStorage.getItem('rpi-unity') &&
+    // a game already in some chapter (a checkpoint, the dig) is not a fresh player: no I · TRIVIAL card
+    !localStorage.getItem(PHASE_KEY);
 
   if (isFreshPlayer) {
     await playChapterCard({ roman: 'I', title: 'TRIVIAL' });

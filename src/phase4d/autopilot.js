@@ -10,7 +10,7 @@ import { W, H, T } from './world.js';
 import {
     tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, pingShows, ping, gpsReady,
     priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST, rowShown, maxLevel, ROWS, roomOf,
-    stopOpen, closeStop, STOPS, litAt, boost, teleport, shock,
+    stopOpen, closeStop, STOPS, litAt, boost, teleport, shock, fittable, fit,
 } from './dig.js';
 import { coolLeft } from './quantum.js';
 import { HOME_X, roomSpot } from './base.js';
@@ -86,7 +86,7 @@ function wanted(s, x, y, t) {
     if (s.__explore && (isOre(t) || t === T.FIND) && Math.abs(x - s.x) + Math.abs(y - s.y) <= 70) return true;
     const d = Math.hypot(x - s.x, y - s.y);
     const lit = litAt(s, x, y) || d <= lampRadius(s);
-    const onRadar = pingShows(s, x, y) || (s.pingSeen && s.pingSeen.has(y * W + x));
+    const onRadar = pingShows(s, x, y) || (s.pingSeen && s.pingSeen.has(y * W + x)) || (s.levels.mapping > 0 && d <= 12 && s.seen.includes(y * W + x));
     if (t === T.FIND || t === T.QUANTUM) return lit || onRadar || (t === T.QUANTUM && d <= lampRadius(s) * 1.5);
     if (t === T.GHOST) return lit && !(s.pingSeen && s.pingSeen.size);  // a ping shows it is not there
     if (!isOre(t)) return false;
@@ -159,7 +159,7 @@ function blocker(s) {
     return null;
 }
 
-const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'homing', 'lamp', 'hull'];
+const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'mapping', 'homing', 'lamp', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
@@ -189,6 +189,7 @@ function unswing(s, mem, dir) {
 
 /** Would the player walk to the workshop now: something there they can pay. */
 function wantsToShop(s, mem) {
+    if (fittable(s).length) return true;
     // what shop() would buy, tried on a copy
     const c = { ...s, x: roomSpot('workshop'), y: -1, levels: { ...s.levels }, tut: s.tut && { ...s.tut, rows: [...s.tut.rows] }, events: [], sayAt: { ...s.sayAt } };
     return shop(c, { ...mem }).length > 0;
@@ -205,6 +206,7 @@ export function readStop(s) {
 
 export function shop(s, mem) {
     const bought = [];
+    for (const id of fittable(s)) if (fit(s, id)) bought.push(`fit ${id}`);
     if (!mem.need) mem.need = nextGate(s);
     for (let guard = 0; guard < 12; guard++) {
         if (graftShown(s) && GRAFTS[s.grafts] && s.bio >= GRAFTS[s.grafts].price && buyGraft(s)) { bought.push('graft'); continue; }
@@ -283,6 +285,14 @@ export function decide(s, mem) {
     for (const r of ROWS) if (rowShown(s, r) && s.levels[r] < maxLevel(r)) cheapest = Math.min(cheapest, priceFor(r, s.levels[r]));
     const near = saving ? 90 : s.parts >= cheapest * 1.5 && s.reserve > 60 && depthOf(s.y) < 1600 ? 1.2 : 6;
     if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < near ? { x: tgt.x, y: tgt.y } : null; }
+    // a player who finds themself going up and down over the same spot gives up on that target for a while
+    if (tgt && tgt.cost < near && (tgt.dir === 'up' || tgt.dir === 'down')) {
+        mem.vh = (mem.vh || []).filter((h) => s.time - h[1] < 2);
+        const lastV = mem.vh[mem.vh.length - 1];
+        if (!lastV || lastV[0] !== tgt.dir) mem.vh.push([tgt.dir, s.time]);
+        if (mem.vh.length >= 4) { mem.vh = []; mem.target = null; mem.calmUntil = s.time + 6; }
+    }
+    if (mem.calmUntil > s.time) tgt = null;
     if (tgt && tgt.cost < near) return { dir: unswing(s, mem, tgt.dir) };
     // the BOOSTER on the way down; the SHOCK WAVE when solid ground is in the way
     if (coolLeft(s, 'booster') === 0 && s.y > 3) boost(s);

@@ -15,6 +15,8 @@ const mem = {};
 if (process.argv.includes('--careless')) { mem.noRepair = true; process.argv.push('--noradio'); }
 // --noradio: a player who never buys the SHORT WAVE RADIO (hears of failures only at home)
 const noradio = process.argv.includes('--noradio');
+// --nosteer: a player who keeps STEERING I (two steps a sideways press)
+const nosteer = process.argv.includes('--nosteer');
 const s = newState(arg('--seed', 7));
 const DT = 0.05;
 let read = 0;                                   // seconds spent on stops
@@ -33,6 +35,7 @@ for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     if (stopOpen(s)) { const id = s.tut.stop.id; read += readStop(s); news.push([wall(), `stop ${id}`]); continue; }
     const before = ups();
     if (noradio && s.tut) s.tut.rows = s.tut.rows.filter((r) => r !== 'radio');
+    if (nosteer && s.tut) s.tut.rows = s.tut.rows.filter((r) => r !== 'steering');
     step(s, DT, { decide: (st) => {
         let { dir } = decide(st, mem);
         if (dir && firsts.dig === undefined && st.tut?.dug === false) first('dig', 'first dig decision');

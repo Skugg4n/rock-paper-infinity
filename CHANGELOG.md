@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.92.1 - 2026-10-09 (chapter IV, the dig after its test)
+
+After the third independent test (docs/playtests/2026-10-09-dig-human-test-3.md, NÄSTAN) and Ola's own play ("GRYM uppdatering! Älskar lugnet.").
+- **The game no longer locks** (Ola C, E). Space paused the whole game (the shell's pause) when it was used to close a stop or after a click on a workshop row; the drone looked stuck "until a reload", also back at the base after a repair. The dig now keeps Space and Enter to itself (captured before the shell), and clicked rows let go of the focus. Tested: Space in the workshop buys and never reaches the shell; the drone drives afterwards; the base row is drivable into every room and back, also after a repair.
+- **No I · TRIVIAL card at the start of the dig** (Ola D). A game already in a chapter (the dig's save, or any saved phase) is not a fresh player. The dig opens with the IV · DEEP card from the interim, or with none.
+- **STEERING I never locks anyone out.** Still two steps a sideways press, but an up or down press cancels the second step, the second step never carries the drone past an open way up (it stops under the shaft), and up held beside the shaft steps into it. A tap of up climbs (the drone holds 0.6 s before it falls), so tapping up a shaft is no longer a step up and a fall back for power. Measured: the autopilot with STEERING I dies 0 times in 6 min (four seeds; was 2, 1, 0, 0), and a key-tapping player in headless Chrome with STEERING I came home every time for 5 min (0 deaths).
+- **No more "Up only through open ground."** (Ola A). Up into rock is a small bump and a puff of dust. The drone digs up into ore, a find or a quantum object (slower and costlier, as before). The CRT never shows the same line twice in a row, and a line that is no longer true (its time is up, the turn back no longer holds) goes.
+- **A full cargo leaves the ore in the rock** (Ola H): the drone does not dig it, and says "Cargo full." once, at the drone.
+- **The workshop with keys** (Ola B): up and down (or W and S) choose a row while the drone stands in the workshop, Enter or Space buys it; the chosen row has a white frame; something new is chosen when it comes; the mouse still works; left and right still drive.
+- **The lab's things are fitted** (Ola F). The lab says "The lab opened it. It was a BOOSTER." "Fit it in the WORKSHOP."; the workshop shows "FIT BOOSTER" with what it does ("Double speed for 5 s, half the power. Key B."). Only fitted things have their key and button. THE OTHER DRONE is not fitted ("It is us. It is not us.").
+- **MAPPING** (Ola G, 40 parts, one level): ore, finds and quantum objects the lamp has lit stay on the map as dim marks. Its row comes when the drone has lit ore it could not carry.
+- **Deaths are told.** "Chamber 5 went dark. 10 sleepers died." on the CRT, and a stop the first time; away without the radio, at the base: "While you were gone: chamber 5 went dark. 10 died." (the generator: "While you were gone: the generator stopped."). GENERATORS has its stop when the gauge first shows: "The generators keep them alive. Ore keeps the generators running." At 0 the first time: "The generators are empty. The sleepers go dark one by one."
+- **Repairs:** the price is set when the alarm starts (it no longer creeps up while the drone is away); mended says "Chamber 5 is mended." / "The generator is mended."; the first alarm's stop, at the base, says "A chamber is failing. Drive to it and repair it."
+- **Quantum objects:** a steady violet core with jumping edges (seen in a still picture too), and the first time the lamp touches one, QUANTUM OBJECT floats over it.
+- **Small:** the first dive costs half the power (until the first ore is home); POWER's stop waits for a pause in the first dig (or 5 tiles) so it does not cut it; the two unnamed spaces of the base are LIFE SUPPORT and PUMPS; the BOOSTER leaves a trail and speed lines; the workshop's arrow only when what is new there can be had; the HOME mark under POWER no longer touches CARGO.
+- Sim (`node scripts/sim-dig.mjs`): the heart at 25.0 / 20.8 / 19.8 / 21.2 min (seeds 7 / 11 / 3 / 5), no sleepers lost for a careful player, first ore home 19 to 29 s. New: `--nosteer` (keeps STEERING I); `node scripts/play-dig.mjs --long 5 --nosteer --tap`.
+- Noted, not changed: the dig's end goes to the wall "V · UNITY TO COME", while the vault leads into chapter V.
+
 ## v1.92.0 - 2026-10-09 (chapter IV, the dig, pass 3: one thing at a time, a base underground)
 
 From Ola's notes (docs/superpowers/specs/2026-10-09-deep-dig-pass3.md). Built in three steps.

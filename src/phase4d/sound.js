@@ -54,6 +54,8 @@ export function createDigSound() {
             else if (e.type === 'ping') audio.pling();
             else if (e.type === 'quantum' || e.type === 'lab-out' || e.type === 'boost' || e.type === 'teleport') audio.rise();
             else if (e.type === 'shock') thump(0.8, 38);
+            else if (e.type === 'bump') thump(0.25, 70);
+            else if (e.type === 'fit') audio.thunk();
             else if (e.type === 'heart') thump(1, 40);
         },
         /** Each frame: the depth in metres and the seconds since the last. */

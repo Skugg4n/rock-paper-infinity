@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = process.argv.includes('--pass3') || process.argv.includes('--step2') || process.argv.includes('--step3');
+const PASS3 = process.argv.includes('--pass3') || process.argv.includes('--step2') || process.argv.includes('--step3') || process.argv.includes('--nosteer');
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -72,6 +72,7 @@ try {
         await ev(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(cp)}); return true; })`);
         await sleep(2500);
     };
+    const key0 = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k === 'Enter' ? 'Enter' : k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k === 'Enter' ? 'Enter' : k, windowsVirtualKeyCode: VK[k] || 13 }); };
     if (process.argv.includes('--long')) {
         // a long session from the start: the hand is the autopilot's choice, sent as real key presses
         // and real clicks on the workshop; a screenshot every 30 s
@@ -79,23 +80,30 @@ try {
         await ev(`import('/src/phase4d/autopilot.js').then((m) => { window.__pilot = m; window.__mem = {}; return true; })`);
         const MIN = Number(process.argv[process.argv.indexOf('--long') + 1]) || 4;
         let held = null, next = 30, t0 = Date.now();
+        const window0 = { last: null, hist: [] };
         while ((Date.now() - t0) / 1000 < MIN * 60) {
-            const st = await ev(`(() => { const s = window.rpiDig.state; if (s.y === -1 && !s.cargo.length) { const b = [...document.querySelectorAll('.dig-buy')].find((x) => !x.disabled && !x.hidden); if (b) { const r = b.getBoundingClientRect(); return { buy: { x: r.left + 30, y: r.top + 12 } }; } }
-                const d = s.act ? (window.__last || null) : window.__pilot.decide({ ...s, events: [] }, window.__mem).dir; window.__last = d; return { dir: d }; })()`);
+            const st = await ev(`(() => { const s = window.rpiDig.state; if (s.tut && s.tut.stop) return { stop: s.tut.stop.crt ? 'crt' : s.tut.stop.id };
+                if (s.y === -1 && !s.cargo.length) { const b = [...document.querySelectorAll('.dig-buy')].find((x) => !x.disabled && !x.hidden && !(${process.argv.includes('--nosteer')} && x.dataset.row === 'steering')); if (b) { const r = b.getBoundingClientRect(); return { buy: { x: r.left + 30, y: r.top + 12 } }; } }
+                const d = s.act ? (window.__last || null) : window.__pilot.decide({ ...s, events: [] }, window.__mem).dir; window.__last = d; return { dir: d, free: !s.act && !s.commit, snap: { x: s.x, y: s.y, b: Math.round(s.battery * 10) / 10, deaths: s.deaths, going: window.__mem.going, line: s.line.text, cargo: s.cargo.length } }; })()`);
+            if (st.snap) { if (window0.last && st.snap.deaths > window0.last.deaths) console.log('DIED after', JSON.stringify(window0.hist.slice(-12))); window0.last = st.snap; window0.hist.push([st.dir, st.snap.x, st.snap.y, st.snap.b, st.snap.going]); if (window0.hist.length > 60) window0.hist.shift(); }
+            if (st.stop) { if (held) { await send('Input.dispatchKeyEvent', { type: 'keyUp', key: held, code: held, windowsVirtualKeyCode: VK[held] }); held = null; } if (st.stop !== 'crt') { await sleep(1200); await key0('Enter'); } else await sleep(300); continue; }
             if (st.buy) { if (held) { await send('Input.dispatchKeyEvent', { type: 'keyUp', key: held, code: held, windowsVirtualKeyCode: VK[held] }); held = null; } await click(st.buy.x, st.buy.y); await sleep(150); continue; }
             const key = st.dir ? { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }[st.dir] : null;
-            if (key !== held) {
+            if (process.argv.includes('--tap')) {
+                // a player who taps: one press a decision (sideways that is two steps with STEERING I)
+                if (key && st.free) { await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: VK[key] }); await sleep(30); await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: VK[key] }); }
+            } else if (key !== held) {
                 if (held) await send('Input.dispatchKeyEvent', { type: 'keyUp', key: held, code: held, windowsVirtualKeyCode: VK[held] });
                 if (key) await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: VK[key] });
                 held = key;
             }
-            if ((Date.now() - t0) / 1000 >= next) { await shot(`long-${String(next).padStart(3, '0')}s`); next += 30; }
+            if ((Date.now() - t0) / 1000 >= next) { await shot(`long-${String(next).padStart(3, '0')}s`); next += 30; console.log('deaths', await ev('window.rpiDig.state.deaths'), 'steering', await ev('window.rpiDig.state.levels.steering')); }
             await sleep(40);
         }
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !process.argv.includes('--step2') && !process.argv.includes('--step3')) {
+    if (PASS3 && !process.argv.includes('--step2') && !process.argv.includes('--step3') && !process.argv.includes('--long')) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -187,11 +195,19 @@ try {
         await sleep(1200);
         await shot('p3-32-lab-stop');
         await key('Enter');
+        // fitted in the workshop: drive there, Enter fits the chosen row
+        for (let i = 0; i < 12 && (await st('s.x')) > 15; i++) await hold('ArrowLeft', 140);
+        await sleep(500);
+        await shot('p3-32b-fit-row');
+        await key('Enter');
+        await sleep(300);
+        await shot('p3-32c-fitted');
+        await hold('ArrowLeft', 500);
         await hold('ArrowDown', 1600);
         await key('b');
         await hold('ArrowDown', 1200);
         await shot('p3-33-booster');
-        await ev(`(() => { const s = window.rpiDig.state; for (const id of ['shock', 'teleport', 'lamp2']) if (!s.quantum.got.includes(id)) s.quantum.got.push(id); return true; })()`);
+        await ev(`(() => { const s = window.rpiDig.state; for (const id of ['shock', 'teleport', 'lamp2']) { if (!s.quantum.got.includes(id)) s.quantum.got.push(id); if (!s.quantum.fit.includes(id)) s.quantum.fit.push(id); } return true; })()`);
         await key('q');
         await sleep(200);
         await shot('p3-34-shock');

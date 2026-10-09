@@ -29,6 +29,9 @@ beforeAll(() => {
     document.body.innerHTML = '<div id="phase-deep" class="phase-container"></div><div id="menu-dropdown"></div>';
 });
 
+// a torn-down act's last frame stays in the queue (cancelAnimationFrame does nothing here): drop it
+beforeEach(() => { frames.length = 0; });
+
 async function run(n, t0) {
     let t = t0;
     for (let i = 0; i < n; i++) { const f = frames.shift(); if (!f) break; t += 50; f(t); }
@@ -50,6 +53,55 @@ test('a new game shows only the CRT; the gauges wait their turn', async () => {
     }
 });
 
+test('Space and Enter stay in the dig: they never reach the shell (whose Space pauses the game)', async () => {
+    const s0 = preparedState({ row: 20, parts: 200 });
+    s0.y = -1; s0.x = 13;
+    localStorage.setItem(SAVE_KEY, serialize(s0));
+    const m = await import('./index.js');
+    m.init();
+    let leaked = 0;
+    const shell = (e) => { if (e.code === 'Space' || e.key === ' ') leaked++; };
+    document.addEventListener('keydown', shell);
+    try {
+        let t = await run(5, performance.now());
+        const st = window.rpiDig.state;
+        // the workshop with keys: down chooses, Space buys
+        const parts = st.parts;
+        const sel0 = document.querySelector('.dig-buy.is-sel')?.dataset.row;
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        expect(document.querySelector('.dig-buy.is-sel')?.dataset.row).not.toBe(sel0);
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        expect(document.querySelector('.dig-buy.is-sel')?.dataset.row).toBe(sel0);
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+        t = await run(3, t);
+        expect(leaked).toBe(0);
+        expect(st.parts).toBeLessThan(parts);
+        expect(document.querySelector('.dig-buy.is-sel')).not.toBeNull();
+        // after buying, the drone still drives
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+        await run(20, t);
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft' }));
+        expect(st.x).toBeLessThan(13);
+    } finally {
+        document.removeEventListener('keydown', shell);
+        m.teardown();
+    }
+});
+
+test('the CRT never says the same line twice in a row', async () => {
+    localStorage.setItem(SAVE_KEY, serialize(preparedState({ row: 20 })));
+    const m = await import('./index.js');
+    m.init();
+    try {
+        const st = window.rpiDig.state;
+        let t = await run(3, performance.now());
+        for (let k = 0; k < 3; k++) { st.line = { text: 'It was not there.', at: st.time, n: st.line.n + 1, kind: 'ghost', ttl: 3 }; t = await run(2, t); }
+        expect(document.querySelectorAll('#dig-crt .l').length).toBe(1);
+    } finally {
+        m.teardown();
+    }
+});
+
 test('the act draws from the start to the rise without an error', async () => {
     const s = preparedState({ row: 30, levels: { drill: 1 } });
     s.y = 30; s.battery = 8;
@@ -62,7 +114,7 @@ test('the act draws from the start to the rise without an error', async () => {
     expect(document.getElementById('dig-power').textContent).toMatch(/^\d+ \/ \d+$/);
     expect(st.line.kind).toBe('turnback');
     // to the heart
-    st.y = 397; st.x = HOME_X; st.levels.hull = 3; st.levels.drill = 3; st.grafts = 3; st.battery = 300;
+    st.y = 397; st.x = HOME_X; st.levels.hull = 3; st.levels.drill = 3; st.grafts = 3; st.battery = 300; st.tut.done.warm = true;
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     t = await run(120, t);
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown' }));

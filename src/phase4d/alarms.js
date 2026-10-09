@@ -25,6 +25,10 @@ export const failGap = (u, m) => (FAIL_MIN + (FAIL_MAX - FAIL_MIN) * u) * (1 - 0
 
 export const ALARM_LINES = {
     first: 'A chamber is failing. Return to base and repair it.',
+    firstHere: 'A chamber is failing. Drive to it and repair it.',
+    away: (k) => `While you were gone: chamber ${k + 1} went dark. ${KILL} died.`,
+    genAway: 'While you were gone: the generator stopped.',
+    mended: (id) => (id === 'gen' ? 'The generator is mended.' : `Chamber ${Number(id.slice(1)) + 1} is mended.`),
     tag: (id, secs) => `${nameOf(id)} · ${Math.max(0, Math.ceil(secs))} s`,
     dark: (k) => `Chamber ${k + 1} went dark. ${KILL} sleepers died.`,
     genStop: 'The generator stopped. POWER does not charge.',
@@ -73,7 +77,8 @@ export function stepAlarms(s, dt, io) {
         if (al.n > 0 && genFree && rnd(s, 1) < 0.22) id = 'gen';
         else if (free.length) id = `c${free[Math.floor(rnd(s, 2) * free.length)]}`;
         if (id) {
-            al.list.push({ id, at: s.time, until: s.time + failWindow(io.recordM) * (al.n === 0 ? 1.5 : 1) });
+            // the price is set when the alarm starts: it does not creep up while the drone is away
+            al.list.push({ id, at: s.time, until: s.time + failWindow(io.recordM) * (al.n === 0 ? 1.5 : 1), cost: repairCost(io.recordM) });
             io.event({ type: 'fail', id });
         }
         al.n++;
@@ -85,35 +90,39 @@ export function stepAlarms(s, dt, io) {
         if (s.time < f.until) continue;
         al.list.splice(i, 1);
         if (al.repair && al.repair.id === f.id) al.repair = null;
-        let text;
+        const heard = io.home || io.radio;
         if (f.id === 'gen') {
             al.genDown = true;
-            text = ALARM_LINES.genStop;
+            al.genCost = f.cost;
             io.event({ type: 'gen-stop' });
+            if (heard) io.say(ALARM_LINES.genStop, 'alarm');
+            else al.unseen.push({ text: ALARM_LINES.genAway, died: false });
         } else {
             const k = Number(f.id.slice(1));
             let n = 0;
             for (let p = k * PER_CHAMBER + 1; p <= (k + 1) * PER_CHAMBER && n < KILL; p++) if (io.alive(p)) { s.dark.push(p); n++; }
             al.lost += n;
-            text = ALARM_LINES.dark(k);
             io.event({ type: 'chamber-dark', k, n });
+            // people died: said at once when it is heard (a stop the first time), else when the drone is home
+            if (heard) io.died(ALARM_LINES.dark(k));
+            else al.unseen.push({ text: ALARM_LINES.away(k), died: true });
         }
-        if (io.home || io.radio) io.say(text, 'alarm');
-        else al.unseen.push(text);
     }
     // mending: the drone stands under it, at home, still
     const here = io.home && !s.act ? failureAt(al, s.x) : null;
     if (!here) { al.repair = null; return; }
-    const cost = repairCost(io.recordM);
+    const f = al.list.find((q) => q.id === here);
+    const cost = f ? (f.cost ?? repairCost(io.recordM)) : (al.genCost ?? repairCost(io.recordM));
     if (s.parts < cost) { al.repair = null; io.say(ALARM_LINES.short(cost), 'gate'); return; }
     if (!al.repair || al.repair.id !== here) al.repair = { id: here, t: 0 };
     al.repair.t += dt;
     if (al.repair.t >= REPAIR_S) {
         s.parts -= cost;
         al.list = al.list.filter((q) => q.id !== here);
-        if (here === 'gen') al.genDown = false;
+        if (here === 'gen') { al.genDown = false; al.genCost = null; }
         al.repair = null;
         io.event({ type: 'repaired', id: here });
+        io.say(ALARM_LINES.mended(here), 'line');
     }
 }
 function chamberAlive(s, k, io) {
@@ -121,6 +130,11 @@ function chamberAlive(s, k, io) {
     for (let p = k * PER_CHAMBER + 1; p <= (k + 1) * PER_CHAMBER; p++) if (io.alive(p)) n++;
     return n;
 }
+/** What mending this failure costs: the price set when its alarm started. */
+export const costOf = (al, id, recordM) => {
+    const f = al.list.find((q) => q.id === id);
+    return f ? (f.cost ?? repairCost(recordM)) : (al.genCost ?? repairCost(recordM));
+};
 /** The failure closest to its end, or null: what the panel's alarm row shows. */
 export function worstAlarm(s) {
     const al = s.alarms;

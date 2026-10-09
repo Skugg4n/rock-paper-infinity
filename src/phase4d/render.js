@@ -9,7 +9,7 @@
  */
 
 import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
-import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows } from './dig.js';
+import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE } from './dig.js';
 import { spotOf, REPAIR_S } from './alarms.js';
 import { has, boosting, LAB_S } from './quantum.js';
 import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
@@ -60,6 +60,14 @@ export function createRenderer(canvas) {
     let flash = 0, flashAt = 4;
     const r = { cam: { x: 0, y: -6 * TS }, originX: 0, ending: 0, rising: null };
     const pops = [];
+    const trail = [], labels = [];
+    /** A name that floats over a tile for a few seconds. */
+    function label(i, text) { labels.push({ i, text, life: 3.5 }); }
+    /** Up into rock: a puff of dust over the drone. */
+    function bump(s) {
+        const p = dronePos(s);
+        burst(r.originX + p.x * TS + TS / 2, p.y * TS - r.cam.y + 2, '#8f8676', 8);
+    }
     /** A number that floats up from the drone: a find's worth. */
     function pop(text, col = '#f2d98a', big = true, sub = '') { pops.push({ text, col, big, sub, life: 2.2 }); }
     /** RISE: the red mass climbs from the heart to the city in RISE_S seconds. */
@@ -223,6 +231,18 @@ export function createRenderer(canvas) {
             ctx.fillStyle = g;
             ctx.fillRect(-vw * 2, -vh * 2, vw * 4, vh * 4);
             ctx.restore();
+            // MAPPING: what the lamp has lit stays as a dim mark in the dark
+            if (s.levels.mapping > 0) {
+                for (const i of s.seen) {
+                    const yy = Math.floor(i / W);
+                    if (yy < y0 || yy > y1) continue;
+                    const tt = s.tiles[i];
+                    if (!(isOre(tt) || tt === T.FIND)) continue;
+                    ctx.fillStyle = tt === T.FIND ? 'rgba(255,214,120,0.35)' : tt === T.BIO ? 'rgba(255,90,110,0.35)' : 'rgba(160,225,255,0.3)';
+                    const mx = r.originX + (i % W) * TS + TS / 2, my = yy * TS + TS / 2 - camY;
+                    ctx.beginPath(); ctx.moveTo(mx, my - 5); ctx.lineTo(mx + 5, my); ctx.lineTo(mx, my + 5); ctx.lineTo(mx - 5, my); ctx.fill();
+                }
+            }
             // what is not from here flickers faintly even in the dark
             for (let y = Math.max(0, y0); y <= y1 && y1 >= y0; y++) {
                 for (let x = 0; x < W; x++) if (s.tiles[y * W + x] === T.QUANTUM) quantumTile(r.originX + x * TS, y * TS - camY, x, y, t);
@@ -278,7 +298,39 @@ export function createRenderer(canvas) {
         }
 
         // ---- the drone
-        if (r.rising === null) { drawDrone(s, dx, dy); drawRings(dx, dy, dt); }
+        if (r.rising === null) {
+            // the BOOSTER is felt: a trail of the drone where it was, and speed lines
+            if (boosting(s)) {
+                trail.push({ x: dx, y: dy + camY, life: 0.35 });
+                ctx.strokeStyle = 'rgba(143,208,255,0.55)'; ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let k = 0; k < 7; k++) {
+                    const a = hash(k, Math.floor(performance.now() / 60)) * Math.PI * 2, r0 = 26 + 10 * hash(k, 3);
+                    ctx.moveTo(dx + Math.cos(a) * r0, dy + Math.sin(a) * r0); ctx.lineTo(dx + Math.cos(a) * (r0 + 16), dy + Math.sin(a) * (r0 + 16));
+                }
+                ctx.stroke();
+            }
+            for (let k = trail.length - 1; k >= 0; k--) {
+                const q = trail[k];
+                q.life -= dt;
+                if (q.life <= 0) { trail.splice(k, 1); continue; }
+                ctx.fillStyle = `rgba(143,208,255,${(q.life * 0.9).toFixed(3)})`;
+                ctx.beginPath(); ctx.ellipse(q.x, q.y - camY, 16, 11, 0, 0, Math.PI * 2); ctx.fill();
+            }
+            drawDrone(s, dx, dy); drawRings(dx, dy, dt);
+        }
+        // a name over a tile (the first quantum object the lamp touches)
+        for (let k = labels.length - 1; k >= 0; k--) {
+            const q = labels[k];
+            q.life -= dt;
+            if (q.life <= 0) { labels.splice(k, 1); continue; }
+            const lx = r.originX + (q.i % W) * TS + TS / 2, ly = Math.floor(q.i / W) * TS - camY - 10 - (3 - q.life) * 6;
+            ctx.globalAlpha = Math.min(1, q.life);
+            ctx.font = '600 16px "Bebas Neue", "Arial Narrow", sans-serif'; ctx.textAlign = 'center';
+            ctx.fillStyle = '#0b0c0e'; ctx.fillRect(lx - 58, ly - 14, 116, 20);
+            ctx.fillStyle = '#c9b8ff'; ctx.fillText(q.text, lx, ly + 1);
+            ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+        }
         // a stop that says down: an amber arrow under the drone
         if (view.focus === 'down' && r.rising === null) { const k = performance.now() / 1000; ctx.save(); ctx.translate(dx, dy + 52 + 6 * Math.sin(k * 5)); ctx.scale(1.6, 1.6); arrow(0, 0, 1); ctx.restore(); }
         // ---- what rises: the red mass climbs the shaft and breaks through the city
@@ -327,7 +379,10 @@ export function createRenderer(canvas) {
     /** A quantum object: a tile that flickers between realities (not ore: no glint, no crystal). */
     function quantumTile(sx, sy, x, y, t) {
         const f = hash(x * 7 + Math.floor(performance.now() / 90), y);
-        const a = 0.35 + 0.5 * f;
+        const a = 0.65 + 0.35 * f;
+        // a steady violet core, so it shows in a still picture too; the edges jump between realities
+        ctx.fillStyle = 'rgba(150,120,230,0.55)';
+        ctx.fillRect(sx + 9, sy + 9, TS - 18, TS - 18);
         ctx.fillStyle = `rgba(200,190,255,${(a * 0.5).toFixed(3)})`;
         ctx.fillRect(sx + 7, sy + 7, TS - 14, TS - 14);
         const o = (f - 0.5) * 5;
@@ -661,6 +716,23 @@ export function createRenderer(canvas) {
                 x.fillStyle = '#4a2a36'; x.fillRect(rx + 40, floor - 38, 6, 4);
             }
         }, lab);
+        // the spaces between the rooms: LIFE SUPPORT (tanks, filters) and PUMPS (wheels, pipes)
+        const space = (a, b, name, draw) => {
+            const rx = a * TS, rw = (b - a + 1) * TS;
+            x.fillStyle = '#11161c'; x.fillRect(rx + 2, top + 4, rw - 4, floor - top - 4);
+            draw(rx, rw);
+            dymo(x, name, rx + rw / 2, top + 20, 10);
+        };
+        space(4, 5, 'LIFE SUPPORT', (rx, rw) => {
+            x.fillStyle = '#2b333d'; x.fillRect(rx + 8, top + 36, 18, floor - top - 40); x.fillRect(rx + rw - 26, top + 44, 18, floor - top - 48);
+            x.fillStyle = 'rgba(143,208,255,0.35)'; x.fillRect(rx + 12, top + 42, 4, floor - top - 52); x.fillRect(rx + rw - 22, top + 50, 4, floor - top - 60);
+        });
+        space(17, 18, 'PUMPS', (rx, rw) => {
+            x.strokeStyle = '#3a4350'; x.lineWidth = 3;
+            x.beginPath(); x.arc(rx + rw / 2, floor - 26, 13, 0, Math.PI * 2); x.stroke();
+            x.beginPath(); x.moveTo(rx + rw / 2 - 13, floor - 26); x.lineTo(rx + rw / 2 + 13, floor - 26); x.moveTo(rx + rw / 2, floor - 39); x.lineTo(rx + rw / 2, floor - 13); x.stroke();
+            x.fillStyle = '#2b333d'; x.fillRect(rx + 4, top + 34, rw - 8, 5);
+        });
         // the floor, and the hatch in it
         x.fillStyle = '#20262e'; x.fillRect(0, floor - 2, W * TS, 2);
         x.fillStyle = '#050608'; x.fillRect(sx + 2, floor - 3, TS - 4, 3);
@@ -722,8 +794,10 @@ export function createRenderer(canvas) {
         if (home && s.cargo.length && !(rx >= ROOMS.warehouse[0] && rx <= ROOMS.warehouse[1])) {
             arrow(r.originX + roomSpot('warehouse') * TS - TS, top + 46 + 4 * Math.sin(t * 5), 1);
         }
+        // the workshop's arrow only when what is new there can be had now
         const fresh = s.tut && s.tut.on && s.tut.fresh;
-        if (fresh && !(home && rx >= ROOMS.workshop[0] && rx <= ROOMS.workshop[1])) {
+        const can = fresh && (String(fresh).startsWith('fit-') || fresh === 'graft' || (PRICE[fresh] && s.parts >= (PRICE[fresh][s.levels[fresh]] ?? Infinity)));
+        if (can && !(home && rx >= ROOMS.workshop[0] && rx <= ROOMS.workshop[1])) {
             arrow(r.originX + roomSpot('workshop') * TS + TS * 1.5, top + 46 + 4 * Math.sin(t * 5), 1);
         }
         void view;
@@ -860,5 +934,5 @@ export function createRenderer(canvas) {
         }
     }
 
-    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, worldWidth: W * TS };
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, label, bump, worldWidth: W * TS };
 }

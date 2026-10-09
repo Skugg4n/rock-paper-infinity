@@ -5,7 +5,8 @@
  * time the drone is at the base the lab says what it was, and a big upgrade is the drone's.
  *
  * The order is shuffled by the seed, but BOOSTER or SHOCK WAVE comes first (they feel the most).
- * State in s.quantum: { carry: [tile index], labQ: n, lab: seconds | null, ready: [id], got: [id], order: [id], cool: {id: time}, boostUntil }.
+ * State in s.quantum: { carry: [tile index], labQ: n, lab: seconds | null, ready: [id], got: [id] (opened),
+ * fit: [id] (fitted in the workshop: only these work), order: [id], cool: {id: time}, boostUntil }.
  */
 import { rng } from './world.js';
 
@@ -46,9 +47,10 @@ export function qOrder(seed) {
     return [first, ...rest.filter((id) => id !== first)];
 }
 export function newQuantum(seed) {
-    return { carry: [], labQ: 0, lab: null, ready: [], got: [], order: qOrder(seed), cool: {}, boostUntil: -1 };
+    return { carry: [], labQ: 0, lab: null, ready: [], got: [], fit: [], order: qOrder(seed), cool: {}, boostUntil: -1 };
 }
-export const has = (s, id) => !!(s.quantum && s.quantum.got.includes(id));
+/** The drone has it: opened by the lab and fitted in the workshop. */
+export const has = (s, id) => !!(s.quantum && (s.quantum.fit || s.quantum.got).includes(id));
 export const coolLeft = (s, id) => (has(s, id) ? Math.max(0, (s.quantum.cool[id] ?? -1e9) + COOL[id] - s.time) : Infinity);
 export const boosting = (s) => !!(s.quantum && s.time < s.quantum.boostUntil);
 
