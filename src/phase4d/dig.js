@@ -12,6 +12,7 @@
 import { W, H, T, ORE, depthOf, layerIndexOf, LAYERS, FINDS, FIND_PARTS, FIND_BIO, makeWorld, rng, rowOf } from './world.js';
 import { HOME_X, roomAt } from './base.js';
 import { newAlarms, stepAlarms, ALARM_LINES } from './alarms.js';
+import { newQuantum, stepLab, has, coolLeft, boosting, Q_LINES, BOOST_S, SHOCK_R, SHOCK_COST, DEEP_FROM, DEEP_RATE } from './quantum.js';
 
 export { HOME_X };
 export const SAVE_KEY = 'rpi-deep-dig';
@@ -24,6 +25,7 @@ export const STOPS = {
     dig: ['The generators burn ore. Dig.'],
     power: ['Power. It takes you down and brings you home.'],
     failing: [ALARM_LINES.first],
+    warm: [Q_LINES.warm],
 };
 export const LINES = {
     unload: 'Drive into the WAREHOUSE to unload.',
@@ -47,9 +49,9 @@ export function newTut() {
 export const shows = (s, what) => !s.tut || !s.tut.on || !!s.tut.show[what];
 export const rowShown = (s, row) => !s.tut || !s.tut.on || s.tut.rows.includes(row);
 export const stopOpen = (s) => !!(s.tut && s.tut.stop);
-function openStop(s, id, focus = null) {
+function openStop(s, id, focus = null, text = STOPS[id]) {
     if (!s.tut || !s.tut.on || s.tut.done[id] || (s.tut.stop && s.tut.stop.id === id)) return;
-    s.tut.stop = { id, text: STOPS[id], focus };
+    s.tut.stop = { id, text, focus };
     s.events.push({ type: 'stop', id });
 }
 /** OK (or doing what it asks): the stop closes and time runs again. */
@@ -134,8 +136,8 @@ export const GRAFTS = [
 
 // ---- digging and moving -----------------------------------------------------------------------
 /** Seconds to dig a tile at drill 0, and battery it costs. Ore takes its layer's ground. */
-export const DIG_TIME = { [T.SOIL]: 0.25, [T.STONE]: 0.6, [T.HARD]: 0.9, [T.BASALT]: 1.1, [T.FLESH]: 0.5, [T.SINEW]: 0.9, [T.FIND]: 0.5, [T.GHOST]: 0.6 };
-export const DIG_COST = { [T.SOIL]: 0.8, [T.STONE]: 1.3, [T.HARD]: 1.8, [T.BASALT]: 2.4, [T.FLESH]: 1, [T.SINEW]: 2, [T.FIND]: 1, [T.GHOST]: 1.4 };
+export const DIG_TIME = { [T.SOIL]: 0.25, [T.STONE]: 0.6, [T.HARD]: 0.9, [T.BASALT]: 1.1, [T.FLESH]: 0.5, [T.SINEW]: 0.9, [T.FIND]: 0.5, [T.GHOST]: 0.6, [T.QUANTUM]: 0.6 };
+export const DIG_COST = { [T.SOIL]: 0.8, [T.STONE]: 1.3, [T.HARD]: 1.8, [T.BASALT]: 2.4, [T.FLESH]: 1, [T.SINEW]: 2, [T.FIND]: 1, [T.GHOST]: 1.4, [T.QUANTUM]: 1.2 };
 const ORE_TIME = [0.28, 0.4, 0.6, 0.8, 0.95, 0.5];
 const ORE_COST = [0.8, 1.1, 1.3, 1.8, 2.2, 1];
 export const MOVE_TIME = 0.13, MOVE_COST = 0.3;
@@ -179,12 +181,12 @@ export function newState(seed = 7) {
     const pods = Array.from({ length: SLEEPERS }, (_, i) => i + 1);
     for (let i = pods.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [pods[i], pods[j]] = [pods[j], pods[i]]; }
     return {
-        v: 1, seed, tiles: world.tiles, finds: world.finds, found: [],
+        v: 1, seed, tiles: world.tiles, finds: world.finds, found: [], qAt: world.quantum,
         x: HOME_X, y: -1, act: null, fallStreak: 0, face: 1,
         battery: BATTERY_CAP[0], cargo: [], unloadT: 0,
         parts: 0, bio: 0, bioSeen: false, delivered: 0,
         levels: { drill: 0, battery: 0, cargo: 0, lamp: 0, hull: 0, steering: 0, gps: 0, homing: 0, radio: 0 }, grafts: 0, dreaming: false,
-        tut: newTut(), dives: 0, commit: null, alarms: newAlarms(0), ping: null,
+        tut: newTut(), dives: 0, commit: null, alarms: newAlarms(0), ping: null, quantum: newQuantum(seed), bioHome: false,
         reserve: 100, podOrder: pods, dark: [], podT: 0,
         time: 0, record: -1, layerSeen: 0, voiceT: 0, voiceN: 0,
         line: { text: '', at: 0, n: 1, kind: 'line', ttl: 0 },
@@ -222,6 +224,12 @@ export function ping(s) {
     return true;
 }
 export const depthM = (s) => depthOf(s.y);
+/** Is (x, y) in the lamp's light: a circle, and with the SECOND LAMP an oval that reaches down as far again. */
+export function litAt(s, x, y) {
+    const r = lampRadius(s), dx = x - s.x, dy = y - s.y;
+    if (Math.hypot(dx, dy) <= r) return true;
+    return has(s, 'lamp2') && dy > 0 && (dx / r) ** 2 + ((dy - r * 0.8) / (r * 1.8)) ** 2 <= 1;
+}
 export const isHome = (s) => s.y === -1;
 /** The room of the base the drone stands in, or null (away, or between rooms). */
 export const roomOf = (s) => (isHome(s) ? roomAt(s.x) : null);
@@ -281,6 +289,8 @@ function say(s, text, kind = 'line', hold = 4) {
 
 function die(s) {
     need(s, 'lamp');
+    // a quantum object carried goes back where it was found
+    if (s.quantum) { for (const i of s.quantum.carry) s.tiles[i] = T.QUANTUM; s.quantum.carry = []; }
     s.commit = null;
     s.cargo = [];
     if (s.deaths >= FREE_DEATHS) s.reserve = Math.max(0, s.reserve - LOST_ON_DEATH);
@@ -301,6 +311,8 @@ function arrive(s, x, y) {
         if (y >= rowOf(20)) reveal(s, 'depth');
         // the dark gets thick below 400 m: the lamp is wanted even by a drone that never died in it
         if (y >= rowOf(LAMP_NEED_M)) need(s, 'lamp');
+        // the rock gets warm: the system's voice, once
+        if (depthOf(y) > 1100) openStop(s, 'warm');
     }
     if (y >= 0) {
         const li = layerIndexOf(y);
@@ -318,8 +330,7 @@ function arrive(s, x, y) {
 }
 
 function finishDig(s, tx, ty) {
-    const i = ty * W + tx;
-    const t = s.tiles[i];
+    const t = s.tiles[ty * W + tx];
     if (t === T.HEART) {
         // the heart's wall takes a few beats
         s.heartHits = (s.heartHits || 0) + 1;
@@ -328,8 +339,23 @@ function finishDig(s, tx, ty) {
         else say(s, HEART_LINES[s.heartHits - 1], 'voice', 0);
         return;
     }
+    takeTile(s, tx, ty);
+    arrive(s, tx, ty);
+    // the first tile dug: POWER, and what it is
+    if (s.tut && s.tut.on && !s.tut.show.power) { reveal(s, 'power'); openStop(s, 'power', 'power'); }
+}
+
+/** What a tile gives when it is dug (or eaten by the shock wave). */
+function takeTile(s, tx, ty) {
+    const i = ty * W + tx;
+    const t = s.tiles[i];
     s.tiles[i] = T.AIR;
-    if (isOre(t)) {
+    if (t === T.QUANTUM) {
+        s.quantum.carry.push(i);
+        s.quantum.labOpen = true;
+        s.events.push({ type: 'quantum' });
+        say(s, Q_LINES.picked, 'find', 0);
+    } else if (isOre(t)) {
         if (s.cargo.length < cargoCap(s)) {
             s.cargo.push(t);
             reveal(s, 'cargo');
@@ -365,9 +391,40 @@ function finishDig(s, tx, ty) {
         // a long dig through nothing: a way to see ore in the dark is wanted
         if (s.tut && ++s.tut.empty >= EMPTY_DIG) need(s, 'gps');
     }
-    arrive(s, tx, ty);
-    // the first tile dug: POWER, and what it is
-    if (s.tut && s.tut.on && !s.tut.show.power) { reveal(s, 'power'); openStop(s, 'power', 'power'); }
+}
+
+// ---- the big upgrades from the lab (spec E) ----------------------------------------------------
+/** BOOSTER: double speed for 5 s at half the power. */
+export function boost(s) {
+    if (coolLeft(s, 'booster') > 0 || isHome(s) || s.ended || stopOpen(s)) return false;
+    s.quantum.cool.booster = s.time;
+    s.quantum.boostUntil = s.time + BOOST_S;
+    s.events.push({ type: 'boost' });
+    return true;
+}
+/** TELEPORT: home to the base at once, cargo and all. */
+export function teleport(s) {
+    if (coolLeft(s, 'teleport') > 0 || isHome(s) || s.ended || stopOpen(s)) return false;
+    s.quantum.cool.teleport = s.time;
+    s.x = HOME_X; s.y = -1; s.act = null; s.commit = null; s.fallStreak = 0; s.upStreak = 0;
+    s.events.push({ type: 'teleport' });
+    return true;
+}
+/** SHOCK WAVE: eats the ground two tiles round (what the drill could dig); the ore goes in the cargo. */
+export function shock(s) {
+    if (coolLeft(s, 'shock') > 0 || isHome(s) || s.ended || stopOpen(s)) return false;
+    s.quantum.cool.shock = s.time;
+    for (let y = Math.max(0, s.y - SHOCK_R); y <= Math.min(H - 1, s.y + SHOCK_R); y++) {
+        for (let x = Math.max(0, s.x - SHOCK_R); x <= Math.min(W - 1, s.x + SHOCK_R); x++) {
+            if (Math.hypot(x - s.x, y - s.y) > SHOCK_R + 0.3) continue;
+            const t = s.tiles[y * W + x];
+            if (t === T.AIR || t === T.HEART || gateOf(s, t, y)) continue;
+            takeTile(s, x, y);
+        }
+    }
+    s.battery -= SHOCK_COST;
+    s.events.push({ type: 'shock' });
+    return true;
 }
 
 function touchHeart(s) {
@@ -424,7 +481,7 @@ function tryDir(s, dir) {
     }
     if (dy === -1) {
         // ore or a find right above: dig up into it, slower and costlier; other rock only from below
-        if ((isOre(t) || t === T.FIND || t === T.GHOST) && !gateOf(s, t, ty)) {
+        if ((isOre(t) || t === T.FIND || t === T.GHOST || t === T.QUANTUM) && !gateOf(s, t, ty)) {
             s.act = { kind: 'dig', tx, ty, t: 0, dur: digTime(s, t, ty) * 1.6, cost: digCost(t, ty) * 1.6, tile: t };
             s.events.push({ type: 'dig-start', t });
             return true;
@@ -446,7 +503,17 @@ function tryDir(s, dir) {
 }
 
 /** The drone is back in the base: a dive without ore counts; one new workshop row a dive. */
+/** The first biomass at the base: the lab speaks, and GRAFT lights in the workshop. */
+function bioHome(s) {
+    if (s.bioHome) return;
+    s.bioHome = true;
+    if (s.quantum) s.quantum.labOpen = true;
+    if (s.tut && s.tut.on) s.tut.fresh = 'graft';
+    s.events.push({ type: 'row', row: 'graft' });
+    say(s, Q_LINES.bio, 'voice', 0);
+}
 function homeAgain(s) {
+    if (s.bio > 0) bioHome(s);
     // what happened at the base while the drone was away, without the radio
     if (s.alarms && s.alarms.unseen.length) { say(s, s.alarms.unseen.join(' '), 'alarm', 0); s.alarms.unseen = []; }
     const t = s.tut;
@@ -455,7 +522,9 @@ function homeAgain(s) {
         t.dry = t.diveOre > 0 || s.cargo.length ? 0 : t.dry + 1;
         if (t.dry >= 2) need(s, 'gps');
     }
-    if (t.rows.length && t.needs.length && t.revealDive !== s.dives && s.time - (t.revealAt ?? -1e9) >= ROW_GAP) {
+    // one new thing a homecoming: what the lab found, or a failing chamber's first stop, goes before a new row
+    const news = (s.quantum && s.quantum.ready.length) || (s.alarms && s.alarms.list.length && !t.done.failing);
+    if (!news && t.rows.length && t.needs.length && t.revealDive !== s.dives && s.time - (t.revealAt ?? -1e9) >= ROW_GAP) {
         const row = t.needs.shift();
         t.rows.push(row);
         t.revealDive = s.dives;
@@ -516,8 +585,26 @@ export function step(s, dt, input = {}) {
         });
         if (isHome(s) && s.alarms.list.some((f) => f.id !== 'gen') && s.tut && s.tut.on && !s.tut.done.failing) {
             openStop(s, 'failing', 'alarm');
+            if (s.tut) s.tut.revealAt = s.time;
             need(s, 'radio');
             return;
+        }
+    }
+    // the lab works on what it was given; what it found is told at the base, one at a time (a stop)
+    if (s.quantum) {
+        stepLab(s, dt);
+        const q = s.quantum;
+        if (isHome(s) && roomOf(s) === 'lab' && q.carry.length) {
+            q.labQ += q.carry.length; q.carry = [];
+            s.events.push({ type: 'lab-in' });
+        }
+        if (isHome(s) && q.ready.length && !stopOpen(s)) {
+            const id = q.ready.shift();
+            q.got.push(id);
+            if (s.tut) s.tut.revealAt = s.time;
+            s.events.push({ type: 'lab-out', id });
+            if (s.tut && s.tut.on) { openStop(s, `q-${id}`, null, [Q_LINES.opened(id), Q_LINES.use[id]]); return; }
+            say(s, `${Q_LINES.opened(id)} ${Q_LINES.use[id]}`, 'find', 0);
         }
     }
     const cap = batteryCap(s);
@@ -551,6 +638,7 @@ export function step(s, dt, input = {}) {
                 s.parts += ORE[t].parts;
                 s.bio += ORE[t].bio;
                 if (ORE[t].bio && !s.bioSeen) { s.bioSeen = true; s.events.push({ type: 'bio-first' }); }
+                if (ORE[t].bio) bioHome(s);
                 s.reserve = Math.min(100, s.reserve + reserveOf(t));
                 s.delivered++;
                 s.events.push({ type: 'deliver', kind: ORE[t].kind, n: s.cargo.length });
@@ -570,6 +658,7 @@ export function step(s, dt, input = {}) {
         if (depthOf(s.y) > HEAT_FROM && s.grafts < 3) drain += HEAT_DRAIN;
         s.battery -= drain * dt;
         if (s.grafts >= 2) s.battery = Math.min(cap, s.battery + HEAL_RATE * dt);
+        if (has(s, 'deepbat') && depthOf(s.y) > DEEP_FROM) s.battery = Math.min(cap, s.battery + DEEP_RATE * dt);
         // the mind slips below 700 m: a voice now and then
         if (depthOf(s.y) > VOICE_FROM) {
             s.voiceT += dt;
@@ -584,12 +673,13 @@ export function step(s, dt, input = {}) {
     let left = dt;
     for (let guard = 0; guard < 8 && left > 0; guard++) {
         if (s.act) {
-            const need = s.act.dur - s.act.t;
-            if (left < need) { s.act.t += left; left = 0; break; }
+            const k = boosting(s) ? 2 : 1;
+            const need = (s.act.dur - s.act.t) / k;
+            if (left < need) { s.act.t += left * k; left = 0; break; }
             left -= need;
             const a = s.act;
             s.act = null;
-            s.battery -= a.cost;
+            s.battery -= a.cost / k;
             if (a.kind === 'dig') finishDig(s, a.tx, a.ty);
             else {
                 arrive(s, a.tx, a.ty);
@@ -661,7 +751,7 @@ export function buy(s, row) {
     s.events.push({ type: 'buy', row });
     return true;
 }
-export const graftShown = (s) => s.bioSeen || s.grafts > 0;
+export const graftShown = (s) => s.bioHome || s.grafts > 0;
 export function buyGraft(s) {
     const g = GRAFTS[s.grafts];
     if (!g || !inWorkshop(s) || s.bio < g.price) return false;
@@ -689,6 +779,8 @@ export function deserialize(raw) {
         const s = { ...base, ...o, tiles, levels: { ...base.levels, ...o.levels }, act: null, commit: null, events: [] };
         if (o.levels && o.levels.radar) { s.levels.gps = Math.min(2, o.levels.radar); delete s.levels.radar; }
         if (!o.alarms) s.alarms = newAlarms(s.time);
+        if (!o.quantum) s.quantum = newQuantum(s.seed || 7);
+        if (o.bioSeen && o.bioHome === undefined) s.bioHome = true;
         if (!o.tut) inferTut(s);
         else if (s.tut.stop && s.tut.stop.crt) s.tut.stop = { ...newTut().stop };
         return s;
@@ -710,6 +802,7 @@ export function preparedState({ row = 0, levels = {}, grafts = 0, parts = 0, bio
     s.grafts = grafts;
     s.dreaming = grafts > 0;
     s.bioSeen = grafts > 0 || bio > 0;
+    s.bioHome = s.bioSeen;
     s.parts = parts; s.bio = bio; s.time = time;
     for (let y = 0; y <= row; y++) {
         const t = s.tiles[y * W + HOME_X];
@@ -718,6 +811,13 @@ export function preparedState({ row = 0, levels = {}, grafts = 0, parts = 0, bio
     }
     s.record = row;
     s.layerSeen = layerIndexOf(row);
+    // the quantum objects above: found and opened on the way down
+    for (const i of s.qAt || []) {
+        if (Math.floor(i / W) >= row) continue;
+        s.tiles[i] = T.STONE;
+        s.quantum.got.push(s.quantum.order[s.quantum.got.length]);
+        s.quantum.labOpen = true;
+    }
     for (let n = 0; n < found; n++) s.found.push(n);
     s.battery = batteryCap(s);
     if (row >= 0) inferTut(s);
@@ -732,6 +832,7 @@ export function inferTut(s) {
     const t = newTut();
     t.stop = null;
     for (const id of ['arrive', 'dig', 'power', 'unload', 'failing']) t.done[id] = true;
+    if (depthOf(s.record) > 1100) t.done.warm = true;
     for (const w of SHOWS) t.show[w] = true;
     t.dug = true;
     const m = depthOf(s.record);

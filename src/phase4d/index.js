@@ -12,8 +12,9 @@ import { playChapterCard } from '../chapterCard.js';
 import {
     SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, ROW_NAME, rowText, GRAFTS, graftShown,
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
-    shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady,
+    shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf, ping, gpsCharge, gpsReady, boost, teleport, shock,
 } from './dig.js';
+import { has, coolLeft, COOL, LAB_S } from './quantum.js';
 import { worstAlarm, ALARM_LINES } from './alarms.js';
 import { depthOf, FINDS } from './world.js';
 import { createRenderer, RISE_S } from './render.js';
@@ -136,7 +137,11 @@ function buildDom(host) {
       <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div></div>
       <div class="dig-row" id="dig-bio-row" hidden><span class="dymo is-small">BIOMASS</span><span class="dig-val" id="dig-bio">0</span></div>
       <div data-show="finds" class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>
-      <button type="button" class="dig-ping" id="dig-ping" hidden><span>PING</span><small>G</small><i id="dig-ping-bar"></i></button>`;
+      <div class="dig-row" id="dig-q-row" hidden><span class="dymo is-small">QUANTUM OBJECT</span><span class="dig-val" id="dig-q">1</span></div>
+      <button type="button" class="dig-ping" id="dig-ping" hidden><span>PING</span><small>G</small><i id="dig-ping-bar"></i></button>
+      <button type="button" class="dig-ping" data-q="booster" hidden><span>BOOSTER</span><small>B</small><i></i></button>
+      <button type="button" class="dig-ping" data-q="teleport" hidden><span>TELEPORT</span><small>T</small><i></i></button>
+      <button type="button" class="dig-ping" data-q="shock" hidden><span>SHOCK WAVE</span><small>Q</small><i></i></button>`;
     const shop = el('div', 'dig-card dig-shop');
     shop.innerHTML = `<h3><span class="dymo is-small">WORKSHOP</span><span class="dig-val" id="dig-shop-note"></span></h3><div id="dig-shop-rows"></div>`;
     col.append(panel, shop);
@@ -156,7 +161,8 @@ function buildDom(host) {
         crt: $('dig-crt'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
         stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'),
         showEls: [...panel.querySelectorAll('[data-show]')],
-        alarm: $('dig-alarm'), ping: $('dig-ping'), pingBar: $('dig-ping-bar'),
+        alarm: $('dig-alarm'), ping: $('dig-ping'), pingBar: $('dig-ping-bar'), qRow: $('dig-q-row'), q: $('dig-q'),
+        qBtns: [...panel.querySelectorAll('[data-q]')],
     };
 }
 
@@ -209,11 +215,15 @@ export function init() {
             if (!d) return;
         }
         if ((e.key === 'g' || e.key === 'G') && !stopOpen(s)) { e.preventDefault(); ping(s); return; }
+        // the lab's gifts: B, T, Q
+        const qk = { b: boost, t: teleport, q: shock }[e.key.toLowerCase()];
+        if (qk && !stopOpen(s)) { e.preventDefault(); qk(s); return; }
         if (!d) return;
         e.preventDefault();
         press(d);
     }, { signal });
     ui.ping.addEventListener('click', () => ping(s), { signal });
+    for (const b of ui.qBtns) b.addEventListener('click', () => ({ booster: boost, teleport, shock })[b.dataset.q](s), { signal });
     window.addEventListener('keyup', (e) => { const d = KEYS[e.key]; if (d) release(d); }, { signal });
     window.addEventListener('blur', () => { held.length = 0; mouse = null; }, { signal });
     ui.canvas.addEventListener('pointerdown', (e) => { mouse = { x: e.clientX, y: e.clientY }; ui.canvas.setPointerCapture?.(e.pointerId); }, { signal });
@@ -284,6 +294,7 @@ export function init() {
             b.classList.toggle('is-ready', !b.disabled);
         }
         graftBtn.hidden = !graftShown(s);
+        graftBtn.classList.toggle('is-fresh', fresh === 'graft');
         const g = GRAFTS[s.grafts];
         graftBtn.querySelector('.dig-dash').textContent = '■'.repeat(s.grafts) + '□'.repeat(3 - s.grafts);
         graftBtn.querySelector('.dig-desc').textContent = g ? `${g.name}. ${g.text}` : 'All flesh now.';
@@ -434,6 +445,19 @@ export function init() {
         ui.alarm.hidden = !alarm || (stopOpen(s) && s.tut.stop.crt);
         ui.alarm.classList.toggle('is-calm', calm);
         ui.alarm.classList.toggle('dig-focus', !!(s.tut && s.tut.stop && s.tut.stop.focus === 'alarm'));
+        // what the drone carries from the other side, and the lab at work
+        const q = s.quantum;
+        const qText = q ? (q.carry.length ? String(q.carry.length) : q.lab !== null ? `LAB ${Math.ceil(LAB_S - q.lab)} s` : q.labQ ? 'LAB' : '') : '';
+        ui.qRow.hidden = !qText;
+        put('q', ui.q, qText);
+        for (const b of ui.qBtns) {
+            const id = b.dataset.q;
+            b.hidden = !has(s, id);
+            if (b.hidden) continue;
+            const left = coolLeft(s, id);
+            b.querySelector('i').style.width = `${Math.round(100 * (1 - left / COOL[id]))}%`;
+            b.classList.toggle('is-ready', left === 0 && !isHome(s));
+        }
         // the GPS: a button with its charge
         ui.ping.hidden = !(s.levels.gps > 0);
         if (s.levels.gps > 0) {
@@ -500,6 +524,7 @@ export function init() {
                     rnd.pop(e.bio ? `+${e.bio} BIOMASS` : `+${e.parts} PARTS`, '#f2d98a', true, first ? 'Finds are worth more than ore.' : '');
                 }
                 if (e.type === 'pod') blinkPod = { pod: e.pod, at: performance.now() };
+                if (e.type === 'shock' || e.type === 'teleport') rnd.ring(e.type);
                 if (e.type === 'heart') ui.root.classList.add('dig-ending');
                 if (e.type === 'buy' || e.type === 'graft' || e.type === 'deliver') shopKey = '';
             }

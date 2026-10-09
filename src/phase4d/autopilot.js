@@ -10,8 +10,9 @@ import { W, H, T } from './world.js';
 import {
     tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, pingShows, ping, gpsReady,
     priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST, rowShown, maxLevel, ROWS, roomOf,
-    stopOpen, closeStop, STOPS,
+    stopOpen, closeStop, STOPS, litAt, boost, teleport, shock,
 } from './dig.js';
+import { coolLeft } from './quantum.js';
 import { HOME_X, roomSpot } from './base.js';
 import { spotOf, repairCost, worstAlarm } from './alarms.js';
 import { depthOf } from './world.js';
@@ -84,9 +85,9 @@ export function pathHome(s) {
 function wanted(s, x, y, t) {
     if (s.__explore && (isOre(t) || t === T.FIND) && Math.abs(x - s.x) + Math.abs(y - s.y) <= 70) return true;
     const d = Math.hypot(x - s.x, y - s.y);
-    const lit = d <= lampRadius(s);
+    const lit = litAt(s, x, y) || d <= lampRadius(s);
     const onRadar = pingShows(s, x, y) || (s.pingSeen && s.pingSeen.has(y * W + x));
-    if (t === T.FIND) return lit || onRadar;
+    if (t === T.FIND || t === T.QUANTUM) return lit || onRadar || (t === T.QUANTUM && d <= lampRadius(s) * 1.5);
     if (t === T.GHOST) return lit && !(s.pingSeen && s.pingSeen.size);  // a ping shows it is not there
     if (!isOre(t)) return false;
     // with nothing left to buy, parts are only worth it for the colony
@@ -236,6 +237,8 @@ export function decide(s, mem) {
         const toward = (x) => (s.x < x ? 'right' : s.x > x ? 'left' : null);
         // the cargo to the warehouse
         if (s.cargo.length) return { dir: roomOf(s) === 'warehouse' ? null : toward(roomSpot('warehouse')) };
+        // a quantum object to the lab
+        if (s.quantum && s.quantum.carry.length) return { dir: roomOf(s) === 'lab' ? null : toward(roomSpot('lab')) };
         // something failing: stand under it while it is mended
         const al = s.alarms;
         const broken = al && (al.list[0] || (al.genDown ? { id: 'gen' } : null));
@@ -260,6 +263,8 @@ export function decide(s, mem) {
     if (worst && worst.until - s.time < tripS + 25) mem.going = 'home';
     if (mem.going === 'home' || s.cargo.length >= cargoCap(s) || s.battery < homeNeed + 3) {
         mem.going = 'home';
+        // the TELEPORT, when the way home is long
+        if (s.y > 25 && coolLeft(s, 'teleport') === 0 && teleport(s)) return { dir: null };
         return { dir: home ? home.dir : 'up' };
     }
     // a ping whenever the GPS is ready: it costs nothing (what it showed is remembered for this dive)
@@ -279,6 +284,12 @@ export function decide(s, mem) {
     const near = saving ? 90 : s.parts >= cheapest * 1.5 && s.reserve > 60 && depthOf(s.y) < 1600 ? 1.2 : 6;
     if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < near ? { x: tgt.x, y: tgt.y } : null; }
     if (tgt && tgt.cost < near) return { dir: unswing(s, mem, tgt.dir) };
+    // the BOOSTER on the way down; the SHOCK WAVE when solid ground is in the way
+    if (coolLeft(s, 'booster') === 0 && s.y > 3) boost(s);
+    if (coolLeft(s, 'shock') === 0 && s.y > 3) {
+        const below = tileAt(s, s.x, s.y + 1);
+        if (below > 0 && below !== T.HEART && !gateOf(s, below, s.y + 1)) shock(s);
+    }
     // nothing in sight: down; at the bottom, toward the heart
     const below = tileAt(s, s.x, s.y + 1);
     if (below === -1 || (s.y >= 393 && below !== T.HEART)) {

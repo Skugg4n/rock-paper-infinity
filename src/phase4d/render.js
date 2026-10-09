@@ -11,6 +11,7 @@
 import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
 import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows } from './dig.js';
 import { spotOf, REPAIR_S } from './alarms.js';
+import { has, boosting, LAB_S } from './quantum.js';
 import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
 
 export const TS = 32;
@@ -209,12 +210,23 @@ export function createRenderer(canvas) {
         if (!s.ended) {
             let rad = lampRadius(s) * TS;
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);
-            const g = ctx.createRadialGradient(dx, dy, rad * 0.45, dx, dy, rad);
+            const top = Math.max(0, groundY + CITY_ROW * TS);
+            ctx.save();
+            ctx.beginPath(); ctx.rect(0, top, vw, vh - top); ctx.clip();
+            // the SECOND LAMP: the circle of light becomes an oval that reaches down
+            const two = has(s, 'lamp2') && p.y >= 0;
+            ctx.translate(dx, dy + (two ? rad * 0.8 : 0));
+            if (two) ctx.scale(1, 1.8);
+            const g = ctx.createRadialGradient(0, 0, rad * 0.45, 0, 0, rad);
             g.addColorStop(0, 'rgba(0,0,0,0)');
             g.addColorStop(1, `rgba(0,0,0,${(0.995 * under).toFixed(3)})`);
             ctx.fillStyle = g;
-            const top = Math.max(0, groundY + CITY_ROW * TS);
-            ctx.fillRect(0, top, vw, vh - top);
+            ctx.fillRect(-vw * 2, -vh * 2, vw * 4, vh * 4);
+            ctx.restore();
+            // what is not from here flickers faintly even in the dark
+            for (let y = Math.max(0, y0); y <= y1 && y1 >= y0; y++) {
+                for (let x = 0; x < W; x++) if (s.tiles[y * W + x] === T.QUANTUM) quantumTile(r.originX + x * TS, y * TS - camY, x, y, t);
+            }
             // the remembered map: what was dug stays faintly drawn in the dark
             ctx.fillStyle = 'rgba(150,170,195,0.10)';
             for (let y = Math.max(0, y0); y <= y1 && y1 >= y0; y++) {
@@ -266,7 +278,7 @@ export function createRenderer(canvas) {
         }
 
         // ---- the drone
-        if (r.rising === null) drawDrone(s, dx, dy, t);
+        if (r.rising === null) { drawDrone(s, dx, dy); drawRings(dx, dy, dt); }
         // a stop that says down: an amber arrow under the drone
         if (view.focus === 'down' && r.rising === null) { const k = performance.now() / 1000; ctx.save(); ctx.translate(dx, dy + 52 + 6 * Math.sin(k * 5)); ctx.scale(1.6, 1.6); arrow(0, 0, 1); ctx.restore(); }
         // ---- what rises: the red mass climbs the shaft and breaks through the city
@@ -312,6 +324,20 @@ export function createRenderer(canvas) {
         }
     }
 
+    /** A quantum object: a tile that flickers between realities (not ore: no glint, no crystal). */
+    function quantumTile(sx, sy, x, y, t) {
+        const f = hash(x * 7 + Math.floor(performance.now() / 90), y);
+        const a = 0.35 + 0.5 * f;
+        ctx.fillStyle = `rgba(200,190,255,${(a * 0.5).toFixed(3)})`;
+        ctx.fillRect(sx + 7, sy + 7, TS - 14, TS - 14);
+        const o = (f - 0.5) * 5;
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = `rgba(120,240,255,${a.toFixed(3)})`; ctx.strokeRect(sx + 6.5 + o, sy + 6.5, TS - 13, TS - 13);
+        ctx.strokeStyle = `rgba(255,110,220,${a.toFixed(3)})`; ctx.strokeRect(sx + 6.5 - o, sy + 6.5 + o * 0.4, TS - 13, TS - 13);
+        if (f > 0.8) { ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(sx + 4, sy + 10 + f * 10, TS - 8, 1.5); }
+        void t;
+    }
+
     /** A glint that travels over ore now and then: treasure. */
     function glint(sx, sy, h, t) {
         const g = (t * 0.7 + h * 7) % 2.4;
@@ -347,7 +373,7 @@ export function createRenderer(canvas) {
             for (let x = 0; x < W; x++) {
                 const tt = s.tiles[y * W + x], sx = x * TS;
                 if (tt === T.AIR) { ctx.fillStyle = li === 5 ? '#1a0a0e' : '#0d0e10'; ctx.fillRect(sx, sy, TS, TS); continue; }
-                drawTile(tt === T.GHOST ? T.STONE : tt, x, y, sx, sy, pal, li);
+                drawTile(tt === T.GHOST || tt === T.QUANTUM ? T.STONE : tt, x, y, sx, sy, pal, li);
             }
         }
         ctx = save;
@@ -528,8 +554,9 @@ export function createRenderer(canvas) {
     function baseImage(s) {
         const dark = s.dark.length, emptied = s.ended ? Math.floor(Math.min(1, r.ending / 2.4) * SLEEPERS) : 0;
         const shop = !s.tut || !s.tut.on || s.tut.rows.length > 0;
-        const lab = false;
-        const key = `${dark}|${s.dreaming}|${shop}|${lab}|${emptied}`;
+        const lab = !!(s.quantum && s.quantum.labOpen);
+        const other = has(s, 'other');
+        const key = `${dark}|${s.dreaming}|${shop}|${lab}|${other}|${emptied}`;
         const hh = -CITY_ROW * TS;
         if (baseCache && key === baseKey) return baseCache;
         baseKey = key;
@@ -616,8 +643,23 @@ export function createRenderer(canvas) {
             x.fillStyle = C.amber; x.fillRect(rx + 6, floor - 5, 2 * TS, 1.5);
         }, shop);
         room('lab', (rx, rw) => {
-            x.fillStyle = '#0d1116'; x.fillRect(rx + 10, top + 34, rw - 20, floor - top - 34);
-            x.strokeStyle = 'rgba(58,67,80,0.8)'; x.lineWidth = 1; x.strokeRect(rx + 10.5, top + 34.5, rw - 21, floor - top - 35);
+            if (!lab) {
+                x.fillStyle = '#0d1116'; x.fillRect(rx + 10, top + 34, rw - 20, floor - top - 34);
+                x.strokeStyle = 'rgba(58,67,80,0.8)'; x.lineWidth = 1; x.strokeRect(rx + 10.5, top + 34.5, rw - 21, floor - top - 35);
+                return;
+            }
+            // the tank on its stand, a bench with glass
+            const tx = rx + rw - 52;
+            x.fillStyle = C.steel3; x.fillRect(tx - 4, floor - 8, 44, 8);
+            x.fillStyle = 'rgba(143,208,255,0.10)'; x.fillRect(tx, top + 34, 36, floor - top - 42);
+            x.strokeStyle = 'rgba(213,219,227,0.45)'; x.lineWidth = 1; x.strokeRect(tx + 0.5, top + 34.5, 35, floor - top - 43);
+            x.fillStyle = '#2b333d'; x.fillRect(rx + 10, floor - 26, 54, 4); x.fillRect(rx + 12, floor - 22, 3, 22); x.fillRect(rx + 60, floor - 22, 3, 22);
+            x.fillStyle = 'rgba(143,208,255,0.5)'; x.fillRect(rx + 20, floor - 34, 5, 8); x.fillRect(rx + 32, floor - 32, 4, 6);
+            // THE OTHER DRONE: it sits on the bench, dark, like ours
+            if (other) {
+                x.fillStyle = '#20262e'; x.beginPath(); x.ellipse(rx + 46, floor - 34, 14, 8, 0, 0, Math.PI * 2); x.fill();
+                x.fillStyle = '#4a2a36'; x.fillRect(rx + 40, floor - 38, 6, 4);
+            }
         }, lab);
         // the floor, and the hatch in it
         x.fillStyle = '#20262e'; x.fillRect(0, floor - 2, W * TS, 2);
@@ -663,6 +705,18 @@ export function createRenderer(canvas) {
                 ctx.fillStyle = C.amber; ctx.fillRect(bx + 1, byy + 1, 42 * k, 4);
             }
         }
+        // the lab at work: the object turning in the tank, a bar on the room
+        const q = s.quantum;
+        if (q && q.labOpen && (q.lab !== null || q.labQ)) {
+            const [la, lb] = ROOMS.lab, lw = (lb - la + 1) * TS, lx = r.originX + la * TS;
+            const tx = lx + lw - 52 + 18, ty = top + 60;
+            quantumTile(tx - TS / 2 + 2, ty - TS / 2, 3, 3, t);
+            const k = q.lab === null ? 0 : Math.min(1, q.lab / LAB_S);
+            ctx.fillStyle = '#0b0c0e'; ctx.fillRect(lx + 10, top + 34, lw - 70, 6);
+            ctx.fillStyle = C.cold; ctx.fillRect(lx + 11, top + 35, (lw - 72) * k, 4);
+        }
+        // the carried object goes to the lab: an arrow there
+        if (q && q.carry.length && s.y === -1 && !s.cargo.length && !(s.x >= ROOMS.lab[0] && s.x <= ROOMS.lab[1])) arrow(r.originX + roomSpot('lab') * TS + TS * 1.5, top + 46 + 4 * Math.sin(t * 5), 1);
         // look here: the warehouse with cargo aboard, the workshop with something new
         const home = s.y === -1, rx = s.x;
         if (home && s.cargo.length && !(rx >= ROOMS.warehouse[0] && rx <= ROOMS.warehouse[1])) {
@@ -675,34 +729,132 @@ export function createRenderer(canvas) {
         void view;
     }
 
-    function drawDrone(s, dx, dy, t) {
-        const g = s.grafts;
-        const body = g === 0 ? '#b8c0c8' : g === 1 ? '#c9a9a0' : g === 2 ? '#b77a7a' : '#a54a58';
+    /**
+     * The drone (spec G): a body inside a loop of tracks (it climbs and digs), a drill on an arm that
+     * turns toward the dig and spins while it bites, a lamp with its cone, a cargo hatch on top that
+     * opens at the WAREHOUSE. Every upgrade shows: a longer drill, a bigger lamp, a wider hold, armour
+     * plates (HULL), a dish (GPS), a mast (RADIO), nozzles (BOOSTER), a second lamp below. GRAFT turns
+     * it to flesh: a drill of bone, a body that heals in red patches, then skin with veins and tracks of sinew.
+     */
+    function drawDrone(s, dx, dy) {
+        const g = s.grafts, L = s.levels, face = s.face || 1;
+        const now = performance.now() / 1000;
+        const digging = s.act && s.act.kind === 'dig';
+        const moving = !!s.act;
+        const body = g >= 3 ? '#9a4452' : g === 2 ? '#b98a86' : '#b8c0c8';
+        const trackCol = g >= 3 ? '#5a1c26' : '#1b1f25';
+        const tread = g >= 3 ? '#8a2c3a' : '#3a4350';
         ctx.save();
         ctx.translate(dx, dy);
-        ctx.scale(1.5, 1.5);
-        // the lamp's beam forward
-        ctx.fillStyle = 'rgba(255,240,200,0.10)';
-        ctx.beginPath(); ctx.moveTo(s.face * 8, -2); ctx.lineTo(s.face * 60, -22); ctx.lineTo(s.face * 60, 18); ctx.fill();
+        // the lamp's beam forward, and with the SECOND LAMP one down
+        const beam = 46 + 16 * L.lamp;
+        const bg = ctx.createLinearGradient(face * 14, 0, face * (14 + beam), 0);
+        bg.addColorStop(0, 'rgba(255,240,200,0.20)'); bg.addColorStop(1, 'rgba(255,240,200,0)');
+        ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.moveTo(face * 16, -5); ctx.lineTo(face * (16 + beam), -5 - beam * 0.35); ctx.lineTo(face * (16 + beam), -5 + beam * 0.35); ctx.fill();
+        if (has(s, 'lamp2')) {
+            const dg = ctx.createLinearGradient(0, 14, 0, 14 + beam);
+            dg.addColorStop(0, 'rgba(255,240,200,0.16)'); dg.addColorStop(1, 'rgba(255,240,200,0)');
+            ctx.fillStyle = dg;
+            ctx.beginPath(); ctx.moveTo(-4, 14); ctx.lineTo(-beam * 0.32, 14 + beam); ctx.lineTo(beam * 0.32, 14 + beam); ctx.fill();
+        }
+        // the booster's flame
+        if (has(s, 'booster') && boosting(s)) {
+            ctx.fillStyle = `rgba(143,208,255,${(0.5 + 0.4 * Math.sin(now * 40)).toFixed(3)})`;
+            ctx.beginPath(); ctx.moveTo(-face * 20, -6); ctx.lineTo(-face * (34 + 6 * Math.sin(now * 33)), -2); ctx.lineTo(-face * 20, 2); ctx.fill();
+        }
+        // the tracks all round: a loop with treads that run when it moves
+        ctx.fillStyle = trackCol;
+        roundRect(-21, -15, 42, 30, 9); ctx.fill();
+        const off = moving ? (now * 30) % 6 : 0;
+        ctx.fillStyle = tread;
+        for (let k = -18 + off; k < 18; k += 6) { ctx.fillRect(k, -15, 3, 2); ctx.fillRect(k, 13, 3, 2); }
+        for (let k = -11 + off; k < 11; k += 6) { ctx.fillRect(-21, k, 2, 3); ctx.fillRect(19, k, 2, 3); }
+        // armour plates, one a HULL level
+        ctx.fillStyle = g >= 3 ? '#6e2a33' : '#5c6673';
+        for (let k = 0; k < L.hull; k++) { ctx.fillRect(-19 + k * 7, 9, 5, 4); ctx.fillRect(14 - k * 7, 9, 5, 4); }
+        // the body
         ctx.fillStyle = body;
-        ctx.fillRect(-11, -9, 22, 15);
-        ctx.fillStyle = '#2a3038';
-        ctx.fillRect(-11, 6, 22, 4);
-        ctx.fillStyle = g >= 2 ? '#7a2030' : '#556070';
-        ctx.fillRect(-7, -6, 8, 6);
+        roundRect(-15, -10, 30, 19, 4); ctx.fill();
+        if (g >= 2) {
+            // patches that heal, red, breathing
+            ctx.fillStyle = `rgba(168,19,44,${(0.45 + 0.2 * Math.sin(now * 3.3)).toFixed(3)})`;
+            ctx.beginPath(); ctx.ellipse(-6, 2, 6, 4, 0.3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(7, -3, 4, 3, -0.4, 0, Math.PI * 2); ctx.fill();
+        }
+        if (g >= 3) {
+            ctx.strokeStyle = 'rgba(60,0,12,0.8)'; ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(-14, -4); ctx.bezierCurveTo(-6, -11, 4, 6, 14, -6); ctx.moveTo(-10, 7); ctx.bezierCurveTo(-2, 1, 6, 9, 12, 4); ctx.stroke();
+        }
+        // the cargo hold on top, wider with each CARGO level; its hatch opens at the warehouse
+        const hw = 12 + 3 * L.cargo, open = s.y === -1 && s.cargo.length > 0 && s.x >= ROOMS.warehouse[0] && s.x <= ROOMS.warehouse[1];
+        ctx.fillStyle = g >= 3 ? '#7a3040' : '#7d8794';
+        ctx.fillRect(-hw / 2 - 2, -14, hw, 5);
+        ctx.save();
+        ctx.translate(-hw / 2 - 2, -14);
+        ctx.rotate(open ? -1.1 - 0.1 * Math.sin(now * 8) : 0);
+        ctx.fillStyle = g >= 3 ? '#9a4452' : '#9aa4b0'; ctx.fillRect(0, -2, hw, 3);
+        ctx.restore();
+        if (open) { ctx.fillStyle = '#9fd8e8'; ctx.fillRect(-hw / 2, -14 - 3 - (now * 20) % 6, 3, 3); }
+        // the window
+        ctx.fillStyle = g >= 2 ? '#7a2030' : '#2a3442';
+        ctx.fillRect(face > 0 ? 2 : -10, -7, 8, 6);
+        ctx.fillStyle = 'rgba(143,208,255,0.6)'; ctx.fillRect(face > 0 ? 3 : -9, -6, 3, 2);
+        // the lamp, bigger with each LAMP level
         ctx.fillStyle = '#ffe9a8';
-        ctx.fillRect(s.face > 0 ? 8 : -11, -5, 3, 4);
-        // the drill: steel, then bone
+        const lw = 3 + L.lamp;
+        ctx.fillRect(face > 0 ? 14 : -14 - lw, -7, lw, 5);
+        if (has(s, 'lamp2')) ctx.fillRect(-3, 9, 6, 3);
+        // the GPS dish, the radio's mast, the booster's nozzles
+        if (L.gps > 0) { ctx.strokeStyle = '#d5dbe3'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(9, -17, 4 + L.gps, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.fillRect(8.5, -17, 1, 3); }
+        if (L.radio > 0) { ctx.strokeStyle = '#8fa1b6'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-12, -14); ctx.lineTo(-14, -26); ctx.stroke(); ctx.fillStyle = Math.floor(now * 2) % 2 ? '#ff6b5a' : '#4a1a16'; ctx.fillRect(-15, -28, 3, 3); }
+        if (has(s, 'booster')) { ctx.fillStyle = '#3a4350'; ctx.fillRect(face > 0 ? -21 : 17, -8, 4, 4); ctx.fillRect(face > 0 ? -21 : 17, -2, 4, 4); }
+        // the drill, on its arm toward the dig; it spins while it bites; bone after the first graft
+        const dir = digging ? { x: s.act.tx - s.x, y: s.act.ty - s.y } : (s.act && s.act.kind === 'fall') ? { x: 0, y: 1 } : { x: face, y: 0 };
+        const ang = Math.atan2(dir.y, dir.x);
+        const len = 10 + 3 * L.drill;
+        ctx.save();
+        ctx.rotate(ang);
+        ctx.translate(dir.y ? 15 : 21, 0);
+        if (digging) ctx.translate(Math.sin(now * 70) * 0.8, 0);
         ctx.fillStyle = g >= 1 ? '#e8dcc8' : '#7d8794';
-        const dir = s.act && s.act.kind === 'dig' ? { x: s.act.tx - s.x, y: s.act.ty - s.y } : { x: 0, y: 1 };
-        const wob = s.act && s.act.kind === 'dig' ? Math.sin(t * 60) * 1.5 : 0;
-        ctx.beginPath();
-        if (dir.y > 0) { ctx.moveTo(-6 + wob, 10); ctx.lineTo(6 + wob, 10); ctx.lineTo(wob, 18); }
-        else { const sx = dir.x; ctx.moveTo(sx * 11, -6 + wob); ctx.lineTo(sx * 11, 4 + wob); ctx.lineTo(sx * 19, -1 + wob); }
-        ctx.fill();
-        if (g >= 3) { ctx.strokeStyle = '#d33a4a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-11, -2); ctx.bezierCurveTo(-4, -10, 4, 6, 11, -3); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(len, 0); ctx.lineTo(0, 6); ctx.closePath(); ctx.fill();
+        // the spiral grooves run when it bites
+        ctx.strokeStyle = g >= 1 ? 'rgba(120,90,70,0.8)' : 'rgba(30,36,44,0.8)'; ctx.lineWidth = 1.2;
+        const ph = digging ? (now * 24) % 1 : 0;
+        for (let k = 0; k < 3; k++) {
+            const u = ((k + ph) / 3) * len, hh = 6 * (1 - u / len);
+            ctx.beginPath(); ctx.moveTo(u, -hh); ctx.lineTo(u + 2, hh); ctx.stroke();
+        }
+        ctx.restore();
         ctx.restore();
     }
+    function roundRect(x, y, w, h, r0) {
+        ctx.beginPath();
+        ctx.moveTo(x + r0, y); ctx.lineTo(x + w - r0, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r0);
+        ctx.lineTo(x + w, y + h - r0); ctx.quadraticCurveTo(x + w, y + h, x + w - r0, y + h);
+        ctx.lineTo(x + r0, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r0);
+        ctx.lineTo(x, y + r0); ctx.quadraticCurveTo(x, y, x + r0, y); ctx.closePath();
+    }
 
-    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, worldWidth: W * TS };
+    /** A ring that spreads from the drone: the shock wave; a flash at the base: the teleport. */
+    const rings = [];
+    function ring(kind) { rings.push({ kind, life: kind === 'shock' ? 0.5 : 0.7 }); }
+    function drawRings(dx, dy, dt) {
+        for (let i = rings.length - 1; i >= 0; i--) {
+            const q = rings[i];
+            q.life -= dt;
+            if (q.life <= 0) { rings.splice(i, 1); continue; }
+            if (q.kind === 'shock') {
+                const k = 1 - q.life / 0.5;
+                ctx.strokeStyle = `rgba(255,214,120,${(0.8 * (1 - k)).toFixed(3)})`; ctx.lineWidth = 6 * (1 - k) + 1;
+                ctx.beginPath(); ctx.arc(dx, dy, 10 + k * 2.6 * TS, 0, Math.PI * 2); ctx.stroke();
+            } else {
+                ctx.fillStyle = `rgba(200,230,255,${(0.5 * q.life / 0.7).toFixed(3)})`;
+                ctx.beginPath(); ctx.arc(dx, dy, 30 + (0.7 - q.life) * 80, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+    }
+
+    return { draw, resize, burst, screenOf, tileAtScreen, r, pop, rise, ring, worldWidth: W * TS };
 }

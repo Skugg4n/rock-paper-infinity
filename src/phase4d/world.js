@@ -13,7 +13,7 @@ export const METERS_PER_TILE = 5;
 
 export const T = {
     AIR: 0, SOIL: 1, STONE: 2, HARD: 3, BASALT: 4, FLESH: 5, SINEW: 6, HEART: 7,
-    ROCK: 8, PAPER: 9, SCISSORS: 10, BIO: 11, GHOST: 12, FIND: 13,
+    ROCK: 8, PAPER: 9, SCISSORS: 10, BIO: 11, GHOST: 12, FIND: 13, QUANTUM: 14,
 };
 
 /** Ore: what it is worth and in what. */
@@ -146,5 +146,24 @@ export function makeWorld(seed = 1) {
         tiles[y * W + x] = T.FIND;
         finds[y * W + x] = i;
     });
-    return { seed, tiles, finds };
+    // pass 3 (E): about a quantum object a layer, from another reality; laid with their own numbers so
+    // the rest of the mountain stays as it was. None in the city (the first minute has enough in it):
+    // two in the war, the first near 120 m, so the lab opens after a few dives; then one a layer.
+    const q = rng(seed * 131 + 7);
+    const quantum = [];
+    const spans = [[105, 140], [200, 280], ...LAYERS.slice(2).map((L) => [L.from + 30, L.to - 30])];
+    spans.forEach(([from, to]) => {
+        const lo = rowOf(from), hi = Math.min(rowOf(to), SINEW_BAND[0] - 2);
+        for (let tries = 0; tries < 40; tries++) {
+            const y = lo + Math.floor(q() * (hi - lo));
+            const x = 2 + Math.floor(q() * (W - 4));
+            const i = y * W + x;
+            if (finds[i] !== undefined || tiles[i] === T.HARD && (y === HARD_BAND[0] || y === HARD_BAND[1]) || y >= BASALT_BAND[0] && y <= BASALT_BAND[1]) continue;
+            if (x === 11) continue;                 // never in the way down the middle
+            tiles[i] = T.QUANTUM;
+            quantum.push(i);
+            break;
+        }
+    });
+    return { seed, tiles, finds, quantum };
 }

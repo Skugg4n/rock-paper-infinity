@@ -27,6 +27,7 @@ const first = (k, what) => { if (firsts[k] === undefined) { firsts[k] = wall(); 
 let firstUp = false, lastRecord = -1, lastRecordAt = 0;
 const gaps = [];
 const ups = () => ROWS.reduce((a, r) => a + s.levels[r], 0) + s.grafts;
+const uses = { boost: 0, teleport: 0, shock: 0 };
 console.log(' min  record   parts  bio  upgr  sleepers  colony  deaths');
 for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     if (stopOpen(s)) { const id = s.tut.stop.id; read += readStop(s); news.push([wall(), `stop ${id}`]); continue; }
@@ -40,11 +41,15 @@ for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     } });
     for (const e of s.events) {
         if (e.type === 'deliver') first('ore', 'first ore home');
+        if (e.type in uses) uses[e.type]++;
         if (e.type === 'layer') mark(`layer ${e.layer} (${depthOf(s.y)} m)`);
         if (e.type === 'find') mark(`find ${e.n}`);
         if (e.type === 'dead') mark('battery empty, recovered');
         if (e.type === 'graft') mark(`graft ${e.id}`);
         if (e.type === 'heart') mark('THE HEART');
+        if (e.type === 'quantum') mark('quantum object picked up');
+        if (e.type === 'lab-out') { mark(`lab: ${e.id}`); news.push([wall(), `lab ${e.id}`]); }
+        if (e.type === 'fail') news.push([wall(), `fail ${e.id}`]);
         if (e.type === 'show') { news.push([wall(), `shows ${e.what}`]); }
         if (e.type === 'row') { news.push([wall(), `row ${e.row}`]); mark(`workshop row ${e.row}`); }
     }
@@ -63,5 +68,6 @@ let closest = Infinity;
 for (let i = 1; i < early.length; i++) closest = Math.min(closest, early[i][0] - early[i - 1][0]);
 console.log(`\nnew on screen in the first 5 min: ${early.map(([t, w]) => `${Math.round(t)}s ${w}`).join(' · ')}`);
 console.log(`first dig decision ${Math.round(firsts.dig)} s, first ore home ${Math.round(firsts.ore)} s, stops read ${Math.round(read)} s`);
+console.log(`used: ${JSON.stringify(uses)}`);
 console.log(`chambers: ${s.alarms.n} failures, ${s.alarms.lost} sleepers lost to them`);
 console.log(`end at ${(wall() / 60).toFixed(1)} min, levels ${JSON.stringify(s.levels)} grafts ${s.grafts}, finds ${s.found.length}/12, sleepers ${sleepers(s)}, longest wait for a new 25 m: ${Math.round(Math.max(...gaps))} s`);

@@ -52,6 +52,8 @@ export function createDigSound() {
             else if (e.type === 'dead' || e.type === 'pod' || e.type === 'gate' || e.type === 'warn' || e.type === 'fail' || e.type === 'chamber-dark' || e.type === 'gen-stop') audio.knock();
             else if (e.type === 'repaired' || e.type === 'row') audio.thunk();
             else if (e.type === 'ping') audio.pling();
+            else if (e.type === 'quantum' || e.type === 'lab-out' || e.type === 'boost' || e.type === 'teleport') audio.rise();
+            else if (e.type === 'shock') thump(0.8, 38);
             else if (e.type === 'heart') thump(1, 40);
         },
         /** Each frame: the depth in metres and the seconds since the last. */
