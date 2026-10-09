@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.92.3 - 2026-10-09 (chapter IV, the dig: why the drone died, a base with teeth, into chapter V)
+
+After the second independent test of pass 3 (docs/playtests/2026-10-09-dig-human-test-4.md, NÄSTAN).
+- **Every lost drone says why**, in the stop the first time and on the CRT after: "The battery ran out." / "Magma. The hull melted." / "The roof came down." / "Gas. It took 57 POWER." (the gas says its toll when it bursts, too).
+- **Magma is a choice, not a trap.** The drill into a pocket opens it where it is: the drone does not go in. The magma runs a tile every 1.5 s; in it the HULL holds 2.5 s, 1.5 s more a level, and a heat bar over the drone shows it, so a player who touches it can back off.
+- **Lines that are no longer true go.** "Turn back..." is gone from the CRT the moment it stops being the current line (at the base, or anything said after it), never shows at the heart and is never typed again between its beats.
+- **The base has teeth.** The generators take a share of the ore: while under 90 % every other piece goes to them (5 % each), the rest becomes parts, and the WAREHOUSE says so: "8 ORE → 4 to the generators, 22 PARTS". Biomass feeds them a little too. They burn 20 % a minute at first (was 10 %), growing to twice that over 25 min; GENERATOR II to IV burn less. Sim: a careful player sees them under 50 % one to four times and loses nobody. The repair price shows in the alarm ("CHAMBER 3 · 40 s · 12 PARTS") and over the red lamp in the base.
+- **The first two minutes.** Up into rock with nothing to dig up says "Can't dig up here." once. STEERING comes with BATTERY at the first delivery. DRILL I breaks hard rock (DRILL II basalt, DRILL III digs faster): "Too hard. Needs DRILL I."; the row says "Steel bit. Next: breaks hard rock." from the start. The level boxes mean the same on every row: as many boxes as there are levels, the ones the drone has filled (the battery it starts with, the steel bit, UPWARD DRILL I, GENERATOR I count). Rows a wall asks for (DRILL, HULL) come the next time the drone is home.
+- **The base row.** The cargo goes as the drone drives through the WAREHOUSE (no stop). Down anywhere on the base row drives to the hatch and down; in the workshop down chooses rows and, past the last one, leaves. The lab says when it is done while the drone is down, with the radio: "The lab is done. Come and see." (without it, at the base, as before).
+- **Open tunnels:** STEERING I is two tiles a press only when digging sideways; in an open tunnel one press is one step.
+- **The dig's end leads into chapter V** as the vault's does: RISE, the V · UNITY card, and chapter V with the sleepers still alive as its minds (a reload after the rise goes on into chapter V). The old wall "V · UNITY TO COME" is gone.
+- Sim: the heart at 27.6 / 27.4 / 26.0 / 24.2 min (seeds 7 / 11 / 3 / 5), no drones and no sleepers lost by the careful player; `--careless` (never mends) loses 70 sleepers. Headless: `node scripts/play-dig.mjs --v1923` (the alarm with its price, unloading while driving, the heat bar, the reason, RISE into chapter V with 216 minds).
+
 ## v1.92.2 - 2026-10-09 (chapter IV, the dig: hazards and lost drones)
 
 Ola's second play, section H of docs/superpowers/specs/2026-10-09-deep-dig-pass3.md.

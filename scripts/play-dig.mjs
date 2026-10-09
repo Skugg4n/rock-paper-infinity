@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards'].some((a) => process.argv.includes(a));
+const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923'].some((a) => process.argv.includes(a));
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +103,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !['--step2', '--step3', '--long', '--hazards'].some((a) => process.argv.includes(a))) {
+    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923'].some((a) => process.argv.includes(a))) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -236,6 +236,44 @@ try {
         const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
         const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
         fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
+    }
+    if (process.argv.includes('--v1923')) {
+        // v1.92.3: why the drone died, a base with teeth, into chapter V
+        await jump('iv-dig-alarm');
+        await key('Enter');
+        await ev(`(() => { const s = window.rpiDig.state; s.alarms.list[0].cost = 12; s.cargo = [8, 8, 9, 9, 8, 8]; s.reserve = 55; s.x = 15; return true; })()`);
+        await sleep(400);
+        await shot('p3-60-alarm-price');
+        await hold('ArrowLeft', 900);                      // drives through the warehouse without stopping
+        await sleep(300);
+        await shot('p3-61-unload-driving');
+        // down from the workshop's last row: the drone leaves for the hatch
+        await ev(`(() => { const s = window.rpiDig.state; s.x = 13; return true; })()`);
+        await sleep(300);
+        for (let i = 0; i < 4; i++) await key('ArrowDown');
+        await hold('ArrowDown', 1500);
+        await shot('p3-62-down-from-workshop');
+        // up into rock with nothing to dig up
+        await ev(`(() => { const s = window.rpiDig.state; s.x = 13; s.y = 8; for (let x = 12; x <= 13; x++) { s.tiles[8 * 24 + x] = 0; s.tiles[7 * 24 + x] = 2; } s.tiles[9 * 24 + 13] = 2; return true; })()`);
+        await hold('ArrowUp', 600);
+        await shot('p3-63-cant-dig-up');
+        // magma: the heat bar, then the reason
+        await jump('iv-dig-machine');
+        await ev(`(() => { const s = window.rpiDig.state; s.lava[s.y * 24 + s.x] = 0; return true; })()`);
+        await sleep(1500);
+        await shot('p3-64-heat-bar');
+        await sleep(4000);
+        await shot('p3-65-magma-reason');
+        // the heart and RISE into chapter V
+        await jump('iv-dig-heart');
+        await hold('ArrowDown', 4200);
+        await sleep(11000);
+        const rise = await ev(`(() => { const e = document.getElementById('dig-rise'); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+        await shot('p3-66-heart');
+        if (rise) await click(rise.x, rise.y);
+        await sleep(9000);
+        await shot('p3-67-chapter-v');
+        console.log('phase after RISE:', await ev(`localStorage.getItem('rpi-phase') || localStorage.getItem('rpi-game-phase') || [...Object.keys(localStorage)].join(',')`), '| unity save:', await ev(`!!localStorage.getItem('rpi-unity')`));
     }
     if (process.argv.includes('--hazards')) {
         // v1.92.2: ore and parts, magma, gas, a cave-in, a lost drone and its wreck, the generator's levels

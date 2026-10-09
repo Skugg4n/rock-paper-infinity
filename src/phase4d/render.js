@@ -12,6 +12,7 @@ import { W, H, T, HEART, layerIndexOf, LAYERS } from './world.js';
 import { lampRadius, isOre, SLEEPERS, HOME_X, pingShows, GPS, GPS_SHOW, shows, PRICE, BUILD_S } from './dig.js';
 import { spotOf, REPAIR_S } from './alarms.js';
 import { has, boosting, LAB_S } from './quantum.js';
+import { heatHold } from './hazards.js';
 import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
 
 export const TS = 32;
@@ -375,6 +376,12 @@ export function createRenderer(canvas) {
                 ctx.beginPath(); ctx.ellipse(q.x, q.y - camY, 16, 11, 0, 0, Math.PI * 2); ctx.fill();
             }
             drawDrone(s, dx, dy); drawRings(dx, dy, dt);
+            // the heat bar: in the magma the hull holds a few seconds
+            if (s.heat > 0.05) {
+                const k = Math.min(1, s.heat / heatHold(s.levels.hull));
+                ctx.fillStyle = '#0b0c0e'; ctx.fillRect(dx - 22, dy - 36, 44, 7);
+                ctx.fillStyle = k > 0.7 ? C.danger : '#ff9a3a'; ctx.fillRect(dx - 21, dy - 35, 42 * k, 5);
+            }
         }
         // a name over a tile (the first quantum object the lamp touches)
         for (let k = labels.length - 1; k >= 0; k--) {
@@ -831,6 +838,15 @@ export function createRenderer(canvas) {
                 else {
                     const [a, b] = CHAMBERS[Number(f.id.slice(1))];
                     redLamp(r.originX + (a + b) / 2 * TS, groundY + CHAMBER_TOP * TS + 4, blink);
+                }
+                // the price, by the lamp
+                if (f.cost) {
+                    const [a, b] = f.id === 'gen' ? [ga, gb + 1] : CHAMBERS[Number(f.id.slice(1))];
+                    const px = r.originX + (a + b) / 2 * TS, py = f.id === 'gen' ? top + 12 : groundY + CHAMBER_TOP * TS - 10;
+                    ctx.font = '600 12px "Bebas Neue", "Arial Narrow", sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillStyle = '#0b0c0e'; ctx.fillRect(px - 30, py - 9, 60, 14);
+                    ctx.fillStyle = C.danger; ctx.fillText(`${f.cost} PARTS`, px, py + 2);
+                    ctx.textAlign = 'left';
                 }
             }
             if (genDown) redLamp(r.originX + ga * TS + gw / 2 + 30, top + 28, true);

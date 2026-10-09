@@ -29,7 +29,7 @@ export const ALARM_LINES = {
     away: (k) => `While you were gone: chamber ${k + 1} went dark. ${KILL} died.`,
     genAway: 'While you were gone: the generator stopped.',
     mended: (id) => (id === 'gen' ? 'The generator is mended.' : `Chamber ${Number(id.slice(1)) + 1} is mended.`),
-    tag: (id, secs) => `${nameOf(id)} · ${Math.max(0, Math.ceil(secs))} s`,
+    tag: (id, secs, cost) => `${nameOf(id)} · ${Math.max(0, Math.ceil(secs))} s${cost ? ` · ${cost} PARTS` : ''}`,
     dark: (k) => `Chamber ${k + 1} went dark. ${KILL} sleepers died.`,
     genStop: 'The generator stopped. POWER does not charge.',
     short: (n) => `Repair needs ${n} PARTS.`,

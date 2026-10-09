@@ -31,6 +31,7 @@ const gaps = [];
 const ups = () => ROWS.reduce((a, r) => a + s.levels[r], 0) + s.grafts;
 const uses = { boost: 0, teleport: 0, shock: 0 };
 const lostWhy = {};
+let lowGen = 100, under50 = 0, wasUnder = false;
 console.log(' min  record   parts  bio  upgr  sleepers  colony  deaths');
 for (let next = 60; wall() < MIN * 60 && !s.ended;) {
     if (stopOpen(s)) { const id = s.tut.stop.id; read += readStop(s); news.push([wall(), `stop ${id}`]); continue; }
@@ -60,6 +61,7 @@ for (let next = 60; wall() < MIN * 60 && !s.ended;) {
         if (e.type === 'row') { news.push([wall(), `row ${e.row}`]); mark(`workshop row ${e.row}`); }
     }
     s.events.length = 0;
+    if (s.drainFrom != null && s.time > s.drainFrom) { lowGen = Math.min(lowGen, s.reserve); if (s.reserve < 50 && !wasUnder) under50++; wasUnder = s.reserve < 50; }
     if (ups() > before) { if (!firstUp) { firstUp = true; mark('first upgrade'); } }
     if (s.record > lastRecord) { if (Math.floor(depthOf(s.record) / 25) > Math.floor(depthOf(lastRecord) / 25)) { gaps.push(s.time - lastRecordAt); lastRecordAt = s.time; } lastRecord = s.record; }
     if (wall() >= next) {
@@ -75,6 +77,7 @@ for (let i = 1; i < early.length; i++) closest = Math.min(closest, early[i][0] -
 console.log(`\nnew on screen in the first 5 min: ${early.map(([t, w]) => `${Math.round(t)}s ${w}`).join(' · ')}`);
 console.log(`first dig decision ${Math.round(firsts.dig)} s, first ore home ${Math.round(firsts.ore)} s, stops read ${Math.round(read)} s`);
 console.log(`used: ${JSON.stringify(uses)}`);
+console.log(`generators: lowest ${Math.round(lowGen)} %, under 50 % ${under50} times`);
 console.log(`drones lost: ${s.deaths} ${JSON.stringify(lostWhy)}`);
 console.log(`chambers: ${s.alarms.n} failures, ${s.alarms.lost} sleepers lost to them`);
 console.log(`end at ${(wall() / 60).toFixed(1)} min, levels ${JSON.stringify(s.levels)} grafts ${s.grafts}, finds ${s.found.length}/12, sleepers ${sleepers(s)}, longest wait for a new 25 m: ${Math.round(Math.max(...gaps))} s`);

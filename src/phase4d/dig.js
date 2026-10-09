@@ -31,6 +31,13 @@ export const STOPS = {
     empty: ['The generators stopped. The sleepers are freezing.'],
     lost: ['The drone is lost. Build another.'],
 };
+/** Why the drone was lost: said once, in the stop or on the CRT. */
+export const LOST_WHY = {
+    power: 'The battery ran out.',
+    magma: 'Magma. The hull melted.',
+    cave: 'The roof came down.',
+    gas: (n) => `Gas. It took ${n} POWER.`,
+};
 export const LINES = {
     unload: 'Drive into the WAREHOUSE to unload.',
     open: 'The workshop is open.',
@@ -41,7 +48,9 @@ export const LINES = {
     wreck: 'Half of its cargo was still there.',
     genRoom: 'The generator can be built up. Drive to it.',
     build: (n) => (n ? `BUILD A DRONE · ${n} PARTS` : 'BUILD A DRONE'),
-    unloaded: (ore, parts) => `${ore} ORE → ${parts} PARTS`,
+    unloaded: (ore, gen, parts) => (gen ? `${ore} ORE → ${gen} to the generators, ${parts} PARTS` : `${ore} ORE → ${parts} PARTS`),
+    labDone: 'The lab is done. Come and see.',
+    cantUp: "Can't dig up here.",
 };
 /** The generator's levels (spec H5), bought at the GENERATOR from the war on: each burns 30 % less ore. */
 export const GEN_PRICE = [40, 90, 180];
@@ -101,7 +110,7 @@ export function need(s, row) {
 // ---- the workshop -----------------------------------------------------------------------------
 /** Prices per row and level: a little different per row, so the list does not all say the same. */
 export const PRICE = {
-    battery: [15, 35, 70, 150, 300], steering: [15], updrill: [40, 120], drill: [20, 70, 420], cargo: [25, 60, 340],
+    battery: [15, 35, 70, 150, 300], steering: [15], updrill: [40, 120], drill: [25, 120, 420], cargo: [25, 60, 340],
     lamp: [25, 50, 280], gps: [40, 80, 120, 180], homing: [35], radio: [45], mapping: [40], hull: [30, 90, 440],
 };
 /** Kept for old callers: the drill's prices. */
@@ -138,7 +147,7 @@ export function rowText(row, lv) {
     const top = lv >= maxLevel(row);
     const next = (t) => (top ? t : `${t} Next: `);
     switch (row) {
-        case 'drill': return top ? 'Breaks basalt.' : ['Steel bit. Next: digs faster.', 'Faster. Next: breaks hard rock (300 m).', 'Breaks hard rock. Next: basalt (700 m).'][lv];
+        case 'drill': return top ? 'Breaks basalt, fast.' : ['Steel bit. Next: breaks hard rock.', 'Breaks hard rock. Next: basalt (700 m).', 'Breaks basalt. Next: digs faster.'][lv];
         case 'battery': return next(`Holds ${BATTERY_CAP[lv]}.`) + (top ? '' : `${BATTERY_CAP[lv + 1]}.`);
         case 'cargo': return next(`Carries ${CARGO_CAP[lv]}.`) + (top ? '' : `${CARGO_CAP[lv + 1]}.`);
         case 'lamp': return next(`Lights ${LAMP_RADIUS[lv]} tiles.`) + (top ? '' : `${LAMP_RADIUS[lv + 1]}.`);
@@ -170,10 +179,13 @@ export const HEAT_FROM = 1200;          // metres
 export const HEAT_DRAIN = 0.2;          // per second in the heat, without SKIN
 export const HEAL_RATE = 0.6;           // per second below, with the HEALING CELL
 export const CHARGE_RATE = 0.6;         // share of the battery per second, at home
-export const UNLOAD_EVERY = 0.08;       // seconds a piece
+export const UNLOAD_EVERY = 0.08;       // seconds a piece (old; the cargo now goes as the drone drives through)
+export const GEN_TAKES_UNDER = 90;      // % : under this the generators take every other piece of ore
+export const GEN_PIECE = 5;             // % of the generators a piece of ore is worth
 // ---- the colony -------------------------------------------------------------------------------
-export const DRAIN_BASE = 1 / 6;        // % a second at the start
-export const DRAIN_GROWS = 720;         // seconds: the drain doubles over this long
+export const DRAIN_BASE = 1 / 3;        // % a second at the start (the generators can fall under 50 % on a dive)
+export const DRAIN_GROWS = 1500;        // seconds: the drain doubles over this long
+export const DRAIN_MAX = 2;             // and grows no further
 export const POD_EVERY = 3;             // seconds at 0 %
 export const LOST_ON_DEATH = 10;        // % of the reserve, from the fourth recovery on
 export const FREE_DEATHS = 3;           // the first recoveries cost only the cargo
@@ -188,6 +200,7 @@ export const VOICES = [
 ];
 
 export const HEART_BEATS = 4;
+export const HEART_ZONE = 380;          // rows: from here the heart is in view, no turning back
 export const HEART_BEAT_S = 0.95;
 export const HEART_LINES = ['It beats.', 'Come home.', 'Almost.'];
 export const HOVER_DRAIN = 0.03;        // per second, standing still in the air under a ledge
@@ -272,7 +285,7 @@ export const turnBackAt = (s) => {
     const heat = depthOf(s.y) > HEAT_FROM && s.grafts < 3 ? HEAT_DRAIN : 0;
     return rows * UP_COST + secs * (IDLE_DRAIN + heat) + 3 + rows * UP_COST * 0.06;
 };
-export const drainRate = (s) => (s.drainFrom == null || s.time < s.drainFrom ? 0 : DRAIN_BASE * (1 + (s.time - s.drainFrom) / DRAIN_GROWS) * GEN_DRAIN[s.levels.gen || 0]);
+export const drainRate = (s) => (s.drainFrom == null || s.time < s.drainFrom ? 0 : DRAIN_BASE * Math.min(DRAIN_MAX, 1 + (s.time - s.drainFrom) / DRAIN_GROWS) * GEN_DRAIN[s.levels.gen || 0]);
 /** The generator's next level can be bought here: at the GENERATOR, once the war is reached. */
 export const genOpen = (s) => (s.layerSeen || 0) >= 1;
 export function buyGen(s) {
@@ -299,8 +312,8 @@ export function digCost(t, y) {
 
 /** Why this tile cannot be dug now, or null. */
 export function gateOf(s, t, y) {
-    if (t === T.HARD && s.levels.drill < 2) return 'Too hard. Needs DRILL 2.';
-    if (t === T.BASALT && s.levels.drill < 3) return 'Basalt. Needs DRILL 3.';
+    if (t === T.HARD && s.levels.drill < 1) return 'Too hard. Needs DRILL I.';
+    if (t === T.BASALT && s.levels.drill < 2) return 'Basalt. Needs DRILL II.';
     if (t === T.SINEW && s.grafts < 1) return 'It will not cut. It wants bone.';
     const m = depthOf(y);
     if (m > HULL_MAX[s.levels.hull]) {
@@ -341,8 +354,9 @@ function die(s, why = 'power') {
     s.deaths++;
     s.lostCount = (s.lostCount || 0) + 1;
     s.lost = true;
-    if (s.tut && s.tut.on && !s.tut.done.lost) openStop(s, 'lost', null);
-    else say(s, STOPS.lost[0], 'alarm', 0);
+    const reason = why === 'gas' ? LOST_WHY.gas(s.gasTook || 0) : LOST_WHY[why] || LOST_WHY.power;
+    if (s.tut && s.tut.on && !s.tut.done.lost) openStop(s, 'lost', null, [reason, STOPS.lost[0]]);
+    else say(s, `${reason} ${STOPS.lost[0]}`, 'alarm', 0);
 }
 /** BUILD A DRONE, in the workshop: four seconds, then a new drone with the same upgrades and a full battery. */
 export function buildDrone(s) {
@@ -421,11 +435,16 @@ function takeTile(s, tx, ty) {
     // the hazards: gas bursts, magma beside an opened tile runs, a wide opening in old rock falls in
     if (t === T.GAS) {
         const b = burstGas(s, tx, ty);
+        const took = Math.round(Math.min(s.battery, batteryCap(s) * GAS_BURN));
         s.battery -= batteryCap(s) * GAS_BURN;
+        s.gasTook = took;
         s.events.push({ type: 'gas', x: tx, y: ty, cells: b.cells });
+        say(s, LOST_WHY.gas(took), 'alarm', 0);
         return;
     }
-    if (t === T.MAGMA || openMagma(s, tx, ty)) { if (t === T.MAGMA) s.lava[i] = 0; s.events.push({ type: 'magma-open', x: tx, y: ty }); }
+    // the drill into magma: it runs out where the tile was; the drone does not go in (it can back off)
+    if (t === T.MAGMA) { openMagma(s, tx, ty); s.lava[i] = 0; s.events.push({ type: 'magma-open', x: tx, y: ty }); return false; }
+    if (openMagma(s, tx, ty)) s.events.push({ type: 'magma-open', x: tx, y: ty });
     const cave = checkRoof(s, tx, ty);
     if (cave) { s.events.push({ type: 'roof', ...cave }); if (!s.saw.roof) { s.saw.roof = true; say(s, HAZARD_LINES.roof, 'alarm', 0); } }
     if (t === T.QUANTUM) {
@@ -575,6 +594,7 @@ function tryDir(s, dir) {
             return true;
         }
         bump(s);
+        if (!s.saw.up) { s.saw.up = true; say(s, LINES.cantUp, 'hint', 0); s.hintAt = [s.x, s.y]; }
         if ((s.bumps = (s.bumps || 0) + 1) >= 3) need(s, 'updrill');
         return false;
     }
@@ -626,7 +646,9 @@ function homeAgain(s) {
     }
     // one new thing a homecoming: what the lab found, or a failing chamber's first stop, goes before a new row
     const news = (s.quantum && s.quantum.ready.length) || (s.alarms && s.alarms.list.length && !t.done.failing);
-    if (!news && t.rows.length && t.needs.length && t.revealDive !== s.dives && s.time - (t.revealAt ?? -1e9) >= ROW_GAP) {
+    // a row a wall asks for (the drone cannot go on without it) does not wait
+    const wall = t.needs[0] === 'drill' || t.needs[0] === 'hull';
+    if (t.rows.length && t.needs.length && t.revealDive !== s.dives && (wall || (!news && s.time - (t.revealAt ?? -1e9) >= ROW_GAP))) {
         const row = t.needs.shift();
         t.rows.push(row);
         t.revealDive = s.dives;
@@ -642,13 +664,12 @@ function firstDelivery(s) {
     if (!t || !t.on) return;
     reveal(s, 'parts');
     if (!t.rows.length) {
-        t.rows.push('battery');
-        t.fresh = 'battery';
+        t.rows.push('battery', 'steering');
+        t.fresh = 'steering';
         t.revealDive = s.dives;
         t.revealAt = s.time;
         s.events.push({ type: 'row', row: 'battery' });
         say(s, LINES.open, 'line', 0);
-        need(s, 'steering');
     }
 }
 
@@ -721,7 +742,9 @@ export function step(s, dt, input = {}) {
     }
     // the lab works on what it was given; what it found is told at the base, one at a time (a stop)
     if (s.quantum) {
-        stepLab(s, dt);
+        const done = stepLab(s, dt);
+        // the lab is done while the drone is down: the radio says so (without it, the base says it on arrival)
+        if (done && !isHome(s) && s.levels.radio > 0) say(s, LINES.labDone, 'find', 0);
         const q = s.quantum;
         if (isHome(s) && roomOf(s) === 'lab' && q.carry.length) {
             q.labQ += q.carry.length; q.carry = [];
@@ -752,7 +775,34 @@ export function step(s, dt, input = {}) {
     s.wasHome = isHome(s);
     if (isHome(s) && s.line?.kind === ROUTE_TURN) clearLine(s);
     if (s.cargo.length < cargoCap(s)) s.fullSaid = false;
-    if (isHome(s) && !s.act) {
+    // the WAREHOUSE: the cargo goes as the drone drives through (it need not stop). The generators take a
+    // share of the ore while they are under 90 % (every other piece); the rest becomes parts.
+    if (isHome(s) && s.cargo.length && roomOf(s) === 'warehouse') {
+        while (s.cargo.length) {
+            const t = s.cargo.shift();
+            s.batch = s.batch || { ore: 0, gen: 0, parts: 0 };
+            s.batch.ore++;
+            s.delivered++;
+            if (ORE[t].bio) {
+                s.bio += ORE[t].bio;
+                // flesh burns too: biomass feeds the generators a little as it goes in
+                s.reserve = Math.min(100, s.reserve + GEN_PIECE / 2);
+                if (!s.bioSeen) { s.bioSeen = true; s.events.push({ type: 'bio-first' }); }
+                bioHome(s);
+            } else if (s.reserve < GEN_TAKES_UNDER && s.batch.ore % 2 === 1) {
+                s.reserve = Math.min(100, s.reserve + GEN_PIECE);
+                s.batch.gen++;
+            } else {
+                s.parts += ORE[t].parts;
+                s.batch.parts += ORE[t].parts;
+            }
+            s.events.push({ type: 'deliver', kind: ORE[t].kind, n: s.cargo.length });
+            if (s.delivered === 1) firstDelivery(s);
+        }
+        s.events.push({ type: 'unloaded', ...s.batch });
+        s.batch = null;
+    }
+    if (isHome(s)) {
         // a stopped generator does not charge (only a little, so the drone is never stuck at home)
         const genDown = s.alarms && s.alarms.genDown;
         if (!genDown) s.battery = Math.min(cap, s.battery + cap * CHARGE_RATE * dt);
@@ -761,28 +811,11 @@ export function step(s, dt, input = {}) {
             s.tut.done.unload = true;
             say(s, LINES.unload, 'line', 0);
         }
-        if (s.cargo.length && roomOf(s) === 'warehouse') {
-            s.unloadT += dt;
-            while (s.unloadT >= UNLOAD_EVERY && s.cargo.length) {
-                s.unloadT -= UNLOAD_EVERY;
-                const t = s.cargo.shift();
-                s.parts += ORE[t].parts;
-                s.bio += ORE[t].bio;
-                if (ORE[t].bio && !s.bioSeen) { s.bioSeen = true; s.events.push({ type: 'bio-first' }); }
-                if (ORE[t].bio) bioHome(s);
-                s.reserve = Math.min(100, s.reserve + reserveOf(t));
-                s.delivered++;
-                s.batch = s.batch || { ore: 0, parts: 0 };
-                s.batch.ore++; s.batch.parts += ORE[t].parts;
-                if (!s.cargo.length) { s.events.push({ type: 'unloaded', ...s.batch }); s.batch = null; }
-                s.events.push({ type: 'deliver', kind: ORE[t].kind, n: s.cargo.length });
-                if (s.delivered === 1) firstDelivery(s);
-            }
-        } else s.unloadT = 0;
     } else if (s.y >= 0) {
         // once a dive: the moment the battery is just enough to fly home
         // the turn-back line is on while it is true, and only then
-        const low = s.y > 2 && s.battery < turnBackAt(s);
+        // not at the heart (there is no way back from there, nor any need)
+        const low = s.y > 2 && s.y < HEART_ZONE && !s.heartHits && s.battery < turnBackAt(s);
         if (low && s.line?.kind !== ROUTE_TURN && s.line?.kind !== 'end') {
             if (!s.warned) { s.events.push({ type: 'warn' }); need(s, 'homing'); }
             s.warned = true;
@@ -877,7 +910,8 @@ export function step(s, dt, input = {}) {
         const side = input.dir === 'left' || input.dir === 'right';
         if (side && tryDir(s, input.dir)) {
             // the second step never carries the drone past an open way up: it stops under the shaft
-            if (!s.levels.steering && !isHome(s) && !(s.act && upOpen(s, s.act.tx, s.act.ty))) s.commit = input.dir;
+            // (only when digging: in an open tunnel one press is one step)
+            if (!s.levels.steering && !isHome(s) && s.act && s.act.kind === 'dig' && !upOpen(s, s.act.tx, s.act.ty)) s.commit = input.dir;
             continue;
         }
         const wantsUp = input.dir === 'up' && upOpen(s, s.x, s.y);

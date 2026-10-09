@@ -9,6 +9,8 @@
  */
 
 import { playChapterCard } from '../chapterCard.js';
+import { setPhase, phases } from '../gamePhase.js';
+import { SAVE_KEY as UNITY_KEY, serialize as serializeUnity, fromVault } from '../phase5/unity.js';
 import {
     SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, ROW_NAME, rowText, GRAFTS, graftShown,
     batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
@@ -131,6 +133,8 @@ const CSS = `
 #dig-help { position: absolute; right: 16px; bottom: 16px; font: 12px/1.4 system-ui; color: #5d6a78; text-align: right; pointer-events: none; }
 `;
 
+/** Rows whose level 0 is a real thing the drone has (a battery, a steel bit): it is a filled box. */
+const HAS_BASE = ['battery', 'steering', 'drill', 'updrill', 'cargo', 'lamp', 'hull'];
 const ORE_COLOUR = { 8: '#9fd8e8', 9: '#efe6c8', 10: '#9fe3ff', 11: '#ff4d6d' };
 const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
@@ -213,10 +217,13 @@ export function init() {
     window.addEventListener('resize', () => rnd.resize(), { signal });
 
     if (s.ended && !s.risen) ui.root.classList.add('dig-ending');
-    if (s.risen) {
-        // the act is over: the wall again
-        playChapterCard({ roman: END.roman, title: END.title, mode: 'to-come', dark: true });
+    /** The dig's end leads into chapter V as the vault's does: the sleepers still alive are its minds. */
+    function toUnity(fresh = false) {
+        save();
+        try { if (fresh || !localStorage.getItem(UNITY_KEY)) localStorage.setItem(UNITY_KEY, serializeUnity(fromVault(sleepers(s)))); } catch { /* full */ }
+        playChapterCard({ roman: END.roman, title: END.title, dark: true, hold: 2200, onMidpoint: () => setPhase(phases.UNITY) });
     }
+    if (s.risen) riseTimer = setTimeout(() => toUnity(false), 0);
 
     // ---- the hands
     const held = [];
@@ -240,7 +247,8 @@ export function init() {
         }
         // the workshop with keys: up and down choose a row, Enter or Space buys it (left and right still drive)
         if (!stopOpen(s) && !ui.shop.hidden) {
-            if (d === 'up' || d === 'down') { e.preventDefault(); moveSel(d === 'up' ? -1 : 1); return; }
+            // down past the last row leaves the workshop: the drone drives to the hatch and down
+            if ((d === 'up' || d === 'down') && moveSel(d === 'up' ? -1 : 1)) { e.preventDefault(); return; }
             if (confirmKey && !e.repeat) { buySel(); return; }
         }
         if (confirmKey) return;
@@ -323,11 +331,13 @@ export function init() {
     }
     function moveSel(k) {
         const list = shopButtons();
-        if (!list.length) return;
+        if (!list.length) return false;
         const i = Math.max(0, list.findIndex((b) => b.dataset.row === sel));
-        sel = list[(i + k + list.length) % list.length].dataset.row;
+        if (i + k >= list.length) return false;           // past the last row: not a choice, the way down
+        sel = list[Math.max(0, i + k)].dataset.row;
         paintSel();
         list.find((b) => b.dataset.row === sel)?.scrollIntoView?.({ block: 'nearest' });
+        return true;
     }
     function buySel() {
         const b = shopButtons().find((x) => x.dataset.row === sel);
@@ -372,7 +382,7 @@ export function init() {
         const gl = s.levels.gen || 0, genP = GEN_PRICE[gl];
         genBtn.hidden = !atGen;
         genBtn.querySelector('.dymo').textContent = genP === undefined ? GEN_NAME[gl] : GEN_NAME[gl + 1];
-        genBtn.querySelector('.dig-dash').textContent = '■'.repeat(gl) + '□'.repeat(3 - gl);
+        genBtn.querySelector('.dig-dash').textContent = '■'.repeat(gl + 1) + '□'.repeat(3 - gl);
         const gpe = genBtn.querySelector('.dig-price');
         if (genP === undefined) { gpe.textContent = 'DONE'; gpe.className = 'dig-price is-short'; }
         else if (s.parts >= genP) { gpe.textContent = `${genP} PARTS`; gpe.className = 'dig-price'; }
@@ -384,8 +394,9 @@ export function init() {
             // a one-level upgrade leaves the list once it is bought
             b.hidden = !here || !rowShown(s, r) || (top === 1 && lv >= 1);
             b.classList.toggle('is-fresh', fresh === r);
-            // UPWARD DRILL starts at I: the dashes show I to III
-            b.querySelector('.dig-dash').textContent = r === 'updrill' ? '■'.repeat(lv + 1) + '□'.repeat(top - lv) : '■'.repeat(lv) + '□'.repeat(top - lv);
+            // the boxes mean the same on every row: the levels that exist; the ones the drone has are filled
+            const base = HAS_BASE.includes(r) ? 1 : 0;
+            b.querySelector('.dig-dash').textContent = '■'.repeat(lv + base) + '□'.repeat(top - lv);
             b.querySelector('.dig-desc').textContent = rowText(r, lv);
             const pe = b.querySelector('.dig-price');
             if (price === null) { pe.textContent = 'DONE'; pe.className = 'dig-price is-short'; }
@@ -470,7 +481,9 @@ export function init() {
                 }
             }
             // a line whose time is up goes (it is no longer true)
-            crt.lines = crt.lines.filter((l) => l.kind === 'sys' || l.ttl === Infinity || nowMs - l.at < (l.ttl ?? 6) * 1000 + 1500);
+            const cur = lineNow(s);
+            crt.lines = crt.lines.filter((l) => l.kind === 'sys'
+                || (l.ttl === Infinity ? !!cur && cur.n === l.n : nowMs - l.at < (l.ttl ?? 6) * 1000 + 1500));
             const on = lineNow(s);
             html = crt.lines.map((l, k) => {
                 if (l.n >= 0 && l.shown < l.text.length) l.shown = Math.min(l.text.length, Math.floor((nowMs - l.at) / (TYPE_MS * 0.6)));
@@ -566,7 +579,7 @@ export function init() {
         const hear = isHome(s) || s.levels.radio > 0;
         const worst = worstAlarm(s);
         let alarm = '', calm = false;
-        if (hear && worst) alarm = ALARM_LINES.tag(worst.id, worst.until - s.time) + (al.list.length > 1 ? ` +${al.list.length - 1}` : '');
+        if (hear && worst) alarm = ALARM_LINES.tag(worst.id, worst.until - s.time, worst.cost) + (al.list.length > 1 ? ` +${al.list.length - 1}` : '');
         else if (hear && al && al.genDown) { alarm = ALARM_LINES.genStop; calm = true; }
         put('alarm', ui.alarm, alarm);
         ui.alarm.hidden = !alarm || (stopOpen(s) && s.tut.stop.crt);
@@ -623,7 +636,7 @@ export function init() {
         rnd.rise();
         riseTimer = setTimeout(() => {
             sound?.stop();
-            playChapterCard({ roman: END.roman, title: END.title, mode: 'to-come', dark: true });
+            toUnity(true);
         }, RISE_S * 1000);
     }, { signal });
 
@@ -653,7 +666,7 @@ export function init() {
                 if (e.type === 'pod') blinkPod = { pod: e.pod, at: performance.now() };
                 if (e.type === 'shock' || e.type === 'teleport') rnd.ring(e.type);
                 if (e.type === 'full') rnd.pop('Cargo full.', '#f1efe8', false);
-                if (e.type === 'unloaded') rnd.pop(LINES.unloaded(e.ore, e.parts), '#f2d98a', false);
+                if (e.type === 'unloaded') rnd.pop(LINES.unloaded(e.ore, e.gen || 0, e.parts), '#f2d98a', false);
                 if (e.type === 'bump') rnd.bump(s);
                 if (e.type === 'q-named') rnd.label(e.i, 'QUANTUM OBJECT');
                 if (e.type === 'heart') ui.root.classList.add('dig-ending');

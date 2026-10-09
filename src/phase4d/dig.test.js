@@ -3,7 +3,7 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
-    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
+    boost, teleport, shock, litAt, lampRadius, fit, cargoCap, LOST_WHY, buildDrone, buildPrice, BUILD_S, batteryCap, buyGen, GEN_DRAIN, drainRate, canDigUp,
 } from './dig.js';
 import { CAVE_WARN, LAVA_STEP, heatHold } from './hazards.js';
 import { qOrder, has, LAB_S, Q_LINES } from './quantum.js';
@@ -49,10 +49,10 @@ describe('the rules', () => {
         s.levels.drill = 1;
         expect(digTime(s, T.SOIL, 0)).toBeLessThan(0.25);
     });
-    test('the gates: hard rock wants DRILL 2, basalt DRILL 3, the deep a hull, the sinew bone', () => {
+    test('the gates: hard rock wants DRILL I, basalt DRILL II, the deep a hull, the sinew bone', () => {
         const s = newState(7);
-        expect(gateOf(s, T.HARD, 70)).toMatch(/DRILL 2/);
-        expect(gateOf(s, T.BASALT, 70)).toMatch(/DRILL 3/);
+        expect(gateOf(s, T.HARD, 70)).toBe('Too hard. Needs DRILL I.');
+        expect(gateOf(s, T.BASALT, 70)).toBe('Basalt. Needs DRILL II.');
         expect(gateOf(s, T.STONE, 120)).toMatch(/HULL 1/);
         s.levels.hull = 2;
         expect(gateOf(s, T.STONE, 260)).toMatch(/HULL 3/);
@@ -101,7 +101,7 @@ describe('the rules', () => {
         expect(s.wrecks).toHaveLength(1);
         expect(s.wrecks[0].cargo).toHaveLength(4);
         expect(s.reserve).toBe(50);
-        expect(s.tut.stop.text).toEqual(['The drone is lost. Build another.']);
+        expect(s.tut.stop.text).toEqual(['The battery ran out.', 'The drone is lost. Build another.']);
         closeStop(s);
         const y0 = s.y;
         run(s, 10, { dir: 'down' });
@@ -140,7 +140,10 @@ describe('the rules', () => {
         for (let i = 0; i < 20; i++) { step(s, 0.05, { dir: 'up' }); ev.push(...s.events.map((e) => e.type)); s.events.length = 0; }
         expect(s.y).toBe(10);
         expect(ev).toContain('bump');
-        expect(s.line.text).toBe('');
+        expect(s.line.text).toBe("Can't dig up here.");     // once
+        const n = s.line.n;
+        for (let i = 0; i < 20; i++) step(s, 0.05, { dir: 'up' });
+        expect(s.line.n).toBe(n);                            // never again
     });
     test('up under a ledge: the drone hovers, it does not bounce, and costs little', () => {
         const s = preparedState({ row: 10 });
@@ -280,22 +283,25 @@ describe('pass 3: one thing at a time', () => {
         for (let i = 0; i < 20; i++) step(s, 0.05, {});
         expect(s.cargo.length).toBe(0);
         expect(shows(s, 'parts')).toBe(true);
-        expect(s.tut.rows).toEqual(['battery']);
+        expect(s.tut.rows).toEqual(['battery', 'steering']);
         expect(rowShown(s, 'drill')).toBe(false);
     });
-    test('a new row comes with a need, one a dive, at least ROW_GAP apart', () => {
+    test('a new row comes with a need, one a dive, at least ROW_GAP apart; a row a wall asks for does not wait', () => {
         const s = started();
         s.tut.rows = ['battery']; s.tut.revealDive = 0; s.tut.revealAt = 0;
-        s.tut.needs = ['steering', 'drill'];
+        s.tut.needs = ['cargo', 'lamp'];
         const dive = () => { s.y = 3; step(s, 0.05, {}); s.y = -1; s.x = HOME_X; step(s, 0.05, {}); };
         step(s, 0.05, {});
         s.time = ROW_GAP + 1; dive();
-        expect(s.tut.rows).toEqual(['battery', 'steering']);
+        expect(s.tut.rows).toEqual(['battery', 'cargo']);
         dive();
-        expect(s.tut.rows).toEqual(['battery', 'steering']);   // too soon
+        expect(s.tut.rows).toEqual(['battery', 'cargo']);   // too soon
         s.time += ROW_GAP; dive();
-        expect(s.tut.rows).toEqual(['battery', 'steering', 'drill']);
-        expect(s.line.text).toBe('New in the workshop: DRILL.');
+        expect(s.tut.rows).toEqual(['battery', 'cargo', 'lamp']);
+        expect(s.line.text).toBe('New in the workshop: LAMP.');
+        s.tut.needs = ['drill'];
+        dive();
+        expect(s.tut.rows).toContain('drill');               // the wall's row: at once
     });
     test('hard rock asks for the DRILL row; a full cargo three times for CARGO', () => {
         const s = preparedState({ row: 58 });
@@ -303,19 +309,24 @@ describe('pass 3: one thing at a time', () => {
         step(s, 0.05, { dir: 'down' });
         expect(s.tut.needs).toContain('drill');
     });
-    test('steering I is coarse: one press goes two steps; STEERING II one', () => {
+    test('steering I is coarse when digging sideways (two tiles a press); in an open tunnel one step; STEERING II one', () => {
         const s = preparedState({ row: 10 });
         s.levels.steering = 0;
         s.y = 10;
-        for (let x = 0; x < W; x++) s.tiles[10 * W + x] = T.AIR;
         for (let x = 0; x < W; x++) s.tiles[11 * W + x] = T.STONE;
+        for (let x = 0; x < W; x++) if (x !== HOME_X) s.tiles[10 * W + x] = T.SOIL;
+        step(s, 0.05, { dir: 'right' });
+        for (let i = 0; i < 30; i++) step(s, 0.05, {});
+        expect(s.x).toBe(HOME_X + 2);                    // dug two
+        for (let x = 0; x < W; x++) s.tiles[10 * W + x] = T.AIR;
         step(s, 0.05, { dir: 'right' });
         for (let i = 0; i < 20; i++) step(s, 0.05, {});
-        expect(s.x).toBe(HOME_X + 2);
+        expect(s.x).toBe(HOME_X + 3);                    // open tunnel: one
         s.levels.steering = 1;
+        for (let x = 0; x < W; x++) if (x > s.x) s.tiles[10 * W + x] = T.SOIL;
         step(s, 0.05, { dir: 'right' });
-        for (let i = 0; i < 20; i++) step(s, 0.05, {});
-        expect(s.x).toBe(HOME_X + 3);
+        for (let i = 0; i < 30; i++) step(s, 0.05, {});
+        expect(s.x).toBe(HOME_X + 4);
     });
     test('the base: down from a room drives to the hatch; up into the base only through the hatch', () => {
         const s = preparedState({ row: 5 });
@@ -674,5 +685,45 @@ describe('v1.92.2: hazards, lost drones, ore and parts', () => {
         const ev = [];
         for (let k = 0; k < 10; k++) { step(t, 0.05, {}); ev.push(...t.events); t.events.length = 0; }
         expect(ev.find((e) => e.type === 'unloaded')).toMatchObject({ ore: 2, parts: 6 });
+    });
+});
+
+describe('v1.92.3: why the drone died, a base with teeth', () => {
+    test('magma: the drill into it does not carry the drone in; the hull holds a few seconds, so it can back off', () => {
+        const s = preparedState({ row: 130, levels: { drill: 3, hull: 1 } });
+        s.y = 130; s.x = HOME_X;
+        for (let x = 0; x < W; x++) { s.tiles[130 * W + x] = x === HOME_X ? T.AIR : T.STONE; s.tiles[131 * W + x] = T.STONE; }
+        s.tiles[130 * W + HOME_X + 1] = T.MAGMA;
+        run(s, 1, { dir: 'right' });
+        run(s, 10);
+        expect(s.x).toBe(HOME_X);
+        expect(s.lava[130 * W + HOME_X + 1]).toBeDefined();
+        run(s, 60, { dir: 'up' });                      // backs off up the shaft
+        expect(s.lost).toBe(false);
+    });
+    test('every lost drone says why', () => {
+        expect(LOST_WHY.power).toBe('The battery ran out.');
+        expect(LOST_WHY.magma).toBe('Magma. The hull melted.');
+        expect(LOST_WHY.cave).toBe('The roof came down.');
+        expect(LOST_WHY.gas(57)).toBe('Gas. It took 57 POWER.');
+    });
+    test('no turn back at the heart', () => {
+        const s = preparedState({ row: 395, levels: { drill: 3, hull: 3 }, grafts: 3 });
+        s.y = 395; s.x = HOME_X; s.battery = 5;
+        run(s, 4);
+        expect(s.line.kind).not.toBe('turnback');
+    });
+    test('the generators take every other piece while under 90 %; the rest is parts; the drone unloads driving through', () => {
+        const s = started();
+        s.reserve = 50; s.cargo = [T.ROCK, T.ROCK, T.ROCK, T.ROCK]; s.y = -1; s.x = 11; s.tut.dug = true;
+        const ev = [];
+        for (let k = 0; k < 30 && s.x > 3; k++) { run(s, 1, { dir: 'left' }); ev.push(...s.events); s.events.length = 0; }
+        expect(s.cargo).toEqual([]);
+        const u = ev.find((e) => e.type === 'unloaded');
+        expect(u).toMatchObject({ ore: 4, gen: 2, parts: 4 });
+        expect(LINES.unloaded(8, 4, 22)).toBe('8 ORE → 4 to the generators, 22 PARTS');
+    });
+    test('the alarm shows the price', () => {
+        expect(ALARM_LINES.tag('c2', 40, 12)).toBe('CHAMBER 3 · 40 s · 12 PARTS');
     });
 });

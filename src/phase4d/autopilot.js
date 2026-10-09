@@ -170,7 +170,7 @@ const USEFUL = ['steering', 'radio', 'drill', 'cargo', 'battery', 'gps', 'mappin
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
-const GATES = [[300, 'drill', 2], [500, 'hull', 1], [700, 'drill', 3], [900, 'hull', 2], [1200, 'hull', 3]];
+const GATES = [[300, 'drill', 1], [500, 'hull', 1], [700, 'drill', 2], [900, 'hull', 2], [1200, 'hull', 3]];
 function nextGate(s) {
     const best = (s.record + 1) * 5;
     for (const [m, row, lv] of GATES) if (rowShown(s, row) && s.levels[row] < lv && best >= m - 120) return row;
@@ -292,6 +292,8 @@ export function decide(s, mem) {
     const worst = s.levels.radio > 0 ? worstAlarm(s) : null;
     const tripS = (s.y + 1) * 0.05 + 4;
     if (worst && worst.until - s.time < tripS + 25) mem.going = 'home';
+    // the generators low: home with what there is
+    if (s.reserve < 25 && s.cargo.length) mem.going = 'home';
     if (mem.going === 'home' || s.cargo.length >= cargoCap(s) || s.battery < homeNeed + 3) {
         mem.going = 'home';
         // the TELEPORT, when the way home is long

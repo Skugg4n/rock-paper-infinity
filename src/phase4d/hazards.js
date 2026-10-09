@@ -17,7 +17,7 @@ export const CAVE_SPAN = 4;            // an opening this wide under a roof fall
 export const GAS_R = 1.5;
 export const GAS_BURN = 0.55;          // the share of the battery a gas burst takes
 /** Seconds in the magma the drone takes, by HULL level. */
-export const heatHold = (hull) => 1 + 1.2 * hull;
+export const heatHold = (hull) => 2.5 + 1.5 * hull;
 
 export const HAZARD_LINES = {
     magma: 'Magma. Do not open it.',
