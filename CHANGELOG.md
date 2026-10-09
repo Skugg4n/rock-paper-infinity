@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (deep-dig) v1.92.0 (chapter IV, the dig, pass 3: one thing at a time, a base underground)
+## v1.92.0 - 2026-10-09 (chapter IV, the dig, pass 3: one thing at a time, a base underground)
 
 From Ola's notes (docs/superpowers/specs/2026-10-09-deep-dig-pass3.md). Built in three steps.
 
