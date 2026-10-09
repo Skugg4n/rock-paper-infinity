@@ -5,6 +5,7 @@ import { playChapterCard } from '../chapterCard.js';
 import { phases, setPhase } from '../gamePhase.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
+import { startInterim, writeChoice } from '../interim.js';
 import { buildingData } from './buildings-config.js';
 import { createRenderer, armoryClearCost } from './rendering.js';
 import { timed, counter } from '../perf.js';
@@ -40,11 +41,19 @@ let _cityOpening = false;
 const STORE_REVEAL_SUPPLIES = 100;
 
 /**
- * IV · THE DEEP. The black card is the bridge: chapter IV is built during its
- * hold, so the model is already there when the card lifts. The "to come" wall
- * is kept for one case only, a browser that cannot load the chapter at all;
- * the save is never touched either way.
+ * IV · THE DEEP, by way of the INTERIM (v1.90.0, src/interim.js). The black INTERIM card is the
+ * bridge: the interim screen is built under it during its hold, so it is there when the card
+ * lifts. There one match against Destiny decides which chapter IV comes (the vault or the dig,
+ * written under DEEP_VERSION_KEY); then black, and chapter IV starts. The phase 2 save keeps
+ * `interimPending` while the screen is up (a reload comes back to the screen, no card) and
+ * `interimChosen` once the act is chosen (a reload goes straight on down). The "to come" wall is
+ * kept for one case only, a browser that cannot load the chapter at all.
  */
+function markSave(patch) {
+    const { SAVE_KEY } = PHASE2_CONSTANTS;
+    const save = loadFromStorage(SAVE_KEY);
+    if (save) saveToStorage(SAVE_KEY, serializePhase2(Object.assign(save, patch)));
+}
 async function goDeep() {
     if (_deepStarting) return;
     _deepStarting = true;
@@ -55,13 +64,26 @@ async function goDeep() {
         playChapterCard({ roman: 'IV', title: 'THE DEEP', mode: 'to-come' });
         return;
     }
+    const startDeep = () => setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
+    const save = loadFromStorage(PHASE2_CONSTANTS.SAVE_KEY) || {};
+    if (save.interimChosen) {
+        // chosen before a reload: on down
+        writeChoice(save.interimChosen === 'dig' ? 'drone' : 'vault', localStorage);
+        startDeep();
+        return;
+    }
+    const opts = {
+        onDecided: (version) => markSave({ interimPending: false, interimChosen: version }),
+        onGone: startDeep,
+    };
+    if (save.interimPending) { startInterim(opts); return; }   // a reload during the interim: the screen, no card
+    markSave({ interimPending: true });
+    let screen = null;
     playChapterCard({
-        // Slow and dark like the WAR card: a long fade, a rest, IV, a rest, THE DEEP; a click or 7 s ends the hold.
-        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, pause: 1400, hold: 7000, silent: true,   // the war's E♭ falls to D under it, into IV's own low D
-        onMidpoint: () => {
-            setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
-        },
-    });
+        // Slow and dark like the WAR card, no numeral; a click or 4 s ends the hold. Silent: the war's E♭ falls to D under it.
+        roman: '', title: 'INTERIM', dark: true, slow: true, hold: 4000, silent: true,
+        onMidpoint: () => { screen = startInterim({ ...opts, under: true }); },
+    }).then(() => { if (screen) screen.lift(); else startInterim(opts); });   // no card (one already up): the screen at once
 }
 let _ants = null;
 let _islands = null;
@@ -950,6 +972,17 @@ export function init() {
               if (what === 'state') return w;
               updateAllUI();
           };
+          /** Testing: the INTERIM from any point of the war (the way down chosen, no walk). */
+          window.debug_interim = () => {
+              if (_deepStarting) return;
+              gameState.shipChosen = true;
+              if (gameState.war) gameState.war.goingDown = true;
+              saveGameState();
+              savingEnabled = false;
+              clearInterval(logicInterval); clearInterval(fastUiInterval);
+              city.stop(); war.stop();
+              goDeep();
+          };
           /** Everything chapter II sells has been bought. */
           function cityComplete() {
               return !!(gameState.apartmentResearched && gameState.storeResearched && gameState.greenhouseResearched && gameState.toolCaseUnlocked &&
@@ -1771,8 +1804,8 @@ export function init() {
            * only a few. The controls leave, the hatch opens, a chosen few (the
            * people who live highest) walk to it and go down one by one while
            * the war room says who they are; everyone else stands still and is
-           * left behind; the hatch closes, a stillness, then the IV card as
-           * before. Runs once (w.goingDown); a click elsewhere does nothing
+           * left behind; the hatch closes, a stillness, then the INTERIM card
+           * (goDeep, v1.90.0). Runs once (w.goingDown); a click elsewhere does nothing
            * (#phase-city.going-deep); the card always comes (DOWN.fallbackS).
            * The steps are kept in window.rpiGoDeep (seconds after the click).
            */
@@ -1800,7 +1833,7 @@ export function init() {
                   ui.antsCanvas.classList.add('left-behind');      // the ones left behind dim as the card fades in
                   if (fastUiInterval) clearInterval(fastUiInterval);
                   city.stop();
-                  // the IV card takes the war's E flat and lets it fall to D
+                  // the INTERIM card takes the war's E flat and lets it fall to D
                   war.finale('fall');
                   war.stop();
                   goDeep();

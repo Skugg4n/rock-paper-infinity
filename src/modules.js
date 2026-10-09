@@ -5,7 +5,7 @@
  * forgotten here again (2026-09-19: war.js was missing, Ola got a dead page).
  */
 export const MODULE_PATHS = [
-  'index.html', 'main.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'roman.js',
+  'index.html', 'main.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'style-interim.css', 'roman.js', 'src/interim.js',
   'src/audio.js', 'src/audio-city.js', 'src/audio-war.js', 'src/chapterCard.js', 'src/checkpoints.js', 'src/constants.js', 'src/gamePhase.js',
   'src/deepVersion.js', 'src/icons.js', 'src/modules.js', 'src/perf.js', 'src/save-export.js', 'src/version.js',
   'src/phase1/cost-visual.js', 'src/phase1/countdown.js', 'src/phase1/factory-view.js', 'src/phase1/index.js',

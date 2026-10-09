@@ -525,3 +525,48 @@ most successful. No rule changed (`sim-phase3.mjs 1` prints the same line).
   guards too) is unchanged for other callers.
 - Open: no sound for the hatch (B218); after a reload past the launch their red walkers come back on
   the rubble island (B219, seen in iii-end).
+
+## The interim (2026-10-09, v1.90.0, B450 to B454)
+
+Ola's design: between the war and the deep, one short scene decides which chapter IV the player
+gets, the vault (src/phase4v) or the dig (src/phase4d). Ola's words, kept: "As the Earth fails
+there is a divergence in the path of destiny and a choice has to be made. In one reality there
+was a drone. In the other a Vault." Destiny points to one, "but you may choose to oppose".
+
+- **The hand-over.** GO DEEP's walk is unchanged up to the card. `goDeep()` keeps its import guard,
+  then plays a black, slow, silent card with no numeral, INTERIM (hold 4 s, a click ends it). At
+  its midpoint the interim screen is built under the card (z-index 999); when the card lifts it is
+  raised above it (1100, under the ☰ menu at 1500) and the typing starts. The war's E♭ still falls
+  to D under the card; the interim itself is silent but for the match.
+- **The screen** (src/interim.js, style-interim.css): the vault's CRT (VT.crt phosphor, its glow,
+  its scanlines, a block cursor), full-bleed black. The script and its rests: "As the Earth fails"
+  900 ms "there is a divergence in the path of destiny" 900 ms "and a choice has to be made."
+  1400 ms / "In one reality there was a drone." + the drone icon (Lucide Drone, else Bot) 900 ms /
+  "In the other, a vault." + the vault icon (Lucide Vault) 1400 ms / "Destiny points to " and the
+  needle: the two icons light in turn, slowing (55 ms, ×1.17 a flick) for about 2.4 s, and settle
+  on one (Math.random, 50/50) / "the drone." or "the vault." 1000 ms / "But you may choose to
+  oppose." Letters 28 ms, spaces 45 ms. Then two controls: a round button with chapter I's three
+  glyphs (gem, file, scissors; tooltip "Oppose", Space) and "Continue" (Enter). Space is taken
+  before main.js's pause while the choice is up.
+- **The match.** YOU and DESTINY (dymo labels) face each other with a slot each; three hand buttons
+  below. The player picks, Destiny's hand (uniform) shows at once, and the slots take chapter I's
+  look: the winner bold with a ring, the loser faded and smaller, a draw quiet. Draw: "Again." and
+  the hands reset. Win: "You win. The path turns." and the other icon lights with a short flicker
+  (0.7 s); audio.pling. Loss: "Destiny holds."; audio.knock. Exactly one decisive round.
+  Continue: "So be it." Then 1.2 s, the fade to black (1.5 s), the screen removed and
+  `setPhase(DEEP)` as before.
+- **The choice** is written under `DEEP_VERSION_KEY` (drone → 'dig', vault → 'vault', never
+  'colony'). The phase 2 save holds `interimPending: true` from the card on (a reload shows the
+  screen again, from the top, no card) and `interimPending: false, interimChosen` once decided (a
+  reload goes straight to chapter IV). `?deep=` in the URL still wins (B454).
+- **Pause** (window.__rpiPaused) freezes the typing and the needle; reduced motion settles the
+  needle at once and stops the cursor's blink.
+- **Testing.** `window.debug_interim()` from any point of the war (the way down chosen, no walk);
+  `window.rpiInterim` = { steps (seconds since the screen was built), setRng, pointed }. The rng
+  is drawn once for the needle and once per round for Destiny's hand.
+- **Measured** in headless Chrome from iii-end: the card 21.3 s after the click (the walk as in
+  v1.88.0), the screen built 4.4 s into the card, the card lifted 6.8 s later; from the lift:
+  the drone line 6.2 s, the vault 8.9 s, the needle 10.9 s, settled 13.1 s, the choice 15.3 s.
+  A decisive round to black: 0.4 s (loss) or 1.4 s (win) plus 1.2 s, then 1.5 s of fade.
+- Open: no typewriter sound (B451, audio.click has no level), the ☰ and pause buttons stay white
+  over the CRT (B452), "Destiny points to the drone." stays as typed after the path turns (B453).

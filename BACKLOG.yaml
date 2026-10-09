@@ -3470,3 +3470,51 @@ items:
       rubble island: the ants' withdraw only runs live, so on load nothing tells the picture they are gone.
     status: open
     notes: "Likely fix: on load with w.enemyLeft past the launch, tell ants.js the enemies are gone (an enemiesGone setter). Not verified in a real reload."
+
+  - id: B450
+    added: 2026-10-09
+    source: "Ola (war-interim brief)"
+    request: |
+      INTERIM between III and IV: typewriter text with a CRT feel ("As the Earth fails ... In one reality there was a
+      drone. In the other a Vault."), Destiny points at one of the two, the player may oppose with one match of rock
+      paper scissors or Continue; the outcome decides whether chapter IV is the vault or the dig.
+    status: done
+    done: 2026-10-09
+    version: 1.90.0
+    resolved_in: v1.90.0
+    notes: "src/interim.js + style-interim.css; goDeep() plays the INTERIM card and the screen; interimPending/interimChosen in the phase 2 save."
+
+  - id: B451
+    added: 2026-10-09
+    source: "war-interim (v1.90.0)"
+    request: |
+      A quiet key sound for the interim's typewriter. audio.click() has no level option, so the typing is silent.
+    status: open
+    notes: "Would need a gain argument on audio.click (src/audio.js, not touched in v1.90.0) or a typewriter word of its own."
+
+  - id: B452
+    added: 2026-10-09
+    source: "war-interim (v1.90.0), seen in the headless run"
+    request: |
+      The ☰ and pause buttons stay white circles over the interim's black CRT. The vault hides the pause button
+      (body.in-vault); the interim leaves both, so the player can pause the typing.
+    status: open
+    notes: "Ola decides: dim them on the interim, or keep as is."
+
+  - id: B453
+    added: 2026-10-09
+    source: "war-interim (v1.90.0)"
+    request: |
+      After "You win. The path turns." the line "Destiny points to the drone." still names the act Destiny pointed
+      at; only the lit icon switches. Maybe strike the word through or retype it.
+    status: open
+    notes: "Left as typed in v1.90.0 (the turn is shown by the icons and the new line)."
+
+  - id: B454
+    added: 2026-10-09
+    source: "war-interim (v1.90.0)"
+    request: |
+      ?deep= in the URL still wins over the interim's choice (src/deepVersion.js chosenDeep); a test URL with ?deep=
+      skips what the match decided.
+    status: open
+    notes: "By design for testing; written down so nobody is surprised."

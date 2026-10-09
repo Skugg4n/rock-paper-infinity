@@ -1,0 +1,190 @@
+/* INTERIM (v1.90.0, src/interim.js): one match against Destiny between chapter III and IV.
+   A CRT in the vault's palette (src/phase4v/style.js VT: ink, crt, slate): black, phosphor
+   text with a soft glow, faint scanlines, a typewriter with a block cursor. */
+#interim {
+    --in-ink: #030604;
+    --in-crt: #8dff9e;
+    --in-glow: rgba(120, 255, 140, 0.45);
+    --in-faint: rgba(141, 255, 158, 0.08);
+    position: fixed;
+    inset: 0;
+    z-index: 999;                       /* under the chapter card while it lifts */
+    background: radial-gradient(120% 90% at 50% 45%, #06100a 0%, var(--in-ink) 70%);
+    color: var(--in-crt);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+#interim.is-up { z-index: 1100; }       /* above the card, under the ☰ menu (1500) */
+#interim::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+}
+#interim .in-veil {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 1500ms ease;
+}
+#interim.is-leaving .in-veil { opacity: 1; }
+
+#interim .in-text {
+    position: relative;
+    z-index: 1;
+    width: min(640px, calc(100vw - 32px));
+    font-size: 17px;
+    line-height: 28px;
+    text-shadow: 0 0 6px var(--in-glow);
+}
+#interim .in-line { white-space: pre-wrap; word-break: break-word; min-height: 28px; }
+#interim .in-line.gap { margin-top: 22px; }
+#interim .in-cur {
+    display: inline-block;
+    width: 9px;
+    height: 17px;
+    margin-left: 1px;
+    vertical-align: -3px;
+    background: var(--in-crt);
+    box-shadow: 0 0 6px var(--in-glow);
+    animation: in-blink 1s steps(1) infinite;
+}
+@keyframes in-blink { 50% { opacity: 0; } }
+
+/* the two realities' icons, beside their lines */
+#interim .in-icon {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    margin: 0 4px 0 10px;
+    vertical-align: -5px;
+    opacity: 0;
+    transition: opacity 400ms ease, filter 160ms ease;
+}
+#interim .in-icon.shown { opacity: 0.85; }
+#interim .in-icon.lit { opacity: 1; filter: drop-shadow(0 0 5px var(--in-crt)) drop-shadow(0 0 12px var(--in-glow)); }
+#interim .in-icon.dim { opacity: 0.22; filter: none; }
+
+/* the choice: oppose (the three hands) and Continue */
+#interim .in-choice {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    margin-top: 26px;
+    opacity: 0;
+    transition: opacity 500ms ease;
+}
+#interim .in-choice.shown { opacity: 1; }
+#interim .in-choice.gone { opacity: 0; pointer-events: none; transition-duration: 300ms; }
+#interim button {
+    font: inherit;
+    color: inherit;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-shadow: inherit;
+}
+#interim button:disabled { cursor: default; }
+#interim .in-oppose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 64px;
+    height: 64px;
+    border-radius: 9999px;
+    background: var(--in-faint);
+    box-shadow: 0 0 0 1px rgba(141, 255, 158, 0.18), 0 0 18px rgba(120, 255, 140, 0.08);
+    transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+#interim .in-oppose .in-glyph { width: 15px; height: 15px; display: inline-flex; }
+#interim .in-oppose:hover, #interim .in-oppose:focus-visible {
+    background: rgba(141, 255, 158, 0.16);
+    box-shadow: 0 0 0 1px rgba(141, 255, 158, 0.45), 0 0 22px rgba(120, 255, 140, 0.25);
+    transform: scale(1.05);
+    outline: none;
+}
+#interim .in-continue {
+    padding: 8px 4px;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    transition: opacity 160ms ease;
+}
+#interim .in-continue:hover, #interim .in-continue:focus-visible { opacity: 1; outline: none; }
+
+/* the match: YOU against DESTINY, like a round of chapter I */
+#interim .in-match {
+    margin-top: 26px;
+    opacity: 0;
+    transition: opacity 500ms ease;
+}
+#interim .in-match.shown { opacity: 1; }
+#interim .in-row { display: flex; align-items: flex-end; justify-content: space-between; max-width: 360px; }
+#interim .in-side { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+#interim .in-vs { flex: 1; }
+#interim .in-dymo {
+    display: inline-block;
+    padding: 3px 8px 2px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.35) 100%), #07080a;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+    color: var(--in-crt);
+    font-family: 'Bebas Neue', 'Arial Narrow', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 15px;
+    letter-spacing: 0.14em;
+    text-shadow: 0 0 5px var(--in-glow);
+    user-select: none;
+}
+#interim .in-slot {
+    width: 56px;
+    height: 56px;
+    padding: 12px;
+    box-sizing: border-box;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.85;
+    transition: transform 160ms ease-out, opacity 160ms ease-out, box-shadow 160ms ease-out;
+}
+#interim .in-slot .in-empty { width: 6px; height: 6px; border-radius: 9999px; background: var(--in-crt); opacity: 0.3; }
+#interim .in-slot.winner {
+    opacity: 1;
+    transform: scale(1.12);
+    box-shadow: 0 0 0 2px var(--in-crt), 0 0 14px var(--in-glow);
+    filter: drop-shadow(0 0 4px var(--in-glow));
+}
+#interim .in-slot.loser { opacity: 0.28; transform: scale(0.88); }
+#interim .in-slot.draw { opacity: 0.6; }
+#interim .in-hands { display: flex; gap: 12px; margin-top: 18px; }
+#interim .in-hand {
+    width: 44px;
+    height: 44px;
+    padding: 11px;
+    border-radius: 9999px;
+    background: var(--in-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+#interim .in-hand:hover:not(:disabled), #interim .in-hand:focus-visible { background: rgba(141, 255, 158, 0.18); transform: scale(1.06); outline: none; }
+#interim .in-hand:disabled { opacity: 0.3; }
+#interim .in-hand.picked { opacity: 0.9; background: rgba(141, 255, 158, 0.18); }
+
+@media (max-width: 520px) {
+    #interim .in-text { font-size: 15px; line-height: 25px; }
+    #interim .in-line { min-height: 25px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #interim .in-cur { animation: none; }
+    #interim .in-veil { transition-duration: 200ms; }
+}

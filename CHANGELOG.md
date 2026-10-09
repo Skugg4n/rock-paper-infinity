@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.90.0 - 2026-10-09 (INTERIM: one match against Destiny decides the vault or the dig)
+
+Between the war and the deep, Ola's interim. No rule changed (`sim-phase3.mjs 1` prints the same line).
+- **The card.** GO DEEP's hand-over (the chosen few down, the hatch closed, the stillness) now plays a black, slow, silent card with no numeral: INTERIM (4 s, a click ends it). The war's E♭ still falls to D under it.
+- **The screen** (src/interim.js, style-interim.css): built under the card and there when it lifts. A CRT in the vault's palette: black, phosphor green with a soft glow, faint scanlines, a typewriter (28 ms a letter, 45 ms a space) with a blinking block cursor. "As the Earth fails" · "there is a divergence in the path of destiny" · "and a choice has to be made." Then "In one reality there was a drone." with the drone icon, "In the other, a vault." with the vault icon. "Destiny points to" and the two icons light in turn, back and forth, slowing for 2.4 s, until one stays lit (50/50); "the drone." or "the vault." "But you may choose to oppose." Two controls: a round button with chapter I's three glyphs (Space) and "Continue" (Enter).
+- **The match.** YOU against DESTINY (dymo labels), chapter I's rock, paper and scissors; Destiny's hand shows at the same moment; the winner bold with a ring, the loser faded, a draw quiet. A draw: "Again." and the hands reset. A win: "You win. The path turns." and the other icon lights. A loss: "Destiny holds." One decisive round. Continue: "So be it." Then black (1.5 s) and chapter IV: the drone is the dig, the vault the vault, written under `rpi-deep-version`. A win plings, a loss knocks (when sound is on); the typing is silent. Pause freezes the typing; reduced motion settles the needle at once.
+- **Reload.** The phase 2 save keeps `interimPending` while the screen is up (a reload comes back to the screen, no card) and `interimChosen` once the act is chosen (a reload goes straight on down).
+- **Testing.** `window.debug_interim()` starts the interim from any point of the war; `window.rpiInterim` has the steps with their times and `setRng` (Destiny's needle and hand). The script, the needle, the rules and the version written are unit-tested (src/interim.test.js). Measured headless from iii-end: the card 21.3 s after the click, the screen up 11 s later, the choice 15.3 s after that.
+
 ## v1.89.1 - 2026-10-08 (chapter V · UNITY: the planet, the seeds, the mind as the red word)
 
 After the second human test (docs/playtests/2026-10-08-unity-human-test-2.md, NÄSTAN) and a run through the whole act in the browser (docs/playtests/2026-10-08-unity-fas1.md).
