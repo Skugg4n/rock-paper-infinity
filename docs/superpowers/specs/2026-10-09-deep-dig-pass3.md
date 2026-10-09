@@ -121,3 +121,51 @@ Tre steg, tre commits (bb315eb, a62e4ad, f7e78b6). Kod: `src/phase4d/base.js` (b
 - Värmen drar 0,3/s (var 0,4), BATTERY III 420 (var 340), för att hålla hjärtat inom 20 till 25 min med de nya resorna i basen.
 
 **Sim** (`node scripts/sim-dig.mjs`, tid = spelarens, stoppens lästid inräknad): första grävbeslut 11 s, första malm hemma 21 s (frö 11: 40 s), första fel ca 3 min. Hjärtat: frö 7 21,3 min, frö 11 24,1, frö 3 20,5, frö 5 18,6, utan radio 22,1. Försiktig spelare förlorar inga sovande; `--careless` (lagar inget) förlorar 52 i kamrarna och generatorn stannar.
+
+## H. Olas andra spelvarv (2026-10-09, efter v1.92.0): faror, förlorade drönare, tydligare pengar
+
+Byggs som v1.92.2, efter v1.92.1. Spelartext ordagrann.
+
+### H1. Faror
+- **Magma** under cirka 600 m: fickor av glödande sten (orange, pulserar, lyser upp mörkret runt sig). Gräver man in i en ficka,
+  eller bredvid den, rinner magman ut i tunneln sakta (en ruta var 1,5 s, nedåt och åt sidorna). Den skadar drönaren
+  (HULL tål en stund, sedan förlust). Magma stelnar till hård sten efter 20 s. Första gången lampan träffar magma:
+  `Magma. Do not open it.`
+- **Gas** i krigets lager (gamla bunkrar): gröna fickor som exploderar när borren rör dem, och tar rutorna runt om.
+  Första gången: `Gas from the war. It burns.`
+- **Ras:** i det gamla berget kan taket rasa när man gräver stora hålrum (mer än 3 rutor brett utan stöd): stenar faller efter 2 s
+  varning (damm som sipprar). Första gången: `The roof is moving.`
+- Farorna syns när lampan eller GPS lyst på dem, så att det blir ett val, inte en fälla.
+
+### H2. En förlorad drönare är förlorad
+- Tomt batteri, krossad av ras, smält av magma: drönaren dör där den är. Den blir mörk (lampan slocknar, en sista blinkning).
+- Kameran lämnar den där nere och åker upp till WORKSHOP. Där byggs en ny drönare synligt (en ram, delar som sätts på, 4 s).
+  Stopp första gången: `The drone is lost. Build another.` Knappen `BUILD A DRONE · N PARTS`. Lasten är borta.
+- De första tre gångerna kostar det inget (som i dag, så att ingen låser sig). Sedan ett pris som växer lite (10, 15, 20 PARTS).
+  Har man inte råd: en grundmodell byggs gratis men utan uppgraderingar? Nej: uppgraderingarna sitter i verkstaden, inte i drönaren.
+  Den nya drönaren har alltid samma nivåer. Bara lasten och tiden förloras, plus priset.
+- **Vraken ligger kvar** där nere: mörka drönare med en död lampa. Kör man fram till ett vrak får man tillbaka hälften av dess last:
+  `Half of its cargo was still there.` En liten belöning för att gå tillbaka, och kartan minns ens misstag.
+- Drönarna får nummer: `DRONE 2`, `DRONE 3` i panelen.
+
+### H3. ORE och PARTS, tydligt
+- Det man gräver upp och bär är **ORE** (tre sorter: ROCK, PAPER, SCISSORS, som kristaller i berget). Det syns i CARGO med en liten ikon per sort.
+- I WAREHOUSE blir ore till **PARTS**, det man betalar med. Det syns: ore åker in, PARTS räknas upp (`8 ORE → 26 PARTS`).
+- Panelen visar `CARGO` med ore-ikoner och `PARTS` med en kugg-ikon. Inget annat ord för samma sak.
+- Fynd (gula saker) ger PARTS direkt, och det står vid fyndet: `A street sign. +12 PARTS.`
+
+### H4. Batteri: mindre från start, fler nivåer
+- Start 30 POWER (i dag 40). BATTERY får fem nivåer: 30 → 60 → 100 → 160 → 240 → 360.
+- Samma batteri-ikon och samma fyllnadsstapel som akt I:s reservbatteri, så att det känns igen.
+
+### H5. Generatorn går att bygga ut
+- Från lager 2 (krigets lager nått): stå vid GENERATOR och köp nivåer där, som i verkstaden:
+  `GENERATOR II · Burns ore slower.` (I–IV, varje nivå bränner 30 % mindre ore per tid).
+- När GENERATORS sjunker under 30 %: varning i panelen och en rad, `The generators are running low. When they stop, the chambers go cold.`
+  När de står: stopp första gången, `The generators stopped. The sleepers are freezing.` och SLEEPERS räknas ner synligt.
+
+### H6. Verkstaden
+- Uppgraderingar med en enda nivå försvinner ur listan när de är köpta (i dag STEERING).
+- Att gräva uppåt blir en egen uppgradering med nivåer: `UPWARD DRILL` I (bara rutor med ore, fynd och kvantobjekt, långsamt),
+  II (all mjuk sten), III (allt, lika fort som nedåt).
+- GPS får fler nivåer: I kon nedåt, II bredare och längre, III hela cirkeln runt drönaren, IV laddar om på halva tiden.
