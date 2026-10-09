@@ -13,33 +13,28 @@
     color: var(--in-crt);
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;                   /* v1.91.0: a short window scrolls instead of clipping the top */
+    scrollbar-width: none;
 }
+#interim::-webkit-scrollbar { display: none; }
 #interim.is-up { z-index: 1100; }       /* above the card, under the ☰ menu (1500) */
 #interim::after {
     content: '';
-    position: absolute;
+    position: fixed;
     inset: 0;
     pointer-events: none;
     background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
 }
-#interim .in-veil {
-    position: absolute;
-    inset: 0;
-    background: #000;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 2;
-    transition: opacity 1500ms ease;
-}
-#interim.is-leaving .in-veil { opacity: 1; }
+/* v1.91.0: the IV · DEEP card (z 1000) comes over the screen; the screen fades under its veil */
+#interim.is-leaving { z-index: 999; opacity: 0; pointer-events: none; transition: opacity 1800ms ease; }
 
 #interim .in-text {
     position: relative;
     z-index: 1;
     width: min(640px, calc(100vw - 32px));
+    margin: auto;                       /* centred, but never above the top edge */
+    padding: 24px 0;
     font-size: 17px;
     line-height: 28px;
     text-shadow: 0 0 6px var(--in-glow);
@@ -180,6 +175,41 @@
 #interim .in-hand:disabled { opacity: 0.3; }
 #interim .in-hand.picked { opacity: 0.9; background: rgba(141, 255, 158, 0.18); }
 
+/* v1.91.0: the count before the hands show, each digit pulsing once */
+#interim .in-count { display: inline-block; }
+#interim .in-count.pulse { animation: in-pulse 520ms ease-out 1; }
+@keyframes in-pulse {
+    0% { transform: scale(1); text-shadow: 0 0 6px var(--in-glow); }
+    35% { transform: scale(1.45); text-shadow: 0 0 10px var(--in-crt), 0 0 22px var(--in-glow); }
+    100% { transform: scale(1); text-shadow: 0 0 6px var(--in-glow); }
+}
+
+/* v1.91.0: the winner chooses the path, the two icons below the line, both lit, a ring on one */
+#interim .in-paths {
+    display: flex;
+    gap: 36px;
+    margin-top: 18px;
+    opacity: 0;
+    transition: opacity 500ms ease;
+}
+#interim .in-paths.shown { opacity: 1; }
+#interim .in-path {
+    width: 72px;
+    height: 72px;
+    padding: 14px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 0 5px var(--in-crt)) drop-shadow(0 0 12px var(--in-glow));
+    transition: box-shadow 160ms ease, opacity 300ms ease, transform 160ms ease;
+}
+#interim .in-path.is-focus { box-shadow: 0 0 0 2px var(--in-crt), 0 0 16px var(--in-glow); }
+#interim .in-path:focus-visible { outline: none; }
+#interim .in-paths.gone .in-path { opacity: 0.22; filter: none; box-shadow: none; }
+#interim .in-paths.gone .in-path.is-picked { opacity: 1; filter: drop-shadow(0 0 5px var(--in-crt)) drop-shadow(0 0 12px var(--in-glow)); }
+
 /* B452 (v1.90.1): while the screen is up (body.interim-up, src/interim.js) the ☰ and pause buttons
    and the version label step aside instead of standing as white circles on the black. Space still
    pauses (main.js); while paused the cursor stops blinking. */
@@ -192,10 +222,14 @@ body.interim-up.paused #interim .in-cur { animation-play-state: paused; }
 @media (max-width: 520px) {
     #interim .in-text { font-size: 15px; line-height: 25px; }
     #interim .in-line { min-height: 25px; }
+    #interim .in-path { width: 60px; height: 60px; padding: 11px; }
 }
 @media (prefers-reduced-motion: reduce) {
     #interim .in-cur { animation: none; }
-    #interim .in-veil { transition-duration: 200ms; }
+    #interim .in-count.pulse { animation: none; }
+    #interim.is-leaving,
+    #interim .in-paths,
+    #interim .in-path,
     #interim .in-icon,
     #interim .in-choice,
     #interim .in-match,

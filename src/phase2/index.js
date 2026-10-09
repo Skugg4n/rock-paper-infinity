@@ -43,8 +43,9 @@ const STORE_REVEAL_SUPPLIES = 100;
 /**
  * IV · THE DEEP, by way of the INTERIM (v1.90.0, src/interim.js). The black INTERIM card is the
  * bridge: the interim screen is built under it during its hold, so it is there when the card
- * lifts. There one match against Destiny decides which chapter IV comes (the vault or the dig,
- * written under DEEP_VERSION_KEY); then black, and chapter IV starts. The phase 2 save keeps
+ * lifts. There one match against Destiny decides which chapter IV comes (the vault or the dig);
+ * a departure line, then the IV · DEEP card (v1.91.0, played by the interim), and at its midpoint
+ * the version is written under DEEP_VERSION_KEY and chapter IV starts. The phase 2 save keeps
  * `interimPending` while the screen is up (a reload comes back to the screen, no card) and
  * `interimChosen` once the act is chosen (a reload goes straight on down). The "to come" wall is
  * kept for one case only, a browser that cannot load the chapter at all.
@@ -74,7 +75,7 @@ async function goDeep() {
     }
     const opts = {
         onDecided: (version) => markSave({ interimPending: false, interimChosen: version }),
-        onGone: startDeep,
+        onDeep: startDeep,   // the IV · DEEP card's midpoint (the version already written)
     };
     if (save.interimPending) { startInterim(opts); return; }   // a reload during the interim: the screen, no card
     markSave({ interimPending: true });
@@ -1813,7 +1814,7 @@ export function init() {
           const DOWN = { hatchAt: 1.3, line1At: 1.7, walkAt: 2.3, line2At: 6.6, closeAfterLine2: 2.5, closeS: 1.2, stillS: 1.5, fallbackS: 25 };
           const DOWN_LINES = [
               'Status: the shelter takes only a few. The richest. The most successful.',
-              'Status: they go down to wait until the earth can be lived on again.',
+              'Status: they go down to wait until the earth heals its surface and is habitable once more.',
           ];
           function goDownTogether() {
               const t0 = performance.now();
