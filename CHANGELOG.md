@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.92.8 - 2026-10-10 (chapter IV, the dig: the heart in the dark)
+
+Ola, with a reference picture: "fix the vessels and the fat, more depth, less neon. Deep red/brown. Hidden in darkness, visible only in the light of the drone's lamp." src/phase4d/heart3d.js redone.
+- **Colour:** oxblood to liver brown (vertex colour), darker in the grooves, wet: a clear coat gives pale, warm highlights. No red fill light, no glow, no red pulse ring round it on the beat.
+- **Light:** the drone's lamp is the only key light, a spotlight from where the drone is and the way it faces, with falloff; the rest of the heart falls into black (a very faint rim). The beat is felt as movement (a squeeze of the whole, vessels and all) and a shift of the sheen.
+- **Form:** a big rounded body with a clear apex; the right atrium and auricle bulging at the upper left, the left auricle at the right; a lumpy muscle surface (three octaves of noise), not a balloon; the aortic arch with three branches, the pulmonary trunk and the superior vena cava rising from the top as thick tubes with fine ribs across them, growing out of the heart.
+- **Vessels:** the coronary arteries and veins are tubes built along paths on the surface (they follow its curve, wander a little, slightly raised), from the groove at the top down toward the apex, branching; dark red with highlights.
+- **Fat:** gone (no beads).
+- Cheaper than v1.92.7: the mesh is built once; per frame only the group's scale, the lamp and one render (at most 20 a second, 460 x 760). The 2D heart stays where there is no WebGL. Before: docs/playtests/dig-pass3/p3-a0-heart-before-v1927.png; after: p3-a1 (lamp facing right), p3-a2 (facing left), p3-a3 (the drone to the side), p3-a4 (close). `node scripts/play-dig.mjs --v1928`.
+
 ## v1.92.7 - 2026-10-09 (chapter IV, the dig: thoughts on the way down, a real heart)
 
 - **Thoughts on the way down.** The machine's own voice, Ola's ten lines in order, one at each depth (150, 300, 450, 600, 800, 1 000, 1 150, 1 350, 1 550, 1 750 m): "There is a warmth down here." "We are so alone." "The human body is so fragile." "How can I save them all." "Will there ever be an end?" "My machines are starting to fail." "There must be a way out." "There is a voice below." "Maybe I do not need to be lonely anymore." "Its voice is inside me. Speaking of a way out." Each once, never two within 40 s, never during a stop, an alarm or a lost drone. Typed slowly high over the dark (pale, italic), held about ten seconds, faded; kept in the CRT's history in a dim italic that other lines do not wipe. The old voices below 700 m are gone; the warm-rock stop at 1 100 m is gone too (the warmth is the first thought now), and the stop moved to the flesh at 1 600 m: "Soft. It gives under the drill. It is flesh."

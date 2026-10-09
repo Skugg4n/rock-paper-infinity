@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924', '--v1926', '--v1927'].some((a) => process.argv.includes(a));
+const PASS3 = ['--pass3', '--step2', '--step3', '--nosteer', '--hazards', '--v1923', '--v1924', '--v1926', '--v1927', '--v1928'].some((a) => process.argv.includes(a));
 const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +103,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924', '--v1926', '--v1927'].some((a) => process.argv.includes(a))) {
+    if (PASS3 && !['--step2', '--step3', '--long', '--hazards', '--v1923', '--v1924', '--v1926', '--v1927', '--v1928'].some((a) => process.argv.includes(a))) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -236,6 +236,25 @@ try {
         const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
         const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
         fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
+    }
+    if (process.argv.includes('--v1928')) {
+        // v1.92.8: the heart in the dark, lit by the drone's lamp at two angles
+        await jump('iv-dig-heart');
+        await sleep(3500);
+        await ev(`(() => { const s = window.rpiDig.state; s.tut.done.heartWall = true; s.face = 1; return true; })()`);
+        await sleep(1500);
+        await shot('p3-a1-heart-lamp-right');
+        await ev(`(() => { const s = window.rpiDig.state; s.face = -1; return true; })()`);
+        await sleep(1500);
+        await shot('p3-a2-heart-lamp-left');
+        await ev(`(() => { const s = window.rpiDig.state; s.x = 7; s.y = 396; s.face = 1; for (let x = 7; x <= 11; x++) s.tiles[396 * 24 + x] = 0; return true; })()`);
+        await sleep(1500);
+        await shot('p3-a3-heart-lamp-side');
+        const d = await ev(`(() => { const s = window.rpiDig.state; s.x = 11; s.y = 397; s.face = 1; return true; })()`);
+        void d;
+        await sleep(1200);
+        const z = await send('Page.captureScreenshot', { format: 'png', clip: { x: 520, y: 150, width: 520, height: 600, scale: 1.5 } });
+        fs.writeFileSync(path.join(SHOTS, 'p3-a4-heart-close.png'), Buffer.from(z.result.data, 'base64'));
     }
     if (process.argv.includes('--v1927')) {
         // v1.92.7: thoughts on a dive from 700 m; the ending with the heart's voice; the heart in 3D

@@ -210,7 +210,7 @@ export function createRenderer(canvas) {
 
         // ---- the heart (v1.92.6): big, a body; lub-dub; the flesh round it pulled and lit on each beat
         const hy = HEART.cy * TS - camY, hx = r.originX + HEART.cx * TS;
-        if (hy - 8 * TS < vh) drawHeart(hx, hy, t, dt);
+        if (hy - 8 * TS < vh) drawHeart(hx, hy, t, dt, { x: r.originX + p.x * TS + TS / 2 - hx, y: p.y * TS + TS / 2 - camY - hy, face: s.face || 1 });
 
 
         // ---- the dark: a circle of light around the drone; daylight near the top
@@ -1130,20 +1130,13 @@ export function createRenderer(canvas) {
         }
         return h3;
     }
-    function drawHeart(hx, hy, t, dt) {
+    function drawHeart(hx, hy, t, dt, drone) {
         r.swell = Math.max(0, (r.swell || 0) - dt * 0.05);
         const sq = lubdub(t), sc = 1 + (r.swell || 0) - sq * 0.6;
         const h = heart3d();
         if (h) {
-            // a red light spreading through the flesh round it on each beat, then the organ itself
-            const ph3 = (t % 1.1) / 1.1;
-            if (ph3 < 0.6) {
-                const rr = HEART.rx * TS * (1.2 + ph3 * 3);
-                const lg = ctx.createRadialGradient(hx, hy, rr * 0.7, hx, hy, rr);
-                lg.addColorStop(0, 'rgba(168,19,44,0)'); lg.addColorStop(0.8, `rgba(200,30,50,${(0.28 * (1 - ph3 / 0.6)).toFixed(3)})`); lg.addColorStop(1, 'rgba(168,19,44,0)');
-                ctx.fillStyle = lg; ctx.fillRect(hx - rr, hy - rr, rr * 2, rr * 2);
-            }
-            const c = h.render(sq, r.swell || 0);
+            // the organ in the dark, lit only by the drone's lamp; the beat is its movement (no glow)
+            const c = h.render(sq, r.swell || 0, drone);
             ctx.drawImage(c, hx - c.width / 2, hy - h.cy);
             return;
         }
