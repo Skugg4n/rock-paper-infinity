@@ -105,3 +105,19 @@ Inte "artefakter". Föremål från parallella dimensioner som läcker in i berge
 3. E + F + G (föremålen, köttet, drönaren).
 
 Version, backlog-id och worktree tas när Ola säger kör. Byggs i \~/Projects/rpi-deep-dig (gren deep-dig, merge origin/main först).
+
+## Built (deep-dig, v1.92.0, 2026-10-09)
+
+Tre steg, tre commits (bb315eb, a62e4ad, f7e78b6). Kod: `src/phase4d/base.js` (basens layout), `alarms.js` (D), `quantum.js` (E), regler i `dig.js`, spelaren i `autopilot.js`. Spelat headless: `node scripts/play-dig.mjs --pass3 | --step2 | --step3`, bilder i `docs/playtests/dig-pass3/`. Checkpoints nya: `iv-dig-alarm`, `iv-dig-lab`.
+
+**Avvikelser (och varför)**
+- COLONY heter `GENERATORS` (stoppet säger att generatorerna bränner malm) och syns först när den börjar sjunka, 60 s efter första köpet.
+- Rader: STEERING kommer efter första leveransen (tidig uppgradering), HULL när trycket stoppar, LAMP också vid 400 m (en försiktig spelare som aldrig dör fick annars aldrig lampan), GPS också vid 20 rutor utan malm och vid första "It was not there.", HOMING LINE vid första "Turn back.", RADIO vid första felet. Minst 45 s mellan nya rader och max en nyhet per hemkomst; rader som en vägg kräver (DRILL, HULL) går först.
+- Grov styrning gäller bara under jord (basen är exakt).
+- Inga naturliga hålrum finns i berget: GPS-pingen visar malm och fynd, inte hålrum.
+- Ingen QUANTUM OBJECT i staden (första minuten är full nog): två i krigets lager, sedan en per lager.
+- Labbets fynd berättas vid basen som ett stopp med en rad om hur det används (tangent B, T, Q).
+- Generatorn som stått still laddar ändå upp till 15 % hemma, så drönaren aldrig fastnar.
+- Värmen drar 0,3/s (var 0,4), BATTERY III 420 (var 340), för att hålla hjärtat inom 20 till 25 min med de nya resorna i basen.
+
+**Sim** (`node scripts/sim-dig.mjs`, tid = spelarens, stoppens lästid inräknad): första grävbeslut 11 s, första malm hemma 21 s (frö 11: 40 s), första fel ca 3 min. Hjärtat: frö 7 21,3 min, frö 11 24,1, frö 3 20,5, frö 5 18,6, utan radio 22,1. Försiktig spelare förlorar inga sovande; `--careless` (lagar inget) förlorar 52 i kamrarna och generatorn stannar.
