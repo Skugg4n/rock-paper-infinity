@@ -131,6 +131,21 @@ export function moveFocus(at, key) {
     return at;
 }
 
+/**
+ * v1.91.1: a dark card's veil is white at rest (style.css) and only turns black with is-dark, so a
+ * slow dark card faded in from light grey (Ola: "a click with a white box"). Black at once, with
+ * the transition held so the colour does not travel; the card's own fade (opacity) is untouched.
+ * Not restored: every card after this one is dark or sets its own colour.
+ */
+export function blackVeil(veil) {
+    if (!veil?.style) return false;
+    veil.style.transition = 'none';
+    veil.style.background = '#000';
+    void veil.offsetWidth;          // the colour lands before the transition comes back
+    veil.style.transition = '';
+    return true;
+}
+
 /** The body class while the screen is up: the ☰, pause and version label step aside (B452). */
 export const BODY_CLASS = 'interim-up';
 
@@ -291,8 +306,11 @@ export function startInterim({ under = false, onDecided, onDeep } = {}) {
             note('chapter IV (setPhase)');
             try { onDeep?.(version); } catch (e) { console.error('interim onDeep', e); }
         };
-        // under the card: the card (z 1000) covers the screen, which fades as the card's veil comes in
+        // v1.91.1: the screen stays as it is, just under the card (z 1000), and the card's black
+        // veil comes over it; the screen goes at the midpoint, when the veil is whole, so the war
+        // city never shows between them
         root.classList.add('is-leaving');
+        blackVeil(typeof document !== 'undefined' ? document.querySelector('.chapter-card__veil') : null);
         note('the IV card');
         playChapterCard({ ...DEEP_CARD, onMidpoint: goDown })
             .then(() => { goDown(); done(); }, (e) => { console.error('interim card', e); goDown(); done(); });

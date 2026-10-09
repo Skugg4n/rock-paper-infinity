@@ -2,7 +2,7 @@
 import {
     openingScript, scriptLines, pointAt, pointFlicks, POINT_MS, matchResult, destinyHand, actAfter,
     writeChoice, VERSION_OF, OTHER, HANDS, letterDelay, SAY, roundSteps, COUNT, COUNT_MS, RESULT_MS, REST_MS,
-    CHOOSE_LINE, DEPART, DEEP_CARD, moveFocus, ACTS, DEPART_MS,
+    CHOOSE_LINE, DEPART, DEEP_CARD, moveFocus, ACTS, DEPART_MS, blackVeil,
 } from './interim.js';
 import { DEEP_VERSION_KEY } from './deepVersion.js';
 
@@ -138,5 +138,15 @@ describe('the interim', () => {
         expect(() => writeChoice('colony', storage)).toThrow();
         // a storage that throws still gives the version
         expect(writeChoice('drone', { setItem: () => { throw new Error('full'); } })).toBe('dig');
+    });
+    test('the IV card\'s veil is black before it fades in, and its transition comes back (v1.91.1)', () => {
+        const seen = [];
+        const veil = { style: {}, get offsetWidth() { seen.push({ ...this.style }); return 0; } };
+        expect(blackVeil(veil)).toBe(true);
+        // the colour was set while the transition was held, then the transition was given back
+        expect(seen[0]).toEqual({ transition: 'none', background: '#000' });
+        expect(veil.style).toEqual({ transition: '', background: '#000' });
+        expect(blackVeil(null)).toBe(false);
+        expect(DEEP_CARD.dark && DEEP_CARD.slow).toBe(true);
     });
 });

@@ -26,8 +26,9 @@
     pointer-events: none;
     background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
 }
-/* v1.91.0: the IV · DEEP card (z 1000) comes over the screen; the screen fades under its veil */
-#interim.is-leaving { z-index: 999; opacity: 0; pointer-events: none; transition: opacity 1800ms ease; }
+/* v1.91.1: the IV · DEEP card (z 1000) comes over the screen; the screen stays whole under its
+   black veil until the midpoint (it used to fade with the veil, and the war city showed through) */
+#interim.is-leaving { z-index: 999; pointer-events: none; }
 
 #interim .in-text {
     position: relative;
@@ -227,7 +228,6 @@ body.interim-up.paused #interim .in-cur { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
     #interim .in-cur { animation: none; }
     #interim .in-count.pulse { animation: none; }
-    #interim.is-leaving,
     #interim .in-paths,
     #interim .in-path,
     #interim .in-icon,

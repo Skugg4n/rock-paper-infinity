@@ -5,7 +5,7 @@ import { playChapterCard } from '../chapterCard.js';
 import { phases, setPhase } from '../gamePhase.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
-import { startInterim, writeChoice } from '../interim.js';
+import { startInterim, writeChoice, blackVeil } from '../interim.js';
 import { buildingData } from './buildings-config.js';
 import { createRenderer, armoryClearCost } from './rendering.js';
 import { timed, counter } from '../perf.js';
@@ -80,6 +80,7 @@ async function goDeep() {
     if (save.interimPending) { startInterim(opts); return; }   // a reload during the interim: the screen, no card
     markSave({ interimPending: true });
     let screen = null;
+    blackVeil(document.querySelector('.chapter-card__veil'));   // v1.91.1: black from the first frame, never light grey
     playChapterCard({
         // Slow and dark like the WAR card, no numeral; a click or 4 s ends the hold. Silent: the war's E♭ falls to D under it.
         roman: '', title: 'INTERIM', dark: true, slow: true, hold: 4000, silent: true,
@@ -355,7 +356,7 @@ export function init() {
               gameState.populationAllocation = 0.5;
               ui.allocationSlider.value = 50;
               ui.allocationSliderContainer.style.display = 'none';
-              ui.warUi.classList.remove('hidden');
+              ui.warUi.classList.toggle('hidden', !!w.enemyLeft);   // v1.91.1: the war HUD is gone once they have left
               ui.doomsday.classList.remove('hidden');
               ui.armsSlider.value = Math.round((w.armsShare || 0.3) * 100);
               ui.competitorIsland.classList.toggle('enemy-left', w.leaveStage >= 2);
@@ -589,7 +590,8 @@ export function init() {
               }
               // One control at a time, teased grey until it can be afforded.
               // After the first landing has struck, three seconds of nothing new (revealHoldUntil).
-              const opened = w.t >= (w.revealHoldUntil || 0) && !climateFresh(w) ? revealNext(w) : null;
+              // v1.91.1: nothing opens once the enemy has left (the war room said "the crosshair" after the launch).
+              const opened = !w.enemyLeft && w.t >= (w.revealHoldUntil || 0) && !climateFresh(w) ? revealNext(w) : null;
               if (opened) {
                   if (REVEAL_LINES[opened]) logWar(REVEAL_LINES[opened]);
                   if (opened === 'fort') {
@@ -821,14 +823,50 @@ export function init() {
               return true;
           }
 
+          /**
+           * v1.91.1: the battle controls once the enemy has left: the quartermaster, the crosshair, the
+           * auto strike, swords and shields, air defence, the raid, intel, radar, the weapon tier and
+           * the war HUD (the arms slider with it). They fade and slide away with GO DEEP's own
+           * leave (.deep-leave, 60 ms apart), then are hidden; on a load (before the UI has settled)
+           * they are hidden at once. The shovel, the city's buttons, the doomsday ring with the
+           * salvage and the war room stay.
+           */
+          function battleControls() {
+              return [ui.warUi, ui.autoBtn, ui.autoStrikeBtn, ui.strikeBtn, ui.buyForceBtn, ui.buyDefenceBtn, ui.buyAirBtn, ui.raidBtn, ui.intelBtn, ui.radarBtn, ui.tierBtn];
+          }
+          function retireBattle() {
+              let step = 0;
+              for (const el of battleControls()) {
+                  if (!el || el.classList.contains('hidden') || el.classList.contains('deep-leave')) continue;
+                  if (!uiSettled) { el.classList.add('hidden'); continue; }
+                  el.classList.remove('btn-arrive');
+                  el.style.setProperty('--leave-delay', `${step * 60}ms`);
+                  el.style.setProperty('--leave-x', el === ui.warUi ? '-24px' : '24px');
+                  el.classList.add('deep-leave');
+                  setTimeout(() => {
+                      if (ui.phaseCity.classList.contains('going-deep')) return;   // GO DEEP's own leave has them
+                      el.classList.add('hidden');
+                      el.classList.remove('deep-leave');
+                      el.style.removeProperty('--leave-delay'); el.style.removeProperty('--leave-x');
+                  }, 800 + step * 60 + 100);
+                  step++;
+              }
+          }
+
           function updateWarUI() {
               const w = gameState.war;
               const active = !!w?.active;
-              [ui.buyDefenceBtn, ui.buyForceBtn].forEach(btn => btn.classList.toggle('hidden', !active));
+              // v1.91.1 (Ola): once the enemy has left there is nobody to fight; the battle controls and
+              // the war HUD leave the way the controls leave at GO DEEP, and stay gone (a reload too)
+              if (active && w.enemyLeft) retireBattle();
+              const battle = active && !w.enemyLeft;
+              [ui.buyDefenceBtn, ui.buyForceBtn].forEach(btn => { if (!active) btn.classList.add('hidden'); else if (battle) btn.classList.remove('hidden'); });
               // Controls that open during the war arrive with the same pop as the swords (showBtn → arrive)
-              showBtn(ui.strikeBtn, active && isShown(w, 'strike'));
-              showBtn(ui.tierBtn, active && isShown(w, 'tier'));
-              showBtn(ui.autoStrikeBtn, active && isShown(w, 'autoStrike') && !w.enemyLeft);
+              if (!w?.enemyLeft) {
+                  showBtn(ui.strikeBtn, active && isShown(w, 'strike'));
+                  showBtn(ui.tierBtn, active && isShown(w, 'tier'));
+                  showBtn(ui.autoStrikeBtn, active && isShown(w, 'autoStrike'));
+              }
               if (!active) { ui.autoBtn.classList.add('hidden'); ui.radarBtn.classList.add('hidden'); ui.intelBtn.classList.add('hidden'); ui.raidBtn.classList.add('hidden'); }
               // the shovel arrives only after "Go deep." has stood six seconds (leave stage 7)
               showBtn(ui.shipBtn, active && w.enemyLeft && (w.leaveStage || 0) >= LEAVE_SHOVEL);
@@ -849,7 +887,7 @@ export function init() {
               const airOpen = isShown(w, 'air');
               ui.warAirRow.classList.toggle('hidden', !airOpen);
               ui.warAir.textContent = Math.round(w.air || 0).toLocaleString('en-US');
-              showBtn(ui.buyAirBtn, airOpen);
+              if (battle) showBtn(ui.buyAirBtn, airOpen);
               ui.buyAirBtn.disabled = w.arms < AIR_UNIT_COST;
               {
                   const n = Math.max(1, Math.floor(w.arms * 0.1 / AIR_UNIT_COST));
@@ -860,7 +898,7 @@ export function init() {
               ui.warArmsRate.textContent = `+${(armsPerSecond(w.tier) * w.armsShare).toFixed(0)}/s`;
               ui.warTier.textContent = `${tier.numeral} ${tier.id}`;
               ui.warEnemyTier.textContent = w.intel ? `${TIERS[w.enemyTier].numeral} ${TIERS[w.enemyTier].id}` : '?';
-              showBtn(ui.intelBtn, active && !w.intel && isShown(w, 'intel'));
+              if (battle) showBtn(ui.intelBtn, !w.intel && isShown(w, 'intel'));
               ui.intelBtn.disabled = w.arms < INTEL_COST;
               setTooltip(ui.intelBtn, { effect: `<i data-lucide='eye' class='w-4 h-4'></i> intel`, armsCost: INTEL_COST });
               ui.tierBadge.textContent = w.tier < TIERS.length - 1 ? TIERS[w.tier + 1].numeral : tier.numeral;
@@ -875,7 +913,7 @@ export function init() {
               const nextCost = w.tier < TIERS.length - 1 ? tierScienceCost(w.tier + 1, w.scienceRate0, w.enemyTier - w.tier) : null;
               const cooling = (w.t || 0) - (w.lastTierAt ?? -999) < TIER_COOLDOWN_S;
               ui.tierBtn.disabled = nextCost === null || gameState.science < nextCost || cooling;
-              showBtn(ui.autoBtn, active && isShown(w, 'auto'));
+              if (battle) showBtn(ui.autoBtn, isShown(w, 'auto'));
               ui.autoBtn.classList.toggle('toggled', !!w.autoBought && (w.stance || 'balanced') !== 'off');
               // The quartermaster's stance, a ratio defence : force (shield 3:1, scale 1:1, sword 1:3), or off
               {
@@ -891,13 +929,13 @@ export function init() {
               }
               // Raiding party: a helper you send in; while it is there their defence is nothing
               const raidLeft = Math.max(0, Math.ceil((w.raidUntil || 0) - w.t));
-              showBtn(ui.raidBtn, active && !w.enemyLeft && isShown(w, 'raid'));
+              if (battle) showBtn(ui.raidBtn, isShown(w, 'raid'));
               ui.raidBtn.disabled = raidLeft > 0 || w.arms < raidCost(w.raids || 0);
               ui.raidBtn.classList.toggle('active-raid', raidLeft > 0);
               setTooltip(ui.raidBtn, raidLeft > 0 ? { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> ${raidLeft} s` } : { effect: `<i data-lucide='venetian-mask' class='w-4 h-4'></i> their <i data-lucide='shield' class='w-4 h-4'></i> → 0 for ${RAID_S} s`, armsCost: raidCost(w.raids || 0) });
               // Radar: a purchase, then an instrument: the badge counts down to the next landing,
               // the tooltip says how big it is and where it is heading once it is spotted.
-              showBtn(ui.radarBtn, active && !w.enemyLeft && isShown(w, 'radar'));
+              if (battle) showBtn(ui.radarBtn, isShown(w, 'radar'));
               ui.radarBtn.classList.toggle('radar-on', !!w.radar);
               if (w.radar) {
                   const p = w.pendingWave;
@@ -1814,7 +1852,7 @@ export function init() {
           const DOWN = { hatchAt: 1.3, line1At: 1.7, walkAt: 2.3, line2At: 6.6, closeAfterLine2: 2.5, closeS: 1.2, stillS: 1.5, fallbackS: 25 };
           const DOWN_LINES = [
               'Status: the shelter takes only a few. The richest. The most successful.',
-              'Status: they go down to wait until the earth heals its surface and is habitable once more.',
+              'Status: they go down to wait until the earth heals its surface and is habitable once more. The rest of humanity will have to fend for itself.',
           ];
           function goDownTogether() {
               const t0 = performance.now();
