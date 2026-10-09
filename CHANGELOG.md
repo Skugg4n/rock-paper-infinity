@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.92.5 - 2026-10-09 (chapter IV, the dig: the shock wave reloads in 3 s)
+
+- SHOCK WAVE reloads in 3 s instead of 8 (Ola).
+
 ## v1.92.4 - 2026-10-09 (chapter IV, the dig: armour, a fill gauge, a crane that builds)
 
 Ola's notes after v1.92.3.

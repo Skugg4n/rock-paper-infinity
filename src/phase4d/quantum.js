@@ -15,7 +15,7 @@ export const Q_NAME = { booster: 'BOOSTER', teleport: 'TELEPORT', shock: 'SHOCK 
 /** The keys and the panel's buttons: the ones you use. */
 export const Q_KEY = { booster: 'B', teleport: 'T', shock: 'Q' };
 export const LAB_S = 60;
-export const COOL = { booster: 30, teleport: 90, shock: 8 };
+export const COOL = { booster: 30, teleport: 90, shock: 3 };   // v1.92.5: Ola, the shock wave reloads faster (was 8)
 export const BOOST_S = 5;
 export const SHOCK_R = 2;
 export const SHOCK_COST = 3;

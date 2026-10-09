@@ -72,7 +72,7 @@ Inte "artefakter". Föremål från parallella dimensioner som läcker in i berge
 
   * `TELEPORT`: en knapp, hem till basen direkt. Laddar om 90 s.
 
-  * `SHOCK WAVE`: äter all mark i två rutors radie, laddar om 8 s.
+  * `SHOCK WAVE`: äter all mark i två rutors radie, laddar om 3 s (v1.92.5, var 8 s).
 
   * `SECOND LAMP`: lampan lyser åt två håll (ljuscirkeln blir en oval nedåt).
 
