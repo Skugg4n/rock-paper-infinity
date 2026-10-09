@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import {
     openingScript, scriptLines, pointAt, pointFlicks, POINT_MS, matchResult, destinyHand, actAfter,
-    writeChoice, VERSION_OF, OTHER, HANDS, letterDelay, SAY,
+    writeChoice, VERSION_OF, OTHER, HANDS, letterDelay, SAY, retypeAct, afterRetype, ERASE_MS,
 } from './interim.js';
 import { DEEP_VERSION_KEY } from './deepVersion.js';
 
@@ -95,5 +95,15 @@ describe('the interim', () => {
         expect(() => writeChoice('colony', storage)).toThrow();
         // a storage that throws still gives the version
         expect(writeChoice('drone', { setItem: () => { throw new Error('full'); } })).toBe('dig');
+    });
+
+    test('after a win the pointed line is retyped to name the other act (B453)', () => {
+        for (const pointed of ['drone', 'vault']) {
+            const line = scriptLines(openingScript(pointed))[3];
+            const r = retypeAct(pointed, OTHER[pointed]);
+            expect(r.type).toBe(`${OTHER[pointed]}.`);
+            expect(afterRetype(line, r)).toBe(`Destiny points to the ${OTHER[pointed]}.`);
+        }
+        expect(ERASE_MS).toBeLessThan(letterDelay('a') + 1);
     });
 });

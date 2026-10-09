@@ -26,6 +26,7 @@ export const FADE_MS = 1500;    // the fade to black before chapter IV
 export const AFTER_MS = 1200;   // the last line rests this long before the fade
 
 export const letterDelay = (ch) => (ch === ' ' ? SPACE_MS : TYPE_MS);
+export const ERASE_MS = 22;     // a letter struck out (the quick backspace after a win)
 
 /**
  * The opening, as steps: `line` starts a new line (its id), `type` writes, `pause` rests (ms),
@@ -95,6 +96,20 @@ export function actAfter(pointed, result) {
 /** What the round says. */
 export const SAY = { draw: 'Again.', win: 'You win. The path turns.', lose: 'Destiny holds.', accept: 'So be it.' };
 
+/**
+ * B453 (v1.90.1): after a win the line "Destiny points to the drone." would still name the act
+ * Destiny pointed at. Its act word is struck out (`erase` letters, a quick backspace) and the other
+ * typed in its place. `pointed` is the word on the line, `act` the one the path turned to.
+ */
+export function retypeAct(pointed, act) {
+    return { erase: `${pointed}.`.length, type: `${act}.` };
+}
+/** The line after a retype (what the screen says then). */
+export const afterRetype = (line, r) => line.slice(0, line.length - r.erase) + r.type;
+
+/** The body class while the screen is up: the ☰, pause and version label step aside (B452). */
+export const BODY_CLASS = 'interim-up';
+
 /** Writes the chosen chapter IV under DEEP_VERSION_KEY; returns the version ('vault' or 'dig'). */
 export function writeChoice(act, storage) {
     const version = VERSION_OF[act];
@@ -162,6 +177,7 @@ export function startInterim({ under = false, onDecided, onGone } = {}) {
     const veil = el('div', 'in-veil');
     root.append(text, veil);
     document.body.appendChild(root);
+    document.body.classList.add(BODY_CLASS);
 
     const cursor = el('span', 'in-cur');
     const lines = {};
@@ -212,6 +228,23 @@ export function startInterim({ under = false, onDecided, onGone } = {}) {
             icons[a]?.classList.toggle('lit', a === act);
             icons[a]?.classList.toggle('dim', a !== act);
         }
+    }
+    /** B453: the pointed line's act word, backspaced and retyped; the cursor comes back after. */
+    async function retypePointed(act) {
+        const p = lines.point;
+        if (!p || act === pointed) return;
+        const r = retypeAct(pointed, act);
+        const back = current;
+        p.line.appendChild(cursor); current = p;
+        for (let i = 0; i < r.erase; i++) {
+            if (!alive) return;
+            p.tx.textContent = p.tx.textContent.slice(0, -1);
+            await wait(ERASE_MS);
+        }
+        await wait(180);
+        await type(r.type);
+        note(`retyped: the ${act}`);
+        if (back && back !== p) { back.line.appendChild(cursor); current = back; }
     }
     async function needle(target, total) {
         const flicks = pointFlicks(target, total, REDUCED());
@@ -341,7 +374,7 @@ export function startInterim({ under = false, onDecided, onGone } = {}) {
             return;
         }
         const act = actAfter(pointed, result);
-        if (act !== pointed) await needle(act, 700);
+        if (act !== pointed) { await needle(act, 700); await retypePointed(act); }
         decide(act, result === 'win' ? 'you won' : 'destiny won');
     }
 
@@ -357,6 +390,7 @@ export function startInterim({ under = false, onDecided, onGone } = {}) {
         alive = false;
         window.removeEventListener('keydown', onKey, true);
         root.remove();
+        document.body.classList.remove(BODY_CLASS);
         if (_active === handle) _active = null;
     }
 

@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge, landKeeper, shoreline, inPolygon } from './ants.js';
 import { boatCourse, roundCourse, courseAt, courseLength, sailSeconds, chooseArmoryPlot, plateExit } from './ants.js';
-import { pickChosen, chosenCount, CHOSEN_MAX } from './ants.js';
+import { pickChosen, chosenCount, CHOSEN_MAX, enemiesRemain } from './ants.js';
 
 describe('ants', () => {
     test('antCount grows with the square root and is capped', () => {
@@ -274,5 +274,21 @@ describe('landKeeper and shoreline (v1.70.0: nobody stands in the water)', () =>
             expect(chosenCount(60)).toBe(12);
             expect(chosenCount(600)).toBe(12);
         });
+    });
+});
+
+describe('enemiesRemain (B219)', () => {
+    test('their walkers stand on their island before and during the war', () => {
+        expect(enemiesRemain(undefined)).toBe(true);
+        expect(enemiesRemain(null)).toBe(true);
+        expect(enemiesRemain({ active: true })).toBe(true);
+        expect(enemiesRemain({ enemyLeft: false, leaveStage: -1 })).toBe(true);
+    });
+    test('while they withdraw to the rocket (leaveStage 0) they still walk', () => {
+        expect(enemiesRemain({ enemyLeft: true, leaveStage: 0 })).toBe(true);
+        expect(enemiesRemain({ enemyLeft: true })).toBe(true);
+    });
+    test('once launched, left or rubble, nobody comes back (a reload included)', () => {
+        for (const leaveStage of [1, 2, 3, 6, 7]) expect(enemiesRemain({ enemyLeft: true, leaveStage })).toBe(false);
     });
 });

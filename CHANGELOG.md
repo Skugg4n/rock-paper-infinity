@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.90.1 - 2026-10-09 (interim polish, the enemy's island is empty after they leave)
+
+Before Ola's playtest of the interim. No rule changed (`sim-phase3.mjs 1` prints the same line).
+- **The buttons step aside** (B452). While the interim's screen is up (`body.interim-up`) the ☰ button, the pause button and the version label fade out (0.4 s) and take no clicks; they come back with chapter IV. Space still pauses the typing, and while paused the cursor stops blinking. A reload during the interim keeps them hidden.
+- **The pointed line tells the truth** (B453). After "You win. The path turns." the other icon lights, then the act word on "Destiny points to the drone." is backspaced (22 ms a letter) and the other typed in its place: "Destiny points to the vault." The cursor goes back to the last line.
+- **Nobody on the rubble** (B219). After the enemy has left (from the launch on), a reload or the iii-end checkpoint no longer brings their red walkers and watchmen back on the island: the saved war tells the ants they are gone (`enemiesRemain()` in src/phase2/ants.js, unit-tested). A live withdraw still walks them to the rocket; our people walk as before. Measured headless from iii-end: v1.90.0 shows 4 walkers and 10 watchmen, v1.90.1 none.
+- **Reduced motion.** Checked: the needle settles at once (one light, no flicker) and the cursor does not blink; the icons, the choice, the match and the buttons' fade have no transition.
+
 ## v1.90.0 - 2026-10-09 (INTERIM: one match against Destiny decides the vault or the dig)
 
 Between the war and the deep, Ola's interim. No rule changed (`sim-phase3.mjs 1` prints the same line).

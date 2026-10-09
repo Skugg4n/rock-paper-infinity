@@ -180,6 +180,15 @@
 #interim .in-hand:disabled { opacity: 0.3; }
 #interim .in-hand.picked { opacity: 0.9; background: rgba(141, 255, 158, 0.18); }
 
+/* B452 (v1.90.1): while the screen is up (body.interim-up, src/interim.js) the ☰ and pause buttons
+   and the version label step aside instead of standing as white circles on the black. Space still
+   pauses (main.js); while paused the cursor stops blinking. */
+#menu-wrapper,
+#version-info { transition: opacity 400ms ease; }
+body.interim-up #menu-wrapper,
+body.interim-up #version-info { opacity: 0; pointer-events: none; }
+body.interim-up.paused #interim .in-cur { animation-play-state: paused; }
+
 @media (max-width: 520px) {
     #interim .in-text { font-size: 15px; line-height: 25px; }
     #interim .in-line { min-height: 25px; }
@@ -187,4 +196,10 @@
 @media (prefers-reduced-motion: reduce) {
     #interim .in-cur { animation: none; }
     #interim .in-veil { transition-duration: 200ms; }
+    #interim .in-icon,
+    #interim .in-choice,
+    #interim .in-match,
+    #interim .in-slot,
+    #menu-wrapper,
+    #version-info { transition: none; }
 }

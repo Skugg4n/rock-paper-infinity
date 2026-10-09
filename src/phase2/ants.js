@@ -91,6 +91,15 @@ export function chooseArmoryPlot(buildings, pierRect, slots) {
 /** How high a home stands: the rich live highest (the chosen few, v1.88.0). */
 const HOME_RANK = { district: 4, skyscraper: 3, apartment: 2, home: 1 };
 /** Never more than this many go down the hatch. */
+/**
+ * v1.90.1 (B219): may the enemy's walkers and watchmen stand on their island? Not once they have
+ * left: `war.enemyLeft` with the launch begun (leaveStage 1, set when the last of them boarded the
+ * rocket) or later (2 the island left, 3 and up the rubble). Before the war, or with no war: yes.
+ */
+export function enemiesRemain(war) {
+    return !(war?.enemyLeft && (war.leaveStage ?? 0) >= 1);
+}
+
 export const CHOSEN_MAX = 15;
 
 /**
@@ -612,12 +621,13 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
     function reconcile() {
         if (gather || withdrawing || chosen) return;
         if (peopleGone) { ants.length = 0; }
-        if (enemiesGone) { enemies.length = 0; return; }
         // People: match count to population; cars once researched (30 %)
         const want = !peopleGone && state.population > 0 && homes().length ? antCount(state.population) : 0;
         while (ants.length < want) { const a = spawnAnt(state.carUnlocked && Math.random() < 0.3 ? 'car' : 'person'); if (!a) break; ants.push(a); }
         if (ants.length > want) ants.length = want;
         if (state.carUnlocked) ants.forEach(a => { if (a.kind === 'person' && Math.random() < 0.02) a.kind = 'car'; });
+        // v1.90.1 (B219): once they have left nobody comes back; our people still walk
+        if (enemiesGone) { enemies.length = 0; watchmen.length = 0; return; }
         // Their civilians: none until the island has stood a while; a lived-in
         // town at stage 2, fewer as it turns to war (the watchmen take over).
         const enemiesOut = state.enemyStage >= 1 && (state.enemyTicks || 0) >= ENEMY_DELAY_S;
@@ -957,7 +967,7 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
         withdrawing = { rect, onDone };
         enemies.forEach(e => { e.path = null; e.wait = Math.random() * 1.5; e.razing = false; e.homeBound = false; });
         dismissGuards(null);      // the war is over for them: our guards stand down and walk home
-        if (!enemies.length) { withdrawing = null; onDone?.(); }
+        if (!enemies.length) { withdrawing = null; enemiesGone = true; onDone?.(); }
     }
     /** Everyone walks into one plate (the hatch down). onDone when all are in. */
     function gatherAt(slotEl, onDone) {
@@ -1777,7 +1787,15 @@ export function createAnts({ canvas, area, getSlots, getEnemyTiles, getGap, getC
 
     function start() { if (reduced || raf) return; lastT = 0; raf = requestAnimationFrame(frame); }
     function stop() { if (raf) cancelAnimationFrame(raf); raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
-    function setState(next) { state = { ...state, ...next }; }
+    /**
+     * v1.90.1 (B219): the saved war says they have left (state.enemiesGone, from enemiesRemain()).
+     * A live withdraw finishes its own walk to the rocket; otherwise (a reload, a checkpoint) they
+     * are simply gone: no walkers, no watchmen, and reconcile never brings them back.
+     */
+    function setState(next) {
+        state = { ...state, ...next };
+        if (state.enemiesGone && !enemiesGone && !withdrawing) { enemiesGone = true; enemies.length = 0; watchmen.length = 0; }
+    }
 
     const boatInfo = (b) => ({ x: Math.round(b.x), y: Math.round(b.y), aboard: b.aboard, shown: +b.shown.toFixed(2), trip: !!b.trip, moored: b.moored, owner: !!b.owner });
     /** Debug: every guard, walker and watchman where it stands now (layout px), for the on-land check. */

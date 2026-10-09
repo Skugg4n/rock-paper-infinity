@@ -12,7 +12,7 @@ import { timed, counter } from '../perf.js';
 import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY, formatCount,
 } from './economy.js';
-import { createAnts, chooseArmoryPlot } from './ants.js';
+import { createAnts, chooseArmoryPlot, enemiesRemain } from './ants.js';
 import { layoutRect } from './layout.js';
 import { createIsland, coastPoints } from './islands.js';
 import { audio } from '../audio.js';
@@ -1512,6 +1512,7 @@ export function init() {
                   defence: gameState.war?.defence || 0,
                   airDefence: gameState.war?.air || 0,
                   guardsOff: !!gameState.war?.enemyLeft || !!gameState.shipChosen,
+                  enemiesGone: !enemiesRemain(gameState.war),   // B219: after they left, a reload brings no walkers back
                   hitEdges: gameState.war?.hitEdges || [],
                   war: !!gameState.war?.active,
                   armoryId: armoryStanding()?.id ?? null,

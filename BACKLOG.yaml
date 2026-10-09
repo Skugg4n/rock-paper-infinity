@@ -3468,8 +3468,9 @@ items:
     request: |
       After the enemy has left, a reload (or the iii-end checkpoint) brings their red walkers back on the
       rubble island: the ants' withdraw only runs live, so on load nothing tells the picture they are gone.
-    status: open
-    notes: "Likely fix: on load with w.enemyLeft past the launch, tell ants.js the enemies are gone (an enemiesGone setter). Not verified in a real reload."
+    status: done
+    resolved_in: v1.90.1
+    notes: "v1.90.1: enemiesRemain(war) in src/phase2/ants.js (enemyLeft and leaveStage >= 1 = gone); index.js passes it to the ants as state.enemiesGone, which clears walkers and watchmen unless a live withdraw is running. reconcile now matches our people before it returns. Verified headless in iii-end: 4 walkers + 10 watchmen before, 0 after."
 
   - id: B450
     added: 2026-10-09
@@ -3498,8 +3499,9 @@ items:
     request: |
       The ☰ and pause buttons stay white circles over the interim's black CRT. The vault hides the pause button
       (body.in-vault); the interim leaves both, so the player can pause the typing.
-    status: open
-    notes: "Ola decides: dim them on the interim, or keep as is."
+    status: done
+    resolved_in: v1.90.1
+    notes: "v1.90.1: body.interim-up (src/interim.js) fades #menu-wrapper (the ☰ and pause) and #version-info to 0 with no clicks (style-interim.css); Space still pauses, the cursor stops blinking while paused. Restored when the screen is removed."
 
   - id: B453
     added: 2026-10-09
@@ -3507,8 +3509,9 @@ items:
     request: |
       After "You win. The path turns." the line "Destiny points to the drone." still names the act Destiny pointed
       at; only the lit icon switches. Maybe strike the word through or retype it.
-    status: open
-    notes: "Left as typed in v1.90.0 (the turn is shown by the icons and the new line)."
+    status: done
+    resolved_in: v1.90.1
+    notes: "v1.90.1: after a win the needle lights the other icon, then the act word on the pointed line is backspaced and retyped (retypeAct in src/interim.js, tested)."
 
   - id: B454
     added: 2026-10-09
