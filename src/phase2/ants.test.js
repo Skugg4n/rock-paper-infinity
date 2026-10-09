@@ -1,6 +1,7 @@
 /* eslint-env jest */
 import { antCount, streetPath, crossPath, reversePath, onIsland, coastRing, ringPoint, ringCoord, ringWalk, ringLength, nearestEdge, landKeeper, shoreline, inPolygon } from './ants.js';
 import { boatCourse, roundCourse, courseAt, courseLength, sailSeconds, chooseArmoryPlot, plateExit } from './ants.js';
+import { pickChosen, chosenCount, CHOSEN_MAX, enemiesRemain } from './ants.js';
 
 describe('ants', () => {
     test('antCount grows with the square root and is capped', () => {
@@ -229,5 +230,65 @@ describe('landKeeper and shoreline (v1.70.0: nobody stands in the water)', () =>
         expect(inner[1]).toEqual({ x: 270, y: 215 });
         expect(inner[2]).toEqual({ x: 215, y: 215 });
         expect(inner[3]).toEqual({ x: 215, y: R.y + R.h });
+    });
+
+    describe('the chosen few (v1.88.0)', () => {
+        // a seeded rng (mulberry32), so a run is the same every time
+        const seeded = (seed) => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        const town = () => {
+            const homes = ['home', 'apartment', 'skyscraper', 'district', null];
+            return Array.from({ length: 60 }, (_, i) => ({ home: homes[i % 5], inside: i % 3 === 0, kind: i % 7 === 0 ? 'car' : 'person' }));
+        };
+
+        test('never more than CHOSEN_MAX, however many are asked for', () => {
+            expect(CHOSEN_MAX).toBe(15);
+            expect(pickChosen(town(), 40, seeded(1))).toHaveLength(15);
+            expect(pickChosen(town(), 12, seeded(1))).toHaveLength(12);
+            expect(pickChosen([], 12, seeded(1))).toEqual([]);
+            expect(pickChosen(town(), 0, seeded(1))).toEqual([]);
+        });
+
+        test('the people who live highest go first, at home before out, and no cars', () => {
+            const people = town();
+            const few = pickChosen(people, 12, seeded(7)).map(i => people[i]);
+            expect(few.every(p => p.kind !== 'car')).toBe(true);
+            // 60 people, 12 in districts minus the cars among them: districts first, then skyscrapers
+            const districts = people.filter(p => p.home === 'district' && p.kind !== 'car').length;
+            expect(few.slice(0, districts).every(p => p.home === 'district')).toBe(true);
+            expect(few.slice(districts).every(p => p.home === 'skyscraper')).toBe(true);
+            const firstOut = few.findIndex(p => p.home === 'district' && !p.inside);
+            expect(few.slice(0, firstOut).every(p => p.inside)).toBe(true);
+        });
+
+        test('the same seed gives the same few; another seed may break ties differently', () => {
+            const a = pickChosen(town(), 12, seeded(42));
+            expect(pickChosen(town(), 12, seeded(42))).toEqual(a);
+            expect(new Set(a).size).toBe(a.length);
+        });
+
+        test('about one in five, at least three, never more than twelve', () => {
+            expect(chosenCount(0)).toBe(0);
+            expect(chosenCount(2)).toBe(2);
+            expect(chosenCount(10)).toBe(3);
+            expect(chosenCount(40)).toBe(8);
+            expect(chosenCount(60)).toBe(12);
+            expect(chosenCount(600)).toBe(12);
+        });
+    });
+});
+
+describe('enemiesRemain (B219)', () => {
+    test('their walkers stand on their island before and during the war', () => {
+        expect(enemiesRemain(undefined)).toBe(true);
+        expect(enemiesRemain(null)).toBe(true);
+        expect(enemiesRemain({ active: true })).toBe(true);
+        expect(enemiesRemain({ enemyLeft: false, leaveStage: -1 })).toBe(true);
+    });
+    test('while they withdraw to the rocket (leaveStage 0) they still walk', () => {
+        expect(enemiesRemain({ enemyLeft: true, leaveStage: 0 })).toBe(true);
+        expect(enemiesRemain({ enemyLeft: true })).toBe(true);
+    });
+    test('once launched, left or rubble, nobody comes back (a reload included)', () => {
+        for (const leaveStage of [1, 2, 3, 6, 7]) expect(enemiesRemain({ enemyLeft: true, leaveStage })).toBe(false);
     });
 });

@@ -489,3 +489,84 @@ the three bottom-row plates nearest the pier, so our soldiers walked out of shop
 - Open (B210): the default HP, people who do not fit when a home is taken, the first steps of a
   soldier cross the plate from its middle like every walker's.
 
+
+## GO DEEP: the chosen few (2026-10-06, v1.88.0, B211 to B216)
+
+Ola played the whole war and was happy with it; the ending bounced: "Everyone walks down into the
+deep, but only 216 arrive." The story now says why: the shelter takes only a few, the richest and
+most successful. No rule changed (`sim-phase3.mjs 1` prints the same line).
+
+- **The shovel** says "GO DEEP" (aria-label "Go deep"), greyed with the salvage cost until ready as
+  before. Like the buttons before it, it never says the chapter changes. The "Unfinished" gate is no
+  longer asked (the markup and `deepGate.js` stay for the DEEP session, B217).
+- **The line before it** is "But a few have a secret plan." (then "Go deep." as before). No new lines
+  before the shovel.
+- **The click** (`goDownTogether`, once: `w.goingDown`, `shipChosen` saved first so a reload goes
+  straight down) runs on its own clock, the steps kept in `window.rpiGoDeep`:
+  0 s every control leaves (`leaveControls`: the war HUD, the doomsday clock, the plates' buttons
+  together, the button column, the shovel last; 0.8 s each, 60 ms apart, `translate` so their own
+  transforms stay; `#phase-city.going-deep` takes the clicks) → 1.3 s the hatch opens
+  (`.deep-facility.open`: the bar slides off, the hole widens 46 → 54 %, 1.2 s) → 1.7 s "Status: the
+  shelter takes only a few. The richest. The most successful." → 2.3 s the chosen few set out →
+  6.6 s "Status: they go down to wait until the earth can be lived on again." → the last one down
+  (and at least 2.5 s after the second line) the hatch closes → 1.2 s + 1.5 s of stillness → the card
+  path exactly as before (city.stop, war.finale('fall'), war.stop, goDeep), the people left behind
+  dimmed to 55 % as it fades in. Measured in headless Chrome from iii-end: last one down 11.3 s,
+  the card 14.0 s. A fallback brings the card at 25 s whatever happens.
+- **Who goes** (`ants.js`): `chosenCount(n)` is about one in five of the people on the map, at least
+  three, at most twelve; `pickChosen(people, n, rng)` (pure, tested) ranks by how high they live
+  (district, skyscraper, apartment, home) and then whether they are at home, never a car, never more
+  than 15, ties by `rng`. `gatherChosen(slot, n, onDone)` first leaves out anyone farther than 620 px
+  of street from the hatch (unless that leaves too few), so the walk stays calm. Someone inside a
+  building leaves from their home; someone on a street finishes the walk, steps in for 0.3 s and
+  turns for the hatch. Each walks at a pace (18 to 80 px/s) that brings the nearest in 4 s after
+  setting out and the next ones about 0.45 s apart, so they go down one by one; on the facility a
+  chosen dot fades only in the hole. Everyone else stops where they stand. `gatherAt` (everyone,
+  guards too) is unchanged for other callers.
+- Open: no sound for the hatch (B218); after a reload past the launch their red walkers come back on
+  the rubble island (B219, seen in iii-end).
+
+## The interim (2026-10-09, v1.90.0, B450 to B454)
+
+Ola's design: between the war and the deep, one short scene decides which chapter IV the player
+gets, the vault (src/phase4v) or the dig (src/phase4d). Ola's words, kept: "As the Earth fails
+there is a divergence in the path of destiny and a choice has to be made. In one reality there
+was a drone. In the other a Vault." Destiny points to one, "but you may choose to oppose".
+
+- **The hand-over.** GO DEEP's walk is unchanged up to the card. `goDeep()` keeps its import guard,
+  then plays a black, slow, silent card with no numeral, INTERIM (hold 4 s, a click ends it). At
+  its midpoint the interim screen is built under the card (z-index 999); when the card lifts it is
+  raised above it (1100, under the ☰ menu at 1500) and the typing starts. The war's E♭ still falls
+  to D under the card; the interim itself is silent but for the match.
+- **The screen** (src/interim.js, style-interim.css): the vault's CRT (VT.crt phosphor, its glow,
+  its scanlines, a block cursor), full-bleed black. The script and its rests: "As the Earth fails"
+  900 ms "there is a divergence in the path of destiny" 900 ms "and a choice has to be made."
+  1400 ms / "In one reality there was a drone." + the drone icon (Lucide Drone, else Bot) 900 ms /
+  "In the other, a vault." + the vault icon (Lucide Vault) 1400 ms / "Destiny points to " and the
+  needle: the two icons light in turn, slowing (55 ms, ×1.17 a flick) for about 2.4 s, and settle
+  on one (Math.random, 50/50) / "the drone." or "the vault." 1000 ms / "But you may choose to
+  oppose." Letters 28 ms, spaces 45 ms. Then two controls: a round button with chapter I's three
+  glyphs (gem, file, scissors; tooltip "Oppose", Space) and "Continue" (Enter). Space is taken
+  before main.js's pause while the choice is up.
+- **The match.** YOU and DESTINY (dymo labels) face each other with a slot each; three hand buttons
+  below. The player picks, Destiny's hand (uniform) shows at once, and the slots take chapter I's
+  look: the winner bold with a ring, the loser faded and smaller, a draw quiet. Draw: "Again." and
+  the hands reset. Win: "You win. The path turns." and the other icon lights with a short flicker
+  (0.7 s); audio.pling. Loss: "Destiny holds."; audio.knock. Exactly one decisive round.
+  Continue: "So be it." Then 1.2 s, the fade to black (1.5 s), the screen removed and
+  `setPhase(DEEP)` as before.
+- **The choice** is written under `DEEP_VERSION_KEY` (drone → 'dig', vault → 'vault', never
+  'colony'). The phase 2 save holds `interimPending: true` from the card on (a reload shows the
+  screen again, from the top, no card) and `interimPending: false, interimChosen` once decided (a
+  reload goes straight to chapter IV). `?deep=` in the URL still wins (B454).
+- **Pause** (window.__rpiPaused) freezes the typing and the needle; reduced motion settles the
+  needle at once and stops the cursor's blink.
+- **Testing.** `window.debug_interim()` from any point of the war (the way down chosen, no walk);
+  `window.rpiInterim` = { steps (seconds since the screen was built), setRng, pointed }. The rng
+  is drawn once for the needle and once per round for Destiny's hand.
+- **Measured** in headless Chrome from iii-end: the card 21.3 s after the click (the walk as in
+  v1.88.0), the screen built 4.4 s into the card, the card lifted 6.8 s later; from the lift:
+  the drone line 6.2 s, the vault 8.9 s, the needle 10.9 s, settled 13.1 s, the choice 15.3 s.
+  A decisive round to black: 0.4 s (loss) or 1.4 s (win) plus 1.2 s, then 1.5 s of fade.
+- Open: no typewriter sound (B451, audio.click has no level), the ☰ and pause buttons stay white
+  over the CRT (B452), "Destiny points to the drone." stays as typed after the path turns (B453).

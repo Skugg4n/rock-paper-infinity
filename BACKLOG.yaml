@@ -3386,3 +3386,138 @@ items:
     status: done
     resolved_in: deep-pass4 (version at merge)
     notes: "docs/playtests/2026-10-04-pass4-play.md, rebuild-shots/pass4-*.png; src/phase4/pass4.test.js."
+
+  - id: B211
+    added: 2026-10-06
+    source: "Ola's playtest of the whole war (war-chosen brief)"
+    request: |
+      "Everyone walks down into the deep, but only 216 arrive." The story must say why: only a chosen
+      few go down, a secret plan; the best, the richest and most successful, are the ones who get away.
+    status: done
+    resolved_in: v1.88.0
+    notes: "index.js goDownTogether + ants.js gatherChosen/pickChosen: twelve of the people (about one in five, max 15), districts and skyscrapers first, walk into the hatch; the rest stand still and stay behind."
+
+  - id: B212
+    added: 2026-10-06
+    source: "Ola's playtest of the whole war (war-chosen brief)"
+    request: |
+      Remove the warning that the deep is not finished (the "Unfinished. Continue at your own peril." gate on the shovel).
+    status: done
+    resolved_in: v1.88.0
+    notes: "The shovel no longer calls askDeepGate; the markup and src/deepGate.js stay for the DEEP session to remove (B217)."
+
+  - id: B213
+    added: 2026-10-06
+    source: "Ola's playtest of the whole war (war-chosen brief)"
+    request: |
+      The shovel's label is just "GO DEEP", like the earlier buttons, which never reveal that the act changes
+      (it read "IV · THE DEEP ▾").
+    status: done
+    resolved_in: v1.88.0
+
+  - id: B214
+    added: 2026-10-06
+    source: "Ola's playtest of the whole war (war-chosen brief)"
+    request: |
+      When GO DEEP is chosen, all the other buttons disappear (fade or animate away).
+    status: done
+    resolved_in: v1.88.0
+    notes: "leaveControls: the button column, the plates' buttons, the war HUD and the doomsday clock fade and slide out 60 ms apart, the shovel last; the war room stays."
+
+  - id: B215
+    added: 2026-10-06
+    source: "Ola's playtest of the whole war (war-chosen brief)"
+    request: |
+      The hole opens, a few people walk there and go down, the hatch closes behind them.
+    status: done
+    resolved_in: v1.88.0
+    notes: "style-stage2.css .deep-facility.open (the bar slides off, the hole widens, 1.2 s); closes when the last is down, 1.5 s still, then the IV card."
+
+  - id: B216
+    added: 2026-10-06
+    source: "Ola's playtest of the whole war (war-chosen brief)"
+    request: |
+      Meanwhile the information text: "The best humans, the rich, the successful, gather and enter. In wait
+      for the earth to again become inhabitable." (in correct English)
+    status: done
+    resolved_in: v1.88.0
+    notes: "Two war room lines: 'Status: the shelter takes only a few. The richest. The most successful.' / 'Status: they go down to wait until the earth can be lived on again.' The line before the shovel is 'But a few have a secret plan.'"
+
+  - id: B217
+    added: 2026-10-06
+    source: "war-chosen (v1.88.0)"
+    request: |
+      The deep gate is unused since v1.88.0: the #deep-gate markup in index.html, its CSS in style.css and
+      src/deepGate.js (+ test) can go.
+    status: done
+    done: 2026-10-06
+    version: 1.88.1
+    notes: "For the DEEP session (it owns index.html markup and the gate)."
+
+  - id: B218
+    added: 2026-10-06
+    source: "war-chosen (v1.88.0)"
+    request: |
+      A sound for the hatch opening and closing at GO DEEP (today only the war's drone plays under it).
+    status: open
+    notes: "Would need a new event name in src/audio-war.js; none was added in v1.88.0."
+
+  - id: B219
+    added: 2026-10-06
+    source: "war-chosen (v1.88.0), seen in the iii-end checkpoint"
+    request: |
+      After the enemy has left, a reload (or the iii-end checkpoint) brings their red walkers back on the
+      rubble island: the ants' withdraw only runs live, so on load nothing tells the picture they are gone.
+    status: done
+    resolved_in: v1.90.1
+    notes: "v1.90.1: enemiesRemain(war) in src/phase2/ants.js (enemyLeft and leaveStage >= 1 = gone); index.js passes it to the ants as state.enemiesGone, which clears walkers and watchmen unless a live withdraw is running. reconcile now matches our people before it returns. Verified headless in iii-end: 4 walkers + 10 watchmen before, 0 after."
+
+  - id: B450
+    added: 2026-10-09
+    source: "Ola (war-interim brief)"
+    request: |
+      INTERIM between III and IV: typewriter text with a CRT feel ("As the Earth fails ... In one reality there was a
+      drone. In the other a Vault."), Destiny points at one of the two, the player may oppose with one match of rock
+      paper scissors or Continue; the outcome decides whether chapter IV is the vault or the dig.
+    status: done
+    done: 2026-10-09
+    version: 1.90.0
+    resolved_in: v1.90.0
+    notes: "src/interim.js + style-interim.css; goDeep() plays the INTERIM card and the screen; interimPending/interimChosen in the phase 2 save."
+
+  - id: B451
+    added: 2026-10-09
+    source: "war-interim (v1.90.0)"
+    request: |
+      A quiet key sound for the interim's typewriter. audio.click() has no level option, so the typing is silent.
+    status: open
+    notes: "Would need a gain argument on audio.click (src/audio.js, not touched in v1.90.0) or a typewriter word of its own."
+
+  - id: B452
+    added: 2026-10-09
+    source: "war-interim (v1.90.0), seen in the headless run"
+    request: |
+      The ☰ and pause buttons stay white circles over the interim's black CRT. The vault hides the pause button
+      (body.in-vault); the interim leaves both, so the player can pause the typing.
+    status: done
+    resolved_in: v1.90.1
+    notes: "v1.90.1: body.interim-up (src/interim.js) fades #menu-wrapper (the ☰ and pause) and #version-info to 0 with no clicks (style-interim.css); Space still pauses, the cursor stops blinking while paused. Restored when the screen is removed."
+
+  - id: B453
+    added: 2026-10-09
+    source: "war-interim (v1.90.0)"
+    request: |
+      After "You win. The path turns." the line "Destiny points to the drone." still names the act Destiny pointed
+      at; only the lit icon switches. Maybe strike the word through or retype it.
+    status: done
+    resolved_in: v1.90.1
+    notes: "v1.90.1: after a win the needle lights the other icon, then the act word on the pointed line is backspaced and retyped (retypeAct in src/interim.js, tested)."
+
+  - id: B454
+    added: 2026-10-09
+    source: "war-interim (v1.90.0)"
+    request: |
+      ?deep= in the URL still wins over the interim's choice (src/deepVersion.js chosenDeep); a test URL with ?deep=
+      skips what the match decided.
+    status: open
+    notes: "By design for testing; written down so nobody is surprised."

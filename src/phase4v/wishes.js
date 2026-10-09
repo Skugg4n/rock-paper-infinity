@@ -9,10 +9,12 @@
  *
  * Real seconds (not game days): a bubble lives ~10 s at ▶ and at ▶▶ alike. Pure; state in s.wishes.
  */
+import { computerSays } from './story.js';
+import { tutOn, did, hand, FIRST_WISHES_S, FIRST_WISHES_FOR_S } from './tutorial.js';
 
 export const LIFE_S = 10;
-export const EVERY_S = [6, 8];           // act I: one every 6 to 8 s
-export const EVERY_TURNED_S = [3, 4.5];  // after the turn, and two or three at once
+export const EVERY_S = [8, 11];          // act I: one every 8 to 11 s (test 4: never a clicking job)
+export const EVERY_TURNED_S = [6, 9];    // after the turn, one or two at once
 export const GHOST_EVERY_S = 4;
 export const WAVE_AT = 4;
 export const WAVE_EVERY_S = 70;
@@ -30,8 +32,12 @@ export const ICONS = {
     pool: { text: 'Human #{n} wants a pool table.', at: ['common', 'game', 'bar'], wave: { line: 'Overwhelming wishes for a pool table.', kind: 'game' } },
     bell: { text: 'Room {n} is ringing for service.', at: ['suites'], rude: true },
     finger: { text: 'Human #{n} wants to complain.', at: ['common', 'suites', 'bar', 'cinema'], rude: true },
+    // once there is a meat lab: a piece of steak
+    steak: { text: 'Room {n} wants a steak.', at: ['suites', 'common', 'bar'], needs: 'meatlab', wave: { line: 'Overwhelming wishes for steak.', kind: 'meatlab' } },
 };
-const POLITE = ['drink', 'hand', 'food', 'music', 'towel', 'pool'];
+const POLITE_ALL = ['drink', 'hand', 'food', 'music', 'towel', 'pool', 'steak'];
+/** The polite wishes there can be now: the steak only once a meat lab stands. */
+const politeNow = (s) => POLITE_ALL.filter((i) => !ICONS[i].needs || builtScore(s, ICONS[i].needs) > 0);
 const RUDE = ['bell', 'finger'];
 
 export function normalizeWishes(w) {
@@ -92,7 +98,7 @@ export function stepWishes(s, sec) {
         if (s.phase === 'night' && s.asleep > 0 && w.clock >= w.ghostNext) {
             w.ghostNext = w.clock + GHOST_EVERY_S * (0.6 + rnd(s) * 0.8);
             const pods = []; s.rooms.forEach((r, i) => { if (r.kind === 'cryo' && r.flesh !== 1) pods.push(i); });
-            if (pods.length) w.list.push({ id: w.nextId++, icon: pick(s, [...POLITE, ...RUDE]), slot: pick(s, pods), fx: 0.15 + rnd(s) * 0.7, born: w.clock, life: 6, ghost: true, text: '' });
+            if (pods.length) w.list.push({ id: w.nextId++, icon: pick(s, [...politeNow(s), ...RUDE]), slot: pick(s, pods), fx: 0.15 + rnd(s) * 0.7, born: w.clock, life: 6, ghost: true, text: '' });
         }
         w.wave = null;
         return;
@@ -104,6 +110,8 @@ export function stepWishes(s, sec) {
             w.missed++;
             fx(s, { type: 'miss', slot: b.slot, fx: b.fx, text: `-${MISS_MOOD} %` });
             s.sfx?.push('miss');
+            // now and then someone shouts at the system
+            if (s.out) computerSays(s, 'miss');
         }
     }
     w.list = w.list.filter((b) => w.clock - b.born < b.life);
@@ -117,20 +125,24 @@ export function stepWishes(s, sec) {
         s.sfx?.push('thanks');
         w.wave = null;
     }
+    // pass 3: no wishes before the bubbles are taught; then one every 12 s the first minute
+    const taught = !tutOn(s) || s.tut.at.wishes != null;
+    if (!taught && s.phase === 'palace') return;
     // new ones: the fewer awake, the fewer wishes
     if (w.clock >= w.next) {
         const share = Math.max(0.15, awakeOf(s) / Math.max(1, s.residents));
         const [a, b] = s.turned ? EVERY_TURNED_S : EVERY_S;
-        w.next = w.clock + (a + rnd(s) * (b - a)) / share;
+        const early = tutOn(s) && s.wishes.firstAt != null && w.clock - s.wishes.firstAt < FIRST_WISHES_FOR_S;
+        w.next = w.clock + (early ? FIRST_WISHES_S : (a + rnd(s) * (b - a)) / share);
         // the woken at night are only rude
         const night = s.phase === 'night';
-        const n = night ? 1 + (rnd(s) < 0.5 ? 1 : 0) : s.turned ? 2 + (rnd(s) < 0.5 ? 1 : 0) : 1;
-        for (let k = 0; k < n; k++) spawn(s, night || (s.turned && rnd(s) < 0.5) ? pick(s, RUDE) : pick(s, POLITE));
+        const n = night ? 1 : s.turned ? 1 + (rnd(s) < 0.4 ? 1 : 0) : 1;
+        for (let k = 0; k < n; k++) spawn(s, night || (s.turned && rnd(s) < 0.5) ? pick(s, RUDE) : pick(s, politeNow(s)));
     }
     // a wave: one icon over many rooms, hinting at a long project
     if (!w.wave && w.clock >= w.waveNext && awakeOf(s) > 20 && s.phase === 'palace') {
         w.waveNext = w.clock + WAVE_EVERY_S * (0.8 + rnd(s) * 0.4);
-        const open = POLITE.filter((i) => ICONS[i].wave && builtScore(s, ICONS[i].wave.kind) < 3);
+        const open = politeNow(s).filter((i) => ICONS[i].wave && builtScore(s, ICONS[i].wave.kind) < 3);
         if (open.length) {
             const icon = pick(s, open);
             for (let k = 0; k < WAVE_AT + 1; k++) { const b = spawn(s, icon); if (b) b.born += k * 0.4; }
@@ -145,9 +157,16 @@ export function stepWishes(s, sec) {
             const { line, kind } = ICONS[icon].wave;
             const slot = w.list.find((b) => b.icon === icon).slot;
             w.wave = { icon, kind, base: builtScore(s, kind), slot };
-            s.out?.push({ text: line, who: 'res' });
+            hand(s, kind);
+            s.log = [...(s.log || []), line].slice(-3);
         }
     }
+}
+
+/** One polite wish now (the stop that teaches the bubbles shows one at once). */
+export function spawnWish(s) {
+    s.wishes = normalizeWishes(s.wishes);
+    return spawn(s, pick(s, politeNow(s)));
 }
 
 /** A click on a bubble. Returns true when it popped. */
@@ -163,6 +182,7 @@ export function popWish(s, id) {
     w.list = w.list.filter((x) => x !== b);
     fx(s, { type: 'pop', slot: b.slot, fx: b.fx, text: `+${POP_MOOD} %` });
     s.sfx?.push('pop');
+    did(s, 'pop');
     return true;
 }
 

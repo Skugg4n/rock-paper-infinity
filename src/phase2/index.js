@@ -2,17 +2,17 @@
 
 import { PHASE2_CONSTANTS, PHASE_KEY } from "../constants.js";
 import { playChapterCard } from '../chapterCard.js';
-import { askDeepGate } from '../deepGate.js';
 import { phases, setPhase } from '../gamePhase.js';
 import { serializePhase2, loadFromStorage, saveToStorage } from './persistence.js';
 import { mountSaveButtons } from '../save-export.js';
+import { startInterim, writeChoice } from '../interim.js';
 import { buildingData } from './buildings-config.js';
 import { createRenderer, armoryClearCost } from './rendering.js';
 import { timed, counter } from '../perf.js';
 import {
     siloFraction, stallCost, harvestAmount, spendHarvestEfficiency, recoverHarvestEfficiency, STALL_SUPPLY, formatCount,
 } from './economy.js';
-import { createAnts, chooseArmoryPlot } from './ants.js';
+import { createAnts, chooseArmoryPlot, enemiesRemain } from './ants.js';
 import { layoutRect } from './layout.js';
 import { createIsland, coastPoints } from './islands.js';
 import { audio } from '../audio.js';
@@ -41,11 +41,19 @@ let _cityOpening = false;
 const STORE_REVEAL_SUPPLIES = 100;
 
 /**
- * IV · THE DEEP. The black card is the bridge: chapter IV is built during its
- * hold, so the model is already there when the card lifts. The "to come" wall
- * is kept for one case only, a browser that cannot load the chapter at all;
- * the save is never touched either way.
+ * IV · THE DEEP, by way of the INTERIM (v1.90.0, src/interim.js). The black INTERIM card is the
+ * bridge: the interim screen is built under it during its hold, so it is there when the card
+ * lifts. There one match against Destiny decides which chapter IV comes (the vault or the dig,
+ * written under DEEP_VERSION_KEY); then black, and chapter IV starts. The phase 2 save keeps
+ * `interimPending` while the screen is up (a reload comes back to the screen, no card) and
+ * `interimChosen` once the act is chosen (a reload goes straight on down). The "to come" wall is
+ * kept for one case only, a browser that cannot load the chapter at all.
  */
+function markSave(patch) {
+    const { SAVE_KEY } = PHASE2_CONSTANTS;
+    const save = loadFromStorage(SAVE_KEY);
+    if (save) saveToStorage(SAVE_KEY, serializePhase2(Object.assign(save, patch)));
+}
 async function goDeep() {
     if (_deepStarting) return;
     _deepStarting = true;
@@ -56,13 +64,26 @@ async function goDeep() {
         playChapterCard({ roman: 'IV', title: 'THE DEEP', mode: 'to-come' });
         return;
     }
+    const startDeep = () => setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
+    const save = loadFromStorage(PHASE2_CONSTANTS.SAVE_KEY) || {};
+    if (save.interimChosen) {
+        // chosen before a reload: on down
+        writeChoice(save.interimChosen === 'dig' ? 'drone' : 'vault', localStorage);
+        startDeep();
+        return;
+    }
+    const opts = {
+        onDecided: (version) => markSave({ interimPending: false, interimChosen: version }),
+        onGone: startDeep,
+    };
+    if (save.interimPending) { startInterim(opts); return; }   // a reload during the interim: the screen, no card
+    markSave({ interimPending: true });
+    let screen = null;
     playChapterCard({
-        // Slow and dark like the WAR card: a long fade, a rest, IV, a rest, THE DEEP; a click or 7 s ends the hold.
-        roman: 'IV', title: 'THE DEEP', dark: true, slow: true, pause: 1400, hold: 7000, silent: true,   // the war's E♭ falls to D under it, into IV's own low D
-        onMidpoint: () => {
-            setPhase(phases.DEEP).catch((e) => console.error('chapter IV failed to start', e));
-        },
-    });
+        // Slow and dark like the WAR card, no numeral; a click or 4 s ends the hold. Silent: the war's E♭ falls to D under it.
+        roman: '', title: 'INTERIM', dark: true, slow: true, hold: 4000, silent: true,
+        onMidpoint: () => { screen = startInterim({ ...opts, under: true }); },
+    }).then(() => { if (screen) screen.lift(); else startInterim(opts); });   // no card (one already up): the screen at once
 }
 let _ants = null;
 let _islands = null;
@@ -647,7 +668,7 @@ export function init() {
                   ui.competitorIsland.classList.remove('enemy-launch', 'enemy-ignite'); ui.competitorIsland.classList.add('enemy-rubble');
                   logWar('Our scientists have declared the surface uninhabitable for life. The enemy has left for space.', true);
               } else if (w.leaveStage === 3 && since >= 10) { next(4); logWar('We have not had the resources to do the same.'); }
-              else if (w.leaveStage === 4 && since >= 8) { next(5); logWar('But there is a secret plan.'); }
+              else if (w.leaveStage === 4 && since >= 8) { next(5); logWar('But a few have a secret plan.'); }
               else if (w.leaveStage === 5 && since >= 6) { next(6); logWar('Go deep.'); placeFacility(true); }
               else if (w.leaveStage === 6 && since >= 6) next(LEAVE_SHOVEL);
               if (w.leaveStage >= 1 && w.leaveStage < 3) ui.competitorIsland.classList.add('enemy-ignite');
@@ -929,7 +950,8 @@ export function init() {
                   ? { unlockReq: `<i data-lucide='factory' class='w-4 h-4'></i> military structures destroyed` }
                   : { effect: `${Math.round(w.force)} <i data-lucide='swords' class='w-4 h-4'></i> ${w.intel ? `→ ${Math.round(w.force * relativePower(w.tier, w.enemyTier)).toLocaleString('en-US')} <i data-lucide='flame' class='w-4 h-4'></i> ` : ''}${canRaze ? '✓' : '×'}` });
               setTooltip(ui.tierBtn, nextCost === null ? { effect: tier.numeral } : (cooling ? { unlockReq: `${TIERS[w.tier + 1].numeral} · ${Math.max(0, TIER_COOLDOWN_S - ((w.t || 0) - (w.lastTierAt ?? 0)))} s` } : { effect: `${TIERS[w.tier + 1].numeral} · ${TIERS[w.tier + 1].id}`, scienceCost: nextCost }));
-              setTooltip(ui.shipBtn, w.shipReady ? { effect: `IV · THE DEEP ▾` } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
+              // like the buttons before it, the shovel never says the act changes (v1.88.0)
+              setTooltip(ui.shipBtn, w.shipReady ? { effect: 'GO DEEP' } : { unlockReq: `${SHIP_SALVAGE.toLocaleString('en-US')} ▾` });
               // enemy tiles: razed ones dim until rebuilt
               enemyTileEls().forEach((el, i) => el.classList.toggle('enemy-razed', (w.enemyRazedUntil?.[i] || 0) > 0));
           }
@@ -949,6 +971,17 @@ export function init() {
               if (what === 'raze') w.enemyRazedUntil = w.enemyRazedUntil.map(() => w.t + ENEMY_REBUILD_S);
               if (what === 'state') return w;
               updateAllUI();
+          };
+          /** Testing: the INTERIM from any point of the war (the way down chosen, no walk). */
+          window.debug_interim = () => {
+              if (_deepStarting) return;
+              gameState.shipChosen = true;
+              if (gameState.war) gameState.war.goingDown = true;
+              saveGameState();
+              savingEnabled = false;
+              clearInterval(logicInterval); clearInterval(fastUiInterval);
+              city.stop(); war.stop();
+              goDeep();
           };
           /** Everything chapter II sells has been bought. */
           function cityComplete() {
@@ -1479,6 +1512,7 @@ export function init() {
                   defence: gameState.war?.defence || 0,
                   airDefence: gameState.war?.air || 0,
                   guardsOff: !!gameState.war?.enemyLeft || !!gameState.shipChosen,
+                  enemiesGone: !enemiesRemain(gameState.war),   // B219: after they left, a reload brings no walkers back
                   hitEdges: gameState.war?.hitEdges || [],
                   war: !!gameState.war?.active,
                   armoryId: armoryStanding()?.id ?? null,
@@ -1754,32 +1788,95 @@ export function init() {
               updateAllUI();
           }, { signal });
           ui.armsSlider.addEventListener('input', (e) => { if (gameState.war?.active) gameState.war.armsShare = e.target.value / 100; updateAllUI(); }, { signal });
-          ui.shipBtn.addEventListener('click', async () => {
-              const w = gameState.war; if (!w?.shipReady || gameState.shipChosen) return;
-              // Chapter IV is playable but unfinished: the player chooses, before
-              // anything irreversible. "Stay" leaves the war's end as it is.
-              if (!(await askDeepGate())) return;
-              if (gameState.shipChosen) return;
+          ui.shipBtn.setAttribute('aria-label', 'Go deep');
+          ui.shipBtn.addEventListener('click', () => {
+              const w = gameState.war; if (!w?.shipReady || gameState.shipChosen || w.goingDown) return;
+              // No gate (v1.88.0): the click is the choice. A reload from here goes straight down (load: shipChosen).
+              w.goingDown = true;
               gameState.shipChosen = true;
               saveGameState();
               savingEnabled = false;
               if (logicInterval) clearInterval(logicInterval);
-              // The facility on the bottom-right plate (there since "Go deep."): everyone walks into its hatch.
+              goDownTogether();
+          }, { signal });
+          /**
+           * GO DEEP (v1.88.0, Ola's playtest of the whole war: "everyone walks
+           * down, but only 216 arrive"). The story says why: the shelter takes
+           * only a few. The controls leave, the hatch opens, a chosen few (the
+           * people who live highest) walk to it and go down one by one while
+           * the war room says who they are; everyone else stands still and is
+           * left behind; the hatch closes, a stillness, then the INTERIM card
+           * (goDeep, v1.90.0). Runs once (w.goingDown); a click elsewhere does nothing
+           * (#phase-city.going-deep); the card always comes (DOWN.fallbackS).
+           * The steps are kept in window.rpiGoDeep (seconds after the click).
+           */
+          const DOWN = { hatchAt: 1.3, line1At: 1.7, walkAt: 2.3, line2At: 6.6, closeAfterLine2: 2.5, closeS: 1.2, stillS: 1.5, fallbackS: 25 };
+          const DOWN_LINES = [
+              'Status: the shelter takes only a few. The richest. The most successful.',
+              'Status: they go down to wait until the earth can be lived on again.',
+          ];
+          function goDownTogether() {
+              const t0 = performance.now();
+              const since = () => (performance.now() - t0) / 1000;
+              const steps = window.rpiGoDeep = [];
+              const note = (what) => steps.push(`${since().toFixed(1)} s ${what}`);
+              const later = (s, fn) => setTimeout(() => { if (!signal.aborted) fn(); }, Math.max(0, s) * 1000);
+              ui.phaseCity.classList.add('going-deep');
+              leaveControls(); note('the controls leave');
               placeFacility();
               const hatch = hatchSlot();
+              const facility = hatch?.querySelector('.deep-facility');
               let carded = false;
-              const card = () => {
+              const card = (why) => {
                   if (carded) return;
                   carded = true;
+                  note(`the card (${why})`);
+                  ui.antsCanvas.classList.add('left-behind');      // the ones left behind dim as the card fades in
                   if (fastUiInterval) clearInterval(fastUiInterval);
                   city.stop();
-                  // the IV card takes the war's E flat and lets it fall to D
+                  // the INTERIM card takes the war's E flat and lets it fall to D
                   war.finale('fall');
                   war.stop();
                   goDeep();
               };
-              if (_ants && hatch) { _ants.gatherAt(hatch, () => setTimeout(card, 1200)); setTimeout(card, 20000); } else card();
-          }, { signal });
+              let closing = false;
+              const close = () => {
+                  if (closing) return;
+                  closing = true;
+                  later(DOWN.line2At + DOWN.closeAfterLine2 - since(), () => {
+                      facility?.classList.remove('open'); note('the hatch closes');
+                      later(DOWN.closeS + DOWN.stillS, () => card('after the stillness'));
+                  });
+              };
+              later(DOWN.hatchAt, () => { facility?.classList.add('open'); note('the hatch opens'); });
+              later(DOWN.line1At, () => { logWar(DOWN_LINES[0]); note('line 1'); });
+              later(DOWN.line2At, () => { logWar(DOWN_LINES[1]); note('line 2'); });
+              later(DOWN.walkAt, () => {
+                  if (!_ants || !hatch) { note('nobody to walk'); close(); return; }
+                  _ants.gatherChosen(hatch, undefined, () => { note('the last one is down'); close(); });
+                  const d = _ants._debug().chosen;
+                  if (d) note(`the chosen walk: ${d.few} of ${d.few + d.left}, ${d.left} stay`);
+              });
+              later(DOWN.fallbackS, () => card('fallback'));
+          }
+          /** Every control, the plates' buttons and the war counters fade and slide away, one after another; the shovel last. The war room stays. */
+          function leaveControls() {
+              const shown = (el) => el && !el.classList.contains('hidden');
+              const left = [...ui.warUi.children].filter(shown);
+              const plates = [...ui.landGrid.querySelectorAll('.building-action-btn')].filter(shown);   // + ◆ × - on the plates
+              const right = [...document.querySelectorAll('#buildings-container > .btn, #build-separator, #upgrades-container > .btn')]
+                  .filter(el => shown(el) && el !== ui.shipBtn).reverse();
+              const all = [...(shown(ui.warUi) ? left : []), ...(shown(ui.doomsday) ? [ui.doomsday] : []), ...plates, ...right, ui.shipBtn];
+              // the plates' buttons go together, in one step of the line
+              let step = 0;
+              all.forEach((el, i) => {
+                  if (i > 0 && !(plates.includes(el) && plates.includes(all[i - 1]))) step++;
+                  el.classList.remove('btn-arrive');
+                  el.style.setProperty('--leave-delay', `${step * 60}ms`);
+                  el.style.setProperty('--leave-x', left.includes(el) ? '-24px' : (right.includes(el) || el === ui.shipBtn ? '24px' : '0px'));
+                  el.classList.add('deep-leave');
+              });
+          }
           ui.buildHomeBtn.addEventListener('click', () => addBuilding('home'), { signal });
           ui.buildStoreBtn.addEventListener('click', () => addBuilding('store'), { signal });
           ui.buildStallBtn.addEventListener('click', () => {
@@ -2068,4 +2165,8 @@ export function teardown() {
   _starsPerPersonRevealed = false;
   _scienceRevealed = false;
   _starvedSaid = false;
+  // GO DEEP (v1.88.0) left its marks on the shared shell: the city comes back whole
+  document.getElementById('phase-city')?.classList.remove('going-deep');
+  document.getElementById('ants-canvas')?.classList.remove('left-behind');
+  document.querySelectorAll('#phase-city .deep-leave').forEach(el => el.classList.remove('deep-leave'));
 }

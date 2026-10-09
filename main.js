@@ -209,7 +209,8 @@ async function bootstrap() {
     !localStorage.getItem(PHASE1_CONSTANTS.SAVE_KEY) &&
     !localStorage.getItem(PHASE2_CONSTANTS.SAVE_KEY) &&
     !localStorage.getItem(PHASE4_CONSTANTS.SAVE_KEY) &&
-    !localStorage.getItem('rpi-deep-vault');
+    !localStorage.getItem('rpi-deep-vault') &&
+    !localStorage.getItem('rpi-unity');
 
   if (isFreshPlayer) {
     await playChapterCard({ roman: 'I', title: 'TRIVIAL' });

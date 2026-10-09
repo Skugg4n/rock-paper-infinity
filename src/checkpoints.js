@@ -19,6 +19,8 @@ import { initialSurface } from './phase4/surface.js';
 import { startGrow, graphOf, organsOf, settleFloors } from './phase4/grow.js';
 import { LADDER } from './phase4/watcher.js';
 import { preparedState, serialize as serializeDig, SAVE_KEY as DIG_KEY } from './phase4d/dig.js';
+import { UNITY_CHECKPOINTS } from './phase5/checkpoints.js';
+import { SAVE_KEY as UNITY_KEY, serialize as serializeUnity } from './phase5/unity.js';
 
 const P1 = PHASE1_CONSTANTS.SAVE_KEY, P2 = PHASE2_CONSTANTS.SAVE_KEY, XFER = PHASE2_CONSTANTS.STARS_TRANSFER_KEY;
 const P4 = PHASE4_CONSTANTS.SAVE_KEY;
@@ -313,6 +315,13 @@ export const CHECKPOINTS = [
     { id: 'iv-dig-machine', label: 'IV · dig: 700 m', apply: () => digJump({ row: 138, levels: { drill: 3, battery: 2, cargo: 2, lamp: 2, hull: 1, radar: 2 }, parts: 60, time: 660, found: 5, at: true }) },
     { id: 'iv-dig-flesh', label: 'IV · dig: the flesh', apply: () => digJump({ row: 320, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, radar: 3 }, grafts: 1, bio: 3, parts: 150, time: 1200, found: 9, at: true }) },
     { id: 'iv-dig-heart', label: 'IV · dig: 1 990 m', apply: () => digJump({ row: 397, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, radar: 3 }, grafts: 3, bio: 10, parts: 300, time: 1400, found: 11, at: true }) },
+    // chapter V · UNITY (docs/superpowers/specs/2026-10-06-chapter-v-unity.md)
+    ...Object.entries({ 'v-start': 'V · unity: the city', 'v-city-done': 'V · the city almost eaten', 'v-land': 'V · the county', 'v-continent': 'V · the continent', 'v-planet': 'V · the planet' })
+        .map(([id, label]) => ({ id, label, apply: () => {
+            clearAll();
+            set(UNITY_KEY, serializeUnity(UNITY_CHECKPOINTS[id]()));
+            set(PHASE_KEY, 'UNITY');
+        } })),
 ];
 function digJump({ at = false, ...opts }) {
     clearAll();

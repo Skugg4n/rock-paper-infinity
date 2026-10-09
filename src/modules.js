@@ -5,8 +5,8 @@
  * forgotten here again (2026-09-19: war.js was missing, Ola got a dead page).
  */
 export const MODULE_PATHS = [
-  'index.html', 'main.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'roman.js',
-  'src/audio.js', 'src/audio-city.js', 'src/audio-war.js', 'src/chapterCard.js', 'src/checkpoints.js', 'src/constants.js', 'src/deepGate.js', 'src/gamePhase.js',
+  'index.html', 'main.js', 'style.css', 'style-stage2.css', 'style-deep.css', 'style-interim.css', 'roman.js', 'src/interim.js',
+  'src/audio.js', 'src/audio-city.js', 'src/audio-war.js', 'src/chapterCard.js', 'src/checkpoints.js', 'src/constants.js', 'src/gamePhase.js',
   'src/deepVersion.js', 'src/icons.js', 'src/modules.js', 'src/perf.js', 'src/save-export.js', 'src/version.js',
   'src/phase1/cost-visual.js', 'src/phase1/countdown.js', 'src/phase1/factory-view.js', 'src/phase1/index.js',
   'src/phase1/persistence.js', 'src/phase1/rates.js', 'src/phase1/rendering.js',
@@ -23,5 +23,6 @@ export const MODULE_PATHS = [
   'src/phase4/strata-view.js', 'src/phase4/surface.js',
   'src/phase4d/autopilot.js', 'src/phase4d/dig.js', 'src/phase4d/index.js', 'src/phase4d/render.js', 'src/phase4d/sound.js', 'src/phase4d/world.js',
   'src/phase4/tree-view.js', 'src/phase4/tree.js', 'src/phase4/view-hooks.js', 'src/phase4/views.js', 'src/phase4/watcher.js',
-  'src/phase4v/checkpoints.js', 'src/phase4v/index.js', 'src/phase4v/sound.js', 'src/phase4v/style.js', 'src/phase4v/vault.js', 'src/phase4v/view.js', 'src/phase4v/wishes.js',
+  'src/phase4v/checkpoints.js', 'src/phase4v/index.js', 'src/phase4v/sound.js', 'src/phase4v/story.js', 'src/phase4v/style.js', 'src/phase4v/tutorial.js', 'src/phase4v/vault.js', 'src/phase4v/view.js', 'src/phase4v/wishes.js',
+  'src/phase5/checkpoints.js', 'src/phase5/globe.js', 'src/phase5/index.js', 'src/phase5/sound.js', 'src/phase5/style.js', 'src/phase5/terrain.js', 'src/phase5/unity.js', 'src/phase5/view.js',
 ];
