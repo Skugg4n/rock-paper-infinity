@@ -34,7 +34,7 @@ export const LAYERS = [
     { id: 'war', name: 'THE WAR', from: 60, to: 300, line: 'Rust. The war is down here too.' },
     { id: 'old', name: 'OLD ROCK', from: 300, to: 700, line: 'Old rock. Nobody lived here.' },
     { id: 'machine', name: 'THE MACHINE', from: 700, to: 1100, line: 'Machines. Older than the war.' },
-    { id: 'warm', name: 'WARM ROCK', from: 1100, to: 1600, line: 'The rock is red here.' },
+    { id: 'warm', name: 'WARM ROCK', from: 1100, to: 1600, line: null },
     { id: 'flesh', name: 'THE FLESH', from: 1600, to: 2000, line: 'Soft. It gives under the drill.' },
 ];
 export function layerIndexOf(row) {

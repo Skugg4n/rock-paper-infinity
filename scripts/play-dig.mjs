@@ -95,7 +95,7 @@ try {
     }
     const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
     const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
-    if (PASS3 && !process.argv.includes('--step2')) {
+    if (PASS3 && !process.argv.includes('--step2') && !process.argv.includes('--step3')) {
         // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
         await jump('iv-dig-start');
         await sleep(600);
@@ -173,6 +173,52 @@ try {
         await hold('ArrowLeft', 900);
         await sleep(500);
         await shot('p3-26-homing-line');
+    }
+    if (process.argv.includes('--step3')) {
+        // step 3: a quantum object to the lab, the lab's stop, the gifts used; the warm stop; the drone close up; the flesh
+        await jump('iv-dig-lab');
+        await sleep(600);
+        await shot('p3-30-carrying');
+        const lab = await ev(`import('/src/phase4d/base.js').then((m) => m.roomSpot('lab'))`);
+        for (let i = 0; i < 14 && (await st('s.x')) !== lab; i++) await hold('ArrowRight', 140);
+        await sleep(1500);
+        await shot('p3-31-lab-working');
+        await ev(`(() => { window.rpiDig.state.quantum.lab = 59.5; return true; })()`);
+        await sleep(1200);
+        await shot('p3-32-lab-stop');
+        await key('Enter');
+        await hold('ArrowDown', 1600);
+        await key('b');
+        await hold('ArrowDown', 1200);
+        await shot('p3-33-booster');
+        await ev(`(() => { const s = window.rpiDig.state; for (const id of ['shock', 'teleport', 'lamp2']) if (!s.quantum.got.includes(id)) s.quantum.got.push(id); return true; })()`);
+        await key('q');
+        await sleep(200);
+        await shot('p3-34-shock');
+        await sleep(600);
+        await shot('p3-35-second-lamp');
+        await key('t');
+        await sleep(500);
+        await shot('p3-36-teleported');
+        await jump('iv-dig-machine');
+        await ev(`(() => { const s = window.rpiDig.state; s.tut.done.warm = false; s.levels.hull = 3; s.y = 218; s.x = 11; for (let y = 140; y < 219; y++) s.tiles[y * 24 + 11] = 0; return true; })()`);
+        await hold('ArrowDown', 1500);
+        await shot('p3-37-warm-stop');
+        await jump('iv-dig-flesh');
+        await hold('ArrowDown', 800);
+        await shot('p3-38-flesh-drone');
+        // the drone close up at the base, every upgrade
+        await jump('iv-dig-heart');
+        await ev(`(() => { const s = window.rpiDig.state; s.y = -1; s.x = 8; s.cargo = [8, 8, 8]; s.quantum.got = ['booster', 'lamp2']; s.grafts = 0; return true; })()`);
+        await sleep(900);
+        const d = await ev(`(() => { const r = window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()); return r; })()`);
+        const z = await send('Page.captureScreenshot', { format: 'png', clip: { x: d.x - 120, y: d.y - 90, width: 240, height: 150, scale: 3 } });
+        fs.writeFileSync(path.join(SHOTS, 'p3-39-drone-closeup.png'), Buffer.from(z.result.data, 'base64'));
+        await ev(`(() => { const s = window.rpiDig.state; s.grafts = 3; s.y = 300; s.x = 11; s.cargo = []; s.act = { kind: 'dig', tx: 11, ty: 301, t: 0, dur: 99, cost: 0, tile: 5 }; return true; })()`);
+        await sleep(700);
+        const d2 = await ev(`(() => window.rpiDig.renderer.screenOf(window.rpiDig.state, window.rpiDig.view()))()`);
+        const z2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: d2.x - 120, y: d2.y - 90, width: 240, height: 150, scale: 3 } });
+        fs.writeFileSync(path.join(SHOTS, 'p3-40-drone-flesh-closeup.png'), Buffer.from(z2.result.data, 'base64'));
     }
     if (!process.argv.includes('--long') && !PASS3 && !process.argv.includes('--step2')) {
     // 1. the start: dig down, mine sideways, come home, buy

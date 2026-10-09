@@ -312,6 +312,7 @@ export const CHECKPOINTS = [
     // the dig (src/phase4d): jumping there chooses that version of chapter IV
     { id: 'iv-dig-start', label: 'IV · dig: start', apply: () => digJump({ row: -1 }) },
     { id: 'iv-dig-alarm', label: 'IV · dig: a chamber failing', apply: () => digJump({ row: 30, levels: { battery: 1 }, parts: 40, time: 200, found: 1, alarm: true }) },
+    { id: 'iv-dig-lab', label: 'IV · dig: a quantum object home', apply: () => digJump({ row: 15, levels: { battery: 1, cargo: 1 }, parts: 60, time: 140, found: 2, quantum: true }) },
     { id: 'iv-dig-war', label: 'IV · dig: 300 m', apply: () => digJump({ row: 58, levels: { drill: 2, battery: 1, cargo: 1, lamp: 1 }, parts: 20, time: 240, found: 3, at: true }) },
     { id: 'iv-dig-machine', label: 'IV · dig: 700 m', apply: () => digJump({ row: 138, levels: { drill: 3, battery: 2, cargo: 2, lamp: 2, hull: 1, gps: 2, homing: 1, radio: 1 }, parts: 60, time: 660, found: 5, at: true }) },
     { id: 'iv-dig-flesh', label: 'IV · dig: the flesh', apply: () => digJump({ row: 320, levels: { drill: 3, battery: 3, cargo: 3, lamp: 3, hull: 3, gps: 2, homing: 1, radio: 1 }, grafts: 1, bio: 3, parts: 150, time: 1200, found: 9, at: true }) },
@@ -324,11 +325,13 @@ export const CHECKPOINTS = [
             set(PHASE_KEY, 'UNITY');
         } })),
 ];
-function digJump({ at = false, alarm = false, ...opts }) {
+function digJump({ at = false, alarm = false, quantum = false, ...opts }) {
     clearAll();
     const s = preparedState(opts);
     if (at) { s.y = opts.row; s.x = 11; }
     // a chamber failing, the drone at the base: the first failure's stop comes at once
+    // the first quantum object carried home, the lab not yet open
+    if (quantum && s.qAt && s.qAt.length) { const i = s.qAt[0]; s.tiles[i] = 0; s.quantum.carry.push(i); s.quantum.labOpen = true; }
     if (alarm) { s.alarms.list.push({ id: 'c2', at: s.time, until: s.time + 110 }); s.tut.done.failing = false; s.tut.rows = s.tut.rows.filter((r) => r !== 'radio' && r !== 'homing' && r !== 'gps'); }
     set(DIG_KEY, serializeDig(s));
     set(DEEP_VERSION_KEY, 'dig');

@@ -746,6 +746,7 @@ export function createRenderer(canvas) {
         const tread = g >= 3 ? '#8a2c3a' : '#3a4350';
         ctx.save();
         ctx.translate(dx, dy);
+        ctx.scale(1.12, 1.12);
         // the lamp's beam forward, and with the SECOND LAMP one down
         const beam = 46 + 16 * L.lamp;
         const bg = ctx.createLinearGradient(face * 14, 0, face * (14 + beam), 0);
@@ -787,7 +788,10 @@ export function createRenderer(canvas) {
             ctx.beginPath(); ctx.moveTo(-14, -4); ctx.bezierCurveTo(-6, -11, 4, 6, 14, -6); ctx.moveTo(-10, 7); ctx.bezierCurveTo(-2, 1, 6, 9, 12, 4); ctx.stroke();
         }
         // the cargo hold on top, wider with each CARGO level; its hatch opens at the warehouse
-        const hw = 12 + 3 * L.cargo, open = s.y === -1 && s.cargo.length > 0 && s.x >= ROOMS.warehouse[0] && s.x <= ROOMS.warehouse[1];
+        // the hatch stays open a moment after the last piece is out
+        const inStore = s.y === -1 && s.x >= ROOMS.warehouse[0] && s.x <= ROOMS.warehouse[1];
+        if (inStore && s.cargo.length) r.hatchUntil = now + 1.2;
+        const hw = 12 + 3 * L.cargo, open = inStore && now < (r.hatchUntil || 0);
         ctx.fillStyle = g >= 3 ? '#7a3040' : '#7d8794';
         ctx.fillRect(-hw / 2 - 2, -14, hw, 5);
         ctx.save();
@@ -795,7 +799,7 @@ export function createRenderer(canvas) {
         ctx.rotate(open ? -1.1 - 0.1 * Math.sin(now * 8) : 0);
         ctx.fillStyle = g >= 3 ? '#9a4452' : '#9aa4b0'; ctx.fillRect(0, -2, hw, 3);
         ctx.restore();
-        if (open) { ctx.fillStyle = '#9fd8e8'; ctx.fillRect(-hw / 2, -14 - 3 - (now * 20) % 6, 3, 3); }
+        if (open && s.cargo.length) { ctx.fillStyle = '#9fd8e8'; ctx.fillRect(-hw / 2, -14 - 3 - (now * 20) % 6, 3, 3); }
         // the window
         ctx.fillStyle = g >= 2 ? '#7a2030' : '#2a3442';
         ctx.fillRect(face > 0 ? 2 : -10, -7, 8, 6);

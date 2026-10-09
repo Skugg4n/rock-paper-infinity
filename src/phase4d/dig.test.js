@@ -3,7 +3,9 @@ import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from 
 import {
     newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
     closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES, ping, pingShows, gpsReady, GPS,
+    boost, teleport, shock, litAt, lampRadius,
 } from './dig.js';
+import { qOrder, has, LAB_S, Q_LINES } from './quantum.js';
 import { FIRST_FAIL, REPAIR_S, spotOf, repairCost, ALARM_LINES } from './alarms.js';
 import { decide, readStop } from './autopilot.js';
 import { roomSpot, roomAt, chamberOf, chamberOver } from './base.js';
@@ -387,5 +389,93 @@ describe('pass 3, step 2: the base breaks, the tools are upgrades', () => {
         s.tiles[31 * W + HOME_X] = T.GHOST; s.battery = 40;
         for (let i = 0; i < 30; i++) step(s, 0.05, { dir: 'down' });
         expect(s.tut.needs).toContain('gps');
+    });
+});
+
+describe('pass 3, step 3: things from the other side, the flesh', () => {
+    test('six quantum objects in the rock, none in the city; BOOSTER or SHOCK WAVE first, never THE OTHER DRONE', () => {
+        for (const seed of [1, 3, 7, 11, 42]) {
+            const w = makeWorld(seed);
+            expect(w.quantum).toHaveLength(6);
+            for (const i of w.quantum) { expect(w.tiles[i]).toBe(T.QUANTUM); expect(depthOf(Math.floor(i / W))).toBeGreaterThan(60); }
+            const o = qOrder(seed);
+            expect(['booster', 'shock']).toContain(o[0]);
+            expect(new Set(o).size).toBe(6);
+        }
+    });
+    test('dug, it is carried (not cargo); in the LAB it takes 60 s; told at the base as a stop; then it is the drone\'s', () => {
+        const s = preparedState({ row: 20 });
+        s.y = 20; s.tiles[21 * W + HOME_X] = T.QUANTUM;
+        for (let i = 0; i < 30 && !s.quantum.carry.length; i++) step(s, 0.05, { dir: 'down' });
+        expect(s.quantum.carry).toHaveLength(1);
+        expect(s.cargo).toHaveLength(0);
+        expect(s.line.text).toBe('It flickers. Take it to the LAB.');
+        s.y = -1; s.x = roomSpot('lab'); s.act = null;
+        step(s, 0.05, {});
+        expect(s.quantum.carry).toHaveLength(0);
+        s.x = HOME_X;
+        for (let i = 0; i < Math.ceil(LAB_S / 0.05) + 100 && !stopOpen(s); i++) step(s, 0.05, {});
+        const first = s.quantum.order[0];
+        expect(s.tut.stop.text[0]).toBe(`The lab opened it. It was a ${first === 'booster' ? 'BOOSTER' : 'SHOCK WAVE'}.`);
+        expect(has(s, first)).toBe(true);
+    });
+    test('THE OTHER DRONE: It is us. It is not us.', () => {
+        expect(Q_LINES.opened('other')).toBe('The lab opened it. It was a drone.');
+        expect(Q_LINES.use.other).toBe('It is us. It is not us.');
+    });
+    test('a quantum object carried goes back to its rock when the drone is recovered', () => {
+        const s = preparedState({ row: 20 });
+        s.y = 20; s.quantum.carry = [25 * W + 3]; s.tiles[25 * W + 3] = T.AIR; s.battery = 0.01;
+        step(s, 0.05, { dir: 'left' }); step(s, 0.5, { dir: 'left' });
+        expect(s.tiles[25 * W + 3]).toBe(T.QUANTUM);
+        expect(s.quantum.carry).toEqual([]);
+    });
+    test('BOOSTER: twice as fast at half the power; TELEPORT: home at once; SHOCK WAVE: eats two tiles round, ore to the cargo', () => {
+        const a = preparedState({ row: 20 }), b = preparedState({ row: 20 });
+        for (const s of [a, b]) { s.y = 20; s.quantum.got.push('booster', 'teleport', 'shock'); }
+        expect(boost(b)).toBe(true);
+        const a0 = a.battery, b0 = b.battery;
+        for (const s of [a, b]) for (let y = 21; y < 60; y++) s.tiles[y * W + HOME_X] = T.SOIL;
+        for (let i = 0; i < 60; i++) { step(a, 0.05, { dir: 'down' }); step(b, 0.05, { dir: 'down' }); }
+        expect(b.y - 20).toBeGreaterThan((a.y - 20) * 1.6);
+        expect((b0 - b.battery) / (b.y - 20)).toBeLessThan((a0 - a.battery) / (a.y - 20));
+        expect(boost(b)).toBe(false);                    // recharging
+        const c = preparedState({ row: 40 });
+        c.y = 40; c.quantum.got.push('shock', 'teleport');
+        c.tiles[41 * W + HOME_X + 1] = T.ROCK; c.tiles[42 * W + HOME_X] = T.STONE;
+        expect(shock(c)).toBe(true);
+        expect(c.tiles[42 * W + HOME_X]).toBe(T.AIR);
+        expect(c.cargo).toContain(T.ROCK);
+        expect(teleport(c)).toBe(true);
+        expect(c.y).toBe(-1);
+    });
+    test('the SECOND LAMP lights farther down; the DEEP BATTERY charges in the heat', () => {
+        const s = preparedState({ row: 260, levels: { hull: 3, drill: 3, battery: 3 } });
+        s.y = 260; s.x = HOME_X; s.quantum.got = [];
+        const r = lampRadius(s);
+        expect(litAt(s, HOME_X, 260 + Math.ceil(r) + 1)).toBe(false);
+        s.quantum.got.push('lamp2');
+        expect(litAt(s, HOME_X, 260 + Math.ceil(r) + 1)).toBe(true);
+        expect(litAt(s, HOME_X, 260 - Math.ceil(r) - 1)).toBe(false);
+        s.tiles[261 * W + HOME_X] = T.STONE;
+        s.battery = 50; s.grafts = 3;
+        step(s, 1, {});
+        const without = s.battery;
+        s.quantum.got.push('deepbat'); s.battery = 50;
+        step(s, 1, {});
+        expect(s.battery).toBeGreaterThan(without);
+    });
+    test('the warm rock stops the game once; the first biomass at the base: the lab speaks, GRAFT lights', () => {
+        const s = preparedState({ row: 218, levels: { hull: 2, drill: 3 } });
+        s.tut.done.warm = false;
+        s.y = 218; s.x = HOME_X;
+        for (let i = 0; i < 80 && !stopOpen(s); i++) step(s, 0.05, { dir: 'down' });
+        expect(s.tut.stop.text).toEqual(['The rock is warm. Warm like skin. We should not be here.']);
+        const t = started();
+        t.bioHome = false; t.bioSeen = false; t.delivered = 5; t.tut.rows = ['battery'];
+        t.cargo = [T.BIO]; t.y = -1; t.x = roomSpot('warehouse');
+        for (let i = 0; i < 10; i++) step(t, 0.05, {});
+        expect(t.line.text).toBe('This is not rock. It is growing in the tank.');
+        expect(t.tut.fresh).toBe('graft');
     });
 });
