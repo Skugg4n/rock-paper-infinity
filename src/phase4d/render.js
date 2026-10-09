@@ -1,15 +1,27 @@
 /**
- * Chapter IV · THE DEEP, the dig: the picture. Canvas 2D, one frame at a time, only the tiles in
- * view. On top the ruined city under a storm and the base with its pods; below, the ground in its
- * layers, dark outside the lamp's circle; the drone; the flesh that breathes; the heart.
+ * Chapter IV · THE DEEP, the dig: the picture. Canvas 2D, only the tiles in view. On top the ruined
+ * city in the storm, a shaft down through the rock, and the base under the ground (pass 3, B): six cryo
+ * chambers, the generator, the rooms the drone drives into. Below, the ground in its layers, dark
+ * from the start outside the lamp's circle; the drone; the flesh that breathes; the heart.
+ *
+ * The owner's machine is slow: the base, the city and the ground (in chunks of 16 rows) are drawn once
+ * into offscreen canvases and redrawn only when what they show changes; per frame only what moves.
  */
 
 import { W, H, T, HEART, layerIndexOf } from './world.js';
 import { lampRadius, radarRange, isOre, SLEEPERS, HOME_X } from './dig.js';
+import { ROOMS, ROOM_NAME, CHAMBERS, PER_CHAMBER, ROOM_TOP, CHAMBER_TOP, CITY_ROW, TOP_ROW, roomSpot } from './base.js';
 
 export const TS = 32;
 export const RISE_S = 5;
-const BASE_X0 = 7, BASE_X1 = 16;          // the base's tiles, on the surface
+const CHUNK = 16;                          // rows of ground per cached canvas
+const KEEP_CHUNKS = 6;
+// the vault's palette (src/phase4v/style.js VT), the colours the base is drawn in
+const C = {
+    ink: '#07080a', stone: '#0b0d10', steel: '#12171e', steel2: '#1a2029', steel3: '#2a313b', slate: '#3a4350',
+    mist: '#8fa1b6', plate: '#d5dbe3', paper: '#f1efe8', lamp: '#f2e2b8', cold: '#8fd0ff', amber: '#ffd678',
+    danger: '#ff6b5a', pulse: '#a8132c',
+};
 // per layer: the ground's two tones and a mark colour
 const PAL = [
     { a: '#3a3633', b: '#2d2a28', m: '#5c5650', soil: '#4a3f35' },      // city: concrete, rebar
@@ -35,8 +47,13 @@ function makeSkyline(seed) {
 }
 
 export function createRenderer(canvas) {
-    const ctx = canvas.getContext('2d');
+    const main = canvas.getContext('2d');
+    let ctx = main;
     const skyline = makeSkyline(7);
+    let dpr = 1;
+    const off = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w * dpr)); c.height = Math.max(1, Math.ceil(h * dpr)); const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); return { c, x }; };
+    let baseCache = null, baseKey = '', cityCache = null;
+    const chunks = new Map();             // chunk index -> { c, x, sum, used }
     const sparks = [];
     let flash = 0, flashAt = 4;
     const r = { cam: { x: 0, y: -6 * TS }, originX: 0, ending: 0, rising: null };
@@ -48,10 +65,11 @@ export function createRenderer(canvas) {
     function riseY() { const k = Math.min(1, (r.rising || 0) / (RISE_S * 0.8)); const e = k * k * (3 - 2 * k); return HEART.cy + (-6 - HEART.cy) * e; }
 
     function resize() {
-        const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+        dpr = Math.min(1.5, window.devicePixelRatio || 1);
         canvas.width = Math.floor(canvas.clientWidth * dpr);
         canvas.height = Math.floor(canvas.clientHeight * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        main.setTransform(dpr, 0, 0, dpr, 0, 0);
+        baseCache = null; baseKey = ''; cityCache = null; chunks.clear();
     }
 
     /** Dust and sparks where the drill bites. */
@@ -83,6 +101,8 @@ export function createRenderer(canvas) {
         // at the end the camera goes up to the pods, then follows the red band down to the heart
         let focusY = p.y;
         let mid = 0.42;
+        // at the base: the whole base in view, the city faint at the top
+        if (p.y < 0) { focusY = (CHAMBER_TOP + 1) / 2 + 0.3; mid = 0.45; }
         if (p.y >= 380) { focusY = HEART.cy - 0.5; mid = 0.5; }
         if (r.rising !== null) { focusY = riseY(); mid = 0.5; }
         else if (s.ended) {
@@ -94,7 +114,7 @@ export function createRenderer(canvas) {
             }
         }
         // the bottom may scroll past the world's end, so the heart can sit in the middle
-        const want = Math.max(-8 * TS, Math.min((H + 6) * TS - vh * 0.5, focusY * TS - vh * mid));
+        const want = Math.max(TOP_ROW * TS, Math.min((H + 6) * TS - vh * 0.5, focusY * TS - vh * mid));
         r.cam.y += (want - r.cam.y) * Math.min(1, dt * 6);
         if (Math.abs(want - r.cam.y) > vh && !(s.ended && r.ending > 2.6)) r.cam.y = want;
         if ((s.ended && r.ending > 2.6) || r.rising !== null) r.cam.y = want;
@@ -103,45 +123,10 @@ export function createRenderer(canvas) {
         const deep = p.y * 5;                            // metres, roughly
         const mad = deep > 700 ? Math.min(1, (deep - 700) / 1000) : 0;
 
-        // ---- the sky and the city, when in view
-        ctx.fillStyle = '#05070a';
+        // ---- the void; the city and the base are drawn after the dark (they have their own light)
+        ctx.fillStyle = C.ink;
         ctx.fillRect(0, 0, vw, vh);
-        const groundY = -camY;                            // screen y of row 0's top
-        if (groundY > 0) {
-            const g = ctx.createLinearGradient(0, groundY - 8 * TS, 0, groundY);
-            g.addColorStop(0, '#11151c'); g.addColorStop(0.7, '#2a2f38'); g.addColorStop(1, '#3a3d42');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, vw, groundY);
-            // the storm: a flash now and then
-            flashAt -= dt;
-            if (flashAt <= 0) { flash = 1; flashAt = 5 + Math.random() * 9; }
-            if (flash > 0) { ctx.fillStyle = `rgba(200,210,230,${(flash * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, vw, groundY); flash -= dt * 3; }
-            // the ruins
-            ctx.fillStyle = '#0c0f14';
-            for (const b of skyline) {
-                const bx = b.x - 200, by = groundY - TS - b.h;
-                if (bx > vw || bx + b.w < 0) continue;
-                ctx.beginPath();
-                ctx.moveTo(bx, groundY - TS);
-                ctx.lineTo(bx, by + (b.broken ? 18 : 0));
-                ctx.lineTo(bx + b.w * 0.4, by);
-                ctx.lineTo(bx + b.w * 0.6, by + (b.broken ? 26 : 0));
-                ctx.lineTo(bx + b.w, by + 6);
-                ctx.lineTo(bx + b.w, groundY - TS);
-                ctx.fill();
-            }
-            // rain
-            ctx.strokeStyle = 'rgba(150,170,190,0.18)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            for (let i = 0; i < 70; i++) {
-                const rx = (hash(i, 1) * vw + t * 60 * (1 + hash(i, 2))) % vw;
-                const ry = (hash(i, 3) * groundY + t * 500 * (0.7 + hash(i, 4))) % Math.max(1, groundY);
-                ctx.moveTo(rx, ry); ctx.lineTo(rx - 3, ry + 10);
-            }
-            ctx.stroke();
-            drawBase(s, groundY);
-        }
+        const groundY = -camY;                            // screen y of row 0's top: the base's floor
 
         // ---- the ground, only the rows in view
         const y0 = Math.max(0, Math.floor(camY / TS)), y1 = Math.min(H - 1, Math.ceil((camY + vh) / TS));
@@ -152,19 +137,28 @@ export function createRenderer(canvas) {
             ctx.fillRect(0, top, r.originX, vh - top);
             ctx.fillRect(r.originX + W * TS, top, vw - r.originX - W * TS, vh - top);
         }
+        // the ground from its cached chunks, then what moves on it (glints, ghosts, the flesh's breath)
+        for (let c = Math.floor(y0 / CHUNK); c <= Math.floor(y1 / CHUNK) && y1 >= y0; c++) {
+            const ch = chunk(s, c);
+            ctx.drawImage(ch.c, r.originX, c * CHUNK * TS - camY, W * TS, CHUNK * TS);
+        }
         for (let y = y0; y <= y1; y++) {
             const li = layerIndexOf(y);
-            const pal = PAL[li];
             const sy = y * TS - camY;
             for (let x = 0; x < W; x++) {
                 const tt = s.tiles[y * W + x];
+                if (tt === T.AIR) continue;
                 const sx = r.originX + x * TS;
-                if (tt === T.AIR) {
-                    ctx.fillStyle = li === 5 ? '#1a0a0e' : '#0d0e10';
+                if (li === 5 || tt === T.FLESH) {
+                    const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 - y * 0.35 + x * 0.2);
+                    ctx.fillStyle = `rgba(255,70,90,${(0.1 * pulse).toFixed(3)})`;
                     ctx.fillRect(sx, sy, TS, TS);
-                    continue;
                 }
-                drawTile(tt, x, y, sx, sy, pal, li, t, mad);
+                if (isOre(tt)) glint(sx, sy, hash(x, y), t);
+                else if (tt === T.GHOST) {
+                    const h = hash(x, y);
+                    if (Math.sin(t * 1.3 + h * 40) >= 0.2 - mad * 0.6) { drawOre(h < 0.5 ? T.SCISSORS : T.PAPER, sx, sy, h); glint(sx, sy, h, t); }
+                }
             }
         }
 
@@ -209,21 +203,20 @@ export function createRenderer(canvas) {
 
         // ---- the dark: a circle of light around the drone; daylight near the top
         const dx = r.originX + p.x * TS + TS / 2, dy = p.y * TS + TS / 2 - camY;
-        // daylight fades over the first 150 m, never all at once
-        const u0 = Math.max(0, Math.min(1, (p.y + 1) / 30));
-        const under = u0 * u0 * (3 - 2 * u0);
-        if (under > 0 && !s.ended) {
-            let rad = lampRadius(s) * TS * (1 + 2.2 * (1 - under));
+        // dark from the start (pass 3): only the base's lamps and the drone's
+        const under = 1;
+        if (!s.ended) {
+            let rad = lampRadius(s) * TS;
             if (mad > 0) rad *= 1 - mad * 0.12 * (hash(Math.floor(t * 9), 5) > 0.8 ? 1 : 0);
-            const g = ctx.createRadialGradient(dx, dy, rad * 0.35, dx, dy, rad);
+            const g = ctx.createRadialGradient(dx, dy, rad * 0.45, dx, dy, rad);
             g.addColorStop(0, 'rgba(0,0,0,0)');
             g.addColorStop(1, `rgba(0,0,0,${(0.995 * under).toFixed(3)})`);
             ctx.fillStyle = g;
-            const top = Math.max(0, groundY);
+            const top = Math.max(0, groundY + CITY_ROW * TS);
             ctx.fillRect(0, top, vw, vh - top);
             // the remembered map: what was dug stays faintly drawn in the dark
             ctx.fillStyle = 'rgba(150,170,195,0.10)';
-            for (let y = Math.max(0, y0); y <= y1; y++) {
+            for (let y = Math.max(0, y0); y <= y1 && y1 >= y0; y++) {
                 for (let x = 0; x < W; x++) if (s.tiles[y * W + x] === T.AIR) ctx.fillRect(r.originX + x * TS + 3, y * TS - camY + 3, TS - 6, TS - 6);
             }
             // the way home, when the power is short: a faint dotted line along the open ground
@@ -251,8 +244,16 @@ export function createRenderer(canvas) {
             }
         }
 
+        // ---- the city in the storm and the base with its own lamps, over the dark
+        if (groundY + TOP_ROW * TS < vh && groundY > -2 * TS) {
+            drawCity(groundY, vw, dt, t);
+            drawBase(s, groundY, t, view);
+        }
+
         // ---- the drone
         if (r.rising === null) drawDrone(s, dx, dy, t);
+        // a stop that says down: an amber arrow under the drone
+        if (view.focus === 'down' && r.rising === null) { const k = performance.now() / 1000; ctx.save(); ctx.translate(dx, dy + 52 + 6 * Math.sin(k * 5)); ctx.scale(1.6, 1.6); arrow(0, 0, 1); ctx.restore(); }
         // ---- what rises: the red mass climbs the shaft and breaks through the city
         if (r.rising !== null) {
             r.rising += dt;
@@ -296,7 +297,49 @@ export function createRenderer(canvas) {
         }
     }
 
-    function drawTile(tt, x, y, sx, sy, pal, li, t, mad) {
+    /** A glint that travels over ore now and then: treasure. */
+    function glint(sx, sy, h, t) {
+        const g = (t * 0.7 + h * 7) % 2.4;
+        if (g >= 0.35) return;
+        const a = Math.sin(g / 0.35 * Math.PI);
+        ctx.fillStyle = `rgba(255,255,255,${(0.9 * a).toFixed(3)})`;
+        const gx = sx + 10 + h * 12, gy = sy + 10 + (1 - h) * 8;
+        ctx.fillRect(gx - 4 * a, gy - 0.75, 8 * a, 1.5); ctx.fillRect(gx - 0.75, gy - 4 * a, 1.5, 8 * a);
+    }
+
+    /** A chunk of 16 rows, drawn once; redrawn when a tile in it changes. */
+    function chunk(s, c) {
+        let sum = 0;
+        const y0 = c * CHUNK, y1 = Math.min(H, y0 + CHUNK);
+        for (let i = y0 * W; i < y1 * W; i++) sum = (sum * 31 + s.tiles[i] + 1) | 0;
+        let ch = chunks.get(c);
+        if (ch && ch.sum === sum) { ch.used = performance.now(); return ch; }
+        if (!ch) {
+            if (chunks.size >= KEEP_CHUNKS) {
+                let old = null;
+                for (const [k, v] of chunks) if (!old || v.used < old[1].used) old = [k, v];
+                chunks.delete(old[0]);
+            }
+            ch = { ...off(W * TS, CHUNK * TS), sum: 0, used: 0 };
+            chunks.set(c, ch);
+        }
+        ch.sum = sum; ch.used = performance.now();
+        const save = ctx;
+        ctx = ch.x;
+        ctx.clearRect(0, 0, W * TS, CHUNK * TS);
+        for (let y = y0; y < y1; y++) {
+            const li = layerIndexOf(y), pal = PAL[li], sy = (y - y0) * TS;
+            for (let x = 0; x < W; x++) {
+                const tt = s.tiles[y * W + x], sx = x * TS;
+                if (tt === T.AIR) { ctx.fillStyle = li === 5 ? '#1a0a0e' : '#0d0e10'; ctx.fillRect(sx, sy, TS, TS); continue; }
+                drawTile(tt === T.GHOST ? T.STONE : tt, x, y, sx, sy, pal, li);
+            }
+        }
+        ctx = save;
+        return ch;
+    }
+
+    function drawTile(tt, x, y, sx, sy, pal, li) {
         const h = hash(x, y);
         let base = h < 0.5 ? pal.a : pal.b;
         if (tt === T.SOIL) base = pal.soil;
@@ -305,7 +348,7 @@ export function createRenderer(canvas) {
         if (tt === T.SINEW) base = '#6e2a33';
         if (tt === T.HEART) base = '#5a0d1a';
         if (tt === T.FLESH || tt === T.BIO || li === 5) {
-            const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 - y * 0.35 + x * 0.2);
+            const pulse = 0.5 + 0.5 * Math.sin(-y * 0.35 + x * 0.2);
             base = `rgb(${Math.round(80 + 30 * pulse)},${Math.round(22 + 6 * pulse)},${Math.round(34 + 8 * pulse)})`;
             if (tt === T.SINEW) base = `rgb(${Math.round(92 + 18 * pulse)},${Math.round(28 + 6 * pulse)},40)`;
         }
@@ -329,23 +372,8 @@ export function createRenderer(canvas) {
             ctx.strokeRect(sx + 1.5, sy + 1.5, TS - 3, TS - 3);
             if (tt === T.BASALT) { ctx.beginPath(); ctx.moveTo(sx + 16, sy + 2); ctx.lineTo(sx + 16, sy + TS - 2); ctx.stroke(); }
         }
-        // ore and the ore that is not there
-        let ore = tt;
-        if (tt === T.GHOST) {
-            if (Math.sin(t * 1.3 + h * 40) < 0.2 - mad * 0.6) return;
-            ore = h < 0.5 ? T.SCISSORS : T.PAPER;
-        }
-        if (ORE_COL[ore]) {
-            drawOre(ore, sx, sy, h);
-            // a glint that travels over it now and then: treasure
-            const g = (t * 0.7 + h * 7) % 2.4;
-            if (g < 0.35) {
-                const a = Math.sin(g / 0.35 * Math.PI);
-                ctx.fillStyle = `rgba(255,255,255,${(0.9 * a).toFixed(3)})`;
-                const gx = sx + 10 + h * 12, gy = sy + 10 + (1 - h) * 8;
-                ctx.fillRect(gx - 4 * a, gy - 0.75, 8 * a, 1.5); ctx.fillRect(gx - 0.75, gy - 4 * a, 1.5, 8 * a);
-            }
-        }
+        // ore (the ore that is not there is drawn per frame: it flickers)
+        if (ORE_COL[tt]) drawOre(tt, sx, sy, h);
         if (tt === T.FIND) {
             ctx.fillStyle = '#e9c46a';
             ctx.fillRect(sx + 8, sy + 10, 16, 12);
@@ -374,38 +402,197 @@ export function createRenderer(canvas) {
         }
     }
 
-    function drawBase(s, groundY) {
-        const bx = r.originX + BASE_X0 * TS, bw = (BASE_X1 - BASE_X0 + 1) * TS;
-        const top = groundY - TS - 4 * TS;
-        // the surface walkway
-        ctx.fillStyle = '#1b1e23';
-        ctx.fillRect(r.originX, groundY - 4, W * TS, 4);
-        // the base: a low bunker with the pods' windows
-        ctx.fillStyle = '#1d2229';
-        ctx.fillRect(bx, top, bw, 4 * TS - 6);
-        ctx.fillStyle = '#262c35';
-        ctx.fillRect(bx - 6, top - 6, bw + 12, 8);
-        // 216 windows: 24 by 9
-        const cols = 24, pitch = 10;   // nine rows
-        const wx = bx + (bw - cols * pitch) / 2, wy = top + 14;
-        const dark = new Set(s.dark);
-        const emptied = s.ended ? Math.floor(Math.min(1, r.ending / 2.4) * SLEEPERS) : 0;
-        for (let i = 0; i < SLEEPERS; i++) {
-            const pod = i + 1;
-            const cx = wx + (i % cols) * pitch, cy = wy + Math.floor(i / cols) * pitch;
-            let col = s.dreaming ? '#d33a4a' : '#5fb4ff';
-            if (dark.has(pod) || i < emptied) col = '#14181d';
-            ctx.fillStyle = col;
-            ctx.fillRect(cx, cy, 6, 6);
+    /** An amber arrow pointing down (dir 1) or up (-1): look here. */
+    function arrow(x, y, dir = 1) {
+        ctx.save();
+        ctx.fillStyle = C.amber;
+        ctx.shadowColor = 'rgba(255,214,120,0.6)'; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(x - 9, y - 6 * dir); ctx.lineTo(x + 9, y - 6 * dir); ctx.lineTo(x, y + 7 * dir); ctx.closePath(); ctx.fill();
+        ctx.fillRect(x - 3, y - 16 * dir, 6, 10 * dir);
+        ctx.restore();
+    }
+
+    /** A dymo label: black tape, pale letters. */
+    function dymo(x, text, cx, cy, size = 11) {
+        x.font = `600 ${size}px "Bebas Neue", "Arial Narrow", sans-serif`;
+        const w = x.measureText(text).width + 12;
+        x.fillStyle = '#0b0c0e'; x.fillRect(cx - w / 2, cy - size / 2 - 3, w, size + 6);
+        x.fillStyle = 'rgba(255,255,255,0.08)'; x.fillRect(cx - w / 2, cy - size / 2 - 3, w, 2);
+        x.fillStyle = C.paper; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(text, cx, cy + 1);
+        x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+    }
+
+    /** The ruined city above, faint in the storm: the sky per frame, the ruins cached. */
+    function drawCity(groundY, vw, dt, t) {
+        const skyTop = groundY + TOP_ROW * TS, street = groundY + CITY_ROW * TS;
+        if (street < 0) return;
+        const g = ctx.createLinearGradient(0, skyTop, 0, street);
+        g.addColorStop(0, '#0b0e13'); g.addColorStop(1, '#1b2029');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, Math.max(0, skyTop), vw, street - Math.max(0, skyTop));
+        flashAt -= dt;
+        if (flashAt <= 0) { flash = 1; flashAt = 5 + Math.random() * 9; }
+        if (flash > 0) { ctx.fillStyle = `rgba(200,210,230,${(flash * 0.18).toFixed(3)})`; ctx.fillRect(0, Math.max(0, skyTop), vw, street - Math.max(0, skyTop)); flash -= dt * 3; }
+        const hh = (CITY_ROW - TOP_ROW) * TS, cw = 2400;
+        if (!cityCache) {
+            cityCache = off(cw, hh);
+            const x = cityCache.x;
+            for (const b of skyline) {
+                const bx = b.x, h = Math.min(hh - 20, 24 + b.h * 0.55), by = hh - h;
+                x.fillStyle = '#10141a';
+                x.beginPath();
+                x.moveTo(bx, hh); x.lineTo(bx, by + (b.broken ? 12 : 0)); x.lineTo(bx + b.w * 0.4, by);
+                x.lineTo(bx + b.w * 0.6, by + (b.broken ? 18 : 0)); x.lineTo(bx + b.w, by + 4); x.lineTo(bx + b.w, hh); x.fill();
+                // a dead window here and there
+                x.fillStyle = 'rgba(143,161,182,0.08)';
+                for (let k = 0; k < 4; k++) if (hash(b.x | 0, k) > 0.6) x.fillRect(bx + 6 + hash(k, b.x | 0) * (b.w - 14), by + 14 + k * 14, 4, 5);
+            }
+            // the shaft's headframe over the hatch, in the middle
+            const hx = cw / 2 - W * TS / 2 + HOME_X * TS + TS / 2;
+            x.strokeStyle = '#1c222b'; x.lineWidth = 4;
+            x.beginPath(); x.moveTo(hx - 22, hh); x.lineTo(hx - 4, hh - 70); x.moveTo(hx + 22, hh); x.lineTo(hx + 4, hh - 70); x.stroke();
+            x.beginPath(); x.arc(hx, hh - 72, 9, 0, Math.PI * 2); x.stroke();
+            x.fillStyle = '#161b22'; x.fillRect(0, hh - 5, cw, 5);
         }
-        // the hatch
-        ctx.fillStyle = '#0d1014';
-        ctx.fillRect(r.originX + HOME_X * TS + 4, groundY - TS - 2, TS - 8, TS - 2);
-        // the store and the workshop: two signs
-        ctx.font = '600 11px "Bebas Neue", "Arial Narrow", sans-serif';
-        ctx.fillStyle = '#8fa1b6';
-        ctx.fillText('STORE', bx + 4, top + 4 * TS - 12);
-        ctx.fillText('WORKSHOP', bx + bw - 52, top + 4 * TS - 12);
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(cityCache.c, r.originX + W * TS / 2 - cw / 2, street - hh, cw, hh);
+        ctx.globalAlpha = 1;
+        // rain
+        ctx.strokeStyle = 'rgba(150,170,190,0.14)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const top = Math.max(0, skyTop), span = Math.max(1, street - top);
+        for (let i = 0; i < 50; i++) {
+            const rx = (hash(i, 1) * vw + t * 60 * (1 + hash(i, 2))) % vw;
+            const ry = top + (hash(i, 3) * span + t * 500 * (0.7 + hash(i, 4))) % span;
+            ctx.moveTo(rx, ry); ctx.lineTo(rx - 3, ry + 10);
+        }
+        ctx.stroke();
+    }
+
+    /** The base under the ground: rock and the shaft, the six chambers, the rooms. Cached; redrawn when it changes. */
+    function baseImage(s) {
+        const dark = s.dark.length, emptied = s.ended ? Math.floor(Math.min(1, r.ending / 2.4) * SLEEPERS) : 0;
+        const shop = !s.tut || !s.tut.on || s.tut.rows.length > 0;
+        const lab = false;
+        const key = `${dark}|${s.dreaming}|${shop}|${lab}|${emptied}`;
+        const hh = -CITY_ROW * TS;
+        if (baseCache && key === baseKey) return baseCache;
+        baseKey = key;
+        baseCache = baseCache || off(W * TS, hh);
+        const x = baseCache.x;
+        const Y = (row) => (row - CITY_ROW) * TS;        // a row's top in the cache
+        x.clearRect(0, 0, W * TS, hh);
+        // the rock between the city and the base, with faint strata
+        x.fillStyle = C.stone; x.fillRect(0, 0, W * TS, Y(CHAMBER_TOP));
+        x.strokeStyle = 'rgba(143,161,182,0.05)'; x.lineWidth = 1;
+        for (let k = 0; k < 9; k++) { x.beginPath(); x.moveTo(0, 8 + k * 14); for (let i = 0; i <= 12; i++) x.lineTo(i * 64, 8 + k * 14 + Math.sin(i * 1.7 + k) * 4); x.stroke(); }
+        // the hall: chambers above, rooms below
+        x.fillStyle = '#0e1217'; x.fillRect(0, Y(CHAMBER_TOP), W * TS, Y(0) - Y(CHAMBER_TOP));
+        x.fillStyle = C.steel3; x.fillRect(0, Y(CHAMBER_TOP) - 4, W * TS, 4); x.fillRect(0, Y(ROOM_TOP) - 3, W * TS, 6);
+        // the shaft: from the street down through the rock and the hall to the hatch
+        const sx = HOME_X * TS;
+        x.fillStyle = '#050608'; x.fillRect(sx + 3, 0, TS - 6, Y(0));
+        x.fillStyle = C.slate; x.fillRect(sx + 3, 0, 2, Y(0)); x.fillRect(sx + TS - 5, 0, 2, Y(0));
+        x.strokeStyle = 'rgba(143,161,182,0.35)'; x.beginPath(); x.moveTo(sx + TS / 2, 0); x.lineTo(sx + TS / 2, Y(-2)); x.stroke();
+        for (let row = CITY_ROW + 1; row < 0; row += 2) { x.fillStyle = 'rgba(242,226,184,0.35)'; x.fillRect(sx + 6, Y(row) + 4, 3, 3); }
+        // the life support: pipes along the hall's ceiling, from the generator out to the chambers
+        x.fillStyle = '#2b333d';
+        x.fillRect(0, Y(ROOM_TOP) + 6, W * TS, 5);
+        x.fillRect(0, Y(ROOM_TOP) + 14, 5.5 * TS, 3);
+        for (const [a] of CHAMBERS) x.fillRect(a * TS + 8, Y(ROOM_TOP) - 4, 3, 12);
+        // the six chambers, 36 windows each
+        const deadSet = new Set(s.dark);
+        CHAMBERS.forEach(([a, b], k) => {
+            const cx = a * TS + 4, cw = (b - a) * TS - 8, cy = Y(CHAMBER_TOP) + 6, chh = (ROOM_TOP - CHAMBER_TOP) * TS - 16;
+            x.fillStyle = C.steel; x.fillRect(cx, cy, cw, chh);
+            x.strokeStyle = 'rgba(143,161,182,0.25)'; x.strokeRect(cx + 0.5, cy + 0.5, cw - 1, chh - 1);
+            // its lamp
+            x.fillStyle = C.lamp; x.fillRect(cx + cw / 2 - 6, cy + 2, 12, 2);
+            const pitch = 13, gx = cx + (cw - 6 * pitch) / 2 + 2, gy = cy + 12;
+            for (let i = 0; i < PER_CHAMBER; i++) {
+                const pod = k * PER_CHAMBER + i + 1;
+                const wx = gx + (i % 6) * pitch, wy = gy + Math.floor(i / 6) * pitch;
+                let col = s.dreaming ? '#d33a4a' : C.cold;
+                if (deadSet.has(pod) || pod <= emptied) col = '#151a20';
+                x.fillStyle = col; x.fillRect(wx, wy, 9, 9);
+                if (col !== '#151a20') { x.fillStyle = 'rgba(255,255,255,0.25)'; x.fillRect(wx + 1, wy + 1, 3, 2); }
+            }
+            x.fillStyle = C.mist; x.font = '600 10px "Bebas Neue", "Arial Narrow", sans-serif'; x.textAlign = 'center';
+            x.fillText(`CHAMBER ${k + 1}`, cx + cw / 2, cy + chh - 5);
+            x.textAlign = 'left';
+        });
+        // the rooms
+        const top = Y(ROOM_TOP), floor = Y(0);
+        const room = (id, draw, lit = true) => {
+            const [a, b] = ROOMS[id];
+            const rx = a * TS, rw = (b - a + 1) * TS;
+            x.fillStyle = lit ? '#141a21' : '#0b0e12'; x.fillRect(rx + 2, top + 4, rw - 4, floor - top - 4);
+            if (lit) {
+                const lg = x.createRadialGradient(rx + rw / 2, top + 10, 2, rx + rw / 2, top + 10, rw * 0.7);
+                lg.addColorStop(0, 'rgba(242,226,184,0.22)'); lg.addColorStop(1, 'rgba(242,226,184,0)');
+                x.fillStyle = lg; x.fillRect(rx + 2, top + 4, rw - 4, floor - top - 4);
+                x.fillStyle = C.lamp; x.fillRect(rx + rw / 2 - 8, top + 6, 16, 3);
+            }
+            x.fillStyle = C.slate; x.fillRect(rx, top, 2, floor - top); x.fillRect(rx + rw - 2, top, 2, floor - top);
+            draw(rx, rw);
+            // a room that is not open yet has no name: it is a dark door until it matters
+            if (lit) dymo(x, ROOM_NAME[id], rx + rw / 2, top + 20, 12);
+        };
+        room('generator', (rx, rw) => {
+            // two tanks and the drum
+            x.fillStyle = '#2b333d'; x.fillRect(rx + 8, top + 34, 16, floor - top - 38); x.fillRect(rx + 28, top + 40, 14, floor - top - 44);
+            x.fillStyle = 'rgba(143,161,182,0.3)'; x.fillRect(rx + 10, top + 36, 3, floor - top - 42);
+            x.fillStyle = C.steel3; x.fillRect(rx + 50, top + 36, rw - 58, floor - top - 40);
+            x.fillStyle = '#0a0d11'; x.fillRect(rx + 58, top + 46, rw - 74, 18);
+        });
+        room('warehouse', (rx, rw) => {
+            for (let k = 0; k < 4; k++) { x.fillStyle = k % 2 ? '#3a4350' : '#2f3742'; x.fillRect(rx + 8 + k * 22, floor - 22 - (k === 1 ? 18 : 0), 20, 20); }
+            x.fillStyle = '#3a4350'; x.fillRect(rx + 8 + 22, floor - 40, 20, 18);
+            // the hopper the ore goes into
+            x.fillStyle = C.steel3; x.beginPath(); x.moveTo(rx + rw - 54, top + 36); x.lineTo(rx + rw - 10, top + 36); x.lineTo(rx + rw - 22, floor - 6); x.lineTo(rx + rw - 42, floor - 6); x.fill();
+            x.fillStyle = 'rgba(143,208,255,0.35)'; x.fillRect(rx + rw - 46, top + 40, 28, 3);
+        });
+        room('workshop', (rx, rw) => {
+            if (!shop) { x.fillStyle = '#10141a'; for (let k = 0; k < 8; k++) x.fillRect(rx + 4, top + 32 + k * 8, rw - 8, 5); return; }
+            // the tool wall, the crane arm, the plate the drone stands on
+            x.strokeStyle = C.slate; x.lineWidth = 3; x.beginPath(); x.moveTo(rx + 14, top + 10); x.lineTo(rx + 14, top + 40); x.lineTo(rx + 70, top + 40); x.lineTo(rx + 70, top + 52); x.stroke();
+            x.fillStyle = C.mist; for (let k = 0; k < 5; k++) x.fillRect(rx + rw - 60 + k * 10, top + 36 + (k % 2) * 4, 3, 14);
+            x.fillStyle = C.steel3; x.fillRect(rx + 6, floor - 5, 2 * TS, 5);
+            x.fillStyle = C.amber; x.fillRect(rx + 6, floor - 5, 2 * TS, 1.5);
+        }, shop);
+        room('lab', (rx, rw) => {
+            x.fillStyle = '#0d1116'; x.fillRect(rx + 10, top + 34, rw - 20, floor - top - 34);
+            x.strokeStyle = 'rgba(58,67,80,0.8)'; x.lineWidth = 1; x.strokeRect(rx + 10.5, top + 34.5, rw - 21, floor - top - 35);
+        }, lab);
+        // the floor, and the hatch in it
+        x.fillStyle = '#20262e'; x.fillRect(0, floor - 2, W * TS, 2);
+        x.fillStyle = '#050608'; x.fillRect(sx + 2, floor - 3, TS - 4, 3);
+        for (let k = 0; k < 4; k++) { x.fillStyle = k % 2 ? C.amber : '#0b0c0e'; x.fillRect(sx - 6 + k * 3, floor - 2, 3, 2); x.fillRect(sx + TS + k * 3 - 6, floor - 2, 3, 2); }
+        return baseCache;
+    }
+
+    function drawBase(s, groundY, t, view) {
+        const img = baseImage(s);
+        ctx.drawImage(img.c, r.originX, groundY + CITY_ROW * TS, W * TS, -CITY_ROW * TS);
+        // the generator hums: its window glows and breathes
+        const [ga, gb] = ROOMS.generator;
+        const gw = (gb - ga + 1) * TS, top = groundY + ROOM_TOP * TS;
+        const hum = 0.55 + 0.25 * Math.sin(t * 6) + 0.1 * Math.sin(t * 17);
+        ctx.fillStyle = `rgba(143,208,255,${(0.35 * hum).toFixed(3)})`;
+        ctx.fillRect(r.originX + ga * TS + 58, top + 46, gw - 74, 18);
+        // look here: the warehouse with cargo aboard, the workshop with something new
+        const home = s.y === -1, rx = s.x;
+        if (home && s.cargo.length && !(rx >= ROOMS.warehouse[0] && rx <= ROOMS.warehouse[1])) {
+            arrow(r.originX + roomSpot('warehouse') * TS - TS, top + 46 + 4 * Math.sin(t * 5), 1);
+        }
+        const fresh = s.tut && s.tut.on && s.tut.fresh;
+        if (fresh && !(home && rx >= ROOMS.workshop[0] && rx <= ROOMS.workshop[1])) {
+            arrow(r.originX + roomSpot('workshop') * TS + TS * 1.5, top + 46 + 4 * Math.sin(t * 5), 1);
+        }
+        void view;
     }
 
     function drawDrone(s, dx, dy, t) {

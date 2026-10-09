@@ -10,8 +10,9 @@
 
 import { playChapterCard } from '../chapterCard.js';
 import {
-    SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, rowText, GRAFTS, graftShown,
-    batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS,
+    SAVE_KEY, newState, deserialize, serialize, step, buy, buyGraft, priceOf, ROWS, ROW_NAME, rowText, GRAFTS, graftShown,
+    batteryCap, cargoCap, turnBackAt, isHome, sleepers, depthM, lineNow, BATTERY_CAP, SLEEPERS, maxLevel,
+    shows, rowShown, stopOpen, closeStop, inWorkshop, roomOf,
 } from './dig.js';
 import { depthOf, FINDS } from './world.js';
 import { createRenderer, RISE_S } from './render.js';
@@ -21,7 +22,10 @@ import { createDigSound } from './sound.js';
 const END = { roman: 'V', title: 'UNITY' };
 const COLUMN = 300;                   // the panel's column, px
 const KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', a: 'left', d: 'right', w: 'up', s: 'down', A: 'left', D: 'right', W: 'up', S: 'down' };
-const ROW_NAME = { drill: 'DRILL', battery: 'BATTERY', cargo: 'CARGO', lamp: 'LAMP', hull: 'HULL', radar: 'RADAR' };
+/** The CRT types this fast, ms a letter (as the vault's); the arrival waits this long after the last line. */
+const TYPE_MS = 40;
+const ARRIVE_HOLD_MS = 1400;
+const FRAME_MS = 1000 / 30;           // the picture at 30 fps at most: the owner's machine is slow
 
 let ac = null, raf = 0, saveTimer = 0, riseTimer = 0, root = null, style = null, sound = null, state = null;
 
@@ -68,9 +72,37 @@ const CSS = `
 .dig-away .dig-buy { opacity: .55; }
 #dig-rise { position: absolute; left: 50%; top: 22%; transform: translate(-50%, -50%); padding: 14px 34px; font: 600 30px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .3em; color: #ffe1e6; background: #7a1022; border: 0; border-radius: 6px; box-shadow: 0 0 40px rgba(200,20,45,.6); cursor: pointer; }
 #dig-rise[hidden] { display: none; }
+@keyframes dig-crt-in { from { opacity: 0; filter: brightness(2.2) blur(1px); } to { opacity: 1; filter: none; } }
+.dig-crt { position: relative; background: #030604; border-radius: 6px; padding: 10px 12px 8px; min-height: 64px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end;
+  box-shadow: inset 0 0 18px rgba(0,0,0,.9), 0 0 0 2px #07080a, 0 0 0 3px #3a4350; font: 14px/20px ui-monospace, 'SF Mono', Menlo, monospace; color: #8dff9e; text-shadow: 0 0 6px rgba(120,255,140,.45); overflow: hidden; margin-bottom: 10px; }
+.dig-crt.is-arriving { animation: dig-crt-in 1.4s ease-out both; }
+.dig-crt::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); border-radius: 6px; }
+.dig-crt .l { white-space: pre-wrap; word-break: break-word; opacity: .5; }
+.dig-crt .l.is-now { opacity: 1; }
+.dig-crt .l + .l { margin-top: 4px; }
+.dig-crt .l.is-voice { color: #ff8a9a; text-shadow: 0 0 6px rgba(255,120,140,.4); }
+.dig-crt .l.is-alarm, .dig-crt .l.is-turnback { color: #ff6b5a; text-shadow: 0 0 6px rgba(255,107,90,.4); }
+.dig-crt .l.is-find { color: #ffd678; text-shadow: 0 0 6px rgba(255,214,120,.4); }
+.dig-crt .cur { display: inline-block; width: 8px; height: 14px; background: currentColor; vertical-align: -1px; animation: dig-cur 1s steps(1) infinite; }
+@keyframes dig-cur { 50% { opacity: 0; } }
+.dig-card [data-show] { transition: opacity .6s ease; }
+.dig-card .is-new { animation: dig-new 1.6s ease-out; }
+@keyframes dig-new { 0% { background: rgba(255,214,120,.35); } 100% { background: transparent; } }
+.dig-focus { animation: dig-focus 1s ease-in-out infinite; border-radius: 4px; box-shadow: 0 0 0 2px #ffd678; }
+@keyframes dig-focus { 50% { box-shadow: 0 0 0 2px #ffd678, 0 0 16px rgba(255,214,120,.6); } }
+.dig-panel.is-bare { background: transparent; box-shadow: none; }
+.dig-shop h3 .dig-val { font-size: 16px; }
+.dig-buy.is-fresh { box-shadow: inset 0 0 0 2px #ffd678; }
+.dig-stop { position: absolute; left: calc(50% + ${COLUMN / 2}px); top: 18px; transform: translateX(-50%); z-index: 30; max-width: 440px; min-width: 280px; padding: 16px 20px 14px; border-radius: 10px; box-sizing: border-box;
+  background: rgba(7,8,10,.94); box-shadow: 0 0 0 1.5px #ffd678, 0 20px 60px rgba(0,0,0,.7), 0 0 30px rgba(255,214,120,.15);
+  font: 15px/22px ui-monospace, 'SF Mono', Menlo, monospace; color: #ffd678; text-shadow: 0 0 6px rgba(255,214,120,.35); display: flex; flex-direction: column; gap: 12px; }
+.dig-stop[hidden] { display: none; }
+.dig-stop .ok { align-self: flex-end; border: 0; border-radius: 6px; padding: 6px 20px; background: #ffd678; color: #07080a; font: 600 18px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .12em; cursor: pointer; }
+#dig-root.has-stop #dig-canvas { filter: brightness(.82); }
 #dig-help { position: absolute; right: 16px; bottom: 16px; font: 12px/1.4 system-ui; color: #5d6a78; text-align: right; pointer-events: none; }
 `;
 
+const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 
 function buildDom(host) {
@@ -78,25 +110,28 @@ function buildDom(host) {
     const canvas = el('canvas'); canvas.id = 'dig-canvas';
     const col = el('div', 'dig-col');
     const panel = el('div', 'dig-card dig-panel');
+    // pass 3: everything after the CRT is shown one at a time (data-show), as it comes to matter
     panel.innerHTML = `
-      <div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val" id="dig-power">100 %</span></div>
-      <div class="dig-bar" id="dig-power-track"><i id="dig-power-fill"></i><s id="dig-power-zone"></s><b id="dig-power-home"></b><em id="dig-power-home-label">HOME</em></div>
-      <div class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val" id="dig-cargo">0 / 8</span></div>
-      <div class="dig-row"><span class="dymo is-small">DEPTH</span><span class="dig-val" id="dig-depth">0 m</span></div>
-      <div class="dig-row"><span class="dymo is-small">COLONY</span><span class="dig-val" id="dig-colony">100 %</span></div>
-      <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div>
-      <div class="dig-row"><span class="dymo is-small">SLEEPERS</span><span class="dig-val" id="dig-sleepers">216</span></div>
-      <canvas class="dig-pods" id="dig-pods" width="240" height="26"></canvas>
-      <div class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val" id="dig-parts">0</span></div>
+      <div class="dig-crt" id="dig-crt"></div>
+      <div data-show="sleepers"><div class="dig-row"><span class="dymo is-small">SLEEPERS</span><span class="dig-val" id="dig-sleepers">216</span></div>
+      <canvas class="dig-pods" id="dig-pods" width="240" height="26"></canvas></div>
+      <div data-show="power" id="dig-power-box"><div class="dig-row"><span class="dymo is-small">POWER</span><span class="dig-val" id="dig-power">100 %</span></div>
+      <div class="dig-bar" id="dig-power-track"><i id="dig-power-fill"></i><s id="dig-power-zone"></s><b id="dig-power-home"></b><em id="dig-power-home-label">HOME</em></div></div>
+      <div data-show="cargo" class="dig-row" style="margin-top:12px"><span class="dymo is-small">CARGO</span><span class="dig-val" id="dig-cargo">0 / 8</span></div>
+      <div data-show="depth" class="dig-row"><span class="dymo is-small">DEPTH</span><span class="dig-val" id="dig-depth">0 m</span></div>
+      <div data-show="parts" class="dig-row"><span class="dymo is-small">PARTS</span><span class="dig-val" id="dig-parts">0</span></div>
+      <div data-show="gen"><div class="dig-row"><span class="dymo is-small">GENERATORS</span><span class="dig-val" id="dig-colony">100 %</span></div>
+      <div class="dig-bar"><i id="dig-colony-fill" style="background:#5fb4ff"></i></div></div>
       <div class="dig-row" id="dig-bio-row" hidden><span class="dymo is-small">BIOMASS</span><span class="dig-val" id="dig-bio">0</span></div>
-      <div class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>
-      <div class="dig-line" id="dig-line"></div>`;
+      <div data-show="finds" class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>`;
     const shop = el('div', 'dig-card dig-shop');
-    shop.innerHTML = `<h3><span class="dymo is-small">WORKSHOP</span><span class="dig-note" id="dig-shop-note"></span></h3><div id="dig-shop-rows"></div>`;
+    shop.innerHTML = `<h3><span class="dymo is-small">WORKSHOP</span><span class="dig-val" id="dig-shop-note"></span></h3><div id="dig-shop-rows"></div>`;
     col.append(panel, shop);
+    const stop = el('div', 'dig-stop'); stop.id = 'dig-stop'; stop.hidden = true;
+    stop.innerHTML = '<div class="txt" id="dig-stop-text"></div><button type="button" class="ok" id="dig-stop-ok">OK</button>';
     const rise = el('button', '', 'RISE'); rise.id = 'dig-rise'; rise.hidden = true; rise.type = 'button';
     const help = el('div', '', 'Arrows or WASD. Or hold the mouse beside the drone.'); help.id = 'dig-help';
-    root.append(canvas, col, rise, help);
+    root.append(canvas, col, rise, help, stop);
     host.appendChild(root);
     const $ = (id) => root.querySelector('#' + id);
     return {
@@ -105,7 +140,9 @@ function buildDom(host) {
         power: $('dig-power'), powerFill: $('dig-power-fill'), powerHome: $('dig-power-home'), powerHomeLabel: $('dig-power-home-label'),
         cargo: $('dig-cargo'), depth: $('dig-depth'), colony: $('dig-colony'), colonyFill: $('dig-colony-fill'),
         sleepers: $('dig-sleepers'), parts: $('dig-parts'), bio: $('dig-bio'), bioRow: $('dig-bio-row'), finds: $('dig-finds'),
-        line: $('dig-line'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop,
+        crt: $('dig-crt'), shopNote: $('dig-shop-note'), shopRows: $('dig-shop-rows'), shop, panel,
+        stop, stopText: $('dig-stop-text'), stopOk: $('dig-stop-ok'), powerBox: $('dig-power-box'),
+        showEls: [...panel.querySelectorAll('[data-show]')],
     };
 }
 
@@ -148,8 +185,16 @@ export function init() {
     const press = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); held.push(dir); if (dir in pressedAt) pressedAt[dir] = performance.now(); };
     const release = (dir) => { const i = held.indexOf(dir); if (i >= 0) held.splice(i, 1); };
     window.addEventListener('keydown', (e) => {
+        if (e.metaKey || e.ctrlKey) return;
         const d = KEYS[e.key];
-        if (!d || e.metaKey || e.ctrlKey) return;
+        // a stop: OK, Enter or Space, or a fresh press of a direction (doing what it asks); the arrival is typed: a key finishes it
+        if (stopOpen(s) && !e.repeat && (d || e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            if (s.tut.stop.crt) { crtSkip(); return; }
+            closeStop(s);
+            if (!d) return;
+        }
+        if (!d) return;
         e.preventDefault();
         press(d);
     }, { signal });
@@ -166,7 +211,8 @@ export function init() {
         const short = !isHome(s) && !s.ended && s.y > 2 && s.battery < turnBackAt(s) * 1.4 + 4;
         if (!short) path = null;
         else if (s.time - pathAt > 0.4) { pathAt = s.time; path = pathHome(s); }
-        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path };
+        const st = s.tut && s.tut.stop;
+        return { w: ui.canvas.clientWidth, h: ui.canvas.clientHeight, left: COLUMN, path, focus: st && !st.crt ? st.focus : null };
     };
     /** The hand: a direction, and with up a side (held, or pressed in the last 250 ms) to turn into. */
     function hand() {
@@ -200,21 +246,25 @@ export function init() {
     ui.shopRows.appendChild(graftBtn);
     let shopKey = '';
     function refreshShop(force = false) {
-        const home = isHome(s);
-        const key = `${home}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}`;
+        const here = inWorkshop(s) && !s.ended;
+        const fresh = s.tut && s.tut.on ? s.tut.fresh : null;
+        const key = `${here}|${s.parts}|${s.bio}|${JSON.stringify(s.levels)}|${s.grafts}|${graftShown(s)}|${s.tut?.rows.join()}|${fresh}`;
         if (!force && key === shopKey) return;
         shopKey = key;
-        ui.shop.classList.toggle('dig-away', !home);
-        ui.shopNote.textContent = home ? 'At the base.' : 'Buy at the base.';
+        // the workshop is a place: its card is up while the drone stands in it
+        ui.shop.hidden = !here;
+        ui.shopNote.textContent = `${s.parts} PARTS`;
         for (const r of ROWS) {
-            const b = rows[r], lv = s.levels[r], price = priceOf(s, r);
-            b.querySelector('.dig-dash').textContent = '■'.repeat(lv) + '□'.repeat(3 - lv);
+            const b = rows[r], lv = s.levels[r], price = priceOf(s, r), top = maxLevel(r);
+            b.hidden = !rowShown(s, r);
+            b.classList.toggle('is-fresh', fresh === r);
+            b.querySelector('.dig-dash').textContent = '■'.repeat(lv) + '□'.repeat(top - lv);
             b.querySelector('.dig-desc').textContent = rowText(r, lv);
             const pe = b.querySelector('.dig-price');
             if (price === null) { pe.textContent = 'DONE'; pe.className = 'dig-price is-short'; }
             else if (s.parts >= price) { pe.textContent = `${price} PARTS`; pe.className = 'dig-price'; }
             else { pe.textContent = `Need ${price - s.parts} more.`; pe.className = 'dig-price is-short'; }
-            b.disabled = !home || price === null || s.parts < price;
+            b.disabled = !here || price === null || s.parts < price;
             b.classList.toggle('is-ready', !b.disabled);
         }
         graftBtn.hidden = !graftShown(s);
@@ -225,28 +275,90 @@ export function init() {
         if (!g) { gp.textContent = 'DONE'; gp.className = 'dig-price is-short'; }
         else if (s.bio >= g.price) { gp.textContent = `${g.price} BIOMASS`; gp.className = 'dig-price'; }
         else { gp.textContent = `Need ${g.price - s.bio} more.`; gp.className = 'dig-price is-short'; }
-        graftBtn.disabled = !home || !g || s.bio < g.price;
+        graftBtn.disabled = !here || !g || s.bio < g.price;
         graftBtn.classList.toggle('is-ready', !graftBtn.disabled);
     }
 
-    // ---- the line, typed
-    let typed = { n: -1, text: '', shown: 0, kind: 'line' };
-    function typeLine(dt) {
-        const on = lineNow(s);
-        ui.line.classList.toggle('is-gone', !on);
-        if (s.line && s.line.n !== typed.n) typed = { n: s.line.n, text: s.line.text, shown: 0, kind: s.line.kind };
-        if (typed.shown < typed.text.length) {
-            typed.shown = Math.min(typed.text.length, typed.shown + dt * 40);
-            ui.line.textContent = typed.text.slice(0, Math.ceil(typed.shown));
-            ui.line.className = `dig-line is-${typed.kind}${on ? '' : ' is-gone'}`;
+    // ---- the CRT: the arrival typed (40 ms a letter), then the lines the rules say
+    const crt = { lines: [], n: -1 };
+    let crtAt = performance.now(), crtDoneAt = 0;
+    function crtSkip() {
+        if (!crtDoneAt) crtAt = -1e9;
+        else { crtDoneAt = -1e9; }
+    }
+    if (stopOpen(s) && s.tut.stop.crt) ui.crt.classList.add('is-arriving');
+    function stepCrt(nowMs) {
+        let html;
+        const st = s.tut && s.tut.stop;
+        if (st && st.crt) {
+            // the arrival: line after line, 40 ms a letter, a short pause between
+            let ms = nowMs - crtAt - 900, done = true;
+            const parts = [];
+            for (const l of st.text) {
+                const n = Math.max(0, Math.min(l.length, Math.floor(ms / TYPE_MS)));
+                if (n > 0 || !parts.length) parts.push(`<div class="l is-now">${esc(l.slice(0, n))}${n < l.length ? '<span class="cur"></span>' : ''}</div>`);
+                if (n < l.length) { done = false; break; }
+                ms -= l.length * TYPE_MS + 500;
+                if (ms < 0) { done = false; break; }
+            }
+            if (done && !crtDoneAt) crtDoneAt = nowMs;
+            if (done && nowMs - crtDoneAt > ARRIVE_HOLD_MS) {
+                closeStop(s);
+                crt.lines = st.text.map((text) => ({ text, kind: 'sys', shown: text.length, n: -1 }));
+            }
+            html = parts.join('');
+        } else {
+            const line = s.line;
+            if (line && line.n !== crt.n) {
+                crt.n = line.n;
+                if (line.text) {
+                    crt.lines.push({ text: line.text, kind: line.kind, shown: 0, n: line.n, at: nowMs });
+                    if (crt.lines.length > 4) crt.lines.splice(0, crt.lines.length - 4);
+                } else {
+                    // a line that stopped being true (turn back) goes
+                    const last = crt.lines[crt.lines.length - 1];
+                    if (last && last.kind === 'turnback') crt.lines.pop();
+                }
+            }
+            const on = lineNow(s);
+            html = crt.lines.map((l, k) => {
+                if (l.n >= 0 && l.shown < l.text.length) l.shown = Math.min(l.text.length, Math.floor((nowMs - l.at) / (TYPE_MS * 0.6)));
+                const now = k === crt.lines.length - 1 && on && on.n === l.n;
+                return `<div class="l is-${l.kind}${now ? ' is-now' : ''}">${esc(l.text.slice(0, l.shown))}${l.shown < l.text.length ? '<span class="cur"></span>' : ''}</div>`;
+            }).join('');
         }
+        if (ui.crt.__html !== html) { ui.crt.innerHTML = html; ui.crt.__html = html; }
+    }
+
+    // ---- the stop: the amber box (the arrival is on the CRT instead)
+    ui.stopOk.addEventListener('click', () => { closeStop(s); }, { signal });
+    let stopHtml = '';
+    function refreshStop() {
+        const st = s.tut && s.tut.stop;
+        const box = !!st && !st.crt;
+        ui.stop.hidden = !box;
+        ui.root.classList.toggle('has-stop', box);
+        const html = box ? st.text.map((l) => `<div>${esc(l)}</div>`).join('') : '';
+        if (html !== stopHtml) { stopHtml = html; ui.stopText.innerHTML = html; }
+        ui.powerBox.classList.toggle('dig-focus', box && st.focus === 'power');
     }
 
     // ---- the panel
     const last = {};
     const put = (k, node, text) => { if (last[k] !== text) { last[k] = text; node.textContent = text; } };
     const drainLog = [];
+    const shown = {};
     function refreshPanel() {
+        const arriving = stopOpen(s) && s.tut.stop.crt;
+        for (const e of ui.showEls) {
+            const w = e.dataset.show;
+            const on = w === 'sleepers' ? !arriving : shows(s, w);
+            if (on !== shown[w]) {
+                if (on && shown[w] === false) { e.classList.remove('is-new'); void e.offsetWidth; e.classList.add('is-new'); }
+                shown[w] = on;
+                e.hidden = !on;
+            }
+        }
         const cap = batteryCap(s);
         const pct = Math.max(0, Math.round(100 * s.battery / cap));
         const homePct = Math.min(100, 100 * turnBackAt(s) / cap);
@@ -324,12 +436,14 @@ export function init() {
     }, { signal });
 
     // ---- the loop
-    let prev = performance.now();
+    let prev = performance.now(), drawnAt = -1e9, wasInShop = false;
     function frame(now) {
         raf = requestAnimationFrame(frame);
         let dt = Math.min(0.1, (now - prev) / 1000);
         prev = now;
         if (window.__rpiPaused || document.hidden) dt = 0;
+        // a stop: the world stands still (the rules see it too); the picture keeps breathing
+        if (stopOpen(s)) dt = 0;
         if (dt > 0) {
             const input = s.ended ? {} : hand();
             // small steps, so a slow frame does not skip a tile
@@ -354,10 +468,21 @@ export function init() {
             if (riseShownAt && !s.risen && s.time - riseShownAt > 9.5) ui.rise.hidden = false;
             if (!ui.rise.hidden) ui.rise.style.left = `${rnd.r.originX + rnd.worldWidth / 2}px`;
         }
-        typeLine(dt);
+        // the new row is seen once the drone has been in the workshop and left
+        const inShop = roomOf(s) === 'workshop';
+        if (wasInShop && !inShop && s.tut && s.tut.fresh) s.tut.fresh = null;
+        wasInShop = inShop;
+        stepCrt(now);
+        refreshStop();
         refreshPanel();
         refreshShop();
-        rnd.draw(s, dt, view());
+        // the picture: 30 fps at most, 10 while a stop holds the world
+        const every = stopOpen(s) ? 100 : FRAME_MS;
+        if (now - drawnAt >= every) {
+            const since = Math.min(0.2, (now - drawnAt) / 1000);
+            drawnAt = now;
+            rnd.draw(s, since, view());
+        }
     }
     raf = requestAnimationFrame(frame);
     saveTimer = setInterval(save, 5000);

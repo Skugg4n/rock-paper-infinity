@@ -1,7 +1,18 @@
 /* eslint-env jest */
 import { makeWorld, W, H, T, depthOf, HARD_BAND, BASALT_BAND, SINEW_BAND } from './world.js';
-import { newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X } from './dig.js';
-import { decide } from './autopilot.js';
+import {
+    newState, step, buy, buyGraft, gateOf, digTime, serialize, deserialize, preparedState, sleepers, PRICES, POD_EVERY, HOME_X,
+    closeStop, stopOpen, shows, rowShown, STOPS, INTRO, ROW_GAP, LINES,
+} from './dig.js';
+import { decide, readStop } from './autopilot.js';
+import { roomSpot, roomAt, chamberOf, chamberOver } from './base.js';
+
+/** A fresh game past its first stops. */
+function started() {
+    const s = newState(7);
+    while (stopOpen(s)) closeStop(s);
+    return s;
+}
 import { chosenDeep, nextDeep, deepModule } from '../deepVersion.js';
 
 describe('the world', () => {
@@ -43,9 +54,12 @@ describe('the rules', () => {
         const s = newState(7);
         const mem = {};
         let t = 0;
-        while (s.delivered === 0 && t < 60) { step(s, 0.05, { decide: (st) => decide(st, mem).dir }); s.events.length = 0; t += 0.05; }
+        while (s.delivered === 0 && t < 90) {
+            if (stopOpen(s)) { t += readStop(s); continue; }
+            step(s, 0.05, { decide: (st) => decide(st, mem).dir }); s.events.length = 0; t += 0.05;
+        }
         expect(s.delivered).toBeGreaterThan(0);
-        expect(t).toBeLessThan(30);                  // first ore home within 30 s
+        expect(t).toBeLessThan(60);                  // first ore home within a minute, stops read
     });
     test('the first recoveries cost only the cargo', () => {
         const s = preparedState({ row: 10 });
@@ -55,12 +69,18 @@ describe('the rules', () => {
         expect(s.cargo).toEqual([]);
         expect(s.reserve).toBe(50);
     });
-    test('the colony does not drink before the first purchase', () => {
-        const s = newState(7);
+    test('the colony does not drink before the first purchase, and its gauge comes when it does', () => {
+        const s = started();
         for (let i = 0; i < 200; i++) step(s, 0.05, {});
         expect(s.reserve).toBe(100);
-        s.parts = 100; buy(s, 'drill');
+        s.tut.rows.push('battery');
+        s.x = roomSpot('workshop');
+        s.parts = 100; expect(buy(s, 'battery')).toBe(true);
         for (let i = 0; i < 200; i++) step(s, 0.05, {});
+        expect(s.reserve).toBe(100);
+        expect(shows(s, 'gen')).toBe(false);
+        for (let i = 0; i < 1200; i++) step(s, 0.05, {});
+        expect(shows(s, 'gen')).toBe(true);
         expect(s.reserve).toBeLessThan(100);
     });
     test('an empty battery, later on: recovered home, cargo gone, a tenth of the reserve lost', () => {
@@ -125,18 +145,23 @@ describe('the rules', () => {
         expect(s.line.text).toBe('');
     });
     test('the colony at 0 %: a pod goes dark every three seconds', () => {
-        const s = newState(7);
+        const s = started();
         s.reserve = 0;
         for (let i = 0; i < Math.round(POD_EVERY * 2 / 0.05) + 1; i++) step(s, 0.05, {});
         expect(sleepers(s)).toBe(214);
         expect(s.line.text).toMatch(/^Pod \d+ went dark\.$/);
     });
-    test('the workshop: only at the base, only with the parts; a graft makes the sleepers dream', () => {
-        const s = newState(7);
+    test('the workshop: only in its room, only rows it shows, only with the parts; a graft makes the sleepers dream', () => {
+        const s = started();
         s.parts = PRICES[0];
         s.y = 3;
         expect(buy(s, 'drill')).toBe(false);
-        s.y = -1;
+        s.y = -1; s.x = roomSpot('workshop');
+        expect(buy(s, 'drill')).toBe(false);          // not shown yet
+        s.tut.rows.push('drill');
+        s.x = HOME_X;
+        expect(buy(s, 'drill')).toBe(false);          // not in the room
+        s.x = roomSpot('workshop');
         expect(buy(s, 'drill')).toBe(true);
         expect(s.levels.drill).toBe(1);
         expect(s.parts).toBe(0);
@@ -174,3 +199,112 @@ describe('which chapter IV', () => {
         expect(deepModule('colony')).toBe('./phase4/index.js');
     });
 });
+
+describe('pass 3: one thing at a time', () => {
+    test('the arrival is typed, then one stop: dig; the game stands still while a stop is open', () => {
+        const s = newState(7);
+        expect(s.tut.stop.id).toBe('arrive');
+        expect(STOPS.arrive).toEqual([INTRO, '216 SLEEPERS.']);
+        step(s, 1, { dir: 'down' });
+        expect(s.time).toBe(0);
+        expect(s.y).toBe(-1);
+        closeStop(s);
+        expect(s.tut.stop.text).toEqual(['The generators burn ore. Dig.']);
+        expect(SHOWS_AT_START(s)).toEqual([]);
+        closeStop(s);
+        expect(stopOpen(s)).toBe(false);
+    });
+    test('at the start only down goes; the first tile dug shows POWER, with its stop', () => {
+        const s = started();
+        for (let i = 0; i < 10; i++) step(s, 0.05, { dir: 'left' });
+        expect(s.x).toBe(HOME_X);
+        for (let i = 0; i < 20 && !stopOpen(s); i++) step(s, 0.05, { dir: 'down' });
+        expect(s.y).toBe(0);
+        expect(shows(s, 'power')).toBe(true);
+        expect(s.tut.stop.text).toEqual(['Power. It takes you down and brings you home.']);
+    });
+    test('CARGO at the first ore, DEPTH at 20 m, PARTS and the workshop (one row: BATTERY) at the first delivery', () => {
+        const s = started();
+        expect(shows(s, 'cargo') || shows(s, 'depth') || shows(s, 'parts')).toBe(false);
+        s.tut.dug = true; s.tut.show.power = true; s.tut.done.power = true;
+        s.tiles[0 * W + HOME_X] = T.ROCK;
+        for (let i = 0; i < 20 && !s.cargo.length; i++) step(s, 0.05, { dir: 'down' });
+        expect(shows(s, 'cargo')).toBe(true);
+        expect(shows(s, 'depth')).toBe(false);
+        for (let i = 0; i < 80 && s.y < 3; i++) step(s, 0.05, { dir: 'down' });
+        expect(shows(s, 'depth')).toBe(true);
+        // home through the hatch, to the warehouse
+        for (let i = 0; i < 80 && s.y > -1; i++) step(s, 0.05, { dir: 'up' });
+        expect(s.y).toBe(-1);
+        for (let i = 0; i < 20; i++) step(s, 0.05, {});
+        expect(s.cargo.length).toBe(1);                       // not unloaded at the hatch
+        expect(s.line.text).toBe(LINES.unload);
+        for (let i = 0; i < 40 && roomAt(s.x) !== 'warehouse'; i++) step(s, 0.05, { dir: 'left' });
+        for (let i = 0; i < 20; i++) step(s, 0.05, {});
+        expect(s.cargo.length).toBe(0);
+        expect(shows(s, 'parts')).toBe(true);
+        expect(s.tut.rows).toEqual(['battery']);
+        expect(rowShown(s, 'drill')).toBe(false);
+    });
+    test('a new row comes with a need, one a dive, at least ROW_GAP apart', () => {
+        const s = started();
+        s.tut.rows = ['battery']; s.tut.revealDive = 0; s.tut.revealAt = 0;
+        s.tut.needs = ['steering', 'drill'];
+        const dive = () => { s.y = 3; step(s, 0.05, {}); s.y = -1; s.x = HOME_X; step(s, 0.05, {}); };
+        step(s, 0.05, {});
+        s.time = ROW_GAP + 1; dive();
+        expect(s.tut.rows).toEqual(['battery', 'steering']);
+        dive();
+        expect(s.tut.rows).toEqual(['battery', 'steering']);   // too soon
+        s.time += ROW_GAP; dive();
+        expect(s.tut.rows).toEqual(['battery', 'steering', 'drill']);
+        expect(s.line.text).toBe('New in the workshop: DRILL.');
+    });
+    test('hard rock asks for the DRILL row; a full cargo three times for CARGO', () => {
+        const s = preparedState({ row: 58 });
+        s.tut.rows = ['battery']; s.y = 58; s.x = HOME_X;
+        step(s, 0.05, { dir: 'down' });
+        expect(s.tut.needs).toContain('drill');
+    });
+    test('steering I is coarse: one press goes two steps; STEERING II one', () => {
+        const s = preparedState({ row: 10 });
+        s.levels.steering = 0;
+        s.y = 10;
+        for (let x = 0; x < W; x++) s.tiles[10 * W + x] = T.AIR;
+        for (let x = 0; x < W; x++) s.tiles[11 * W + x] = T.STONE;
+        step(s, 0.05, { dir: 'right' });
+        for (let i = 0; i < 20; i++) step(s, 0.05, {});
+        expect(s.x).toBe(HOME_X + 2);
+        s.levels.steering = 1;
+        step(s, 0.05, { dir: 'right' });
+        for (let i = 0; i < 20; i++) step(s, 0.05, {});
+        expect(s.x).toBe(HOME_X + 3);
+    });
+    test('the base: down from a room drives to the hatch; up into the base only through the hatch', () => {
+        const s = preparedState({ row: 5 });
+        s.y = -1; s.x = roomSpot('workshop') + 2;
+        for (let i = 0; i < 60 && s.y < 1; i++) step(s, 0.05, { dir: 'down' });
+        expect(s.x).toBe(HOME_X);
+        expect(s.y).toBeGreaterThanOrEqual(0);
+        const t = preparedState({ row: 5 });
+        t.y = 0; t.x = HOME_X + 1; t.tiles[HOME_X + 1] = T.AIR;
+        for (let i = 0; i < 10; i++) step(t, 0.05, { dir: 'up' });
+        expect(t.y).toBe(0);
+        expect(t.line.text).toMatch(/^Up only through open ground/);
+    });
+    test('the chambers: 36 sleepers each, six of them', () => {
+        expect(chamberOf(1)).toBe(0);
+        expect(chamberOf(216)).toBe(5);
+        expect(chamberOver(HOME_X)).toBe(-1);
+        expect(chamberOver(2)).toBe(0);
+    });
+    test('an old save without the guide gets one: everything shown, no stop', () => {
+        const s = preparedState({ row: 70, levels: { drill: 2 } });
+        const o = JSON.parse(serialize(s)); delete o.tut;
+        const back = deserialize(JSON.stringify(o));
+        expect(stopOpen(back)).toBe(false);
+        expect(shows(back, 'power')).toBe(true);
+        expect(rowShown(back, 'drill')).toBe(true);
+    });
+});
+const SHOWS_AT_START = (s) => Object.keys(s.tut.show).filter((k) => s.tut.show[k]);

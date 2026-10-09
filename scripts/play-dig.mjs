@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const SHOTS = path.join(ROOT, 'docs/playtests/dig-shots');
+const PASS3 = process.argv.includes('--pass3');
+const SHOTS = path.join(ROOT, PASS3 ? 'docs/playtests/dig-pass3' : 'docs/playtests/dig-shots');
 const PORT = 8127;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -59,7 +60,7 @@ try {
     const shot = async (name) => {
         const out = await send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(path.join(SHOTS, `${name}.png`), Buffer.from(out.result.data, 'base64'));
-        const st = await ev(`(() => { const s = window.rpiDig?.state; if (!s) return null; return { depth: document.getElementById('dig-depth')?.textContent, power: document.getElementById('dig-power')?.textContent, cargo: document.getElementById('dig-cargo')?.textContent, parts: s.parts, line: document.getElementById('dig-line')?.textContent, levels: s.levels, home: s.y === -1, ended: s.ended }; })()`);
+        const st = await ev(`(() => { const s = window.rpiDig?.state; if (!s) return null; const vis = [...document.querySelectorAll('[data-show]')].filter((e) => !e.hidden).map((e) => e.dataset.show); return { x: s.x, y: s.y, depth: document.getElementById('dig-depth')?.textContent, power: document.getElementById('dig-power')?.textContent, cargo: s.cargo.length, parts: s.parts, crt: document.getElementById('dig-crt')?.textContent.slice(-90), stop: s.tut?.stop?.id || null, shown: vis.join(','), rows: s.tut?.rows.join(','), shop: !document.querySelector('.dig-shop').hidden, ended: s.ended }; })()`);
         console.log(`[${name}]`, JSON.stringify(st));
     };
     await send('Runtime.enable'); await send('Page.enable');
@@ -92,7 +93,61 @@ try {
             await sleep(40);
         }
     }
-    if (!process.argv.includes('--long')) {
+    const key = async (k) => { await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); await sleep(60); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: VK[k] || 13 }); };
+    const st = (expr) => ev(`(() => { const s = window.rpiDig.state; return ${expr}; })()`);
+    if (PASS3) {
+        // pass 3, step by step as a new player: the arrival, the first stop, the first dive, home, the warehouse, the workshop
+        await jump('iv-dig-start');
+        await sleep(600);
+        await shot('p3-01-crt-fades-in');
+        await sleep(4000);
+        await shot('p3-02-typing');
+        for (let i = 0; i < 30 && (await st('s.tut.stop && s.tut.stop.id')) === 'arrive'; i++) await sleep(500);
+        await sleep(400);
+        await shot('p3-03-stop-dig');
+        await hold('ArrowLeft', 400);
+        console.log('left at the start moves?', await st('s.x'));
+        await key('ArrowDown');
+        await hold('ArrowDown', 700);
+        await sleep(300);
+        await shot('p3-04-stop-power');
+        await key('ArrowDown');
+        // dig down a little, look for ore sideways
+        await hold('ArrowDown', 2500);
+        await shot('p3-05-first-dive');
+        for (let k = 0; k < 6 && !(await st('s.cargo.length')); k++) { await hold(k % 2 ? 'ArrowLeft' : 'ArrowRight', 500); await hold('ArrowDown', 500); }
+        await shot('p3-06-ore');
+        // home: the autopilot's way
+        await ev(`import('/src/phase4d/autopilot.js').then((m) => { window.__pilot = m; return true; })`);
+        for (let i = 0; i < 200 && !(await st('s.y === -1')); i++) {
+            const d = await st('(window.__pilot.wayHome(s) || {}).dir');
+            if (!d) break;
+            await hold({ left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }[d], 120);
+        }
+        await sleep(800);
+        await shot('p3-07-home-with-cargo');
+        await hold('ArrowLeft', 500);
+        await sleep(1500);
+        await shot('p3-08-warehouse');
+        await hold('ArrowRight', 900);
+        await sleep(600);
+        await shot('p3-09-workshop');
+        const b = await ev(`(() => { const e = [...document.querySelectorAll('.dig-buy')].find((x) => !x.disabled && !x.hidden); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 10 }; })()`);
+        if (b) { await click(b.x, b.y); await sleep(400); }
+        await shot('p3-10-bought');
+        await hold('ArrowDown', 1500);
+        await shot('p3-11-down-again');
+        for (const [cp, name] of [['iv-dig-war', 'p3-12-war'], ['iv-dig-machine', 'p3-13-machine']]) {
+            await jump(cp);
+            await hold('ArrowDown', 1200);
+            await shot(name);
+        }
+        const t0 = await ev('performance.now()');
+        await sleep(2000);
+        const fps = await ev(`new Promise((r) => { let n = 0; const t = performance.now(); const f = () => { n++; if (performance.now() - t < 1000) requestAnimationFrame(f); else r(n); }; requestAnimationFrame(f); })`);
+        console.log('rAF per second', fps, t0 > 0);
+    }
+    if (!process.argv.includes('--long') && !PASS3) {
     // 1. the start: dig down, mine sideways, come home, buy
     await jump('iv-dig-start');
     await shot('01-start');

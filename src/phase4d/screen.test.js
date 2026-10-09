@@ -2,12 +2,12 @@
 // The dig's screen, run in jsdom with a do-nothing canvas: every frame of the act draws without an
 // error (the start, a dive with the way home shown, the heart's beats, the ending and the rise).
 import { JSDOM } from 'jsdom';
-import { preparedState, serialize, SAVE_KEY, HOME_X } from './dig.js';
+import { preparedState, newState, serialize, SAVE_KEY, HOME_X } from './dig.js';
 
 function noopCtx() {
     const grad = { addColorStop() {} };
     return new Proxy({}, {
-        get: (o, k) => (k in o ? o[k] : (k === 'createRadialGradient' || k === 'createLinearGradient') ? () => grad : () => {}),
+        get: (o, k) => (k in o ? o[k] : (k === 'createRadialGradient' || k === 'createLinearGradient') ? () => grad : k === 'measureText' ? () => ({ width: 10 }) : () => {}),
         set: (o, k, v) => { o[k] = v; return true; },
     });
 }
@@ -34,6 +34,21 @@ async function run(n, t0) {
     for (let i = 0; i < n; i++) { const f = frames.shift(); if (!f) break; t += 50; f(t); }
     return t;
 }
+
+test('a new game shows only the CRT; the gauges wait their turn', async () => {
+    localStorage.setItem(SAVE_KEY, serialize(newState(7)));
+    const m = await import('./index.js');
+    m.init();
+    try {
+        await run(10, performance.now());
+        const shown = [...document.querySelectorAll('[data-show]')].filter((e) => !e.hidden).map((e) => e.dataset.show);
+        expect(shown).toEqual([]);
+        expect(document.querySelector('.dig-shop').hidden).toBe(true);
+        expect(window.rpiDig.state.tut.stop.id).toBe('arrive');
+    } finally {
+        m.teardown();
+    }
+});
 
 test('the act draws from the start to the rise without an error', async () => {
     const s = preparedState({ row: 30, levels: { drill: 1 } });

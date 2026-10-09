@@ -8,8 +8,13 @@
 import { W, H, T } from './world.js';
 import {
     tileAt, isOre, gateOf, digTime, homeCost, isHome, batteryCap, cargoCap, lampRadius, radarRange,
-    priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST,
+    priceFor, buy, buyGraft, GRAFTS, graftShown, MOVE_TIME, UP_TIME, UP_COST, MOVE_COST, rowShown, maxLevel, ROWS, roomOf,
+    stopOpen, closeStop, STOPS,
 } from './dig.js';
+import { HOME_X, roomSpot } from './base.js';
+
+/** Into the base only through the hatch. */
+const passUp = (x, ny) => ny !== -1 || x === HOME_X;
 
 const DIRS = [['down', 0, 1], ['left', -1, 0], ['right', 1, 0], ['up', 0, -1]];
 
@@ -25,7 +30,7 @@ export function wayHome(s) {
         if (y === -1) { end = [x, y]; break; }
         for (const [, dx, dy] of DIRS) {
             const nx = x + dx, ny = y + dy;
-            if (tileAt(s, nx, ny) !== T.AIR) continue;
+            if (tileAt(s, nx, ny) !== T.AIR || !passUp(nx, ny)) continue;
             const k = key(nx, ny);
             if (prev.has(k)) continue;
             prev.set(k, [x, y, dx, dy]);
@@ -58,7 +63,7 @@ export function pathHome(s) {
         if (y === -1) { end = [x, y]; break; }
         for (const [, dx, dy] of DIRS) {
             const nx = x + dx, ny = y + dy;
-            if (tileAt(s, nx, ny) !== T.AIR) continue;
+            if (tileAt(s, nx, ny) !== T.AIR || !passUp(nx, ny)) continue;
             const k = key(nx, ny);
             if (prev.has(k)) continue;
             prev.set(k, [x, y]);
@@ -82,7 +87,7 @@ function wanted(s, x, y, t) {
     if (t === T.GHOST) return lit && !onRadar;        // the radar shows it is not there
     if (!isOre(t)) return false;
     // with nothing left to buy, parts are only worth it for the colony
-    const maxed = ['drill', 'battery', 'cargo', 'lamp', 'hull', 'radar'].every((r) => s.levels[r] >= 3);
+    const maxed = ROWS.every((r) => s.levels[r] >= maxLevel(r));
     if (maxed && t !== T.BIO && s.reserve > 50) return false;
     return lit || onRadar;
 }
@@ -147,15 +152,31 @@ function blocker(s) {
     return null;
 }
 
-const USEFUL = ['drill', 'cargo', 'battery', 'radar', 'lamp', 'hull'];
+const USEFUL = ['steering', 'drill', 'cargo', 'battery', 'radar', 'lamp', 'hull'];
 
 /** At home: buy what the gate asked for, then the cheapest useful thing, while there is money. */
 /** The next gate below the record, as the row to buy, when it is near: a player reads the workshop. */
 const GATES = [[300, 'drill', 2], [500, 'hull', 1], [700, 'drill', 3], [900, 'hull', 2], [1200, 'hull', 3]];
 function nextGate(s) {
     const best = (s.record + 1) * 5;
-    for (const [m, row, lv] of GATES) if (s.levels[row] < lv && best >= m - 120) return row;
+    for (const [m, row, lv] of GATES) if (rowShown(s, row) && s.levels[row] < lv && best >= m - 120) return row;
     return null;
+}
+
+/** Would the player walk to the workshop now: something there they can pay. */
+function wantsToShop(s, mem) {
+    // what shop() would buy, tried on a copy
+    const c = { ...s, x: roomSpot('workshop'), y: -1, levels: { ...s.levels }, tut: s.tut && { ...s.tut, rows: [...s.tut.rows] }, events: [], sayAt: { ...s.sayAt } };
+    return shop(c, { ...mem }).length > 0;
+}
+
+/** A player reads a stop: the arrival is typed (40 ms a letter), the others take a moment. Seconds. */
+export function readStop(s) {
+    if (!stopOpen(s)) return 0;
+    const st = s.tut.stop;
+    const secs = st.crt ? STOPS.arrive.join(' ').length * 0.04 + 1.5 : 2.5;
+    closeStop(s);
+    return secs;
 }
 
 export function shop(s, mem) {
@@ -163,12 +184,12 @@ export function shop(s, mem) {
     if (!mem.need) mem.need = nextGate(s);
     for (let guard = 0; guard < 12; guard++) {
         if (graftShown(s) && GRAFTS[s.grafts] && s.bio >= GRAFTS[s.grafts].price && buyGraft(s)) { bought.push('graft'); continue; }
-        const want = mem.need && mem.need !== 'graft' ? mem.need : null;
-        if (want && s.levels[want] < 3) {
+        const want = mem.need && mem.need !== 'graft' && rowShown(s, mem.need) ? mem.need : null;
+        if (want && s.levels[want] < maxLevel(want)) {
             if (s.parts >= priceFor(want, s.levels[want])) { buy(s, want); bought.push(want); mem.need = null; continue; }
             // save for it, but buy cheap things that do not delay it much
         }
-        const cands = USEFUL.filter((r) => s.levels[r] < 3 && (r !== 'hull' || mem.need === 'hull'))
+        const cands = USEFUL.filter((r) => rowShown(s, r) && s.levels[r] < maxLevel(r) && (r !== 'hull' || mem.need === 'hull'))
             .map((r) => ({ r, p: priceFor(r, s.levels[r]) }))
             .filter((c) => c.p <= s.parts && (!want || s.parts - c.p >= priceFor(want, s.levels[want]) * 0.5 || c.p <= 30))
             .sort((a, b) => a.p - b.p || USEFUL.indexOf(a.r) - USEFUL.indexOf(b.r));
@@ -189,10 +210,16 @@ export function decide(s, mem) {
     if (s.ended) return { dir: null };
     if (isHome(s)) {
         mem.going = null; mem.target = null;
-        if (s.cargo.length) return { dir: null };
-        shop(s, mem);
+        const toward = (x) => (s.x < x ? 'right' : s.x > x ? 'left' : null);
+        // the cargo to the warehouse
+        if (s.cargo.length) return { dir: roomOf(s) === 'warehouse' ? null : toward(roomSpot('warehouse')) };
+        // something to buy: to the workshop
+        if (wantsToShop(s, mem)) {
+            if (roomOf(s) !== 'workshop') return { dir: toward(roomSpot('workshop')) };
+            shop(s, mem);
+        }
         if (s.battery < batteryCap(s) * 0.97) return { dir: null };
-        // walk to the shaft or dig a new one under the base
+        // down: the drone drives to the hatch
         return { dir: 'down' };
     }
     const home = wayHome(s);
@@ -205,7 +232,7 @@ export function decide(s, mem) {
     let tgt = null;
     if (mem.target && tileAt(s, mem.target.x, mem.target.y) > 0) tgt = nearestWanted(s, 30, mem.target);
     // saving for a gate it cannot pay yet: it explores sideways for ore, as a player would
-    const saving = mem.need && mem.need !== 'graft' && s.levels[mem.need] < 3 && s.parts < priceFor(mem.need, s.levels[mem.need]);
+    const saving = mem.need && mem.need !== 'graft' && s.levels[mem.need] < maxLevel(mem.need) && s.parts < priceFor(mem.need, s.levels[mem.need]);
     s.__explore = saving;
     if (!tgt) { tgt = nearestWanted(s, saving ? 60 : 30); s.__explore = false; mem.target = tgt && tgt.cost < (saving ? 90 : 6) ? { x: tgt.x, y: tgt.y } : null; }
     if (tgt && tgt.cost < (saving ? 90 : 6)) return { dir: tgt.dir };
@@ -222,6 +249,9 @@ export function decide(s, mem) {
     const need = blocker(s);
     if (need) {
         mem.need = need;
+        // a player presses into it once and reads why not (that is what puts its row in the workshop)
+        mem.tried = mem.tried || {};
+        if (need !== 'graft' && !rowShown(s, need) && !mem.tried[need]) { mem.tried[need] = true; return { dir: 'down' }; }
         // the gate is a whole band: home, buy it
         if (need === 'graft' || /DRILL|HULL/.test(g)) {
             if (tgt) return { dir: tgt.dir };

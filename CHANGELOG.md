@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (deep-dig) v1.92.0 (chapter IV, the dig, pass 3: one thing at a time, a base underground)
+
+From Ola's notes (docs/superpowers/specs/2026-10-09-deep-dig-pass3.md). Built in three steps.
+
+**Step 1 (A + B): the start and the base.**
+- **Nothing, then one thing at a time.** The act is dark from the start. The vault's CRT fades in and types (40 ms a letter) "As the humans wait, frozen in cryogenic sleep, and the earth crumbles above, you must keep the humans alive, the generators humming, the time flowing." then "216 SLEEPERS." Only SLEEPERS is in the panel. A key finishes the typing.
+- **Stops** (the vault's amber box; the game stands still): "The generators burn ore. Dig." with an amber arrow under the drone; only down goes. The first tile dug brings POWER with "Power. It takes you down and brings you home." OK, Enter, Space or a fresh press of a direction closes a stop.
+- **The panel grows as things matter:** CARGO at the first ore, DEPTH at 20 m, PARTS at the first delivery, GENERATORS (the old COLONY reserve, renamed: the generators burn the ore) when it starts to fall, 60 s after the first purchase; FINDS from the third find.
+- **The workshop is a place.** It opens after the first delivery ("The workshop is open.") with one row, BATTERY. Each new row comes with a need, at most one a dive and 45 s apart, the next time the drone is home ("New in the workshop: DRILL."): STEERING after the first delivery, DRILL when hard rock stops the drone, HULL when the pressure does, LAMP after a recovery, CARGO after a full cargo three times, RADAR after two dives without ore. Its card is up only while the drone stands in it, with the wallet (PARTS) on it; a new row has an amber edge and the room an amber arrow until the drone has been there.
+- **Steering I is coarse:** a sideways press underground goes two steps. STEERING (15 parts): "Less twitchy. One step per press."
+- **The base under the ground.** The ruined city faint in the storm on top, a shaft down through the rock, six cryo chambers (36 windows each, 216 in all), life support pipes, a generator that hums, lamps. The rooms are on the drone's own row: GENERATOR, WAREHOUSE (the cargo is unloaded here only: "Drive into the WAREHOUSE to unload." the first time, an amber arrow while carrying), WORKSHOP (dark and unnamed until it opens), LAB (dark until later). The drone goes down and comes up only through the hatch; pressing down in a room drives it to the hatch.
+- **The slow machine:** the base, the city and the ground (16-row chunks) are drawn once into offscreen canvases and redrawn only when they change; the picture is drawn at 30 fps at most, 10 while a stop holds the world.
+
 ## v1.90.1 - 2026-10-09 (interim polish, the enemy's island is empty after they leave)
 
 Before Ola's playtest of the interim. No rule changed (`sim-phase3.mjs 1` prints the same line).
