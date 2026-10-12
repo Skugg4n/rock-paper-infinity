@@ -12,12 +12,15 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 24px 16px 64px;
+    padding: 24px 16px 64px;   /* the bottom clears the fixed footer */
     overflow-y: auto;
     user-select: none;
     scrollbar-width: none;
 }
 .start-screen::-webkit-scrollbar { display: none; }
+/* centred when it fits, top-anchored and scrollable when it does not (auto margins, where `safe` is missing) */
+.start-screen > :first-child { margin-top: auto; }
+.start-screen > .start-acts { margin-bottom: auto; }
 /* the shell's menu and version line stay out of the way while the screen is up */
 body.start-up #menu-wrapper, body.start-up #version-info { display: none !important; }
 
@@ -64,11 +67,20 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
     100% { transform: scale(10.6); }  /* the ring and the hands */
 }
 .start-cycle:hover .start-disc { animation: start-eaten 450ms 2.05s forwards; }
+@keyframes start-swallow-small {
+    0%   { transform: scale(1); }
+    23%  { transform: scale(2.4); }
+    38%  { transform: scale(2.4); }
+    54%  { transform: scale(3.4); }
+    69%  { transform: scale(4.6); }
+    100% { transform: scale(8.6); }   /* 189 px over a 180 px cycle: all of it, nothing more */
+}
 @keyframes start-eaten { to { background: transparent; box-shadow: none; color: #f8fafc; } }
 
 /* the title, a letter at a time */
-.start-title { margin: 0 0 56px; font-size: clamp(56px, 11vw, 132px); line-height: 0.9; text-align: center; min-height: 0.9em; }
-.start-letter { display: inline-block; white-space: pre; opacity: 0; animation: start-letter 180ms ease-out forwards; }
+.start-title { margin: 0 0 56px; font-size: clamp(44px, 11vw, 132px); line-height: 0.9; text-align: center; min-height: 0.9em; }
+.start-word-wrap { display: inline-block; white-space: nowrap; }
+.start-letter { display: inline-block; opacity: 0; animation: start-letter 180ms ease-out forwards; }
 @keyframes start-letter { from { opacity: 0; transform: translateY(0.12em); } to { opacity: 1; transform: none; } }
 
 /* CONTINUE or START, the line under it, New game */
@@ -89,6 +101,7 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
 /* the question before erasing or starting an act again */
 .start-confirm { margin-top: 14px; display: flex; align-items: center; gap: 14px; font-size: 12px; letter-spacing: 0.08em; color: #0f172a; }
 .start-confirm[hidden] { display: none; }
+.start-confirm-row { display: block; margin: 0 0 10px; cursor: default; }
 .start-confirm button { background: #0f172a; color: #fff; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
 .start-confirm [data-confirm="no"] { background: transparent; color: #64748b; }
 .start-confirm [data-confirm="no"]:hover { color: #0f172a; }
@@ -124,11 +137,13 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
     .start-hand-scissors { translate: 55px 32px; }
     .start-hand-paper { translate: -55px 32px; }
     .start-title { margin-bottom: 40px; }
+    .start-cycle:hover .start-hole { animation-name: start-swallow-small; }
     .start-foot { padding: 0 16px 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .start-ring, .start-hand { animation: none; }
-    .start-cycle:hover .start-hole { animation: none; transform: scale(2.4); }
+    .start-cycle:hover .start-hole { animation: none; transform: none; }
+    .start-hole { transition: none; }
     .start-cycle:hover .start-disc { animation: none; }
     .start-letter { animation: none; opacity: 1; }
 }

@@ -149,12 +149,16 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
 
     // the title, a letter at a time
     const h1 = root.querySelector('.start-title');
+    // one nowrap wrapper per word so a narrow screen never breaks a word; the space between is plain text
+    let wrap = null;
     [...WORDS.title].forEach((ch, i) => {
+        if (ch === ' ') { h1.appendChild(document.createTextNode(' ')); wrap = null; return; }
+        if (!wrap) { wrap = document.createElement('span'); wrap.className = 'start-word-wrap'; h1.appendChild(wrap); }
         const el = document.createElement('span');
         el.className = 'start-letter';
         el.textContent = ch;
         el.style.animationDelay = `${TYPE_START_MS + i * TYPE_MS}ms`;
-        h1.appendChild(el);
+        wrap.appendChild(el);
     });
 
     // the words
@@ -193,16 +197,38 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
     const confirm = root.querySelector('.start-confirm');
     const confirmText = confirm.querySelector('.start-confirm-text');
     const confirmYes = confirm.querySelector('[data-confirm="yes"]');
+    const confirmNo = confirm.querySelector('[data-confirm="no"]');
     let onYes = null;
+    let opener = null;
+    let confirmRow = null;   // the li that holds the question when it sits inside the list
     const ask = (after, text, yesWord, yes) => {
         confirmText.textContent = text;
         confirmYes.textContent = yesWord;
         onYes = yes;
-        after.insertAdjacentElement('afterend', confirm);
+        opener = after;
+        if (after.tagName === 'LI') {
+            if (!confirmRow) {
+                confirmRow = document.createElement('li');
+                confirmRow.className = 'start-confirm-row';
+                confirmRow.setAttribute('role', 'presentation');
+            }
+            confirmRow.appendChild(confirm);
+            after.insertAdjacentElement('afterend', confirmRow);
+        } else {
+            after.insertAdjacentElement('afterend', confirm);
+            confirmRow?.remove();
+        }
         confirm.hidden = false;
-        confirmYes.focus();
+        confirmNo.focus();   // the safe answer
     };
-    const closeAsk = () => { confirm.hidden = true; onYes = null; };
+    const closeAsk = () => {
+        const wasOpen = !confirm.hidden;
+        confirm.hidden = true;
+        onYes = null;
+        if (confirmRow?.isConnected) { root.querySelector('.start-acts').insertAdjacentElement('beforebegin', confirm); confirmRow.remove(); }
+        if (wasOpen && opener?.isConnected) opener.focus({ preventScroll: true });
+        opener = null;
+    };
 
     root.addEventListener('click', (e) => {
         const t = e.target.closest('[data-start], [data-confirm], [data-pref], .start-acts li');
@@ -228,8 +254,9 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
     });
     const onKey = (e) => {
         if (e.key === 'Escape') { closeAsk(); return; }
-        if (e.key !== 'Enter' || e.repeat) return;
         const el = document.activeElement;
+        if (e.key === ' ' && el?.matches?.('.start-acts li') && root.contains(el)) { e.preventDefault(); if (!e.repeat) el.click(); return; }
+        if (e.key !== 'Enter' || e.repeat) return;
         if (el && root.contains(el) && el !== document.body && el.tagName === 'BUTTON' && el !== primary) return;   // a focused button answers itself
         if (el && el.matches?.('.start-acts li')) { el.click(); return; }
         if (!confirm.hidden) return;

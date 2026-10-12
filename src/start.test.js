@@ -145,4 +145,59 @@ describe('the screen', () => {
         expect(await s.choice).toEqual({ kind: 'continue' });
         s.lift();
     });
+    test('the title: three nowrap words, 17 letters, PAPER starts at 650ms', () => {
+        const s = showStart();
+        expect(document.querySelectorAll('.start-title .start-word-wrap').length).toBe(3);
+        expect(document.querySelectorAll('.start-title .start-letter').length).toBe(17);
+        expect(document.querySelectorAll('.start-title .start-word-wrap')[1].querySelector('.start-letter').style.animationDelay).toBe('650ms');
+        s.lift();
+    });
+
+    test('Escape closes the question and focus returns to New game', () => {
+        localStorage.setItem('rpi-phase', 'INDUSTRY'); localStorage.setItem('rpi-reached', '["trivial"]');
+        const s = showStart();
+        const newBtn = document.querySelector('[data-start="new"]');
+        newBtn.focus();
+        newBtn.click();
+        expect(document.activeElement.dataset.confirm).toBe('no');
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(document.querySelector('.start-confirm').hidden).toBe(true);
+        expect(document.activeElement).toBe(newBtn);
+        s.lift();
+    });
+
+    test('after lift() Enter resolves nothing', async () => {
+        const s = showStart();
+        s.lift();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        const sentinel = Symbol('pending');
+        expect(await Promise.race([s.choice, Promise.resolve(sentinel)])).toBe(sentinel);
+    });
+
+    test('a reached act with no game starts at once, no question', async () => {
+        localStorage.setItem('rpi-reached', '["trivial","capital"]');
+        const s = showStart();
+        document.querySelector('.start-acts li[data-id="capital"]').click();
+        expect(await s.choice).toEqual({ kind: 'act', id: 'capital' });
+        expect(document.querySelector('.start-confirm').hidden).toBe(true);
+        s.lift();
+    });
+
+    test('the act question sits in an li inside the list, gone after Keep; Space opens a row', () => {
+        localStorage.setItem('rpi-phase', 'INDUSTRY'); localStorage.setItem('rpi-reached', '["trivial","capital"]');
+        const s = showStart();
+        const row = document.querySelector('.start-acts li[data-id="capital"]');
+        row.focus();
+        const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+        document.dispatchEvent(space);
+        expect(space.defaultPrevented).toBe(true);
+        const wrapper = document.querySelector('.start-acts > li.start-confirm-row');
+        expect(wrapper).not.toBeNull();
+        expect(wrapper.previousElementSibling).toBe(row);
+        expect(wrapper.querySelector('.start-confirm').hidden).toBe(false);
+        wrapper.querySelector('[data-confirm="no"]').click();
+        expect(document.querySelector('.start-confirm-row')).toBeNull();
+        expect(document.querySelector('.start-confirm').hidden).toBe(true);
+        s.lift();
+    });
 });
