@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.93.0 - 2026-10-12 (the start screen)
+
+Ola: "a start screen, start or continue, the feeling of rock paper scissors with a hint that it goes deeper." Spec docs/superpowers/specs/2026-10-12-start-screen-design.md, look docs/mockups/start-screen-3.html.
+- **The screen** (src/start.js, style-start.css), every time the page opens: rock, scissors and paper turning slowly round a small black hole (it grows under the pointer), ROCK PAPER INFINITY typed out a letter at a time, CONTINUE with where the game is (`IV · Deep, the drone`), NEW GAME, and the acts reached as a list. A new player sees START and nothing else. Sound · on / Music · on bottom left, "A game by Ola Belin" and the version bottom right. Enter is the big word. The first click unlocks the browser's audio, so the first chapter card sounds.
+- **The acts reached** (src/reached.js, `rpi-reached`): a set, never a maximum, kept through New game and every checkpoint; the chapter cards mark I, II, III, V, VI, the interim marks drone or vault; an older game's saves are read once. Only reached acts are listed; both chapter IVs appear as soon as one is, the one not chosen grey. VI Infinity appears grey once the VI card has played.
+- **An act again:** a click asks (`Starting III · War again replaces your game.` Play again / Keep), then the act's checkpoint and its chapter card. New game asks too (`Your game will be erased.` Start over / Keep).
+- ☰ → **Main menu** (where Reset everything was; New game lives on the start screen now) reloads with the screen in front. The test menu, the snapshot slots and the headless scripts reload straight into the game (`rpi-go`), and `?go` in the URL skips the screen.
+- **Where the game stands counts as reached**, with the acts on the way to it (`markReachedThrough`), so a checkpoint jump (which plays no chapter card) still lists the act in the start screen.
+- The bootstrap takes both session flags (`rpi-go`, `rpi-card`) at once, so none lingers to the next reload.
 ## v1.92.8 - 2026-10-10 (chapter IV, the dig: the heart in the dark)
 
 Ola, with a reference picture: "fix the vessels and the fat, more depth, less neon. Deep red/brown. Hidden in darkness, visible only in the light of the drone's lamp." src/phase4d/heart3d.js redone.

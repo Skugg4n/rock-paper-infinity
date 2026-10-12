@@ -57,14 +57,17 @@ The on-screen ★/s is MEASURED (EMA), never a formula.
 rock-paper-infinity/
 ├── index.html              # Single-page shell: both phase containers + shared elements
 ├── stage-2.html            # Redirect → index.html (backwards compat)
-├── main.js                 # Bootstrap: loads icons, detects phase, calls setPhase()
+├── main.js                 # Bootstrap: loads icons, shows the start screen, acts on the choice (Continue, New game, an act again)
 ├── style.css               # Shared styles + Phase 1 styles
 ├── style-stage2.css        # Phase 2 styles (scoped with #phase-city for conflicts)
+├── style-start.css         # The start screen (built from JS on document.body, removed with lift())
 ├── roman.js                # Roman numeral utility (ES module)
 ├── jest.config.js          # Jest config: native ESM, no transform
 ├── src/
 │   ├── constants.js        # Centralized magic numbers + localStorage keys (incl. PHASE_KEY)
 │   ├── version.js          # VERSION constant
+│   ├── reached.js          # The acts reached, ever (rpi-reached): marked by the chapter cards and the interim, read by the start screen
+│   ├── start.js            # The start screen: the model (tested) and the screen built on body; main.js shows it first
 │   ├── gamePhase.js        # Phase state machine: show/hide containers, persist to localStorage
 │   ├── icons.js            # SVG icon preloading and caching (Phase 1 only)
 │   ├── audio.js            # Sound: synthesised words (click, pling, thunk…) and the machine (chapter I's music); prefs in rpi-audio

@@ -3532,14 +3532,14 @@ items:
     resolved_in: v1.91.0
     notes: "v1.91.0: #interim scrolls (scrollbar hidden), the text centres with margin auto and the screen follows the newest line (style-interim.css, src/interim.js). Checked headless at 1280 x 600."
   - id: B456
-    date: 2026-10-12
-    source: Ola (chat)
-    status: open
-    title: "Start screen: title, the cycle with the hole, Continue, New game, the reached acts, sound/music, credit"
-    details: >
-      A start screen every time the page opens. ROCK PAPER INFINITY, rock/scissors/paper turning round
-      a small black hole, CONTINUE (where the game is), NEW GAME, the acts reached as a list (I Trivial,
+    added: 2026-10-12
+    source: "Ola (chat)"
+    request: |
+      A start screen every time the page opens: ROCK PAPER INFINITY, rock/scissors/paper turning round a
+      small black hole, CONTINUE (where the game is), NEW GAME, the acts reached as a list (I Trivial,
       II Capital, III War, IV Deep Drone, IV Deep Vault, V Unity, VI Infinity); the chapter IV not chosen
-      in the interim is grey, no explanation; one save, a separate rpi-reached set.
-      Sound/Music toggles and "A game by Ola Belin". Spec docs/superpowers/specs/2026-10-12-start-screen-design.md,
-      look docs/mockups/start-screen-3.html.
+      in the interim is grey, no explanation; one save, a separate rpi-reached set. Sound/Music toggles and
+      "A game by Ola Belin". A new player sees START only.
+    status: done
+    resolved_in: v1.93.0
+    notes: "Spec docs/superpowers/specs/2026-10-12-start-screen-design.md, look docs/mockups/start-screen-3.html (?new for the new player). src/start.js, src/reached.js, style-start.css."

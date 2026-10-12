@@ -60,7 +60,7 @@ A bombastic chapter card plays at each transition. See [vision.md](vision.md) fo
 rock-paper-infinity/
 ├── index.html                # Single-page shell: both phase containers + shared elements
 ├── stage-2.html              # Redirect → index.html (backwards compat)
-├── main.js                   # Bootstrap: loads icons, detects phase, calls setPhase()
+├── main.js                   # Bootstrap: loads icons, shows the start screen, acts on the choice (Continue, New game, an act again)
 ├── style.css                 # Shared styles + Phase 1 styles
 ├── style-stage2.css          # Phase 2 styles (scoped with #phase-city for conflicts)
 ├── roman.js                  # Roman numeral utility (ES module)
