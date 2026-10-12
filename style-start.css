@@ -94,6 +94,7 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
     transform: scaleX(0.35); transform-origin: center; transition: transform 300ms;
 }
 .start-word:hover::after, .start-word:focus-visible::after { transform: scaleX(1); }
+.start-word:focus-visible { outline: none; }   /* the widening underline is the focus; no box round the word */
 .start-where { margin-top: 10px; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: #64748b; min-height: 1em; }
 .start-new { margin-top: 44px; background: transparent; border: 0; cursor: pointer; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #94a3b8; }
 .start-new:hover, .start-new:focus-visible { color: #0f172a; }

@@ -269,7 +269,8 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
 
     document.body.appendChild(root);
     document.body.classList.add(BODY_CLASS);
-    primary.focus({ preventScroll: true });
+    // no focus on open: Chrome draws a focus ring round a programmatically focused button, a tight box
+    // round START (Ola). Enter reaches the primary word through the document listener anyway.
 
     function lift() {
         document.removeEventListener('keydown', onKey);

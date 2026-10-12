@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.93.1 - 2026-10-12 (the start screen: no box round START)
+
+- Ola: "remove the box round the start button, too tight round the text." The screen no longer focuses the big word on open (Chrome drew a focus ring round it), and a keyboard focus shows as the widening underline instead of an outline.
+
 ## v1.93.0 - 2026-10-12 (the start screen)
 
 Ola: "a start screen, start or continue, the feeling of rock paper scissors with a hint that it goes deeper." Spec docs/superpowers/specs/2026-10-12-start-screen-design.md, look docs/mockups/start-screen-3.html.
