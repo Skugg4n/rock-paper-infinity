@@ -12,7 +12,39 @@
   /* the cycle: rock beats scissors beats paper beats rock, turning slowly around a hole */
   h1 { margin:0 0 56px; min-height:1em; }
   .cycle { position:relative; width:220px; height:220px; margin-bottom:30px; }
-  .ring { position:absolute; inset:0; animation:turn 48s linear infinite; }
+  .ring { position:absolute; inset:0; animation:turn 48s linear infinite; z-index:3; }
+  @keyframes turn { to { transform:rotate(360deg); } }
+  .hand { position:absolute; width:72px; height:72px; left:50%; top:50%; margin:-36px; animation:unturn 48s linear infinite; z-index:3; }
+  .disc { width:100%; height:100%; border-radius:50%; background:#f8fafc; box-shadow:0 8px 20px rgba(15,23,42,.16);
+          display:flex; align-items:center; justify-content:center; color:#334155; transition:background .35s, box-shadow .35s, color .35s; }
+  .disc svg { width:32px; height:32px; stroke-width:1.4; }
+  .h1 { translate:0 -80px; }
+  .h2 { translate:69px 40px; }
+  .h3 { translate:-69px 40px; }
+  @keyframes unturn { to { transform:rotate(-360deg); } }
+  .arrows { position:absolute; inset:22px; border-radius:50%; border:1px dashed rgba(15,23,42,.18); }
+  /* the halos round the hole, each its own thing so the black can eat them one at a time */
+  .halo { position:absolute; left:50%; top:50%; border-radius:50%; }
+  .halo-dark { width:66px; height:66px; margin:-33px; background:rgba(0,0,0,.06); }
+  .halo-light { width:90px; height:90px; margin:-45px; background:rgba(0,0,0,.03); }
+  /* the hole: behind the hands. On hover it grows, rests, then eats the dark halo, the light halo,
+     the dashed ring and at last the hands, which turn to ghosts in the black: the abyss. */
+  .hole { position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px; border-radius:50%; background:#000;
+          box-shadow:inset 0 0 8px #000; z-index:2; transition:transform .5s ease; }
+  .cycle:hover .hole { animation:swallow 2.6s cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes swallow {
+    0%   { transform:scale(1); }
+    23%  { transform:scale(2.4); }   /* 0.6 s: as before */
+    38%  { transform:scale(2.4); }   /* a rest */
+    54%  { transform:scale(3.4); }   /* the dark halo goes */
+    69%  { transform:scale(4.6); }   /* the light halo goes */
+    100% { transform:scale(10.6); }  /* the ring and the hands */
+  }
+  .cycle:hover .disc { animation:eaten .45s 2.05s forwards; }
+  @keyframes eaten { to { background:transparent; box-shadow:none; color:#f8fafc; } }
+  h1 { margin:0 0 56px; min-height:1em; }
+  .cycle { position:relative; width:220px; height:220px; margin-bottom:30px; }
+  .ring { position:absolute; inset:0; animation:turn 48s linear infinite; z-index:3; }
   @keyframes turn { to { transform:rotate(360deg); } }
   .hand { position:absolute; width:72px; height:72px; border-radius:50%; background:#f8fafc; box-shadow:0 8px 20px rgba(15,23,42,.16);
           display:flex; align-items:center; justify-content:center; left:50%; top:50%; margin:-36px; animation:unturn 48s linear infinite; }
@@ -60,12 +92,14 @@
 <body>
   <div class="cycle">
     <div class="arrows"></div>
-    <div class="ring">
-      <div class="hand h1"><i data-lucide="gem"></i></div>
-      <div class="hand h2"><i data-lucide="scissors"></i></div>
-      <div class="hand h3"><i data-lucide="file-text"></i></div>
-    </div>
+    <div class="halo halo-light"></div>
+    <div class="halo halo-dark"></div>
     <div class="hole"></div>
+    <div class="ring">
+      <div class="hand h1"><div class="disc"><i data-lucide="gem"></i></div></div>
+      <div class="hand h2"><div class="disc"><i data-lucide="scissors"></i></div></div>
+      <div class="hand h3"><div class="disc"><i data-lucide="file-text"></i></div></div>
+    </div>
   </div>
   <h1 class="bebas">ROCK PAPER INFINITY</h1>
   <div class="continue-wrap"><button class="continue bebas">CONTINUE</button>
