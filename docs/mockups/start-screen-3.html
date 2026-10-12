@@ -36,15 +36,16 @@
   .continue::after { content:''; position:absolute; left:12px; right:12px; bottom:0; height:2px; background:#0f172a; transform:scaleX(.35); transform-origin:center; transition:transform .3s; }
   .continue:hover::after { transform:scaleX(1); }
   .where { margin-top:10px; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#64748b; }
-  .acts { list-style:none; margin:44px 0 0; padding:0; display:flex; flex-direction:column; align-items:center; gap:10px; }
-  .acts li { display:flex; align-items:baseline; gap:14px; cursor:pointer; color:#0f172a; position:relative; }
-  .acts .n { width:34px; text-align:right; font-size:22px; opacity:.55; }
+  /* one left-aligned block, centred on the page: the numerals in a right-aligned column, the names after */
+  .acts { list-style:none; margin:44px auto 0; padding:0; display:table; }
+  .acts li { display:flex; align-items:baseline; gap:14px; cursor:pointer; color:#0f172a; position:relative; margin-bottom:10px; }
+  .acts .n { flex:0 0 40px; text-align:right; font-size:22px; opacity:.55; }
   .acts .t { font-size:22px; letter-spacing:.08em; }
   .acts li:hover .t { text-decoration:underline; text-underline-offset:4px; }
   .acts li.now .n { opacity:1; }
   .acts li.grey { color:#94a3b8; cursor:default; }
   .acts li.grey:hover .t { text-decoration:none; }
-  .acts .why { font-family:-apple-system,system-ui,sans-serif; font-size:10px; letter-spacing:.14em; text-transform:uppercase; margin-left:10px; opacity:0; transition:opacity .2s; }
+  .acts .why { position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:16px; white-space:nowrap; font-family:-apple-system,system-ui,sans-serif; font-size:10px; letter-spacing:.14em; text-transform:uppercase; opacity:0; transition:opacity .2s; }
   .acts li.grey:hover .why { opacity:1; }
   .newgame { margin-top:18px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#94a3b8; cursor:pointer; }
   .newgame:hover { color:#0f172a; }
