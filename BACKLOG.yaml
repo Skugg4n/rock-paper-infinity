@@ -3558,4 +3558,18 @@ items:
       Chapter I: the blue button that fills up (the quantum foam collapse button, top right) should
       sit where the other buttons are, in the upgrade tray above the Bank.
     status: open
+  - id: B459
+    added: 2026-10-12
+    source: "Ola (chat, playing the dig live)"
+    request: |
+      Dig / drone: once STEERING is bought (hover, one tile per tap) the drone can no longer fall at all.
+      Holding the down key without digging for three tiles should start a fall.
+    status: open
+  - id: B460
+    added: 2026-10-12
+    source: "Ola (chat)"
+    request: |
+      Players must get important updates: find a way to make the browser pick up a new deploy, or let
+      the game reload itself at a safe moment (one player today, but updates must reach them).
+    status: open
 
