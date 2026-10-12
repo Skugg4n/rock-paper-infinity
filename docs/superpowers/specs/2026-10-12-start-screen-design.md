@@ -62,7 +62,7 @@ Existing checkpoints: `i-start`, `ii-start`, `iii-start`, `iv-dig-start`. New, i
 - `style-start.css` — the look, scoped under `.start-screen`. Chapter I's palette (slate 100 / slate 900), Bebas Neue for the title, the word CONTINUE and the numerals.
 - `main.js` — `bootstrap()`: icons, then `showStart`, then what the player chose. The screen is skipped with `?go` in the URL, which the headless play scripts and the ☰ "Jump to" reload with, so nothing that drives the game by URL breaks.
 - `src/chapterCard.js` — one line: mark by roman. `src/interim.js` `writeChoice` — one line.
-- `index.html` — ☰ menu gets **Start screen** above Reset everything (reloads the page). `style-start.css` linked. Version bumped.
+- `index.html` — the ☰ menu's **Reset everything** becomes **Main menu** (reloads the page, the start screen in front; New game lives there now). The old reset button stays in the DOM hidden, because chapters I and II bind to it. `style-start.css` linked. Version bumped.
 - `src/modules.js` — the new module in the list the cache-mix check reads.
 
 ## Not in this

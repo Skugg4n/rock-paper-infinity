@@ -940,7 +940,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Files:**
 - Modify: `main.js` (imports; the audio menu paint, lines 57-63; `bootstrap()`, lines 201-224)
 - Modify: `src/checkpoints.js` (`clearAll` exported as `clearGame`; `jumpTo` and `restore` set the skip flag)
-- Modify: `index.html:686` (the ☰ item)
+- Modify: `index.html:686` (the ☰ item: Main menu replaces Reset everything)
 - Test: `src/checkpoints.test.js` (create; small)
 
 **Interfaces:**
@@ -1020,11 +1020,14 @@ Add `START_SKIP_FLAG` to the import from `./constants.js`, and in both `restore(
     try { sessionStorage.setItem(START_SKIP_FLAG, '1'); } catch { /* ignore */ }   // straight into the game after the reload, no start screen
 ```
 
-- [ ] **Step 4: `index.html`:** before the `reset-btn` line (686) add:
+- [ ] **Step 4: `index.html`:** New game lives on the start screen now, so the ☰ menu's "Reset everything" becomes **Main menu** (Ola, 2026-10-12). The old button must STAY in the DOM, hidden, because chapters I and II bind to it without a null check (`src/phase1/index.js:278`, `src/phase2/index.js:1068`) and the debug items insert before it. Replace line 686 with these two lines:
 
 ```html
-                <button id="start-screen-btn" class="block px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap">Start screen</button>
+                <button id="main-menu-btn" class="block px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap">Main menu</button>
+                <button id="reset-btn" class="hidden px-4 py-2 text-sm hover:bg-slate-100 whitespace-nowrap">Reset everything</button>
 ```
+
+(`.hidden` is `display: none !important` in style.css, so the reset button is never shown or clicked; its handlers stay harmless.)
 
 - [ ] **Step 5: `main.js`:** the imports. Change the constants import to:
 
@@ -1058,8 +1061,8 @@ for (const [id, pref] of AUDIO_ITEMS) {
 }
 paintAudioMenu();
 window.addEventListener('rpi-audio-change', paintAudioMenu);
-// ☰ → Start screen: the page again, with the screen in front
-document.getElementById('start-screen-btn')?.addEventListener('click', () => window.location.reload());
+// ☰ → Main menu: the page again, with the start screen in front (New game lives there now)
+document.getElementById('main-menu-btn')?.addEventListener('click', () => window.location.reload());
 ```
 
 - [ ] **Step 7: `main.js`:** the bootstrap. Replace `async function bootstrap() { ... }` (lines 201-224) with:
@@ -1120,7 +1123,7 @@ Expected: green. (`main.js` is ignored by ESLint; read your edit twice instead.)
 - [ ] **Step 9: Open it.** From the worktree: `python3 -m http.server 8132 --bind 127.0.0.1` in the background, then in the browser pane `http://127.0.0.1:8132/`. Check, as a human:
   1. A clean browser profile (or `localStorage.clear()` in the console, reload): the cycle turns, the title types out, **START**, no list. Click START: the `I · TRIVIAL` card, chapter I, the ☰ menu back.
   2. Reload: **CONTINUE** with `I · Trivial`, **New game**, the list `I Trivial`. Enter continues.
-  3. In the ☰ menu turn the debug menu on (five clicks on the version label), Jump to `IV vault · arrival`: no start screen after the reload (the flag). Then ☰ → Start screen: the list shows `I Trivial`, `II Capital`, `III War`, `IV Deep · Drone` (grey), `IV Deep · Vault` (now), Continue says `IV · Deep, the vault`.
+  3. In the ☰ menu turn the debug menu on (five clicks on the version label), Jump to `IV vault · arrival`: no start screen after the reload (the flag). Then ☰ → Main menu (where Reset everything was): the list shows `I Trivial`, `II Capital`, `III War`, `IV Deep · Drone` (grey), `IV Deep · Vault` (now), Continue says `IV · Deep, the vault`.
   4. Click `II Capital`: the question `Starting II · Capital again replaces your game.`, **Play again** → the `II · CAPITAL` card, the city. Keep → nothing.
   5. New game → `Your game will be erased.` → Keep, then Start over → the card, chapter I; reload: the list still has the vault rows (the set survived).
   6. Sound · on → off on the start screen, continue, open ☰: `Sound · off` there too.
@@ -1134,7 +1137,7 @@ Expected: green. (`main.js` is ignored by ESLint; read your edit twice instead.)
 
 ```bash
 git add main.js src/checkpoints.js src/checkpoints.test.js index.html
-git commit -m "feat(start): the start screen in front of the game: Continue, New game, an act again from its start; checkpoints skip it; the menu's Start screen item
+git commit -m "feat(start): the start screen in front of the game: Continue, New game, an act again from its start; checkpoints skip it; Main menu in the ☰ menu where Reset everything was
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -1157,7 +1160,7 @@ Ola: "a start screen, start or continue, the feeling of rock paper scissors with
 - **The screen** (src/start.js, style-start.css), every time the page opens: rock, scissors and paper turning slowly round a small black hole (it grows under the pointer), ROCK PAPER INFINITY typed out a letter at a time, CONTINUE with where the game is (`IV · Deep, the drone`), NEW GAME, and the acts reached as a list. A new player sees START and nothing else. Sound · on / Music · on bottom left, "A game by Ola Belin" and the version bottom right. Enter is the big word. The first click unlocks the browser's audio, so the first chapter card sounds.
 - **The acts reached** (src/reached.js, `rpi-reached`): a set, never a maximum, kept through New game and every checkpoint; the chapter cards mark I, II, III, V, VI, the interim marks drone or vault; an older game's saves are read once. Only reached acts are listed; both chapter IVs appear as soon as one is, the one not chosen grey. VI Infinity appears grey once the VI card has played.
 - **An act again:** a click asks (`Starting III · War again replaces your game.` Play again / Keep), then the act's checkpoint and its chapter card. New game asks too (`Your game will be erased.` Start over / Keep).
-- ☰ → **Start screen** reloads with the screen in front. The test menu, the snapshot slots and the headless scripts reload straight into the game (`rpi-go`), and `?go` in the URL skips the screen.
+- ☰ → **Main menu** (where Reset everything was; New game lives on the start screen now) reloads with the screen in front. The test menu, the snapshot slots and the headless scripts reload straight into the game (`rpi-go`), and `?go` in the URL skips the screen.
 ```
 
 - [ ] **Step 3: BACKLOG.yaml** B456: make the fields match the file (`added`, `source`, `request`, `status`, `resolved_in`, `notes`):
