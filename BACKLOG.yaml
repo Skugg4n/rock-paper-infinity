@@ -3543,3 +3543,19 @@ items:
     status: done
     resolved_in: v1.93.0
     notes: "Spec docs/superpowers/specs/2026-10-12-start-screen-design.md, look docs/mockups/start-screen-3.html (?new for the new player). src/start.js, src/reached.js, style-start.css."
+  - id: B457
+    added: 2026-10-12
+    source: "Ola (chat, while the start screen was built)"
+    request: |
+      Chapter I: when "New game board" is bought, the board should animate in. In general, nicer
+      transitions in both picture and sound wherever it feels relevant; fade buttons in instead of
+      popping them.
+    status: open
+  - id: B458
+    added: 2026-10-12
+    source: "Ola (chat, while the start screen was built)"
+    request: |
+      Chapter I: the blue button that fills up (the quantum foam collapse button, top right) should
+      sit where the other buttons are, in the upgrade tray above the Bank.
+    status: open
+

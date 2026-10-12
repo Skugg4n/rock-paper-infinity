@@ -1,4 +1,4 @@
-# Start screen (title screen) — design
+# Start screen (title screen): design
 
 **Date:** 2026-10-12 · **Backlog:** B456 · **Look locked:** `docs/mockups/start-screen-3.html` ("the hole"; 1 and 2 were the alternatives not chosen)
 
@@ -59,12 +59,12 @@ Existing checkpoints: `i-start`, `ii-start`, `iii-start`, `iv-dig-start`. New, i
 
 ## Code
 
-- `src/start.js` — pure, tested: `startModel(storage)` → `{ continueTo: { phase, label } | null, acts: [{ id, roman, name, state: 'now' | 'reached' | 'grey' }] }`, `markReached`, `reachedSet`, `migrateReached`, `continueLabel`. DOM: `showStart({ onContinue, onNewGame, onAct })` builds the screen on `document.body` (like the interim), returns `{ lift() }`. Rows and labels are the strings above, written once in this file.
-- `style-start.css` — the look, scoped under `.start-screen`. Chapter I's palette (slate 100 / slate 900), Bebas Neue for the title, the word CONTINUE and the numerals.
-- `main.js` — `bootstrap()`: icons, then `showStart`, then what the player chose. The screen is skipped with `?go` in the URL, which the headless play scripts and the ☰ "Jump to" reload with, so nothing that drives the game by URL breaks.
-- `src/chapterCard.js` — one line: mark by roman. `src/interim.js` `writeChoice` — one line.
-- `index.html` — the ☰ menu's **Reset everything** becomes **Main menu** (reloads the page, the start screen in front; New game lives there now). The old reset button stays in the DOM hidden, because chapters I and II bind to it. `style-start.css` linked. Version bumped.
-- `src/modules.js` — the new module in the list the cache-mix check reads.
+- `src/start.js`: pure, tested: `startModel(storage)` → `{ continueTo: { phase, label } | null, acts: [{ id, roman, name, state: 'now' | 'reached' | 'grey' }] }`, `markReached`, `reachedSet`, `migrateReached`, `continueLabel`. DOM: `showStart({ onContinue, onNewGame, onAct })` builds the screen on `document.body` (like the interim), returns `{ lift() }`. Rows and labels are the strings above, written once in this file.
+- `style-start.css`: the look, scoped under `.start-screen`. Chapter I's palette (slate 100 / slate 900), Bebas Neue for the title, the word CONTINUE and the numerals.
+- `main.js`: `bootstrap()`: icons, then `showStart`, then what the player chose. The screen is skipped with `?go` in the URL, which the headless play scripts and the ☰ "Jump to" reload with, so nothing that drives the game by URL breaks.
+- `src/chapterCard.js`: one line: mark by roman. `src/interim.js` `writeChoice`: one line.
+- `index.html`: the ☰ menu's **Reset everything** becomes **Main menu** (reloads the page, the start screen in front; New game lives there now). The old reset button stays in the DOM hidden, because chapters I and II bind to it. `style-start.css` linked. Version bumped.
+- `src/modules.js`: the new module in the list the cache-mix check reads.
 
 ## Not in this
 
