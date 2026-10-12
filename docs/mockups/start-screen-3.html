@@ -10,7 +10,7 @@
          min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; user-select:none; overflow:hidden; }
   .bebas { font-family:'Bebas Neue',system-ui,sans-serif; letter-spacing:0.04em; font-weight:400; }
   /* the cycle: rock beats scissors beats paper beats rock, turning slowly around a hole */
-  h1 { margin:0 0 34px; }
+  h1 { margin:0 0 56px; min-height:1em; }
   .cycle { position:relative; width:220px; height:220px; margin-bottom:30px; }
   .ring { position:absolute; inset:0; animation:turn 48s linear infinite; }
   @keyframes turn { to { transform:rotate(360deg); } }
@@ -31,7 +31,12 @@
           box-shadow:0 0 0 10px rgba(0,0,0,.05), 0 0 0 22px rgba(0,0,0,.025), inset 0 0 8px #000; transition:transform .6s cubic-bezier(.2,.8,.2,1); }
   .cycle:hover .hole { transform:scale(2.4); }
   h1 { margin:0; font-size:clamp(56px, 11vw, 132px); line-height:.9; text-align:center; }
-  h1 span { opacity:.45; }
+  h1 .ch { display:inline-block; opacity:0; animation:letter .18s ease-out forwards; }
+  @keyframes letter { from { opacity:0; transform:translateY(.12em); } to { opacity:1; transform:none; } }
+  /* a new player: the big word is START, nothing else yet */
+  body.new .continue-wrap, body.new .acts, body.new .newgame { display:none; }
+  .start { display:none; }
+  body.new .start { display:inline-block; }
   .continue { margin-top:0; background:transparent; color:#0f172a; border:0; cursor:pointer; font-size:40px; line-height:1; letter-spacing:.08em; position:relative; padding:6px 12px; }
   .continue::after { content:''; position:absolute; left:12px; right:12px; bottom:0; height:2px; background:#0f172a; transform:scaleX(.35); transform-origin:center; transition:transform .3s; }
   .continue:hover::after { transform:scaleX(1); }
@@ -45,7 +50,7 @@
   .acts li.now .n { opacity:1; }
   .acts li.grey { color:#94a3b8; cursor:default; }
   .acts li.grey:hover .t { text-decoration:none; }
-  .newgame { margin-top:18px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#94a3b8; cursor:pointer; }
+  .newgame { margin-top:44px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#94a3b8; cursor:pointer; }
   .newgame:hover { color:#0f172a; }
   footer { position:fixed; left:0; right:0; bottom:0; padding:0 28px 20px; display:flex; justify-content:space-between; align-items:flex-end; color:#64748b; font-size:12px; letter-spacing:.08em; }
   footer .tog { display:flex; gap:22px; } footer .tog span { cursor:pointer; } footer .tog span:hover { color:#0f172a; }
@@ -63,8 +68,9 @@
     <div class="hole"></div>
   </div>
   <h1 class="bebas">ROCK PAPER INFINITY</h1>
-  <button class="continue bebas">CONTINUE</button>
-  <div class="where">IV · Deep, the drone</div>
+  <div class="continue-wrap"><button class="continue bebas">CONTINUE</button>
+  <div class="where">IV · Deep, the drone</div></div>
+  <button class="continue start bebas">START</button>
   <div class="newgame">New game</div>
   <ul class="acts bebas">
     <li><span class="n">I</span><span class="t">Trivial</span></li>
@@ -74,5 +80,17 @@
     <li class="grey"><span class="n">IV</span><span class="t">Deep · Vault</span></li>
   </ul>
   <footer><div class="tog"><span>Sound · on</span><span>Music · on</span></div><div class="by"><b>A game by Ola Belin</b><br><i>v1.86.0</i></div></footer>
-  <script>lucide.createIcons();</script>
+  <script>
+    lucide.createIcons();
+    if (/[?&]new\b/.test(location.search)) document.body.classList.add('new');
+    // the title writes itself: a letter every 70 ms, the cycle already turning
+    const h1 = document.querySelector('h1');
+    const text = h1.textContent; h1.textContent = '';
+    [...text].forEach((c, i) => {
+      const el = document.createElement('span');
+      el.className = 'ch'; el.textContent = c === ' ' ? '\u00a0' : c;
+      el.style.animationDelay = (300 + i * 70) + 'ms';
+      h1.appendChild(el);
+    });
+  </script>
 </body></html>
