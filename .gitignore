@@ -5,3 +5,4 @@ firebase-debug.log
 
 # Playwright screenshots and other dev artifacts
 *.png
+.superpowers/
