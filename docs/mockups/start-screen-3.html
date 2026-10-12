@@ -10,8 +10,8 @@
          min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; user-select:none; overflow:hidden; }
   .bebas { font-family:'Bebas Neue',system-ui,sans-serif; letter-spacing:0.04em; font-weight:400; }
   /* the cycle: rock beats scissors beats paper beats rock, turning slowly around a hole */
-  h1 { margin:0 0 30px; }
-  .cycle { position:relative; width:220px; height:220px; margin-bottom:34px; }
+  h1 { margin:0 0 34px; }
+  .cycle { position:relative; width:220px; height:220px; margin-bottom:30px; }
   .ring { position:absolute; inset:0; animation:turn 48s linear infinite; }
   @keyframes turn { to { transform:rotate(360deg); } }
   .hand { position:absolute; width:72px; height:72px; border-radius:50%; background:#f8fafc; box-shadow:0 8px 20px rgba(15,23,42,.16);
@@ -45,8 +45,6 @@
   .acts li.now .n { opacity:1; }
   .acts li.grey { color:#94a3b8; cursor:default; }
   .acts li.grey:hover .t { text-decoration:none; }
-  .acts .why { position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:16px; white-space:nowrap; font-family:-apple-system,system-ui,sans-serif; font-size:10px; letter-spacing:.14em; text-transform:uppercase; opacity:0; transition:opacity .2s; }
-  .acts li.grey:hover .why { opacity:1; }
   .newgame { margin-top:18px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#94a3b8; cursor:pointer; }
   .newgame:hover { color:#0f172a; }
   footer { position:fixed; left:0; right:0; bottom:0; padding:0 28px 20px; display:flex; justify-content:space-between; align-items:flex-end; color:#64748b; font-size:12px; letter-spacing:.08em; }
@@ -55,7 +53,6 @@
   footer .by i { font-style:normal; opacity:.6; font-family:ui-monospace,Menlo,monospace; font-size:11px; }
 </style></head>
 <body>
-  <h1 class="bebas">ROCK PAPER INFINITY</h1>
   <div class="cycle">
     <div class="arrows"></div>
     <div class="ring">
@@ -65,6 +62,7 @@
     </div>
     <div class="hole"></div>
   </div>
+  <h1 class="bebas">ROCK PAPER INFINITY</h1>
   <button class="continue bebas">CONTINUE</button>
   <div class="where">IV · Deep, the drone</div>
   <div class="newgame">New game</div>
@@ -73,7 +71,7 @@
     <li><span class="n">II</span><span class="t">Capital</span></li>
     <li><span class="n">III</span><span class="t">War</span></li>
     <li class="now"><span class="n">IV</span><span class="t">Deep · Drone</span></li>
-    <li class="grey"><span class="n">IV</span><span class="t">Deep · Vault</span><span class="why">Replay the war to choose this path</span></li>
+    <li class="grey"><span class="n">IV</span><span class="t">Deep · Vault</span></li>
   </ul>
   <footer><div class="tog"><span>Sound · on</span><span>Music · on</span></div><div class="by"><b>A game by Ola Belin</b><br><i>v1.86.0</i></div></footer>
   <script>lucide.createIcons();</script>

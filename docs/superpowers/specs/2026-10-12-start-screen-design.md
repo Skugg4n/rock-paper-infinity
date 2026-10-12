@@ -6,8 +6,8 @@
 
 A start screen in front of the game, every time the page opens. Ola: "the feeling of rock paper scissors, with a hint that it goes deeper." Clean. Top to bottom:
 
-1. **ROCK PAPER INFINITY** (Bebas Neue, no commas).
-2. **The cycle:** rock, scissors, paper as chapter I's round buttons, turning slowly in a ring (one turn in 48 s, no turning under reduced motion). In the middle a small black hole that grows when the pointer rests on the ring. That is the whole hint.
+1. **The cycle:** rock, scissors, paper as chapter I's round buttons, turning slowly in a ring (one turn in 48 s, no turning under reduced motion). In the middle a small black hole that grows when the pointer rests on the ring. That is the whole hint.
+2. **ROCK PAPER INFINITY** (Bebas Neue, no commas).
 3. **CONTINUE** (big word, a short underline that widens on hover) with a small line under it saying where the game is, e.g. `IV · Deep, the drone`. Only when there is a game to continue.
 4. **NEW GAME** (small caps, grey).
 5. **The acts** you have reached, one row each, roman numeral + name. Nothing you have not reached is listed, with one exception (the other chapter IV, below).
@@ -27,7 +27,7 @@ Enter = Continue (New game when there is nothing to continue). The first click a
 | V Unity | reached | V from its start |
 | VI Infinity | reached (the VI card has played at the end of V) | nothing; grey. The tease |
 
-The two IV rows appear together as soon as either is reached. The one not chosen in the interim is **grey**, not clickable, and on hover says `Replay the war to choose this path`. Once both have been reached (across replays) both are black. The row the game is in now has its numeral at full strength; the others' numerals are dimmed.
+The two IV rows appear together as soon as either is reached. The one not chosen in the interim is **grey** and not clickable, with no explanation (Ola: the war's replay leads to the fork, and the player will find that). Once both have been reached (across replays) both are black. The row the game is in now has its numeral at full strength; the others' numerals are dimmed.
 
 Clicking an act while a game exists asks first (the game's own confirm style, not `window.confirm`): `Starting III · War again replaces your game.` with **Play again** / **Keep**. Then the act's chapter card plays and the act starts, exactly as if you had arrived there. Clicking the row you are already in equals Continue.
 

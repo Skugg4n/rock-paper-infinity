@@ -3540,6 +3540,6 @@ items:
       A start screen every time the page opens. ROCK PAPER INFINITY, rock/scissors/paper turning round
       a small black hole, CONTINUE (where the game is), NEW GAME, the acts reached as a list (I Trivial,
       II Capital, III War, IV Deep Drone, IV Deep Vault, V Unity, VI Infinity); the chapter IV not chosen
-      in the interim is grey ("Replay the war to choose this path"); one save, a separate rpi-reached set.
+      in the interim is grey, no explanation; one save, a separate rpi-reached set.
       Sound/Music toggles and "A game by Ola Belin". Spec docs/superpowers/specs/2026-10-12-start-screen-design.md,
       look docs/mockups/start-screen-3.html.
