@@ -638,8 +638,10 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
     root.className = 'start-screen';
     root.innerHTML = `
       <div class="start-cycle" aria-hidden="true">
-        <div class="start-ring">${HANDS.map(([, k]) => `<div class="start-hand start-hand-${k}"></div>`).join('')}</div>
+        <div class="start-halo start-halo-light"></div>
+        <div class="start-halo start-halo-dark"></div>
         <div class="start-hole"></div>
+        <div class="start-ring">${HANDS.map(([, k]) => `<div class="start-hand start-hand-${k}"><div class="start-disc"></div></div>`).join('')}</div>
       </div>
       <h1 class="start-title"></h1>
       <div class="start-main">
@@ -662,7 +664,7 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
       </footer>`;
 
     // the hands
-    HANDS.forEach(([icon, k]) => { const svg = iconSvg(icon); if (svg) root.querySelector(`.start-hand-${k}`).appendChild(svg); });
+    HANDS.forEach(([icon, k]) => { const svg = iconSvg(icon); if (svg) root.querySelector(`.start-hand-${k} .start-disc`).appendChild(svg); });
 
     // the title, a letter at a time
     const h1 = root.querySelector('.start-title');
@@ -802,28 +804,44 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
     font-weight: 400;
 }
 
-/* the cycle: rock beats scissors beats paper beats rock, turning round a hole */
+/* the cycle: rock beats scissors beats paper beats rock, turning round a hole. The hole sits BEHIND
+   the hands. On hover it grows, rests, then eats the dark halo, the light halo, the dashed ring and at
+   last the hands, which turn to ghosts in the black: the abyss, in small. The pointer leaving brings
+   everything back (transitions). */
 .start-cycle { position: relative; width: 220px; height: 220px; margin-bottom: 30px; flex: 0 0 auto; }
 .start-cycle::before { content: ''; position: absolute; inset: 22px; border-radius: 50%; border: 1px dashed rgba(15, 23, 42, 0.18); }
-.start-ring { position: absolute; inset: 0; animation: start-turn 48s linear infinite; }
-.start-hand {
-    position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px;
-    border-radius: 50%; background: #f8fafc; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
-    display: flex; align-items: center; justify-content: center;
-    animation: start-unturn 48s linear infinite;
+.start-halo { position: absolute; left: 50%; top: 50%; border-radius: 50%; }
+.start-halo-dark { width: 66px; height: 66px; margin: -33px; background: rgba(0, 0, 0, 0.06); }
+.start-halo-light { width: 90px; height: 90px; margin: -45px; background: rgba(0, 0, 0, 0.03); }
+.start-hole {
+    position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; border-radius: 50%;
+    background: #000; box-shadow: inset 0 0 8px #000; z-index: 2;
+    transition: transform 500ms ease;
 }
-.start-hand svg { width: 32px; height: 32px; stroke-width: 1.4; color: #334155; }
+.start-ring { position: absolute; inset: 0; z-index: 3; animation: start-turn 48s linear infinite; }
+.start-hand { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px; animation: start-unturn 48s linear infinite; }
+.start-disc {
+    width: 100%; height: 100%; border-radius: 50%; background: #f8fafc; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+    display: flex; align-items: center; justify-content: center; color: #334155;
+    transition: background 350ms, box-shadow 350ms, color 350ms;
+}
+.start-disc svg { width: 32px; height: 32px; stroke-width: 1.4; }
 .start-hand-rock { translate: 0 -80px; }
 .start-hand-scissors { translate: 69px 40px; }
 .start-hand-paper { translate: -69px 40px; }
 @keyframes start-turn { to { transform: rotate(360deg); } }
 @keyframes start-unturn { to { transform: rotate(-360deg); } }
-.start-hole {
-    position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; border-radius: 50%;
-    background: #000; box-shadow: 0 0 0 10px rgba(0, 0, 0, 0.05), 0 0 0 22px rgba(0, 0, 0, 0.025), inset 0 0 8px #000;
-    transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.start-cycle:hover .start-hole { animation: start-swallow 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+@keyframes start-swallow {
+    0%   { transform: scale(1); }
+    23%  { transform: scale(2.4); }   /* 0.6 s: the hole grows */
+    38%  { transform: scale(2.4); }   /* a rest */
+    54%  { transform: scale(3.4); }   /* the dark halo goes */
+    69%  { transform: scale(4.6); }   /* the light halo goes */
+    100% { transform: scale(10.6); }  /* the ring and the hands */
 }
-.start-cycle:hover .start-hole { transform: scale(2.4); }
+.start-cycle:hover .start-disc { animation: start-eaten 450ms 2.05s forwards; }
+@keyframes start-eaten { to { background: transparent; box-shadow: none; color: #f8fafc; } }
 
 /* the title, a letter at a time */
 .start-title { margin: 0 0 56px; font-size: clamp(56px, 11vw, 132px); line-height: 0.9; text-align: center; min-height: 0.9em; }
@@ -878,6 +896,7 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
 @media (max-width: 479px) {
     .start-cycle { width: 180px; height: 180px; }
     .start-hand { width: 60px; height: 60px; margin: -30px; }
+    .start-disc svg { width: 26px; height: 26px; }
     .start-hand-rock { translate: 0 -64px; }
     .start-hand-scissors { translate: 55px 32px; }
     .start-hand-paper { translate: -55px 32px; }
@@ -886,6 +905,8 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
 }
 @media (prefers-reduced-motion: reduce) {
     .start-ring, .start-hand { animation: none; }
+    .start-cycle:hover .start-hole { animation: none; transform: scale(2.4); }
+    .start-cycle:hover .start-disc { animation: none; }
     .start-letter { animation: none; opacity: 1; }
 }
 ```

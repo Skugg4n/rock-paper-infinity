@@ -6,7 +6,7 @@
 
 A start screen in front of the game, every time the page opens. Ola: "the feeling of rock paper scissors, with a hint that it goes deeper." Clean. Top to bottom:
 
-1. **The cycle:** rock, scissors, paper as chapter I's round buttons, turning slowly in a ring (one turn in 48 s, no turning under reduced motion). In the middle a small black hole that grows when the pointer rests on the ring. That is the whole hint.
+1. **The cycle:** rock, scissors, paper as chapter I's round buttons, turning slowly in a ring (one turn in 48 s, no turning under reduced motion). In the middle, behind the hands, a small black hole with two faint halos. When the pointer rests on the ring the hole grows, rests a moment, then eats the dark halo, the light halo, the dashed ring and at last the hands, which turn to ghosts (pale outlines) in the black. The pointer leaving brings it all back. That is the whole hint: the abyss, in small.
 2. **ROCK PAPER INFINITY** (Bebas Neue, no commas), written out a letter at a time (70 ms a letter, starting 300 ms in; at once under reduced motion). Clear air under it before Continue.
 3. **CONTINUE** (big word, a short underline that widens on hover) with a small line under it saying where the game is, e.g. `IV · Deep, the drone`. Only when there is a game to continue.
 4. **NEW GAME** (small caps, grey), with more air above it than the line under Continue has, so the two never read as one pattern.
