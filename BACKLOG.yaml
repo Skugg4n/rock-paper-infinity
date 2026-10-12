@@ -3564,7 +3564,9 @@ items:
     request: |
       Dig / drone: once STEERING is bought (hover, one tile per tap) the drone can no longer fall at all.
       Holding the down key without digging for three tiles should start a fall.
-    status: open
+    status: done
+    resolved_in: v1.93.2
+    notes: "src/phase4d/dig.js step(): with STEERING III, down held through air for three paced tiles starts a real fall (pressSteps >= 3 and fallStreak >= 3); released, the drone hovers again."
   - id: B460
     added: 2026-10-12
     source: "Ola (chat)"

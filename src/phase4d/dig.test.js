@@ -793,9 +793,26 @@ describe('v1.92.4: STEERING III, pacing, trapped', () => {
         run(s, 1, { dir: 'up' }); run(s, 10);
         expect(s.y).toBe(29);                                // one tap, one tile
         const y0 = s.y;
-        run(s, 20, { dir: 'down' });                         // held 1 s: about four
-        expect(s.y - y0).toBeGreaterThanOrEqual(3);
-        expect(s.y - y0).toBeLessThanOrEqual(5);
+        run(s, 10, { dir: 'down' });                         // held 0.5 s: three paced tiles
+        expect(s.y - y0).toBeGreaterThanOrEqual(2);
+        expect(s.y - y0).toBeLessThanOrEqual(3);
+    });
+    test('STEERING III: down held through open air for three tiles lets go, and the drone falls (v1.93.2)', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 20; s.x = HOME_X; s.levels.steering = 2;
+        for (let y = 10; y <= 60; y++) s.tiles[y * W + HOME_X] = T.AIR;
+        run(s, 20);
+        expect(s.y).toBe(20);                                // hovers
+        run(s, 20, { dir: 'down' });                         // held 1 s: three paced tiles, then a fall
+        expect(s.y - 20).toBeGreaterThanOrEqual(7);
+        // the hold released: the tile under way finishes, then the drone holds still where it is
+        run(s, 5);
+        const y1 = s.y;
+        run(s, 20);
+        expect(s.y).toBe(y1);
+        // a tap down is still one tile
+        run(s, 1, { dir: 'down' }); run(s, 10);
+        expect(s.y).toBe(y1 + 1);
     });
     test('STEERING II: a tap up is exactly one tile', () => {
         const s = preparedState({ row: 30 });

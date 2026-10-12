@@ -1153,6 +1153,12 @@ export function step(s, dt, input = {}) {
         if (s.tut && s.tut.powerPending && (!input.dir || s.tut.tiles >= 5)) { s.tut.powerPending = false; openStop(s, 'power', 'power'); return; }
         // the hand held: which way, since when (for the pace)
         if (input.dir !== s.holdDir) { s.holdDir = input.dir; s.holdFrom = s.time; s.pressSteps = 0; }
+        // STEERING III: down held through open air for three tiles is a fall (v1.93.2, Ola: "once you
+        // hover you can no longer fall"): the hover lets go and gravity takes over, speeding up as before
+        if (input.dir === 'down' && s.levels.steering >= 2 && !isHome(s) && below === T.AIR && (s.pressSteps || 0) >= 3 && s.fallStreak >= 3) {
+            s.act = { kind: 'fall', tx: s.x, ty: s.y + 1, t: 0, dur: Math.max(0.03, 0.1 - 0.012 * s.fallStreak), cost: 0 };
+            continue;
+        }
         if (input.dir && !paceOk(s, input.dir)) {
             if (s.levels.steering >= 2 && tileAt(s, s.x, s.y + 1) === T.AIR && !isHome(s)) s.battery -= HOVER_DRAIN * left;
             break;

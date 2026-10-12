@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.93.2 - 2026-10-12 (the dig: the hovering drone falls when down is held)
+
+- Ola, playing live: "once you have bought the upgrade that moves one tile per press you can no longer fall." With STEERING III (hover), down held through open air for three tiles now lets go: the drone falls, speeding up as before, until the key is released (then it hovers again). A tap is still one tile. B459.
+
 ## v1.93.1 - 2026-10-12 (the start screen: no box round START)
 
 - Ola: "remove the box round the start button, too tight round the text." The screen no longer focuses the big word on open (Chrome drew a focus ring round it), and a keyboard focus shows as the widening underline instead of an outline.
