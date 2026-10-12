@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Start screen mockup 3 · the hole</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a; background:#f1f5f9;
+         min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; user-select:none; overflow:hidden; }
+  .bebas { font-family:'Bebas Neue',system-ui,sans-serif; letter-spacing:0.04em; font-weight:400; }
+  /* the cycle: rock beats scissors beats paper beats rock, turning slowly around a hole */
+  h1 { margin:0 0 30px; }
+  .cycle { position:relative; width:220px; height:220px; margin-bottom:34px; }
+  .ring { position:absolute; inset:0; animation:turn 48s linear infinite; }
+  @keyframes turn { to { transform:rotate(360deg); } }
+  .hand { position:absolute; width:72px; height:72px; border-radius:50%; background:#f8fafc; box-shadow:0 8px 20px rgba(15,23,42,.16);
+          display:flex; align-items:center; justify-content:center; left:50%; top:50%; margin:-36px; animation:unturn 48s linear infinite; }
+  @keyframes unturn { to { transform:rotate(-360deg); } }
+  .hand svg { width:32px; height:32px; stroke-width:1.4; color:#334155; }
+  .h1 { transform-origin:center; translate:0 -80px; }
+  .h2 { translate:69px 40px; }
+  .h3 { translate:-69px 40px; }
+  .hand.h1 { animation-name:unturn1; } .hand.h2 { animation-name:unturn2; } .hand.h3 { animation-name:unturn3; }
+  @keyframes unturn1 { from { transform:rotate(0); } to { transform:rotate(-360deg); } }
+  @keyframes unturn2 { from { transform:rotate(0); } to { transform:rotate(-360deg); } }
+  @keyframes unturn3 { from { transform:rotate(0); } to { transform:rotate(-360deg); } }
+  .arrows { position:absolute; inset:22px; border-radius:50%; border:1px dashed rgba(15,23,42,.18); }
+  /* the hole */
+  .hole { position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px; border-radius:50%; background:#000;
+          box-shadow:0 0 0 10px rgba(0,0,0,.05), 0 0 0 22px rgba(0,0,0,.025), inset 0 0 8px #000; transition:transform .6s cubic-bezier(.2,.8,.2,1); }
+  .cycle:hover .hole { transform:scale(2.4); }
+  h1 { margin:0; font-size:clamp(56px, 11vw, 132px); line-height:.9; text-align:center; }
+  h1 span { opacity:.45; }
+  .continue { margin-top:0; background:transparent; color:#0f172a; border:0; cursor:pointer; font-size:40px; line-height:1; letter-spacing:.08em; position:relative; padding:6px 12px; }
+  .continue::after { content:''; position:absolute; left:12px; right:12px; bottom:0; height:2px; background:#0f172a; transform:scaleX(.35); transform-origin:center; transition:transform .3s; }
+  .continue:hover::after { transform:scaleX(1); }
+  .where { margin-top:10px; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#64748b; }
+  .acts { list-style:none; margin:44px 0 0; padding:0; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .acts li { display:flex; align-items:baseline; gap:14px; cursor:pointer; color:#0f172a; position:relative; }
+  .acts .n { width:34px; text-align:right; font-size:22px; opacity:.55; }
+  .acts .t { font-size:22px; letter-spacing:.08em; }
+  .acts li:hover .t { text-decoration:underline; text-underline-offset:4px; }
+  .acts li.now .n { opacity:1; }
+  .acts li.grey { color:#94a3b8; cursor:default; }
+  .acts li.grey:hover .t { text-decoration:none; }
+  .acts .why { font-family:-apple-system,system-ui,sans-serif; font-size:10px; letter-spacing:.14em; text-transform:uppercase; margin-left:10px; opacity:0; transition:opacity .2s; }
+  .acts li.grey:hover .why { opacity:1; }
+  .newgame { margin-top:18px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#94a3b8; cursor:pointer; }
+  .newgame:hover { color:#0f172a; }
+  footer { position:fixed; left:0; right:0; bottom:0; padding:0 28px 20px; display:flex; justify-content:space-between; align-items:flex-end; color:#64748b; font-size:12px; letter-spacing:.08em; }
+  footer .tog { display:flex; gap:22px; } footer .tog span { cursor:pointer; } footer .tog span:hover { color:#0f172a; }
+  footer .by { text-align:right; line-height:1.6; } footer .by b { font-weight:500; color:#0f172a; }
+  footer .by i { font-style:normal; opacity:.6; font-family:ui-monospace,Menlo,monospace; font-size:11px; }
+</style></head>
+<body>
+  <h1 class="bebas">ROCK PAPER INFINITY</h1>
+  <div class="cycle">
+    <div class="arrows"></div>
+    <div class="ring">
+      <div class="hand h1"><i data-lucide="gem"></i></div>
+      <div class="hand h2"><i data-lucide="scissors"></i></div>
+      <div class="hand h3"><i data-lucide="file-text"></i></div>
+    </div>
+    <div class="hole"></div>
+  </div>
+  <button class="continue bebas">CONTINUE</button>
+  <div class="where">IV · Deep, the drone</div>
+  <div class="newgame">New game</div>
+  <ul class="acts bebas">
+    <li><span class="n">I</span><span class="t">Trivial</span></li>
+    <li><span class="n">II</span><span class="t">Capital</span></li>
+    <li><span class="n">III</span><span class="t">War</span></li>
+    <li class="now"><span class="n">IV</span><span class="t">Deep · Drone</span></li>
+    <li class="grey"><span class="n">IV</span><span class="t">Deep · Vault</span><span class="why">Replay the war to choose this path</span></li>
+  </ul>
+  <footer><div class="tog"><span>Sound · on</span><span>Music · on</span></div><div class="by"><b>A game by Ola Belin</b><br><i>v1.86.0</i></div></footer>
+  <script>lucide.createIcons();</script>
+</body></html>

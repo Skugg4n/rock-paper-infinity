@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Start screen mockup 1 · the table</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root { --ink:#0f172a; --mute:#64748b; --paper:#f1f5f9; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
+         background:linear-gradient(to bottom, var(--paper) 0%, var(--paper) 62%, #0b0f1a 86%, #000 100%);
+         min-height:100vh; display:flex; flex-direction:column; align-items:center; user-select:none; overflow:hidden; }
+  .bebas { font-family:'Bebas Neue',system-ui,sans-serif; letter-spacing:0.04em; font-weight:400; }
+  .stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding-top:4vh; }
+  .hands { display:flex; gap:28px; margin-bottom:34px; position:relative; }
+  .hand { width:84px; height:84px; border-radius:50%; background:#f8fafc; box-shadow:0 10px 24px rgba(15,23,42,.18), 0 1px 2px rgba(15,23,42,.1);
+          display:flex; align-items:center; justify-content:center; transition:transform .25s; }
+  .hand:hover { transform:translateY(-6px); }
+  .hand svg { width:40px; height:40px; stroke-width:1.4; color:#334155; }
+  /* long shadows falling off the table edge: the hint */
+  .hand::after { content:''; position:absolute; left:50%; top:100%; width:84px; height:52vh; transform:translateX(-50%) perspective(220px) rotateX(58deg);
+                 transform-origin:top center; background:radial-gradient(ellipse at top, rgba(15,23,42,.22), rgba(15,23,42,0) 70%); pointer-events:none; }
+  h1 { margin:0; font-size:clamp(56px, 11vw, 132px); line-height:.9; }
+  h1 span { opacity:.45; }
+  .continue { margin-top:38px; background:var(--ink); color:#fff; border:0; border-radius:999px; padding:18px 54px; cursor:pointer;
+              font-size:28px; line-height:1; display:flex; flex-direction:column; align-items:center; gap:6px; box-shadow:0 12px 30px rgba(15,23,42,.25); transition:transform .2s; }
+  .continue:hover { transform:translateY(-3px); }
+  .continue small { font-family:-apple-system,system-ui,sans-serif; font-size:11px; letter-spacing:.18em; text-transform:uppercase; opacity:.65; }
+  .acts { margin-top:30px; display:flex; gap:34px; align-items:flex-end; }
+  .act { text-align:center; cursor:pointer; color:var(--ink); }
+  .act .n { font-size:30px; line-height:1; }
+  .act .t { font-size:10px; letter-spacing:.2em; text-transform:uppercase; margin-top:6px; opacity:0; transition:opacity .2s; }
+  .act:hover .t { opacity:.7; }
+  .act.now .t { opacity:.7; }
+  .act.locked { color:#94a3b8; cursor:default; }
+  .act.locked .n { opacity:.55; }
+  .act.locked .t { opacity:0 !important; }
+  .newgame { margin-top:26px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--mute); cursor:pointer; }
+  .newgame:hover { color:var(--ink); }
+  footer { width:100%; padding:0 28px 22px; display:flex; justify-content:space-between; align-items:flex-end; color:rgba(255,255,255,.72); font-size:12px; letter-spacing:.08em; }
+  footer .tog { display:flex; gap:22px; }
+  footer .tog span { cursor:pointer; }
+  footer .tog span:hover { color:#fff; }
+  footer .by { text-align:right; line-height:1.6; }
+  footer .by b { font-weight:500; color:#fff; }
+  footer .by i { font-style:normal; opacity:.5; font-family:ui-monospace,Menlo,monospace; font-size:11px; }
+</style></head>
+<body>
+  <div class="stage">
+    <div class="hands">
+      <div class="hand"><i data-lucide="gem"></i></div>
+      <div class="hand"><i data-lucide="file-text"></i></div>
+      <div class="hand"><i data-lucide="scissors"></i></div>
+    </div>
+    <h1 class="bebas">ROCK<span>,</span> PAPER<span>,</span> INFINITY</h1>
+    <button class="continue bebas">CONTINUE<small>II · Capital</small></button>
+    <div class="acts bebas">
+      <div class="act"><div class="n">I</div><div class="t">Trivial</div></div>
+      <div class="act now"><div class="n">II</div><div class="t">Capital</div></div>
+      <div class="act"><div class="n">III</div><div class="t">War</div></div>
+      <div class="act locked"><div class="n">IV</div><div class="t"></div></div>
+    </div>
+    <div class="newgame">New game</div>
+  </div>
+  <footer>
+    <div class="tog"><span>Sound · on</span><span>Music · on</span></div>
+    <div class="by"><b>A game by Ola Belin</b><br><i>v1.86.0</i></div>
+  </footer>
+  <script>lucide.createIcons();</script>
+</body></html>

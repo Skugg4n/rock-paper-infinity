@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Start screen mockup 2 · the shaft</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a; background:#000;
+         min-height:100vh; display:flex; flex-direction:column; user-select:none; overflow:hidden; }
+  .bebas { font-family:'Bebas Neue',system-ui,sans-serif; letter-spacing:0.04em; font-weight:400; }
+  /* the sky: title and the three hands */
+  .sky { background:#f1f5f9; flex:0 0 44vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; }
+  .hands { display:flex; gap:18px; }
+  .hand { width:56px; height:56px; border-radius:50%; background:#f8fafc; box-shadow:0 6px 16px rgba(15,23,42,.16); display:flex; align-items:center; justify-content:center; }
+  .hand svg { width:26px; height:26px; stroke-width:1.5; color:#334155; }
+  h1 { margin:0; font-size:clamp(48px, 9vw, 112px); line-height:.9; }
+  h1 span { opacity:.45; }
+  /* the ground: one layer per act, each darker */
+  .layer { flex:1; display:flex; align-items:center; padding:0 7vw; gap:28px; position:relative; cursor:pointer; transition:filter .2s; }
+  .layer:hover { filter:brightness(1.08); }
+  .layer .n { font-size:44px; width:70px; line-height:1; }
+  .layer .t { font-size:13px; letter-spacing:.22em; text-transform:uppercase; opacity:.7; }
+  .l1 { background:#e2e8f0; color:#0f172a; }
+  .l2 { background:#94a3b8; color:#0f172a; }
+  .l3 { background:#1e293b; color:#f1f5f9; }
+  .l4 { background:#000; color:#f1f5f9; cursor:default; }
+  .l4 .n { opacity:.3; }
+  .l4 .t { opacity:.25; letter-spacing:.3em; }
+  .continue { margin-left:auto; background:#0f172a; color:#fff; border:0; border-radius:999px; padding:14px 40px; cursor:pointer; font-size:24px; line-height:1;
+              box-shadow:0 10px 26px rgba(0,0,0,.35); display:flex; align-items:center; gap:14px; transition:transform .2s; }
+  .continue:hover { transform:translateY(-2px); }
+  .continue small { white-space:nowrap; font-family:-apple-system,system-ui,sans-serif; font-size:10px; letter-spacing:.18em; text-transform:uppercase; opacity:.65; }
+  .l3 .continue { background:#f1f5f9; color:#0f172a; }
+  .again { margin-left:auto; font-size:11px; letter-spacing:.18em; text-transform:uppercase; opacity:.5; }
+  .layer:hover .again { opacity:.9; }
+  .hair { position:absolute; left:0; right:0; top:0; height:1px; background:rgba(0,0,0,.12); }
+  .l3 .hair, .l4 .hair { background:rgba(255,255,255,.08); }
+  footer { position:absolute; left:0; right:0; bottom:0; padding:0 28px 18px; display:flex; justify-content:space-between; align-items:flex-end; color:rgba(255,255,255,.7); font-size:12px; letter-spacing:.08em; }
+  footer .tog { display:flex; gap:22px; }
+  footer .tog span { cursor:pointer; }
+  footer .by { text-align:right; line-height:1.6; }
+  footer .by b { font-weight:500; color:#fff; }
+  footer .by i { font-style:normal; opacity:.5; font-family:ui-monospace,Menlo,monospace; font-size:11px; }
+  .newgame { position:absolute; right:28px; top:18px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#64748b; cursor:pointer; }
+</style></head>
+<body>
+  <div class="sky">
+    <div class="newgame">New game</div>
+    <div class="hands"><div class="hand"><i data-lucide="gem"></i></div><div class="hand"><i data-lucide="file-text"></i></div><div class="hand"><i data-lucide="scissors"></i></div></div>
+    <h1 class="bebas">ROCK<span>,</span> PAPER<span>,</span> INFINITY</h1>
+  </div>
+  <div class="layer l1"><div class="hair"></div><div class="n bebas">I</div><div class="t">Trivial</div><div class="again">Play again</div></div>
+  <div class="layer l2"><div class="hair"></div><div class="n bebas">II</div><div class="t">Capital</div><button class="continue bebas">CONTINUE <small>you are here</small></button></div>
+  <div class="layer l3"><div class="hair"></div><div class="n bebas">III</div><div class="t">War</div><div class="again">Play again</div></div>
+  <div class="layer l4"><div class="hair"></div><div class="n bebas">IV</div><div class="t">· · ·</div>
+    <footer><div class="tog"><span>Sound · on</span><span>Music · on</span></div><div class="by"><b>A game by Ola Belin</b><br><i>v1.86.0</i></div></footer>
+  </div>
+  <script>lucide.createIcons();</script>
+</body></html>
