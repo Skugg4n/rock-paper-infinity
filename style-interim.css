@@ -237,3 +237,9 @@ body.interim-up.paused #interim .in-cur { animation-play-state: paused; }
     #menu-wrapper,
     #version-info { transition: none; }
 }
+
+/* MOBILE (v1.94.1): Continue and the hands a finger's size on a touch screen */
+@media (pointer: coarse) {
+    #interim .in-continue { min-height: 44px; padding: 8px 12px; }
+    #interim .in-hand { min-width: 44px; min-height: 44px; }
+}

@@ -16,6 +16,7 @@ body.in-deep {
     position: fixed;
     inset: 0;
     min-height: 100vh;
+    min-height: 100dvh;   /* v1.94.1: the visible height on a phone */
     color: #8fa1b6;
     overflow: hidden;
     user-select: none;
@@ -2411,3 +2412,13 @@ body.in-deep #version-info { z-index: 1400; }
 .deep-gauge-svg .fluid-top { stroke: #ff6f7f; stroke-width: 2.2; opacity: 1; }
 #deep-panel.og-1 .deep-gauge-svg .vein, #deep-panel.is-flesh .deep-gauge-svg .vein { opacity: 0.38; }
 #deep-panel.is-flesh .deep-gauge-svg .vein.is-d0 { animation: none; }
+
+
+/* MOBILE (v1.94.1, the mobile pass; tokens in style.css) */
+@media (pointer: coarse) {
+    /* the + over an empty chamber: same glyph (centred), a finger's target */
+    .deep-lbl-in .dig-plus { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+}
+@media (max-width: 639px) {
+    #deep-mark { left: calc(var(--corner-w) + 4px); bottom: calc(28px + var(--safe-b)); }
+}

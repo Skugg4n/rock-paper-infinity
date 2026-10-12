@@ -32,6 +32,7 @@ body {
 .phase-container {
     position: relative;
     min-height: 100vh;
+    min-height: 100dvh;   /* the visible height: a phone's address bar and nav bar are not the game's (v1.94.1) */
     user-select: none;
 }
 .btn {
@@ -160,7 +161,10 @@ input[type=range]:focus-visible {
 .countdown-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; animation-name: countdownFade; animation-fill-mode: forwards; }
 @keyframes countdownFade { from { opacity: 1; } to { opacity: 0; } }
 
-#player-zone { position: relative; z-index: 10; }
+/* The footer is a layout box, not a control: it lies over the bottom of the screen (z 10), and
+   until v1.94.1 it swallowed the taps meant for the upgrade buttons beside it on a phone (CLONE).
+   Only its buttons take taps (.btn sets pointer-events: auto). */
+#player-zone { position: relative; z-index: 10; pointer-events: none; }
 
 /* The boards fit the height that is left (B156), so the footer with the
    controls never leaves the window. The container is a size container; a
@@ -600,3 +604,69 @@ body.paused #phase-industry { opacity: 0.7; transition: opacity 0.2s; }
 }
 .update-pill:hover { background: #334155; }
 body.start-up .update-pill { display: none; }
+
+
+/* =========================================================
+   MOBILE (v1.94.1, the mobile pass). One rule set for every chapter:
+   - THE CORNER. ☰, pause and the version line live bottom left in a band of their own,
+     --band tall from the bottom of the visible screen. On a phone (max-width 639px) no
+     chapter's controls go below --band; the update pill shares the band on the right.
+   - BOTTOM BARS sit on top of the band, never in it.
+   - SIDE BUTTONS get a column of their own; boards, grids and panels keep out of it.
+   - TOUCH (pointer: coarse): every tappable is at least 44×44 with 8 px between, decorative
+     rings and overlays take no taps, and nothing jumps on a tap (no hover lift).
+   The chapters' own sheets apply the same tokens (style-stage2.css, style-deep.css,
+   src/phase4v/style.js, src/phase5/style.js, the dig's CSS). scripts/check-mobile.mjs checks it.
+   ========================================================= */
+:root {
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+    --band: calc(72px + var(--safe-b));     /* the corner band: ☰ (48) + 16 below + 8 above */
+    --corner-w: calc(124px + var(--safe-l)); /* ☰ + pause + gaps, from the left edge */
+}
+
+@media (hover: none) {
+    /* a tap leaves :hover stuck on a phone; a lifted button then sits off its own hit area */
+    .choice-btn:hover:not(:disabled),
+    .clover-btn:hover:not(:disabled),
+    .upgrade-btn:hover:not(:disabled),
+    #collapse-foam-btn.ready:hover,
+    #pause-btn:hover,
+    #menu-btn:hover { transform: none; }
+}
+
+@media (pointer: coarse) {
+    #pause-btn { width: 44px; height: 44px; bottom: 2px; left: 56px; }
+    .update-pill { min-height: 44px; padding: 0 16px; }
+}
+
+@media (max-width: 639px) {
+    /* ---- the corner ---- */
+    #menu-wrapper { left: calc(16px + var(--safe-l)); bottom: calc(16px + var(--safe-b)); }
+    #version-info { left: calc(16px + var(--safe-l)); bottom: calc(1px + var(--safe-b)); line-height: 13px; }
+    .update-pill { right: calc(12px + var(--safe-r)); bottom: calc(18px + var(--safe-b)); }
+
+    /* ---- chapter I ---- */
+    /* the player's bar stands on the band; the boards above it get the rest (B156 sizing) */
+    #phase-industry #player-zone { height: auto; padding-bottom: calc(var(--band) - 16px); }
+    #player-controls-container { gap: 8px; }
+    /* the right column: counters, energy, rates and the foam on top, the upgrades below.
+       While anything is in it the boards keep out of it. */
+    #phase-industry { --p1-col: 84px; }
+    #phase-industry:has(#resource-bars:not(.hidden), #upgrade-tray > .btn:not(.invisible)) #game-board-container {
+        margin-right: calc(var(--p1-col) - 16px);
+    }
+    #p1-side { right: calc(12px + var(--safe-r)); max-width: 64px; }
+    #sps-container, #eps-container, #egps-container { flex-wrap: wrap; justify-content: flex-end; row-gap: 0; max-width: 64px; }
+    #game-counters { max-width: 72px; }
+    #tray-dock { right: calc(12px + var(--safe-r)); bottom: calc(var(--band) + 72px); }   /* bar (48) + 24: the dash rings and the scroll padding stay off the bar */
+    /* a hidden upgrade keeps no slot: the column is only what can be bought */
+    #upgrade-tray > .btn.invisible { display: none; }
+    /* below the top of the column (counters, energy, rates: about 260 px); taller than that, it scrolls */
+    #upgrade-tray { gap: 8px; max-height: max(120px, calc(100svh - var(--band) - 72px - 252px)); }
+    #energy-container { height: 64px !important; }
+    #reserve-energy-container { height: 72px !important; }
+    #sps-container, #eps-container, #egps-container { line-height: 1.15; }
+}

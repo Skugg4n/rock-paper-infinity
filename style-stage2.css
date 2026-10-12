@@ -5,6 +5,7 @@
     color: #334155;
     overflow: hidden;
     height: 100vh;
+    height: 100dvh;   /* v1.94.1: the visible height; under a phone's bars the last build button fell off */
 }
 
 /* Phase 2 .btn — scoped to avoid Phase 1 conflict */
@@ -261,7 +262,9 @@
     .sell-btn::after { display: none; }
 }
 @media (hover: none) {
-    .sell-btn { opacity: 0.6; pointer-events: auto; }
+    /* v1.94.1: on touch only the picked plate (a tap on it, src/phase2/index.js) shows its minus */
+    .sell-btn { opacity: 0; pointer-events: none; }
+    .building-slot.is-picked .sell-btn { opacity: 0.85; pointer-events: auto; }
 }
 
 .sell-btn:hover { background-color: #cbd5e1; }
@@ -924,3 +927,123 @@ body.tilt #city-area {
 #ants-canvas { transition: opacity 2500ms ease; }
 #ants-canvas.left-behind { opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) { #phase-city .deep-leave, .deep-facility .df-hatch, .deep-facility .df-bar { transition: none !important; } }
+
+
+/* =========================================================
+   MOBILE (v1.94.1): the city on a phone. Tokens and the rules in style.css (MOBILE).
+   ========================================================= */
+@media (pointer: coarse) {
+    /* The plates: + top right, − bottom right (fort bottom left, clear in the middle). Each hit
+       area is a square in its own corner of its own plate (the plate's 2 px border counted), reaching
+       3 px into the 8 px gap and no further, 2 px from every other, so no two hit areas of any plates overlap. 44 px does not fit twice in a 56 px plate:
+       the squares are half a plate plus 2 (30 px on a 56 px plate, 25 on the narrowest phone, 50 on big plates). */
+    #land-grid { gap: 8px; }
+    .building-slot { --slot: 52px; --hit: calc(var(--slot) / 2 + 2px); }
+    #phase-city .upgrade-btn { top: -5px; right: -5px; width: 22px; height: 22px; font-size: 15px; }
+    .sell-btn { top: auto; left: auto; right: -5px; bottom: -5px; width: 22px; height: 22px; font-size: 13px; }
+    #phase-city .upgrade-btn::after,
+    .sell-btn::after { display: block; left: auto; top: auto; right: 0; transform: none; width: var(--hit); height: var(--hit); }
+    #phase-city .upgrade-btn::after { top: 0; }
+    .sell-btn::after { bottom: 0; }
+    /* the second tap: red, says what it does */
+    .sell-btn.sell-confirm { width: auto; padding: 0 7px; border-radius: 11px; background-color: #b91c1c; color: #fff; font-size: 11px; font-family: system-ui, sans-serif; white-space: nowrap; transform: none; box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.3); }
+    .fort-btn { bottom: -5px; left: -5px; min-height: 22px; }
+    .fort-btn::after { left: 0; top: auto; bottom: 0; transform: none; width: var(--hit); height: var(--hit); }
+    /* the food silo: thin to look at, a whole finger to tap */
+    .silo::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+    .allocation-step-btn { min-width: 44px; min-height: 44px; }
+    /* a slider is the height of a finger, its track stays thin */
+    #phase-city input[type=range] { height: 44px; }
+}
+@media (pointer: coarse) and (min-width: 400px) { .building-slot { --slot: 56px; } }
+@media (pointer: coarse) and (min-width: 640px) { .building-slot { --slot: 96px; } }
+
+@media (hover: none) {
+    /* a tap leaves :hover stuck: no lift (a lifted button sits off its own hit area, and a fixed
+       tooltip inside a moved button would move with it) */
+    #phase-city .btn:hover:not(:disabled) { transform: none; }
+    /* the map is scaled on a phone: a tooltip on a plate would lie over the plates; a tap on + buys */
+    #city-area .tooltip { display: none; }
+}
+
+@media (max-width: 639px) {
+    /* THE COLUMN stands on the band. Its buttons are one column; when they do not fit the visible
+       height a second column opens to the LEFT (never a scroll: the radar's countdown stays on screen).
+       The two groups are laid out as one list (display: contents); arrive() still shows each button. */
+    #city-dock {
+        right: calc(12px + var(--safe-r));
+        bottom: var(--band);
+        max-height: calc(100dvh - var(--band) - var(--hud-bottom, 128px) - 8px);
+        flex-direction: column;
+        flex-wrap: wrap-reverse;
+        align-content: flex-start;
+        justify-content: flex-end;
+        align-items: flex-end;
+        gap: 8px;
+        pointer-events: none;
+    }
+    #upgrades-container, #buildings-container { display: contents; }
+    #build-separator { width: 44px; margin: 0; }
+    #city-dock .btn { flex: none; }
+    /* TOOLTIPS of the column and the silo: one fixed place in the corner band, right of ☰ and
+       pause and left of the column, never over the map */
+    #phase-city #upgrades-container .tooltip,
+    #phase-city #buildings-container .tooltip,
+    #phase-city #supplies-ui .tooltip {
+        position: fixed;
+        left: var(--corner-w);
+        right: calc(76px + var(--safe-r));
+        top: auto;
+        bottom: calc(10px + var(--safe-b));
+        transform: none;
+        translate: none !important;
+        white-space: normal;
+        align-items: flex-start;
+        justify-content: center;
+        min-height: 52px;
+        font-size: 13px;
+        z-index: 1600;
+    }
+    /* THE MAP is scaled and placed into the box under the HUD (fitCityToPhone, src/phase2/index.js) */
+    #city-area {
+        transform-origin: var(--fit-ox, 50%) var(--fit-oy, 58%);
+        transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit, 1));
+    }
+    body.tilt #city-area {
+        transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit, 1)) perspective(900px) rotateX(26deg) scale(1.02);
+    }
+    .building-slot { --slot: min(52px, (100vw - 128px) / 5); width: var(--slot); height: var(--slot); }
+    #competitor-island { margin-top: 84px; }
+    /* THE WAR on a phone: the HUD's three numbers on one line, the slider and the tiers as
+       compact full-width rows under them, a finger tall */
+    #war-ui { flex-direction: row; flex-wrap: wrap; column-gap: 14px; row-gap: 0; padding-top: 4px; }
+    #war-ui > div:nth-child(n+4) { flex-basis: 100%; max-width: 260px; }
+    #allocation-slider-container { min-width: 210px; }
+    #allocation-slider-container .flex.items-center.gap-1 { gap: 8px; }
+    /* THE WAR ROOM: one line, the newest, in its own band under the HUD; a tap opens the last
+       lines as a sheet, a tap closes it (mountWarRoomSheet) */
+    #war-room {
+        position: fixed;
+        top: var(--hud-bottom, 200px);
+        left: calc(12px + var(--safe-l));
+        right: calc(12px + var(--safe-r));
+        width: auto;
+        border-top: 0;
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: rgba(241, 245, 249, 0.92);
+        box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.18);
+        pointer-events: auto;
+        cursor: pointer;
+        z-index: 25;
+    }
+    #war-room div { margin-bottom: 0; }
+    #war-room:not(.is-open) div:not(:last-child) { display: none; }
+    #war-room:not(.is-open) div:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #war-room.is-open { box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18), inset 0 0 0 1px rgba(100, 116, 139, 0.18); max-height: 45dvh; overflow-y: auto; }
+    #war-room.is-open div { margin-bottom: 4px; }
+    #war-room.is-open div:nth-last-child(n+7) { display: none; }
+}
+@media (max-width: 639px) and (min-width: 400px) {
+    .building-slot { --slot: min(56px, (100vw - 128px) / 5); }
+}

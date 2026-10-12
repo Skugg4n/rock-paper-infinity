@@ -167,4 +167,28 @@ body.in-vault #pause-btn { display: none; }
 #phase-vault.is-night .v-panel { filter: brightness(0.82); }
 #phase-vault.is-night .v-dim { opacity: 0.35; }
 .v-mark { position: absolute; right: 16px; bottom: 116px; z-index: 4; }
+/* MOBILE (v1.94.1, the mobile pass; tokens --band, --corner-w in style.css). On a phone the build
+   bar runs the whole width on the corner band (the build button, then its cards), the panel ends
+   above it, the time buttons sit in the band right of the menu, and the rise button above the bar. */
+@media (pointer: coarse) {
+  .v-time button { width: 44px; height: 44px; }
+  .v-time { gap: 8px; }
+  .v-cards { gap: 8px; }
+  .v-stop .ok { min-height: 44px; }
+}
+@media (max-width: 639px) {
+  .v-time { left: var(--corner-w); bottom: calc(14px + var(--safe-b)); }
+  .v-build { left: 12px; right: 12px; bottom: var(--band); height: 88px; }
+  .v-build-btn { width: 76px; }
+  .v-panel { bottom: calc(var(--band) + 100px); max-width: calc(100vw - 32px); overflow-y: auto; scrollbar-width: none; }
+  .v-rise { bottom: calc(var(--band) + 100px); max-width: calc(100vw - 24px); white-space: normal; }
+  .v-rise.dim { padding: 10px 18px; font-size: 16px; }
+  .v-mark { bottom: calc(var(--band) + 100px); }
+  /* the stop box in the middle of the screen (on a desktop it centres right of the panel) */
+  .v-stop { left: 50%; min-width: 0; width: calc(100vw - 24px); }
+  /* the cards scroll sideways inside the bar rather than shrink to nothing */
+  .v-cards { overflow-x: auto; scrollbar-width: none; }
+  .v-cards::-webkit-scrollbar { display: none; }
+  .v-card { flex: 0 0 128px; }
+}
 `;

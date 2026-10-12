@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (mobile)
+
+### v1.94.1 - 2026-10-12 (the mobile pass)
+
+- **CLONE could rarely be tapped on a phone** (B500). The player's footer in chapter I (z 10, 160 px tall, the whole width) lay over the right-hand upgrade buttons and took their taps; only CLONE's top 8 px stuck out above it. The footer takes no taps now (only its buttons do).
+- **One rule set for phones** (style.css MOBILE, used by every chapter's own CSS): ☰, pause and the version line have a corner band of their own at the bottom that no chapter's controls enter; bottom bars stand on it; side buttons get a column of their own that boards, grids and panels keep out of; on touch every button is at least 44 px with 8 px between, rings and overlays take no taps and nothing lifts on a tap. The desktop is unchanged (1440×900: every control in every checkpoint in the same place).
+- **Chapter I on a phone**: the bar sits above the band, the right column holds counters, energy, rates and the upgrades (hidden upgrades keep no slot), the boards keep left of it.
+- **The city on a phone** (B501, B502): the phase uses the visible height (100dvh), so the last build button is no longer under the browser's bars; the column opens a second column to the left instead of running off. Plates on touch: a tap picks a plate and only the picked plate shows its −, bottom right (+ top right); no two hit areas of any plates overlap; the first tap on − turns it red "Sell? N★", the second sells.
+- **The war on a phone** (B503): the map (grid, both islands, sea, missiles) is scaled into the space under the HUD (fitCityToPhone); the war room is one line under the HUD and a tap opens the last lines; the HUD's three numbers share a line; sliders are a finger tall; the column's tooltips show in one place in the corner band, never over the map.
+- **IV and V on a phone**: the vault's and unity's build bar runs the width above the band, the rise button above it, the time buttons and every small button a finger's size; the dig's ping buttons and the colony's + are 44 px.
+- **scripts/check-mobile.mjs**: loads 21 checkpoints at 412×915, 412×780, 360×780 and 390×844 (touch, Android) and fails on overlapping controls, a control under something else, a control outside the visible screen, overlapping plate hit areas, or a 100vh without dvh/svh. Shots in docs/playtests/mobile/ (before-*, after-*).
+
 ## v1.94.0 - 2026-10-12 (updates reach the player; Shift boosts)
 
 - **Updates reach the player** (B460, src/update-check.js). The page asks for src/version.js (no cache) every ten minutes and whenever the tab comes back into view. A newer version reloads the start screen at once (nothing to lose); in a game a small pill bottom right says `v1.95.0 is here · reload`, and after ten minutes away the page reloads by itself when the tab comes back (the chapters save every second). Ola: "we have ONE player, but important updates must reach them."

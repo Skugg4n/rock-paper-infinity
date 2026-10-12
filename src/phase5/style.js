@@ -95,4 +95,21 @@ export const UNITY_CSS = VAULT_CSS.replaceAll('#phase-vault', '#phase-unity').re
 .u-grow.three .u-row .n { font-size: 11px; letter-spacing: 0.04em; }
 .u-btn .g { font-family: system-ui, sans-serif; font-size: 9px; letter-spacing: 0; line-height: 11px; opacity: 0.85; text-transform: none; }
 #phase-unity.is-zooming .v-panel, #phase-unity.is-zooming .v-build { opacity: 0.25; transition: opacity 800ms ease; }
+/* MOBILE (v1.94.1): the vault's phone rules hold here too (VAULT_CSS); these are this act's own */
+@media (pointer: coarse) {
+  .u-srow { grid-template-columns: 52px 44px 24px 44px 1fr; gap: 6px; }
+  .u-seed { gap: 8px; }
+  .u-buys { gap: 8px; }
+  .u-pm { height: 44px; }
+  .u-extra { height: 44px; }
+  #phase-unity .u-btn { min-height: 44px; }
+  .u-more { min-height: 44px; }
+  #phase-unity .v-panel input[type=range] { height: 44px; }
+}
+@media (max-width: 639px) {
+  #phase-unity .v-panel { bottom: calc(var(--band) + 100px); }
+  #phase-unity .v-build { left: 12px; right: 12px; bottom: var(--band); height: 88px; }
+  /* the guide's words lie over the panel on a phone; taps go through to it */
+  .u-guide { left: 12px; right: 12px; width: auto; bottom: calc(var(--band) + 100px); pointer-events: none; }
+}
 `;

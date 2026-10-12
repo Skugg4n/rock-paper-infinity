@@ -37,7 +37,7 @@
         </div>
 
         <!-- Right-side panel: counters + resource bars -->
-        <div class="absolute top-4 right-3 sm:top-8 sm:right-4 md:right-8 flex flex-col items-end gap-2 sm:gap-3">
+        <div id="p1-side" class="absolute top-4 right-3 sm:top-8 sm:right-4 md:right-8 flex flex-col items-end gap-2 sm:gap-3">
             <!-- Game counters (shown after first game) -->
             <div id="game-counters" class="hidden flex flex-col items-end gap-0.5 text-slate-400">
                 <div class="flex items-center gap-1">
@@ -119,7 +119,7 @@
         </div>
 
         <!-- Upgrade buttons -->
-        <div class="absolute bottom-4 right-3 sm:bottom-8 sm:right-8 flex items-end gap-2 sm:gap-3">
+        <div id="tray-dock" class="absolute bottom-4 right-3 sm:bottom-8 sm:right-8 flex items-end gap-2 sm:gap-3">
             <div id="downgrade-tray" class="flex flex-col gap-3"></div>
             <div id="upgrade-tray" class="flex flex-col gap-3">
                 <button id="speed" aria-label="Upgrade game speed" data-upgrade="speed" class="invisible btn upgrade-btn bg-white p-3 rounded-full shadow-lg">
@@ -295,7 +295,7 @@
         </div>
 
         <!-- BUILD MENU -->
-        <div class="absolute bottom-4 right-3 sm:bottom-8 sm:right-8 flex flex-col items-end gap-2 sm:gap-3 z-20">
+        <div id="city-dock" class="absolute bottom-4 right-3 sm:bottom-8 sm:right-8 flex flex-col items-end gap-2 sm:gap-3 z-20">
             <div id="upgrades-container" class="flex flex-col items-end gap-3">
                  <!-- III · WAR is chosen, like the bank in chapter I. Greyed from the
                       moment the competitor appears, open once they have razed a house. -->
@@ -700,7 +700,7 @@
 
     <!-- War room: the advisor's feed during chapter III (icons over text everywhere else;
          Ola asked for this one place where words explain what is happening) -->
-    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.94.0</div>
+    <div id="version-info" class="fixed bottom-2 left-2 text-[10px] text-slate-400 select-none">v1.94.1</div>
     <div id="tooltip"></div>
 
     <div id="chapter-card" class="chapter-card" aria-hidden="true">

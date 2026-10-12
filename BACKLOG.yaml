@@ -3584,3 +3584,37 @@ items:
     resolved_in: v1.94.0
     notes: "src/phase4d/index.js keydown: Shift calls boost(); the button reads B · SHIFT."
 
+  - id: B500
+    added: 2026-10-12
+    source: "Ola (chat, phone screenshot, chapter I)"
+    request: |
+      Go over the mobile versions: buttons lie on top of each other, and CLONE can rarely be tapped
+      (something with that button or its relation to the other buttons).
+    status: done
+    resolved_in: v1.94.1
+    notes: "Cause: the player's footer (#player-zone, z 10, 160 px tall, full width) lay over the right-hand upgrade tray and took the taps; only CLONE's top 8 px were above it. Footer now pointer-events: none; phone rule set (style.css MOBILE): corner band for ☰/pause/version, the bar stands on it, the right column (counters, energy, rates, upgrades) is kept free of the boards. scripts/check-mobile.mjs."
+  - id: B501
+    added: 2026-10-12
+    source: "Ola (chat, phone screenshot, chapter II)"
+    request: |
+      The bottom button of the city's right-hand column disappears under the phone browser's own bars.
+    status: done
+    resolved_in: v1.94.1
+    notes: "100vh → 100dvh (with the vh fallback) for every phase; the column stands on the corner band and opens a second column to the left when it does not fit (never scrolls); check-mobile.mjs fails a control outside the visible screen and any 100vh without dvh/svh."
+  - id: B502
+    added: 2026-10-12
+    source: "Ola (chat, phone, chapter II)"
+    request: |
+      The small sell (−) and upgrade (+) buttons on the city tiles are too close to each other and to the
+      neighbour's: he sells a house when he meant to upgrade the one next to it.
+    status: done
+    resolved_in: v1.94.1
+    notes: "Touch: a tap on a plate picks it and only the picked plate shows its −, now bottom right (+ stays top right); every plate button's hit area is a square in its own corner of its own plate, none overlapping (check-mobile.mjs 'plates'); the first tap on − turns it red 'Sell? N★', the second sells. 44 px twice does not fit in a 56 px plate: the squares are half a plate plus 2 (30 px)."
+  - id: B503
+    added: 2026-10-12
+    source: "Ola (chat, phone screenshot, chapter III)"
+    request: |
+      The war on a phone: too much on top of each other. Zoom out? Other solutions?
+    status: done
+    resolved_in: v1.94.1
+    notes: "Phone: the map (grid, both islands, sea, missiles) is scaled into the box under the HUD (fitCityToPhone, src/phase2/index.js); the war room is one line under the HUD, a tap opens the last lines (mountWarRoomSheet); the HUD's numbers on one line, the slider a finger tall; tooltips of the column in one fixed place in the corner band; plate tooltips off on touch."

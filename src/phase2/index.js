@@ -1181,14 +1181,16 @@ export function init() {
 
               // On touch (no hover), use two-tap confirmation.
               // On pointer devices that can hover, sell immediately (tooltip already shows refund).
-              const isTouch = event.pointerType === 'touch';
+              // v1.94.1: a pen counts as touch too; a click without a pointer type asks the screen.
+              const isTouch = event.pointerType ? event.pointerType !== 'mouse'
+                  : typeof matchMedia === 'function' && matchMedia('(hover: none)').matches;
               if (isTouch && !_pendingSell.has(buildingId)) {
                   // First tap: enter confirm state
                   const refund = Math.floor((buildingData[building.type]?.cost || 0) * 0.7);
                   const slot = ui.landGrid.children[index];
                   const sellBtn = slot ? slot.querySelector('.sell-btn') : null;
                   if (sellBtn) {
-                      sellBtn.textContent = `${formatCount(refund)}★`;
+                      sellBtn.textContent = `Sell? ${formatCount(refund)}★`;   // red (style-stage2.css): a second tap sells
                       sellBtn.classList.add('sell-confirm');
                   }
                   const timeout = setTimeout(() => cancelPendingSell(buildingId), 3000);
@@ -1698,6 +1700,100 @@ export function init() {
           // Event delegation for sell / upgrade buttons inside building slots.
           // Replaces inline onclick="sellBuilding(event, id)" / onclick="upgradeBuilding(...)".
           // One listener on the grid, cleaned up by AbortController on teardown — no globals needed.
+          // Touch (v1.94.1, the mobile pass): a tap on a plate picks it, and only the picked plate
+          // shows its minus (style-stage2.css). A finger aimed at one plate's + never lands on the
+          // neighbour's minus, and selling takes a tap on the plate, then two on the red "Sell?".
+          ui.landGrid.addEventListener('pointerdown', (e) => {
+              if (e.pointerType === 'mouse') return;
+              const slot = e.target.closest('.building-slot');
+              if (!slot || slot.classList.contains('is-picked')) return;
+              for (const s of ui.landGrid.querySelectorAll('.building-slot.is-picked')) s.classList.remove('is-picked');
+              slot.classList.add('is-picked');
+          }, { signal });
+
+          // Phone (v1.94.1, the mobile pass): two layout hooks, nothing in the game's rules.
+          fitCityToPhone();
+          mountWarRoomSheet();
+
+          /**
+           * On a phone the map (the grid, both islands, the sea, the piers and the missiles) is scaled
+           * and placed into the box left between the HUD at the top (and the war room's line under it),
+           * the corner band at the bottom and the column of buttons on the right. Layout only: CSS
+           * variables on #city-area that style-stage2.css turns into a transform (the war's tilt is
+           * kept on top of it). Measured in layout coordinates (layoutRect), so the ants, islands and
+           * arcs that draw in the area's own space are untouched. Wider screens: the variables go.
+           * It runs again whenever the HUD, the column, the grid or the island changes size.
+           */
+          function fitCityToPhone() {
+              const area = ui.cityArea, host = document.getElementById('phase-city');
+              if (!area || !host || typeof ResizeObserver !== 'function') return;
+              const FIT_VARS = ['--fit', '--fit-x', '--fit-y', '--fit-ox', '--fit-oy'];
+              const leftHud = document.getElementById('star-count')?.closest('.absolute');
+              const rightHud = document.getElementById('population-ui')?.parentElement;
+              const island = document.getElementById('competitor-island');
+              const dock = document.getElementById('city-dock');
+              const room = ui.warRoom;
+              const bandProbe = document.createElement('div');
+              bandProbe.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:var(--band);visibility:hidden;pointer-events:none';
+              host.appendChild(bandProbe);
+              const shown = (el) => el && !el.classList.contains('hidden') && el.getClientRects().length > 0;
+              let queued = false;
+              const fit = () => {
+                  queued = false;
+                  if (signal.aborted) return;
+                  const phone = matchMedia('(max-width: 639px)').matches && shown(host);
+                  if (!phone) { for (const v of FIT_VARS) area.style.removeProperty(v); host.style.removeProperty('--hud-bottom'); return; }
+                  let hud = 0;
+                  for (const el of [leftHud, ...(rightHud ? [...rightHud.children].filter((c) => c !== room) : []), ui.doomsday]) {
+                      if (shown(el)) hud = Math.max(hud, el.getBoundingClientRect().bottom);
+                  }
+                  host.style.setProperty('--hud-bottom', `${Math.round(hud + 4)}px`);
+                  const top = hud + 8 + (shown(room) ? room.getBoundingClientRect().height + 6 : 0);
+                  const bottom = innerHeight - (bandProbe.offsetHeight || 72) - 4;
+                  let right = innerWidth - 12;
+                  for (const b of dock ? dock.querySelectorAll('.btn') : []) if (shown(b)) right = Math.min(right, b.getBoundingClientRect().left - 8);
+                  const left = 12;
+                  // the map in the area's own (untransformed) coordinates: the grid and the enemy's island
+                  const parts = [layoutRect(ui.landGrid, area)];
+                  if (shown(island)) parts.push(layoutRect(island, area));
+                  // the land drawn round them (islands.js: an SVG over the whole area, in its pixels)
+                  for (const p of document.querySelectorAll('#islands-svg path')) {
+                      try { const b = p.getBBox(); if (b.width && b.height) parts.push({ x: b.x, y: b.y, w: b.width, h: b.height }); } catch { /* not drawn yet */ }
+                  }
+                  const x0 = Math.min(...parts.map((r) => r.x)), y0 = Math.min(...parts.map((r) => r.y));
+                  const x1 = Math.max(...parts.map((r) => r.x + r.w)), y1 = Math.max(...parts.map((r) => r.y + r.h));
+                  const M = 4;
+                  const w = x1 - x0 + 2 * M, h = y1 - y0 + 2 * M;
+                  if (!(w > 0 && h > 0)) return;
+                  const k = Math.max(0.4, Math.min(1, (right - left) / w, (bottom - top) / h));
+                  const at = layoutRect(area, null);   // the area's untransformed place on the page
+                  const ox = (x0 + x1) / 2, oy = (y0 + y1) / 2;
+                  area.style.setProperty('--fit', k.toFixed(3));
+                  area.style.setProperty('--fit-ox', `${Math.round(ox)}px`);
+                  area.style.setProperty('--fit-oy', `${Math.round(oy)}px`);
+                  area.style.setProperty('--fit-x', `${Math.round((left + right) / 2 - (at.x + ox))}px`);
+                  area.style.setProperty('--fit-y', `${Math.round((top + bottom) / 2 - (at.y + oy))}px`);
+              };
+              const queue = () => { if (!queued) { queued = true; requestAnimationFrame(fit); } };
+              const ro = new ResizeObserver(queue);
+              for (const el of [leftHud, rightHud, room, ui.landGrid, island, dock, ui.doomsday]) if (el) ro.observe(el);
+              const mo = new MutationObserver(queue);   // the land is redrawn (islands.js)
+              if (ui.islandsSvg) mo.observe(ui.islandsSvg, { childList: true, subtree: true, attributes: true, attributeFilter: ['d', 'viewBox'] });
+              window.addEventListener('resize', queue, { signal });
+              signal.addEventListener('abort', () => { ro.disconnect(); mo.disconnect(); bandProbe.remove(); for (const v of FIT_VARS) area.style.removeProperty(v); });
+              queue();
+          }
+
+          /**
+           * On a phone the war room is one line (the newest) under the HUD; a tap opens the last few
+           * lines as a sheet and a tap closes it (style-stage2.css, #war-room.is-open). Coarse pointers only.
+           */
+          function mountWarRoomSheet() {
+              const room = ui.warRoom;
+              if (!room || !matchMedia('(pointer: coarse)').matches) return;
+              room.addEventListener('click', () => room.classList.toggle('is-open'), { signal });
+          }
+
           ui.landGrid.addEventListener('click', (e) => {
               const sellBtn = e.target.closest('.sell-btn');
               if (sellBtn) {

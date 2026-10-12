@@ -132,6 +132,8 @@ const CSS = `
 .dig-ping { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 8px 0 2px; padding: 7px 10px; border: 0; border-radius: 6px; background: #2a313b; color: #f1efe8; cursor: pointer; overflow: hidden;
   font: 600 16px/1 'Bebas Neue', 'Arial Narrow', sans-serif; letter-spacing: .14em; }
 .dig-ping[hidden] { display: none; }
+@media (pointer: coarse) { .dig-ping { min-height: 44px; } .dig-stop .ok { min-height: 44px; } }   /* v1.94.1: a finger tall on a phone */
+@media (max-width: 639px) { .dig-stop { left: 50%; min-width: 0; width: calc(100vw - 24px); } #dig-help { left: var(--corner-w); bottom: calc(18px + var(--safe-b)); } }   /* v1.94.1: on the screen, not right of a column that is not there */
 .dig-ping > i { position: absolute; left: 0; bottom: 0; height: 3px; background: #8fd0ff; }
 .dig-ping.is-ready { background: #3a4350; box-shadow: inset 0 0 0 1px #8fd0ff; }
 .dig-ping small { font: 11px/1 system-ui; letter-spacing: 0; color: #8fa1b6; }
