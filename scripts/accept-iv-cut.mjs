@@ -182,7 +182,7 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 
     async function jump(idOf, { asleep = true, view = VIEW } = {}) {
-        await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug${view ? `&view=${view}` : ''}` });
+        await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug&go${view ? `&view=${view}` : ''}` });
         await sleepMs(1500);
         await evaluate(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(idOf)}); return true; })`);
         await sleepMs(2500);

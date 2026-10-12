@@ -18,7 +18,7 @@ initPerf();
 // they belong to the shell. Chapters I and II each wired the toggle themselves, which
 // meant the button was simply dead in any chapter that did not (Ola, playing IV in
 // v1.40.0: "the menu cannot be clicked"). Wire it once, here, for every chapter there
-// will ever be. Each phase still owns what "Reset everything" means for its own save.
+// will ever be. New game lives on the start screen now; the old reset button stays hidden because chapters I and II bind to it.
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 menuBtn?.addEventListener('click', (e) => {
@@ -76,6 +76,7 @@ document.getElementById('main-menu-btn')?.addEventListener('click', () => window
 document.getElementById('menu-wrapper')?.appendChild(pauseBtn);
 setPaused(false);
 document.addEventListener('keydown', (e) => {
+  if (document.body.classList.contains('start-up')) return;
   if (e.code !== 'Space' || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   const el = document.activeElement;
   if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;

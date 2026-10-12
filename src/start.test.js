@@ -9,6 +9,10 @@ const rows = (model) => model.acts.map((a) => `${a.roman} ${a.name} ${a.state}`)
 
 describe('where the game is', () => {
     test('nothing without a phase', () => { expect(whereIs(fake())).toBeNull(); });
+    test('a legacy save without a phase continues in chapter I', () => {
+        expect(whereIs(fake({ 'rpi-save': '{}' }))).toEqual({ id: 'trivial', label: 'I · Trivial' });
+        expect(whereIs(fake())).toBeNull();
+    });
     test('one line per phase and save', () => {
         expect(whereIs(fake({ [PHASE_KEY]: 'INDUSTRY' }))).toEqual({ id: 'trivial', label: 'I · Trivial' });
         expect(whereIs(fake({ [PHASE_KEY]: 'CITY', [PHASE2_CONSTANTS.SAVE_KEY]: '{"war":false}' }))).toEqual({ id: 'capital', label: 'II · Capital' });
@@ -24,6 +28,9 @@ describe('where the game is', () => {
 describe('the start model', () => {
     test('a new player: fresh, nothing to continue, no rows', () => {
         expect(startModel(fake())).toEqual({ fresh: true, continueTo: null, acts: [] });
+    });
+    test('a legacy save is not fresh', () => {
+        expect(startModel(fake({ 'rpi-save': '{}' })).fresh).toBe(false);
     });
     test('only the acts reached are listed, the current one marked', () => {
         const m = startModel(fake({ [PHASE_KEY]: 'CITY', [PHASE2_CONSTANTS.SAVE_KEY]: '{"war":false}', [REACHED_KEY]: reached('trivial', 'capital') }));
@@ -45,6 +52,7 @@ describe('the start model', () => {
     });
     test('the table, the cards and the words', () => {
         expect(ACTS.map((a) => a.id)).toEqual(['trivial', 'capital', 'war', 'drone', 'vault', 'unity', 'infinity']);
+        expect(ACTS.find((a) => a.id === 'drone').label).toBe('IV · Deep, the drone');
         expect(ACTS.find((a) => a.id === 'drone').checkpoint).toBe('iv-dig-start');
         expect(ACTS.find((a) => a.id === 'vault').checkpoint).toBe('iv-vault-start');
         expect(ACTS.find((a) => a.id === 'unity').checkpoint).toBe('v-start');

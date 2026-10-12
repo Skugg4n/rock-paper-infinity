@@ -14,13 +14,13 @@ import { audio } from './audio.js';
 
 /** The acts in order: the checkpoint an act starts again from, the phase it runs in. */
 export const ACTS = [
-    { id: 'trivial', roman: 'I', name: 'Trivial', checkpoint: 'i-start' },
-    { id: 'capital', roman: 'II', name: 'Capital', checkpoint: 'ii-start' },
-    { id: 'war', roman: 'III', name: 'War', checkpoint: 'iii-start' },
-    { id: 'drone', roman: 'IV', name: 'Deep · Drone', checkpoint: 'iv-dig-start' },
-    { id: 'vault', roman: 'IV', name: 'Deep · Vault', checkpoint: 'iv-vault-start' },
-    { id: 'unity', roman: 'V', name: 'Unity', checkpoint: 'v-start' },
-    { id: 'infinity', roman: 'VI', name: 'Infinity', checkpoint: null },
+    { id: 'trivial', roman: 'I', name: 'Trivial', label: 'I · Trivial', checkpoint: 'i-start' },
+    { id: 'capital', roman: 'II', name: 'Capital', label: 'II · Capital', checkpoint: 'ii-start' },
+    { id: 'war', roman: 'III', name: 'War', label: 'III · War', checkpoint: 'iii-start' },
+    { id: 'drone', roman: 'IV', name: 'Deep · Drone', label: 'IV · Deep, the drone', checkpoint: 'iv-dig-start' },
+    { id: 'vault', roman: 'IV', name: 'Deep · Vault', label: 'IV · Deep, the vault', checkpoint: 'iv-vault-start' },
+    { id: 'unity', roman: 'V', name: 'Unity', label: 'V · Unity', checkpoint: 'v-start' },
+    { id: 'infinity', roman: 'VI', name: 'Infinity', label: 'VI · Infinity', checkpoint: null },
 ];
 
 /** The chapter card an act opens with, as the game plays it on the way (phase1, phase2, interim, phase4). */
@@ -54,7 +54,11 @@ function defaultStorage() { try { return typeof localStorage !== 'undefined' ? l
 /** Where the game is, from the phase and the saves: the act's id and the line under CONTINUE. */
 export function whereIs(storage = defaultStorage()) {
     const phase = get(storage, PHASE_KEY);
-    if (!phase) return null;
+    if (!phase) {
+        // a save from before the phase key: Continue goes to chapter I (the bootstrap defaults to INDUSTRY)
+        const legacy = ['rpi-save', 'rpi-stage2', 'rpi-deep', 'rpi-deep-vault', 'rpi-deep-dig', 'rpi-unity'];
+        return legacy.some((k) => get(storage, k) !== null) ? { id: 'trivial', label: ACTS[0].label } : null;
+    }
     if (phase === 'INDUSTRY') return { id: 'trivial', label: 'I · Trivial' };
     if (phase === 'CITY' || phase === 'WAR') {
         let c = null;
@@ -102,8 +106,6 @@ function iconSvg(name) {
     if (!data || typeof L.createElement !== 'function') return null;
     return L.createElement(data);
 }
-
-function actLabel(act) { return `${act.roman} · ${act.name.replace(' · ', ', the ').replace('Deep, the Drone', 'Deep, the drone').replace('Deep, the Vault', 'Deep, the vault')}`; }
 
 /**
  * Builds the screen on document.body and resolves `choice` with what the player chose.
@@ -249,7 +251,7 @@ export function showStart({ storage = defaultStorage(), version = '' } = {}) {
         if (!id || state === 'grey') return;
         if (state === 'now') { choose({ kind: 'continue' }); return; }
         const act = ACTS.find((a) => a.id === id);
-        if (model.continueTo) ask(t, WORDS.replaces(actLabel(act)), WORDS.playAgain, () => choose({ kind: 'act', id }));
+        if (model.continueTo) ask(t, WORDS.replaces(act.label), WORDS.playAgain, () => choose({ kind: 'act', id }));
         else choose({ kind: 'act', id });
     });
     const onKey = (e) => {

@@ -66,7 +66,7 @@ try {
     await send('Runtime.enable'); await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
     const jump = async (cp) => {
-        await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug` });
+        await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/?debug&go` });
         await sleep(1200);
         await ev(`localStorage.setItem('rpi-audio', JSON.stringify(${process.argv.includes('--sound') ? '{ sfx: true, music: true }' : '{ sfx: false, music: false }'})); true`);
         await ev(`import('/src/checkpoints.js').then((m) => { m.jumpTo(${JSON.stringify(cp)}); return true; })`);

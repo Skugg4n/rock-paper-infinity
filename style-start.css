@@ -11,7 +11,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     padding: 24px 16px 64px;   /* the bottom clears the fixed footer */
     overflow-y: auto;
     user-select: none;
@@ -99,10 +99,10 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
 .start-new:hover, .start-new:focus-visible { color: #0f172a; }
 
 /* the question before erasing or starting an act again */
-.start-confirm { margin-top: 14px; display: flex; align-items: center; gap: 14px; font-size: 12px; letter-spacing: 0.08em; color: #0f172a; }
+.start-confirm { margin-top: 14px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px; font-size: 12px; letter-spacing: 0.08em; color: #0f172a; }
 .start-confirm[hidden] { display: none; }
-.start-confirm-row { display: block; margin: 0 0 10px; cursor: default; }
-.start-confirm button { background: #0f172a; color: #fff; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+.start-acts .start-confirm-row { display: block; margin: 0 0 10px; cursor: default; }
+.start-confirm button { white-space: nowrap; background: #0f172a; color: #fff; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
 .start-confirm [data-confirm="no"] { background: transparent; color: #64748b; }
 .start-confirm [data-confirm="no"]:hover { color: #0f172a; }
 
@@ -118,7 +118,7 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
 
 /* sound and music, the credit */
 .start-foot {
-    position: fixed; left: 0; right: 0; bottom: 0; padding: 0 28px 20px;
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 28px 20px; background: #f1f5f9;
     display: flex; justify-content: space-between; align-items: flex-end;
     color: #64748b; font-size: 12px; letter-spacing: 0.08em;
 }
@@ -138,7 +138,7 @@ body.start-up #menu-wrapper, body.start-up #version-info { display: none !import
     .start-hand-paper { translate: -55px 32px; }
     .start-title { margin-bottom: 40px; }
     .start-cycle:hover .start-hole { animation-name: start-swallow-small; }
-    .start-foot { padding: 0 16px 14px; }
+    .start-foot { padding: 8px 16px 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .start-ring, .start-hand { animation: none; }
