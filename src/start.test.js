@@ -57,3 +57,92 @@ describe('the start model', () => {
         expect(JSON.stringify(WORDS)).not.toMatch(/—/);
     });
 });
+
+import { JSDOM } from 'jsdom';
+import { jest } from '@jest/globals';
+
+describe('the screen', () => {
+    let dom, showStart, prefs, setPref;
+    beforeEach(async () => {
+        dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { url: 'http://localhost/', pretendToBeVisual: true });
+        global.window = dom.window; global.document = dom.window.document; global.localStorage = dom.window.localStorage;
+        global.CustomEvent = dom.window.CustomEvent; global.KeyboardEvent = dom.window.KeyboardEvent;
+        prefs = { sfx: true, music: false };
+        setPref = jest.fn((n, on) => { prefs[n] = on; });
+        jest.resetModules();
+        jest.unstable_mockModule('./audio.js', () => ({ audio: { getPrefs: () => ({ ...prefs }), setPref } }));
+        ({ showStart } = await import('./start.js'));
+    });
+    afterEach(() => { delete global.window; delete global.document; delete global.localStorage; delete global.CustomEvent; delete global.KeyboardEvent; });
+    const text = (sel) => [...document.querySelectorAll(sel)].map((e) => e.textContent.trim());
+
+    test('a new player: the title, START, no New game, no rows; START is the choice', async () => {
+        const s = showStart({ version: 'v9.9.9' });
+        expect(document.body.classList.contains('start-up')).toBe(true);
+        expect(document.querySelector('.start-title').textContent).toBe('ROCK PAPER INFINITY');
+        expect(document.querySelector('.start-title .start-letter').style.animationDelay).toBe('300ms');
+        expect(document.querySelector('[data-start="primary"]').textContent).toBe('START');
+        expect(document.querySelector('[data-start="new"]')).toBeNull();
+        expect(document.querySelectorAll('.start-acts li').length).toBe(0);
+        expect(document.querySelector('.start-version').textContent).toBe('v9.9.9');
+        expect(text('[data-pref]')).toEqual(['Sound · on', 'Music · off']);
+        document.querySelector('[data-start="primary"]').click();
+        expect(await s.choice).toEqual({ kind: 'new' });
+        s.lift();
+        expect(document.getElementById('start-screen')).toBeNull();
+        expect(document.body.classList.contains('start-up')).toBe(false);
+    });
+
+    test('a returning player: CONTINUE with the line, New game asks first, the rows', async () => {
+        localStorage.setItem('rpi-phase', 'DEEP'); localStorage.setItem('rpi-deep-version', 'dig');
+        localStorage.setItem('rpi-reached', JSON.stringify(['trivial', 'capital', 'war', 'drone']));
+        const s = showStart({ version: 'v1' });
+        expect(document.querySelector('[data-start="primary"]').textContent).toBe('CONTINUE');
+        expect(document.querySelector('.start-where').textContent).toBe('IV · Deep, the drone');
+        expect(text('.start-acts li')).toEqual(['I Trivial', 'II Capital', 'III War', 'IV Deep · Drone', 'IV Deep · Vault']);
+        expect([...document.querySelectorAll('.start-acts li')].map((li) => li.dataset.state)).toEqual(['reached', 'reached', 'reached', 'now', 'grey']);
+        document.querySelector('[data-start="new"]').click();
+        const confirm = document.querySelector('.start-confirm');
+        expect(confirm.hidden).toBe(false);
+        expect(confirm.querySelector('.start-confirm-text').textContent).toBe('Your game will be erased.');
+        expect(text('.start-confirm button')).toEqual(['Start over', 'Keep']);
+        confirm.querySelector('[data-confirm="no"]').click();
+        expect(confirm.hidden).toBe(true);
+        document.querySelector('[data-start="new"]').click();
+        confirm.querySelector('[data-confirm="yes"]').click();
+        expect(await s.choice).toEqual({ kind: 'new' });
+    });
+
+    test('an act: the current one continues, a reached one asks then starts again, a grey one does nothing', async () => {
+        localStorage.setItem('rpi-phase', 'DEEP'); localStorage.setItem('rpi-deep-version', 'dig');
+        localStorage.setItem('rpi-reached', JSON.stringify(['trivial', 'capital', 'war', 'drone']));
+        let s = showStart({ version: 'v1' });
+        document.querySelector('.start-acts li[data-id="vault"]').click();
+        expect(document.querySelector('.start-confirm').hidden).toBe(true);
+        document.querySelector('.start-acts li[data-id="war"]').click();
+        const confirm = document.querySelector('.start-confirm');
+        expect(confirm.hidden).toBe(false);
+        expect(confirm.querySelector('.start-confirm-text').textContent).toBe('Starting III · War again replaces your game.');
+        expect(confirm.querySelector('[data-confirm="yes"]').textContent).toBe('Play again');
+        confirm.querySelector('[data-confirm="yes"]').click();
+        expect(await s.choice).toEqual({ kind: 'act', id: 'war' });
+        s.lift();
+        s = showStart({ version: 'v1' });
+        document.querySelector('.start-acts li[data-id="drone"]').click();
+        expect(await s.choice).toEqual({ kind: 'continue' });
+        s.lift();
+    });
+
+    test('Enter is the primary word; the toggles set the preference and tell the menu', async () => {
+        localStorage.setItem('rpi-phase', 'INDUSTRY'); localStorage.setItem('rpi-reached', '["trivial"]');
+        const s = showStart({ version: 'v1' });
+        const told = jest.fn(); window.addEventListener('rpi-audio-change', told);
+        document.querySelector('[data-pref="music"]').click();
+        expect(setPref).toHaveBeenCalledWith('music', true);
+        expect(document.querySelector('[data-pref="music"]').textContent).toBe('Music · on');
+        expect(told).toHaveBeenCalled();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        expect(await s.choice).toEqual({ kind: 'continue' });
+        s.lift();
+    });
+});

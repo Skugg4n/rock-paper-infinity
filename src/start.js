@@ -88,3 +88,164 @@ export function startModel(storage = defaultStorage()) {
     }
     return { fresh: !here, continueTo: here ? { phase: get(storage, PHASE_KEY), label: here.label } : null, acts };
 }
+
+// ---------------------------------------------------------------- the screen
+
+const BODY_CLASS = 'start-up';
+const HANDS = [['Gem', 'rock'], ['Scissors', 'scissors'], ['FileText', 'paper']];   // chapter I's glyphs, in the cycle's order
+const TYPE_START_MS = 300;
+const TYPE_MS = 70;
+
+function iconSvg(name) {
+    const L = typeof window !== 'undefined' ? window.lucide : null;
+    const data = L?.icons?.[name];
+    if (!data || typeof L.createElement !== 'function') return null;
+    return L.createElement(data);
+}
+
+function actLabel(act) { return `${act.roman} · ${act.name.replace(' · ', ', the ').replace('Deep, the Drone', 'Deep, the drone').replace('Deep, the Vault', 'Deep, the vault')}`; }
+
+/**
+ * Builds the screen on document.body and resolves `choice` with what the player chose.
+ * @param {object} [opts]
+ * @param {Storage} [opts.storage] - localStorage unless a test says otherwise
+ * @param {string} [opts.version] - the version line, bottom right
+ * @returns {{ root: HTMLElement, model: object, choice: Promise<object>, lift: Function }}
+ */
+export function showStart({ storage = defaultStorage(), version = '' } = {}) {
+    const model = startModel(storage);
+    const root = document.createElement('div');
+    root.id = 'start-screen';
+    root.className = 'start-screen';
+    root.innerHTML = `
+      <div class="start-cycle" aria-hidden="true">
+        <div class="start-halo start-halo-light"></div>
+        <div class="start-halo start-halo-dark"></div>
+        <div class="start-hole"></div>
+        <div class="start-ring">${HANDS.map(([, k]) => `<div class="start-hand start-hand-${k}"><div class="start-disc"></div></div>`).join('')}</div>
+      </div>
+      <h1 class="start-title"></h1>
+      <div class="start-main">
+        <button type="button" class="start-word" data-start="primary"></button>
+        <div class="start-where"></div>
+        ${model.fresh ? '' : `<button type="button" class="start-new" data-start="new">${WORDS.newGame}</button>`}
+      </div>
+      <div class="start-confirm" hidden>
+        <span class="start-confirm-text"></span>
+        <button type="button" data-confirm="yes"></button>
+        <button type="button" data-confirm="no">${WORDS.keep}</button>
+      </div>
+      <ul class="start-acts"></ul>
+      <footer class="start-foot">
+        <div class="start-audio">
+          <button type="button" data-pref="sfx"></button>
+          <button type="button" data-pref="music"></button>
+        </div>
+        <div class="start-by"><b>${WORDS.by}</b><span class="start-version"></span></div>
+      </footer>`;
+
+    // the hands
+    HANDS.forEach(([icon, k]) => { const svg = iconSvg(icon); if (svg) root.querySelector(`.start-hand-${k} .start-disc`).appendChild(svg); });
+
+    // the title, a letter at a time
+    const h1 = root.querySelector('.start-title');
+    [...WORDS.title].forEach((ch, i) => {
+        const el = document.createElement('span');
+        el.className = 'start-letter';
+        el.textContent = ch;
+        el.style.animationDelay = `${TYPE_START_MS + i * TYPE_MS}ms`;
+        h1.appendChild(el);
+    });
+
+    // the words
+    const primary = root.querySelector('[data-start="primary"]');
+    primary.textContent = model.fresh ? WORDS.start : WORDS.continue;
+    root.querySelector('.start-where').textContent = model.continueTo?.label || '';
+    root.querySelector('.start-version').textContent = version;
+
+    // the rows
+    const list = root.querySelector('.start-acts');
+    for (const a of model.acts) {
+        const li = document.createElement('li');
+        li.dataset.id = a.id;
+        li.dataset.state = a.state;
+        li.innerHTML = `<span class="start-act-n"></span> <span class="start-act-t"></span>`;
+        li.querySelector('.start-act-n').textContent = a.roman;
+        li.querySelector('.start-act-t').textContent = a.name;
+        if (a.state !== 'grey') { li.tabIndex = 0; li.setAttribute('role', 'button'); }
+        list.appendChild(li);
+    }
+
+    // sound and music
+    const paintPrefs = () => {
+        const p = audio.getPrefs();
+        root.querySelector('[data-pref="sfx"]').textContent = `${WORDS.sound} · ${p.sfx ? 'on' : 'off'}`;
+        root.querySelector('[data-pref="music"]').textContent = `${WORDS.music} · ${p.music ? 'on' : 'off'}`;
+    };
+    paintPrefs();
+
+    // the choice
+    let resolve;
+    const choice = new Promise((r) => { resolve = r; });
+    let done = false;
+    const choose = (c) => { if (done) return; done = true; resolve(c); };
+
+    const confirm = root.querySelector('.start-confirm');
+    const confirmText = confirm.querySelector('.start-confirm-text');
+    const confirmYes = confirm.querySelector('[data-confirm="yes"]');
+    let onYes = null;
+    const ask = (after, text, yesWord, yes) => {
+        confirmText.textContent = text;
+        confirmYes.textContent = yesWord;
+        onYes = yes;
+        after.insertAdjacentElement('afterend', confirm);
+        confirm.hidden = false;
+        confirmYes.focus();
+    };
+    const closeAsk = () => { confirm.hidden = true; onYes = null; };
+
+    root.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-start], [data-confirm], [data-pref], .start-acts li');
+        if (!t) return;
+        if (t.dataset.confirm === 'yes') { const f = onYes; closeAsk(); f?.(); return; }
+        if (t.dataset.confirm === 'no') { closeAsk(); return; }
+        if (t.dataset.pref) {
+            const name = t.dataset.pref;
+            audio.setPref(name, !audio.getPrefs()[name]);
+            paintPrefs();
+            window.dispatchEvent(new CustomEvent('rpi-audio-change'));
+            return;
+        }
+        if (t.dataset.start === 'primary') { choose(model.fresh ? { kind: 'new' } : { kind: 'continue' }); return; }
+        if (t.dataset.start === 'new') { ask(t, WORDS.erase, WORDS.startOver, () => choose({ kind: 'new' })); return; }
+        const id = t.dataset.id;
+        const state = t.dataset.state;
+        if (!id || state === 'grey') return;
+        if (state === 'now') { choose({ kind: 'continue' }); return; }
+        const act = ACTS.find((a) => a.id === id);
+        if (model.continueTo) ask(t, WORDS.replaces(actLabel(act)), WORDS.playAgain, () => choose({ kind: 'act', id }));
+        else choose({ kind: 'act', id });
+    });
+    const onKey = (e) => {
+        if (e.key === 'Escape') { closeAsk(); return; }
+        if (e.key !== 'Enter' || e.repeat) return;
+        const el = document.activeElement;
+        if (el && root.contains(el) && el !== document.body && el.tagName === 'BUTTON' && el !== primary) return;   // a focused button answers itself
+        if (el && el.matches?.('.start-acts li')) { el.click(); return; }
+        if (!confirm.hidden) return;
+        e.preventDefault();
+        primary.click();
+    };
+    document.addEventListener('keydown', onKey);
+
+    document.body.appendChild(root);
+    document.body.classList.add(BODY_CLASS);
+    primary.focus({ preventScroll: true });
+
+    function lift() {
+        document.removeEventListener('keydown', onKey);
+        root.remove();
+        document.body.classList.remove(BODY_CLASS);
+    }
+    return { root, model, choice, lift };
+}

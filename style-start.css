@@ -1,0 +1,134 @@
+/* The start screen (B456, src/start.js): chapter I's palette, the cycle with the hole, the title
+   typed out, CONTINUE or START, NEW GAME, the acts reached, sound and music, the credit.
+   Under the chapter card (1000) so New game's I · TRIVIAL plays over it; above the phases. */
+.start-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: #f1f5f9;
+    color: #0f172a;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 64px;
+    overflow-y: auto;
+    user-select: none;
+    scrollbar-width: none;
+}
+.start-screen::-webkit-scrollbar { display: none; }
+/* the shell's menu and version line stay out of the way while the screen is up */
+body.start-up #menu-wrapper, body.start-up #version-info { display: none !important; }
+
+.start-screen .start-title, .start-screen .start-word, .start-screen .start-act-n, .start-screen .start-act-t {
+    font-family: 'Bebas Neue', system-ui, sans-serif;
+    letter-spacing: 0.04em;
+    font-weight: 400;
+}
+
+/* the cycle: rock beats scissors beats paper beats rock, turning round a hole. The hole sits BEHIND
+   the hands. On hover it grows, rests, then eats the dark halo, the light halo, the dashed ring and at
+   last the hands, which turn to ghosts in the black: the abyss, in small. The pointer leaving brings
+   everything back (transitions). */
+.start-cycle { position: relative; width: 220px; height: 220px; margin-bottom: 30px; flex: 0 0 auto; }
+.start-cycle::before { content: ''; position: absolute; inset: 22px; border-radius: 50%; border: 1px dashed rgba(15, 23, 42, 0.18); }
+.start-halo { position: absolute; left: 50%; top: 50%; border-radius: 50%; }
+.start-halo-dark { width: 66px; height: 66px; margin: -33px; background: rgba(0, 0, 0, 0.06); }
+.start-halo-light { width: 90px; height: 90px; margin: -45px; background: rgba(0, 0, 0, 0.03); }
+.start-hole {
+    position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; border-radius: 50%;
+    background: #000; box-shadow: inset 0 0 8px #000; z-index: 2;
+    transition: transform 500ms ease;
+}
+.start-ring { position: absolute; inset: 0; z-index: 3; animation: start-turn 48s linear infinite; }
+.start-hand { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px; animation: start-unturn 48s linear infinite; }
+.start-disc {
+    width: 100%; height: 100%; border-radius: 50%; background: #f8fafc; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+    display: flex; align-items: center; justify-content: center; color: #334155;
+    transition: background 350ms, box-shadow 350ms, color 350ms;
+}
+.start-disc svg { width: 32px; height: 32px; stroke-width: 1.4; }
+.start-hand-rock { translate: 0 -80px; }
+.start-hand-scissors { translate: 69px 40px; }
+.start-hand-paper { translate: -69px 40px; }
+@keyframes start-turn { to { transform: rotate(360deg); } }
+@keyframes start-unturn { to { transform: rotate(-360deg); } }
+.start-cycle:hover .start-hole { animation: start-swallow 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+@keyframes start-swallow {
+    0%   { transform: scale(1); }
+    23%  { transform: scale(2.4); }   /* 0.6 s: the hole grows */
+    38%  { transform: scale(2.4); }   /* a rest */
+    54%  { transform: scale(3.4); }   /* the dark halo goes */
+    69%  { transform: scale(4.6); }   /* the light halo goes */
+    100% { transform: scale(10.6); }  /* the ring and the hands */
+}
+.start-cycle:hover .start-disc { animation: start-eaten 450ms 2.05s forwards; }
+@keyframes start-eaten { to { background: transparent; box-shadow: none; color: #f8fafc; } }
+
+/* the title, a letter at a time */
+.start-title { margin: 0 0 56px; font-size: clamp(56px, 11vw, 132px); line-height: 0.9; text-align: center; min-height: 0.9em; }
+.start-letter { display: inline-block; white-space: pre; opacity: 0; animation: start-letter 180ms ease-out forwards; }
+@keyframes start-letter { from { opacity: 0; transform: translateY(0.12em); } to { opacity: 1; transform: none; } }
+
+/* CONTINUE or START, the line under it, New game */
+.start-main { display: flex; flex-direction: column; align-items: center; }
+.start-word {
+    background: transparent; color: #0f172a; border: 0; cursor: pointer; padding: 6px 12px; position: relative;
+    font-size: 40px; line-height: 1; letter-spacing: 0.08em;
+}
+.start-word::after {
+    content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; background: #0f172a;
+    transform: scaleX(0.35); transform-origin: center; transition: transform 300ms;
+}
+.start-word:hover::after, .start-word:focus-visible::after { transform: scaleX(1); }
+.start-where { margin-top: 10px; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: #64748b; min-height: 1em; }
+.start-new { margin-top: 44px; background: transparent; border: 0; cursor: pointer; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #94a3b8; }
+.start-new:hover, .start-new:focus-visible { color: #0f172a; }
+
+/* the question before erasing or starting an act again */
+.start-confirm { margin-top: 14px; display: flex; align-items: center; gap: 14px; font-size: 12px; letter-spacing: 0.08em; color: #0f172a; }
+.start-confirm[hidden] { display: none; }
+.start-confirm button { background: #0f172a; color: #fff; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+.start-confirm [data-confirm="no"] { background: transparent; color: #64748b; }
+.start-confirm [data-confirm="no"]:hover { color: #0f172a; }
+
+/* the acts: one left-aligned block, centred on the page */
+.start-acts { list-style: none; margin: 44px auto 0; padding: 0; display: table; }
+.start-acts li { display: flex; align-items: baseline; gap: 14px; cursor: pointer; margin-bottom: 10px; color: #0f172a; }
+.start-acts .start-act-n { flex: 0 0 40px; text-align: right; font-size: 22px; opacity: 0.55; }
+.start-acts .start-act-t { font-size: 22px; letter-spacing: 0.08em; }
+.start-acts li:hover .start-act-t, .start-acts li:focus-visible .start-act-t { text-decoration: underline; text-underline-offset: 4px; }
+.start-acts li[data-state="now"] .start-act-n { opacity: 1; }
+.start-acts li[data-state="grey"] { color: #94a3b8; cursor: default; }
+.start-acts li[data-state="grey"]:hover .start-act-t { text-decoration: none; }
+
+/* sound and music, the credit */
+.start-foot {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 0 28px 20px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    color: #64748b; font-size: 12px; letter-spacing: 0.08em;
+}
+.start-audio { display: flex; gap: 22px; }
+.start-audio button { background: transparent; border: 0; padding: 0; cursor: pointer; color: inherit; font: inherit; letter-spacing: inherit; }
+.start-audio button:hover { color: #0f172a; }
+.start-by { text-align: right; line-height: 1.6; display: flex; flex-direction: column; }
+.start-by b { font-weight: 500; color: #0f172a; }
+.start-version { opacity: 0.6; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+
+@media (max-width: 479px) {
+    .start-cycle { width: 180px; height: 180px; }
+    .start-hand { width: 60px; height: 60px; margin: -30px; }
+    .start-disc svg { width: 26px; height: 26px; }
+    .start-hand-rock { translate: 0 -64px; }
+    .start-hand-scissors { translate: 55px 32px; }
+    .start-hand-paper { translate: -55px 32px; }
+    .start-title { margin-bottom: 40px; }
+    .start-foot { padding: 0 16px 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .start-ring, .start-hand { animation: none; }
+    .start-cycle:hover .start-hole { animation: none; transform: scale(2.4); }
+    .start-cycle:hover .start-disc { animation: none; }
+    .start-letter { animation: none; opacity: 1; }
+}
