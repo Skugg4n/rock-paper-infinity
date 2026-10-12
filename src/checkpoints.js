@@ -11,7 +11,7 @@ import { DEEP_VERSION_KEY } from './deepVersion.js';
 import { REACHED_KEY } from './reached.js';
 import { VAULT_CHECKPOINTS } from './phase4v/checkpoints.js';
 import { SAVE_KEY as VAULT_SAVE_KEY, serialize as serializeVault } from './phase4v/vault.js';
-import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
+import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, START_SKIP_FLAG } from './constants.js';
 import { initialDeepState, CRYO, DAYS_PER_YEAR, probeDays, impliedFeed, tickDay } from './phase4/deep.js';
 import { initialLayout } from './phase4/layout.js';
 import { serializeDeep } from './phase4/persistence.js';
@@ -399,14 +399,16 @@ function set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } 
 /** deep-tension: the player's own settings survive a jump: the sound (a muted player got the music back),
  *  the debug flag, the chosen view of chapter IV, and the acts reached (the start screen's list). */
 export const KEEP_KEYS = ['rpi-audio', 'rpi-debug', 'rpi-deep-view', DEEP_VERSION_KEY, REACHED_KEY];
-function clearAll() {
+/** Drops every game key; keeps the player's settings (KEEP_KEYS) and the snapshot slots. New game uses it too. */
+export function clearGame() {
     try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && !KEEP_KEYS.includes(k)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
 }
+const clearAll = clearGame;
 
 /** Copies every game key (not slots, not the debug flag) into slot i. */
 export function snapshot(i) {
     const data = {};
-    try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && k !== 'rpi-debug').forEach(k => { data[k] = localStorage.getItem(k); }); } catch { /* ignore */ }
+    try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && k !== 'rpi-debug' && k !== REACHED_KEY).forEach(k => { data[k] = localStorage.getItem(k); }); } catch { /* ignore */ }
     set(SLOTS[i], JSON.stringify({ at: Date.now(), phase: data[PHASE_KEY] || 'INDUSTRY', data }));
 }
 
@@ -419,6 +421,7 @@ export function restore(i) {
     window.__rpiSkipSave = true;   // the phases save on unload; not this time
     clearAll();
     for (const [k, v] of Object.entries(data)) set(k, v);
+    try { sessionStorage.setItem(START_SKIP_FLAG, '1'); } catch { /* ignore */ }   // straight into the game after the reload, no start screen
     location.reload();
     return true;
 }
@@ -436,5 +439,6 @@ export function jumpTo(id) {
     // a jump into chapter IV picks the version it belongs to
     if (id.startsWith('iv-')) set(DEEP_VERSION_KEY, id.startsWith('iv-vault') ? 'vault' : id.startsWith('iv-dig') ? 'dig' : 'colony');
     try { sessionStorage.removeItem('rpi-recovered'); } catch { /* ignore */ }
+    try { sessionStorage.setItem(START_SKIP_FLAG, '1'); } catch { /* ignore */ }   // straight into the game after the reload, no start screen
     location.reload();
 }

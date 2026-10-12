@@ -1,13 +1,15 @@
 import { phases, setPhase } from './src/gamePhase.js';
-import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, DEBUG_KEY } from './src/constants.js';
+import { PHASE_KEY, DEBUG_KEY, START_SKIP_FLAG, START_CARD_FLAG } from './src/constants.js';
 import { preloadIcons, replaceIcons } from './src/icons.js';
 import { VERSION } from './src/version.js';
 import { playChapterCard } from './src/chapterCard.js';
 import { initPerf } from './src/perf.js';
-import { CHECKPOINTS, jumpTo, snapshot, restore, slotInfo } from './src/checkpoints.js';
+import { CHECKPOINTS, jumpTo, clearGame, snapshot, restore, slotInfo } from './src/checkpoints.js';
 import { MODULE_PATHS } from './src/modules.js';
 import { audio } from './src/audio.js';
 import { DEEP_VERSION_KEY, currentDeep, nextDeep } from './src/deepVersion.js';
+import { showStart, CARD_OF, ACTS } from './src/start.js';
+import { migrateReached, markReached } from './src/reached.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -56,13 +58,21 @@ function setPaused(on) {
 pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); setPaused(!window.__rpiPaused); pauseBtn.blur(); });
 
 // Sound and music on/off in the ☰ menu (src/audio.js keeps and saves the choice).
-for (const [id, pref, label] of [['sound-toggle', 'sfx', 'Sound'], ['music-toggle', 'music', 'Music']]) {
-  const btn = document.getElementById(id);
-  if (!btn) continue;
-  const paint = () => { btn.textContent = `${label} · ${audio.getPrefs()[pref] ? 'on' : 'off'}`; };
-  btn.addEventListener('click', (e) => { e.stopPropagation(); audio.setPref(pref, !audio.getPrefs()[pref]); paint(); });
-  paint();
+// The start screen has the same two toggles; it says 'rpi-audio-change' and the menu follows.
+const AUDIO_ITEMS = [['sound-toggle', 'sfx', 'Sound'], ['music-toggle', 'music', 'Music']];
+function paintAudioMenu() {
+  for (const [id, pref, label] of AUDIO_ITEMS) {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = `${label} · ${audio.getPrefs()[pref] ? 'on' : 'off'}`;
+  }
 }
+for (const [id, pref] of AUDIO_ITEMS) {
+  document.getElementById(id)?.addEventListener('click', (e) => { e.stopPropagation(); audio.setPref(pref, !audio.getPrefs()[pref]); paintAudioMenu(); });
+}
+paintAudioMenu();
+window.addEventListener('rpi-audio-change', paintAudioMenu);
+// ☰ → Main menu: the page again, with the start screen in front (New game lives there now)
+document.getElementById('main-menu-btn')?.addEventListener('click', () => window.location.reload());
 document.getElementById('menu-wrapper')?.appendChild(pauseBtn);
 setPaused(false);
 document.addEventListener('keydown', (e) => {
@@ -197,6 +207,10 @@ async function recoverFromStaleCache(err) {
   location.reload();
 }
 
+function takeFlag(key) {
+  try { const v = sessionStorage.getItem(key); if (v !== null) sessionStorage.removeItem(key); return v; } catch { return null; }
+}
+
 async function bootstrap() {
   try {
     await preloadIcons();
@@ -205,22 +219,36 @@ async function bootstrap() {
     console.error('Failed to preload icons', err);
   }
 
-  const isFreshPlayer =
-    !localStorage.getItem(PHASE1_CONSTANTS.SAVE_KEY) &&
-    !localStorage.getItem(PHASE2_CONSTANTS.SAVE_KEY) &&
-    !localStorage.getItem(PHASE4_CONSTANTS.SAVE_KEY) &&
-    !localStorage.getItem('rpi-deep-vault') &&
-    !localStorage.getItem('rpi-deep-dig') &&
-    !localStorage.getItem('rpi-unity') &&
-    // a game already in some chapter (a checkpoint, the dig) is not a fresh player: no I · TRIVIAL card
-    !localStorage.getItem(PHASE_KEY);
-
-  if (isFreshPlayer) {
-    await playChapterCard({ roman: 'I', title: 'TRIVIAL' });
-  }
-
+  migrateReached();   // an older game's saves → the acts reached (once)
   const savedPhase = localStorage.getItem(PHASE_KEY) || phases.INDUSTRY;
-  await setPhase(savedPhase);
+
+  // An act started again from the start screen: its checkpoint reloaded the page with this flag;
+  // the act's chapter card, then the act.
+  const cardFor = takeFlag(START_CARD_FLAG);
+  if (cardFor && CARD_OF[cardFor]) {
+    await playChapterCard({ ...CARD_OF[cardFor], onMidpoint: () => setPhase(savedPhase).catch((e) => console.error('the act failed to start', e)) });
+    return;
+  }
+  // The test menu, the snapshot slots and the headless scripts reload straight into the game.
+  const skip = takeFlag(START_SKIP_FLAG) !== null || /[?&]go(?=&|$)/.test(window.location.search);
+  if (skip) { await setPhase(savedPhase); return; }
+
+  const screen = showStart({ version: VERSION });
+  const choice = await screen.choice;
+  if (choice.kind === 'continue') {
+    screen.lift();
+    await setPhase(savedPhase);
+  } else if (choice.kind === 'new') {
+    clearGame();
+    markReached('trivial');
+    await playChapterCard({ roman: 'I', title: 'TRIVIAL', onMidpoint: () => screen.lift() });
+    await setPhase(phases.INDUSTRY);
+  } else if (choice.kind === 'act') {
+    const act = ACTS.find((a) => a.id === choice.id);
+    if (!act?.checkpoint) { screen.lift(); await setPhase(savedPhase); return; }
+    try { sessionStorage.setItem(START_CARD_FLAG, act.id); } catch { /* the act starts without its card */ }
+    jumpTo(act.checkpoint);   // writes the act's start, sets the skip flag, reloads
+  }
 }
 
 bootstrap()
