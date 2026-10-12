@@ -996,6 +996,24 @@ export function clearGame() {
 const clearAll = clearGame;
 ```
 
+A snapshot slot must not carry the reached set back in time (restoring an old slot would shrink the "never forgets" set): in `snapshot(i)` exclude it like the debug flag. Change the filter in `snapshot` to:
+
+```js
+    try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && k !== 'rpi-debug' && k !== REACHED_KEY).forEach(k => { data[k] = localStorage.getItem(k); }); } catch { /* ignore */ }
+```
+
+and add this case to `src/checkpoints.test.js`:
+
+```js
+test('a snapshot slot leaves the reached set out, so restoring it never shrinks the list', () => {
+    localStorage.setItem('rpi-phase', 'CITY'); localStorage.setItem('rpi-reached', '["trivial","capital"]');
+    mod.snapshot(0);
+    const slot = JSON.parse(localStorage.getItem('rpi-slot-1'));
+    expect(slot.data['rpi-phase']).toBe('CITY');
+    expect(slot.data['rpi-reached']).toBeUndefined();
+});
+```
+
 Add `START_SKIP_FLAG` to the import from `./constants.js`, and in both `restore(i)` and `jumpTo(id)`, right before `location.reload();`:
 
 ```js
