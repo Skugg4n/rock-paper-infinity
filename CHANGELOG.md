@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.93.3 - 2026-10-12 (the dig: open air is free again)
+
+- Ola: "it moves SO annoyingly in open spaces since the last move update." With STEERING III the one-tile pace now applies only where a tile matters, digging: through open air a held key just goes, sideways at the drive's speed and up as a flight. Down through air keeps its pace until the three-tile fall (v1.93.2). A tap is still one tile.
+
 ## v1.93.2 - 2026-10-12 (the dig: the hovering drone falls when down is held)
 
 - Ola, playing live: "once you have bought the upgrade that moves one tile per press you can no longer fall." With STEERING III (hover), down held through open air for three tiles now lets go: the drone falls, speeding up as before, until the key is released (then it hovers again). A tap is still one tile. B459.

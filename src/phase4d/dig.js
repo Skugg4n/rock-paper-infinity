@@ -735,6 +735,13 @@ export const HOVER_REPEAT = 0.25;
 function paceOk(s, dir) {
     const lv = s.levels.steering || 0;
     if (!s.pressSteps || isHome(s)) return true;
+    // v1.93.3 (Ola: "it moves SO annoyingly in open spaces"): the one-tile pace is for digging, where
+    // a tile matters. Through open air a held key just goes: sideways at the drive's speed, up as a
+    // flight. Down through air keeps its pace until the three-tile fall (v1.93.2).
+    if (lv >= 2 && dir !== 'down') {
+        const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0, dy = dir === 'up' ? -1 : 0;
+        if (tileAt(s, s.x + dx, s.y + dy) === T.AIR) return true;
+    }
     const held = s.time - (s.holdFrom ?? s.time);
     if (lv >= 2) {
         if ((dir === 'up' || dir === 'down') && held > 1.5) return true;

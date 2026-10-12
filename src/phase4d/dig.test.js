@@ -814,6 +814,23 @@ describe('v1.92.4: STEERING III, pacing, trapped', () => {
         run(s, 1, { dir: 'down' }); run(s, 10);
         expect(s.y).toBe(y1 + 1);
     });
+    test('STEERING III: through open air a held key just goes; the pace is for digging (v1.93.3)', () => {
+        const s = preparedState({ row: 30 });
+        s.y = 30; s.x = 5; s.levels.steering = 2;
+        for (let x = 0; x < W; x++) s.tiles[30 * W + x] = T.AIR;          // an open tunnel
+        for (let y = 10; y <= 30; y++) s.tiles[y * W + 5] = T.AIR;          // and a shaft up from it
+        run(s, 20, { dir: 'right' });                                       // held 1 s in the open
+        expect(s.x - 5).toBeGreaterThanOrEqual(6);                          // well past four a second
+        s.x = 5; s.act = null; s.commit = null;
+        run(s, 20, { dir: 'up' });                                          // held 1 s up the shaft
+        expect(30 - s.y).toBeGreaterThanOrEqual(6);
+        // digging stays paced: one tile per press into rock
+        const t = preparedState({ row: 30 });
+        t.y = 30; t.x = 5; t.levels.steering = 2;
+        for (let x = 0; x < W; x++) t.tiles[30 * W + x] = x < 6 ? T.AIR : T.ROCK;
+        run(t, 20, { dir: 'right' });
+        expect(t.x - 5).toBeLessThanOrEqual(5);
+    });
     test('STEERING II: a tap up is exactly one tile', () => {
         const s = preparedState({ row: 30 });
         s.y = 30; s.x = HOME_X;
