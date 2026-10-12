@@ -15,7 +15,7 @@
 - Branch `start-screen` in worktree `~/Projects/rpi-start` (from origin/main v1.92.8). Commit after every task. Push when the network is back (`git push`; it failed offline on 2026-10-12).
 - `node_modules` in the worktree is a symlink to `~/Projects/rock-paper-infinity/node_modules` (already made). Never `npm install` on Drive.
 - Run tests with `npm test` (`NODE_OPTIONS='--experimental-vm-modules' jest`), lint with `npm run lint`. Both must pass at every commit.
-- Strings are exactly the spec's: `ROCK PAPER INFINITY`, `CONTINUE`, `START`, `New game`, `Your game will be erased.`, `Start over`, `Keep`, `Starting III · War again replaces your game.`, `Play again`, `A game by Ola Belin`, `Sound · on`, `Music · off`. Act names: `Trivial`, `Capital`, `War`, `Deep · Drone`, `Deep · Vault`, `Unity`, `Infinity`. Continue lines: `I · Trivial`, `II · Capital`, `III · War`, `The fork`, `IV · Deep, the drone`, `IV · Deep, the vault`, `IV · Deep`, `V · Unity`. No em-dashes anywhere (`—`).
+- Strings are exactly the spec's: `ROCK PAPER INFINITY`, `CONTINUE`, `START`, `New game`, `Your game will be erased.`, `Start over`, `Keep`, `Starting III · War again replaces your game.`, `Play again`, `A game by Ola Belin`, `Sound · on`, `Music · off`. Act names: `Trivial`, `Capital`, `War`, `Deep · Drone`, `Deep · Vault`, `Unity`, `Infinity`. Continue lines: `I · Trivial`, `II · Capital`, `III · War`, `The fork`, `IV · Deep, the drone`, `IV · Deep, the vault`, `IV · Deep`, `V · Unity`. No em-dashes anywhere (`,`).
 - Keys: `rpi-reached` (localStorage, JSON array), `rpi-go` and `rpi-card` (sessionStorage flags). All three named in `src/constants.js`.
 - Hot-path rules of CLAUDE.md do not apply (no tick); event listeners on the screen die with the screen (`root.remove()`).
 - Version at the end: `v1.93.0` in `src/version.js`, `index.html` (`#version-info`), `package.json`, `CHANGELOG.md`.
@@ -370,7 +370,7 @@ describe('the start model', () => {
         expect(CARD_OF.infinity).toBeUndefined();
         expect(WORDS.title).toBe('ROCK PAPER INFINITY');
         expect(WORDS.replaces('III · War')).toBe('Starting III · War again replaces your game.');
-        expect(JSON.stringify(WORDS)).not.toMatch(/—/);
+        expect(JSON.stringify(WORDS)).not.toMatch(/,/);
     });
 });
 ```
