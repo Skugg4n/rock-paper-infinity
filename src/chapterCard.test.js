@@ -191,3 +191,21 @@ test('to-come followed by normal call: normal is no-op while to-come holds wall'
     await jest.advanceTimersByTimeAsync(0);
     expect(toComeDone).toBe(false);
 });
+
+test('a card marks its act as reached: I, II, III, V, VI, never IV', async () => {
+    const { markReached: _m, reachedSet } = await import('./reached.js');
+    const store = {};
+    global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+    try {
+        for (const roman of ['I', 'II', 'III', 'IV', 'V', 'VI']) {
+            const mod = await import('./chapterCard.js');
+            if (mod._resetForTesting) mod._resetForTesting();
+            const p = mod.playChapterCard({ roman, title: 'X' });
+            await jest.runAllTimersAsync();
+            await p;
+        }
+        expect([...reachedSet(global.localStorage)]).toEqual(['trivial', 'capital', 'war', 'unity', 'infinity']);
+    } finally {
+        delete global.localStorage;
+    }
+});

@@ -149,4 +149,14 @@ describe('the interim', () => {
         expect(blackVeil(null)).toBe(false);
         expect(DEEP_CARD.dark && DEEP_CARD.slow).toBe(true);
     });
+
+    test('the choice marks the act reached, in the same storage', async () => {
+        const { REACHED_KEY } = await import('./reached.js');
+        const store = {};
+        const storage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+        writeChoice('drone', storage);
+        expect(JSON.parse(store[REACHED_KEY])).toEqual(['drone']);
+        writeChoice('vault', storage);
+        expect(JSON.parse(store[REACHED_KEY])).toEqual(['drone', 'vault']);
+    });
 });

@@ -1,4 +1,5 @@
 import { audio } from './audio.js';
+import { markReached, ACT_OF_ROMAN } from './reached.js';
 
 const REDUCED_MOTION = typeof window !== 'undefined'
     && window.matchMedia
@@ -35,6 +36,9 @@ function delay(ms) {
  */
 export function playChapterCard({ roman, title, mode = 'normal', onMidpoint, dark = false, hold, slow = false, pause = 0, silent = false } = {}) {
     if (_cardActive) return Promise.resolve();
+    // The start screen lists the acts reached, ever (src/reached.js). A card is the moment an
+    // act opens; IV's card is the interim's, which marks drone or vault itself.
+    if (ACT_OF_ROMAN[roman]) markReached(ACT_OF_ROMAN[roman]);
     if (!silent) audio.swell(dark);
 
     const card = el('#chapter-card');

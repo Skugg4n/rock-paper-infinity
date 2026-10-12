@@ -13,6 +13,7 @@
 import { audio } from './audio.js';
 import { playChapterCard } from './chapterCard.js';
 import { DEEP_VERSION_KEY } from './deepVersion.js';
+import { markReached } from './reached.js';
 
 // ---------------------------------------------------------------- pure rules (tested)
 
@@ -154,6 +155,7 @@ export function writeChoice(act, storage) {
     const version = VERSION_OF[act];
     if (!version) throw new Error(`interim: no act "${act}"`);
     try { storage?.setItem(DEEP_VERSION_KEY, version); } catch { /* the choice still holds for this load */ }
+    markReached(act, storage);   // the start screen lists the act reached (drone or vault)
     return version;
 }
 
