@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (mobile)
+## v1.94.1 - 2026-10-12 (the phone pass: every chapter fits a phone, CLONE can be tapped)
 
 ### v1.94.1 - 2026-10-12 (the mobile pass)
 
