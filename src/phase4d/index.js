@@ -168,7 +168,7 @@ function buildDom(host) {
       <div data-show="finds" class="dig-row"><span class="dymo is-small">FINDS</span><span class="dig-val" id="dig-finds">0 / 12</span></div>
       <div class="dig-row" id="dig-q-row" hidden><span class="dymo is-small">QUANTUM OBJECT</span><span class="dig-val" id="dig-q">1</span></div>
       <button type="button" class="dig-ping" id="dig-ping" hidden><span>PING</span><small>G</small><i id="dig-ping-bar"></i></button>
-      <button type="button" class="dig-ping" data-q="booster" hidden><span>BOOSTER</span><small>B</small><i></i></button>
+      <button type="button" class="dig-ping" data-q="booster" hidden><span>BOOSTER</span><small>B · SHIFT</small><i></i></button>
       <button type="button" class="dig-ping" data-q="teleport" hidden><span>TELEPORT</span><small>T</small><i></i></button>
       <button type="button" class="dig-ping" data-q="shock" hidden><span>SHOCK WAVE</span><small>Q</small><i></i></button>`;
     const shop = el('div', 'dig-card dig-shop');
@@ -266,8 +266,8 @@ export function init() {
         }
         if (confirmKey) return;
         if ((e.key === 'g' || e.key === 'G') && !stopOpen(s)) { e.preventDefault(); ping(s); return; }
-        // the lab's gifts: B, T, Q
-        const qk = { b: boost, t: teleport, q: shock }[e.key.toLowerCase()];
+        // the lab's gifts: B (or Shift, Ola), T, Q
+        const qk = e.key === 'Shift' ? boost : { b: boost, t: teleport, q: shock }[e.key.toLowerCase()];
         if (qk && !stopOpen(s)) { e.preventDefault(); qk(s); return; }
         if (!d) return;
         e.preventDefault();

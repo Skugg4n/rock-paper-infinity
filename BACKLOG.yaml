@@ -3573,5 +3573,14 @@ items:
     request: |
       Players must get important updates: find a way to make the browser pick up a new deploy, or let
       the game reload itself at a safe moment (one player today, but updates must reach them).
-    status: open
+    status: done
+    resolved_in: v1.94.0
+    notes: "src/update-check.js + main.js: src/version.js fetched no-cache every 10 min and on tab focus; start screen reloads at once, a game gets a pill bottom right, 10 min away reloads by itself."
+  - id: B461
+    added: 2026-10-12
+    source: "Ola (chat, playing the dig live)"
+    request: Boost on Shift as well as B.
+    status: done
+    resolved_in: v1.94.0
+    notes: "src/phase4d/index.js keydown: Shift calls boost(); the button reads B · SHIFT."
 

@@ -10,6 +10,7 @@ import { audio } from './src/audio.js';
 import { DEEP_VERSION_KEY, currentDeep, nextDeep } from './src/deepVersion.js';
 import { showStart, whereIs, CARD_OF, ACTS } from './src/start.js';
 import { migrateReached, markReached, markReachedThrough } from './src/reached.js';
+import { startUpdateCheck, OFFER } from './src/update-check.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -259,3 +260,26 @@ async function bootstrap() {
 bootstrap()
   .then(() => { try { sessionStorage.removeItem(RECOVERY_FLAG); } catch { /* ignore */ } })
   .catch(recoverFromStaleCache);
+
+// Updates reach the player (B460, src/update-check.js): a newer src/version.js reloads the start
+// screen at once, offers a small pill in a game, and reloads by itself after a long absence.
+let updatePill = null;
+function offerUpdate(latest) {
+  if (updatePill) { updatePill.textContent = OFFER(latest); return; }
+  updatePill = document.createElement('button');
+  updatePill.type = 'button';
+  updatePill.className = 'update-pill';
+  updatePill.textContent = OFFER(latest);
+  updatePill.addEventListener('click', () => window.location.reload());
+  document.body.appendChild(updatePill);
+}
+startUpdateCheck({
+  running: VERSION,
+  fetchText: async (path) => {
+    const r = await fetch(new URL(path, window.location.href), { cache: 'no-store' });
+    if (!r.ok) throw new Error(`version check ${r.status}`);
+    return r.text();
+  },
+  isStartUp: () => document.body.classList.contains('start-up'),
+  onDecision: (action, latest) => { if (action === 'reload') window.location.reload(); else offerUpdate(latest); },
+});

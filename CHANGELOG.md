@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.94.0 - 2026-10-12 (updates reach the player; Shift boosts)
+
+- **Updates reach the player** (B460, src/update-check.js). The page asks for src/version.js (no cache) every ten minutes and whenever the tab comes back into view. A newer version reloads the start screen at once (nothing to lose); in a game a small pill bottom right says `v1.95.0 is here · reload`, and after ten minutes away the page reloads by itself when the tab comes back (the chapters save every second). Ola: "we have ONE player, but important updates must reach them."
+- **The dig: Shift boosts** as well as B (Ola). The booster button says `B · SHIFT`.
+
 ## v1.93.3 - 2026-10-12 (the dig: open air is free again)
 
 - Ola: "it moves SO annoyingly in open spaces since the last move update." With STEERING III the one-tile pace now applies only where a tile matters, digging: through open air a held key just goes, sideways at the drive's speed and up as a flight. Down through air keeps its pace until the three-tile fall (v1.93.2). A tap is still one tile.

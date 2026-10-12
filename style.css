@@ -591,3 +591,12 @@ body.paused #phase-industry { opacity: 0.7; transition: opacity 0.2s; }
 /* The version label is also the secret debug switch (five quick clicks). */
 #version-info { z-index: 1501; cursor: default; }
 #version-info.debug-flash { color: #475569; }
+
+/* A newer version is live (src/update-check.js): the pill bottom right reloads. Above the menu. */
+.update-pill {
+    position: fixed; right: 12px; bottom: 10px; z-index: 1502;
+    background: #0f172a; color: #fff; border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+}
+.update-pill:hover { background: #334155; }
+body.start-up .update-pill { display: none; }
