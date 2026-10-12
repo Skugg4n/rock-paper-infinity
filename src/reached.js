@@ -60,10 +60,29 @@ export function migrateReached(storage = defaultStorage()) {
         set.add('war');   // the colony too: you came through the war
     }
     if (phase === 'UNITY') set.add('unity');
-    // everything below a reached act was reached on the way
-    if (set.has('unity')) { set.add('war'); }
-    if (set.has('drone') || set.has('vault') || set.has('war')) { set.add('war'); set.add('capital'); }
-    if (set.has('capital')) set.add('trivial');
+    fillBelow(set);
     write(storage, set);
     return reachedSet(storage);
+}
+
+/** Everything below a reached act was reached on the way: V means the war, IV or III mean the city, II means I. */
+function fillBelow(set) {
+    if (set.has('unity')) set.add('war');
+    if (set.has('drone') || set.has('vault') || set.has('war')) { set.add('war'); set.add('capital'); }
+    if (set.has('capital')) set.add('trivial');
+    return set;
+}
+
+/**
+ * Marks the act the game is in, and everything on the way to it. The start screen calls it with
+ * where the game stands, so a checkpoint jump (no chapter card) still lists the act.
+ */
+export function markReachedThrough(id, storage = defaultStorage()) {
+    const set = reachedSet(storage);
+    if (!ACT_IDS.includes(id)) return set;
+    const before = set.size;
+    set.add(id);
+    fillBelow(set);
+    if (set.size !== before) write(storage, set);
+    return new Set(ACT_IDS.filter((a) => set.has(a)));
 }

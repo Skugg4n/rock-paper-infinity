@@ -45,6 +45,7 @@ From `rpi-phase` and the saves: INDUSTRY → `I · Trivial`; CITY → `II · Cap
 - `playChapterCard` marks by roman: I → trivial, II → capital, III → war, V → unity, VI → infinity. (IV is not marked by the card.)
 - The interim's `writeChoice(act)` marks `drone` or `vault`.
 - New game marks `trivial`.
+- The bootstrap marks where the game stands, and everything on the way to it (`markReachedThrough`), so a checkpoint jump (which plays no card) still lists the act.
 
 **Migration, first load with no `rpi-reached`:** derive it from what exists: `rpi-save` → trivial; `rpi-stage2` → capital, and war if that save says the war is on or `interimChosen` is set; `rpi-deep-dig` → drone; `rpi-deep-vault` → vault; `rpi-deep` (the colony) → nothing new; `rpi-unity` → unity; `rpi-phase` DEEP/UNITY → the act it names. Write the key. Ola's own games show the right list without doing anything.
 

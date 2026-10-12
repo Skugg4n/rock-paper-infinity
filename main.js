@@ -8,8 +8,8 @@ import { CHECKPOINTS, jumpTo, clearGame, snapshot, restore, slotInfo } from './s
 import { MODULE_PATHS } from './src/modules.js';
 import { audio } from './src/audio.js';
 import { DEEP_VERSION_KEY, currentDeep, nextDeep } from './src/deepVersion.js';
-import { showStart, CARD_OF, ACTS } from './src/start.js';
-import { migrateReached, markReached } from './src/reached.js';
+import { showStart, whereIs, CARD_OF, ACTS } from './src/start.js';
+import { migrateReached, markReached, markReachedThrough } from './src/reached.js';
 
 document.getElementById('version-info').textContent = VERSION;
 initPerf();
@@ -220,6 +220,7 @@ async function bootstrap() {
   }
 
   migrateReached();   // an older game's saves → the acts reached (once)
+  markReachedThrough(whereIs()?.id);   // where the game stands counts as reached (a checkpoint jump plays no card)
   const savedPhase = localStorage.getItem(PHASE_KEY) || phases.INDUSTRY;
 
   // An act started again from the start screen: its checkpoint reloaded the page with this flag;

@@ -1,5 +1,5 @@
 /* eslint-env jest */
-import { REACHED_KEY, ACT_IDS, ACT_OF_ROMAN, reachedSet, markReached, migrateReached } from './reached.js';
+import { REACHED_KEY, ACT_IDS, ACT_OF_ROMAN, reachedSet, markReached, migrateReached, markReachedThrough } from './reached.js';
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS } from './constants.js';
 import { DEEP_VERSION_KEY } from './deepVersion.js';
 
@@ -46,5 +46,14 @@ describe('the reached set', () => {
         const fresh = fake();
         migrateReached(fresh);
         expect(fresh.m[REACHED_KEY]).toBe('[]');
+    });
+    test('marking an act through fills in the acts on the way to it (a checkpoint jump plays no card)', () => {
+        const s = fake();
+        expect([...markReachedThrough('vault', s)]).toEqual(['trivial', 'capital', 'war', 'vault']);
+        expect(JSON.parse(s.m[REACHED_KEY])).toEqual(['trivial', 'capital', 'war', 'vault']);
+        expect([...markReachedThrough('unity', s)]).toEqual(['trivial', 'capital', 'war', 'vault', 'unity']);
+        expect([...markReachedThrough('capital', fake())]).toEqual(['trivial', 'capital']);
+        expect([...markReachedThrough(null, fake())]).toEqual([]);
+        expect([...markReachedThrough('moon', fake())]).toEqual([]);
     });
 });
