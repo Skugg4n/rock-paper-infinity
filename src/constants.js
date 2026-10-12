@@ -54,3 +54,8 @@ export const PHASE4_CONSTANTS = {
 
 // Debug menus: ?debug in the URL, or the toggle in the ☰ menu (persisted).
 export const DEBUG_KEY = 'rpi-debug';
+
+/** The start screen (src/start.js, src/reached.js). */
+export const REACHED_KEY = 'rpi-reached';        // localStorage: JSON array of acts reached, ever
+export const START_SKIP_FLAG = 'rpi-go';         // sessionStorage: set before a reload that must not show the start screen
+export const START_CARD_FLAG = 'rpi-card';       // sessionStorage: an act id; after the reload its chapter card plays first

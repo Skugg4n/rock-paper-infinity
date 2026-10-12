@@ -8,6 +8,7 @@
  */
 
 import { DEEP_VERSION_KEY } from './deepVersion.js';
+import { REACHED_KEY } from './reached.js';
 import { VAULT_CHECKPOINTS } from './phase4v/checkpoints.js';
 import { SAVE_KEY as VAULT_SAVE_KEY, serialize as serializeVault } from './phase4v/vault.js';
 import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from './constants.js';
@@ -396,8 +397,8 @@ const SLOTS = ['rpi-slot-1', 'rpi-slot-2', 'rpi-slot-3'];
 
 function set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
 /** deep-tension: the player's own settings survive a jump: the sound (a muted player got the music back),
- *  the debug flag and the chosen view of chapter IV. */
-export const KEEP_KEYS = ['rpi-audio', 'rpi-debug', 'rpi-deep-view', DEEP_VERSION_KEY];
+ *  the debug flag, the chosen view of chapter IV, and the acts reached (the start screen's list). */
+export const KEEP_KEYS = ['rpi-audio', 'rpi-debug', 'rpi-deep-view', DEEP_VERSION_KEY, REACHED_KEY];
 function clearAll() {
     try { Object.keys(localStorage).filter(k => k.startsWith('rpi-') && !k.startsWith('rpi-slot-') && !KEEP_KEYS.includes(k)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
 }
