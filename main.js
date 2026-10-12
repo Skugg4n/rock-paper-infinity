@@ -224,13 +224,16 @@ async function bootstrap() {
 
   // An act started again from the start screen: its checkpoint reloaded the page with this flag;
   // the act's chapter card, then the act.
+  // Both flags are taken at once: a checkpoint reload sets both, and a flag left behind would
+  // skip the start screen on the NEXT reload too (☰ → Main menu right after starting an act).
+  const skipFlag = takeFlag(START_SKIP_FLAG);
   const cardFor = takeFlag(START_CARD_FLAG);
   if (cardFor && CARD_OF[cardFor]) {
     await playChapterCard({ ...CARD_OF[cardFor], onMidpoint: () => setPhase(savedPhase).catch((e) => console.error('the act failed to start', e)) });
     return;
   }
   // The test menu, the snapshot slots and the headless scripts reload straight into the game.
-  const skip = takeFlag(START_SKIP_FLAG) !== null || /[?&]go(?=&|$)/.test(window.location.search);
+  const skip = skipFlag !== null || /[?&]go(?=&|$)/.test(window.location.search);
   if (skip) { await setPhase(savedPhase); return; }
 
   const screen = showStart({ version: VERSION });
