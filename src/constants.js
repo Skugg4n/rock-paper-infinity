@@ -54,6 +54,15 @@ export const PHASE4_CONSTANTS = {
 
 // Debug menus: ?debug in the URL, or the toggle in the ☰ menu (persisted).
 export const DEBUG_KEY = 'rpi-debug';
+/** Chapter V · UNITY is not open to players yet (Ola 2026-10-13): its card says "to come" and the act does not start.
+ *  It stays open for Ola to work on: with the debug flag on (?debug, or five clicks on the version) or ?unity in the URL. */
+export const UNITY_OPEN = false;
+/** Is chapter V playable here? Players: no. Ola (debug on, or ?unity): yes. */
+export function unityOpen(storage = (typeof localStorage !== 'undefined' ? localStorage : null), search = (typeof location !== 'undefined' ? location.search : '')) {
+    if (UNITY_OPEN) return true;
+    if (/[?&](unity|debug)(=|&|$)/.test(String(search || ''))) return true;
+    try { return !!storage && storage.getItem(DEBUG_KEY) === '1'; } catch { return false; }
+}
 
 /** The start screen (src/start.js, src/reached.js). */
 export const REACHED_KEY = 'rpi-reached';        // localStorage: JSON array of acts reached, ever

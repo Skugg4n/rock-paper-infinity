@@ -9,6 +9,8 @@
  */
 
 import { playChapterCard } from '../chapterCard.js';
+import { unityOpen } from '../constants.js';
+import { showUnityToCome } from '../toCome.js';
 import { setPhase, phases } from '../gamePhase.js';
 import { SAVE_KEY as UNITY_KEY, serialize as serializeUnity, fromVault } from '../phase5/unity.js';
 import {
@@ -229,6 +231,7 @@ export function init() {
     /** The dig's end leads into chapter V as the vault's does: the sleepers still alive are its minds. */
     function toUnity(fresh = false) {
         save();
+        if (!unityOpen()) { showUnityToCome(); return; }   // chapter V is closed for now
         try { if (fresh || !localStorage.getItem(UNITY_KEY)) localStorage.setItem(UNITY_KEY, serializeUnity(fromVault(sleepers(s)))); } catch { /* full */ }
         playChapterCard({ roman: END.roman, title: END.title, dark: true, hold: 2200, onMidpoint: () => setPhase(phases.UNITY) });
     }

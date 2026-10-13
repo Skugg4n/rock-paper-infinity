@@ -5,7 +5,7 @@
  * screen is built from JS on document.body (style-start.css), like the interim, and removed
  * with lift(). main.js shows it first and acts on the choice.
  */
-import { PHASE_KEY, PHASE2_CONSTANTS } from './constants.js';
+import { PHASE_KEY, PHASE2_CONSTANTS, unityOpen } from './constants.js';
 import { DEEP_VERSION_KEY } from './deepVersion.js';
 import { reachedSet } from './reached.js';
 import { audio } from './audio.js';
@@ -84,6 +84,7 @@ export function startModel(storage = defaultStorage()) {
     const ivSeen = reached.has('drone') || reached.has('vault');
     const acts = [];
     for (const a of ACTS) {
+        if (a.id === 'unity' && !unityOpen(storage, '')) continue;   // chapter V is closed for players for now
         const seen = reached.has(a.id);
         const isIv = a.id === 'drone' || a.id === 'vault';
         if (!seen && !(isIv && ivSeen)) continue;

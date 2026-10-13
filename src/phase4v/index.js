@@ -12,7 +12,8 @@ import { VAULT_CSS, VT } from './style.js';
 import { createVaultSound } from './sound.js';
 import { audio } from '../audio.js';
 import { playChapterCard } from '../chapterCard.js';
-import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS } from '../constants.js';
+import { PHASE_KEY, PHASE1_CONSTANTS, PHASE2_CONSTANTS, PHASE4_CONSTANTS, unityOpen } from '../constants.js';
+import { showUnityToCome } from '../toCome.js';
 import { setPhase, phases } from '../gamePhase.js';
 import { SAVE_KEY as UNITY_KEY, serialize as serializeUnity, fromVault } from '../phase5/unity.js';
 
@@ -526,6 +527,7 @@ export function init() {
     /** The card, then chapter V with the people in the body as its minds. */
     function toUnity(fresh = false) {
         save();
+        if (!unityOpen()) { showUnityToCome(); return; }   // chapter V is closed for now
         // the rise just happened: a new chapter V with the people in the body (s.here) as its minds; a reload after
         // the rise keeps the chapter V that is already there
         try { if (fresh || !localStorage.getItem(UNITY_KEY)) localStorage.setItem(UNITY_KEY, serializeUnity(fromVault(s.here))); } catch { /* full */ }

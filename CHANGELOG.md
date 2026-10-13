@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.94.2 - 2026-10-13 (chapter V closed for now)
+
+- Chapter V · UNITY does not start for players yet (constants.js UNITY_OPEN = false): the vault's and the dig's rise, a save or checkpoint in chapter V, all show the card "V · UNITY · to come" with a quiet "Back to main menu" button (src/toCome.js). The start screen lists no V row while it is closed. The act's code stays (src/phase5) for when it opens. For Ola it stays open: with the debug flag on (?debug, or five clicks on the version) or ?unity in the URL, chapter V plays as before.
+
 ## v1.94.1 - 2026-10-12 (the phone pass: every chapter fits a phone, CLONE can be tapped)
 
 ### v1.94.1 - 2026-10-12 (the mobile pass)

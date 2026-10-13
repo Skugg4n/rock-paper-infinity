@@ -670,3 +670,12 @@ body.start-up .update-pill { display: none; }
     #reserve-energy-container { height: 72px !important; }
     #sps-container, #eps-container, #egps-container { line-height: 1.15; }
 }
+
+/* Chapter V is closed for now (src/toCome.js): a quiet way back under the "to come" card. */
+#back-to-menu {
+    position: fixed; left: 50%; bottom: max(28px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+    z-index: 1600; padding: 10px 18px; min-height: 44px;
+    background: transparent; border: 1px solid rgba(255,255,255,0.25); border-radius: 999px;
+    color: rgba(255,255,255,0.6); font-size: 13px; letter-spacing: 0.04em; cursor: pointer;
+}
+#back-to-menu:hover { color: #fff; border-color: rgba(255,255,255,0.6); }

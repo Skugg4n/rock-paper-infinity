@@ -44,11 +44,12 @@ describe('the start model', () => {
         const both = startModel(fake({ [PHASE_KEY]: 'INDUSTRY', [REACHED_KEY]: reached('trivial', 'capital', 'war', 'drone', 'vault') }));
         expect(rows(both)).toEqual(['I Trivial now', 'II Capital reached', 'III War reached', 'IV Deep · Drone reached', 'IV Deep · Vault reached']);
     });
-    test('V plays again; VI is the tease, grey, only once reached', () => {
+    test('V is closed for now (UNITY_OPEN false): no V row even when reached; VI stays the grey tease', () => {
         const m = startModel(fake({ [PHASE_KEY]: 'UNITY', [REACHED_KEY]: reached('trivial', 'capital', 'war', 'vault', 'unity', 'infinity') }));
-        expect(rows(m).slice(-2)).toEqual(['V Unity now', 'VI Infinity grey']);
+        expect(rows(m).some((r) => r.startsWith('V '))).toBe(false);
+        expect(rows(m).at(-1)).toBe('VI Infinity grey');
         const noVi = startModel(fake({ [PHASE_KEY]: 'UNITY', [REACHED_KEY]: reached('trivial', 'capital', 'war', 'vault', 'unity') }));
-        expect(rows(noVi).at(-1)).toBe('V Unity now');
+        expect(rows(noVi).some((r) => r.startsWith('V '))).toBe(false);
     });
     test('the table, the cards and the words', () => {
         expect(ACTS.map((a) => a.id)).toEqual(['trivial', 'capital', 'war', 'drone', 'vault', 'unity', 'infinity']);

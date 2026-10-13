@@ -1,4 +1,5 @@
-import { PHASE_KEY } from './constants.js';
+import { PHASE_KEY, unityOpen } from './constants.js';
+import { showUnityToCome } from './toCome.js';
 import { currentDeep, deepModule } from './deepVersion.js';
 
 export const phases = {
@@ -57,6 +58,8 @@ export async function setPhase(phase) {
       }
       return currentModule.init();
     case phases.UNITY:
+      // chapter V is closed for now: the card says "to come" and the act does not start
+      if (!unityOpen()) { currentModule = null; showUnityToCome(); return; }
       // chapter V builds its own screen on the body, like the vault
       currentModule = await import('./phase5/index.js');
       return currentModule.init();
